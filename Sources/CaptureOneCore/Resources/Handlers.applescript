@@ -297,18 +297,3 @@ on createBaselineVariant(docName, sourceId)
     end tell
 end createBaselineVariant
 
-on resetVariantAdjustments(docName, variantId)
-    tell application "/Applications/Capture One.app"
-        set d to document docName
-        set v to variant id (variantId as text) of d
-        reset adjustments v
-        set adj to adjustments of v
-        set expVal to (exposure of adj as real)
-        set contVal to (contrast of adj as real)
-        set satVal to (saturation of adj as real)
-        set tempVal to (temperature of adj as real)
-        set tintVal to (tint of adj as real)
-        return {variantId:(variantId as text), afterExposureVal:expVal, afterContrastVal:contVal, afterSaturationVal:satVal, afterTemperatureVal:tempVal, afterTintVal:tintVal}
-    end tell
-end resetVariantAdjustments
-

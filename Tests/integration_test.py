@@ -4,6 +4,7 @@
 import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 C1_BIN = ROOT / ".build" / "debug" / "c1"
 SESSION_DIR = Path("/private/tmp/c1-m1-e2e")
 SESSION_NAME = "c1-m1-e2e.cosessiondb"
-SOURCE_CR3 = Path("/Users/kiri11/Desktop/papochka/2U6A7082.CR3")
+SOURCE_CR3 = Path(os.environ.get("C1_TEST_RAW_FIXTURE", "/Users/kiri11/Desktop/papochka/2U6A7082.CR3"))
 
 def run_applescript(script: str) -> str:
     res = subprocess.run(["osascript", "-s", "s", "-e", f'tell application "/Applications/Capture One.app"\n{script}\nend tell'], capture_output=True, text=True)

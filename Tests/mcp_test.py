@@ -3,6 +3,7 @@
 
 import base64
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MCP_BIN = ROOT / ".build" / "debug" / "c1-mcp"
 SESSION_DIR = Path("/private/tmp/c1-mcp-e2e")
 SESSION_NAME = "c1-mcp-e2e.cosessiondb"
-SOURCE_CR3 = Path("/Users/kiri11/Desktop/papochka/2U6A7082.CR3")
+SOURCE_CR3 = Path(os.environ.get("C1_TEST_RAW_FIXTURE", "/Users/kiri11/Desktop/papochka/2U6A7082.CR3"))
 
 def run_applescript(script: str) -> str:
     res = subprocess.run(

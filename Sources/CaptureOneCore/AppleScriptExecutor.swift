@@ -94,7 +94,7 @@ public final class AppleScriptExecutor {
         let paths = [
             "Sources/CaptureOneCore/Resources/Handlers.applescript",
             "../Sources/CaptureOneCore/Resources/Handlers.applescript",
-            "/Users/kiri11/projects/c1cmd/Sources/CaptureOneCore/Resources/Handlers.applescript"
+            "../../Sources/CaptureOneCore/Resources/Handlers.applescript"
         ]
         for path in paths {
             let url = URL(fileURLWithPath: path)
