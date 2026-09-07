@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dictionary title="M0 read-only dynamic subset; not the full application dictionary">
+  <suite name="M0 Read Subset" code="Cap1">
+    <class name="application" code="capp">
+      <property name="name" code="pnam" type="text" access="r" description="The name of the application." />
+      <property name="version" code="vers" type="text" access="r" description="The version number of the application." />
+      <element type="variant" access="r" />
+    </class>
+    <class name="variant" code="cvar">
+      <property name="name" code="pnam" type="text" access="r" description="The name of the parent image" />
+      <property name="id" code="ID  " type="text" access="r" description="The unique identifier of the variant">
+        <cocoa key="uuid" />
+      </property>
+      <property name="adjustments" code="vset" type="adjustment settings" description="The variant's Image Layer adjustment settings." access="r" />
+    </class>
+    <class name="adjustment settings" code="CVas">
+      <property name="temperature" type="real" code="CVwk" access="r" />
+      <property name="tint" type="real" code="CVwt" access="r" />
+      <property name="exposure" type="real" code="CVex" access="r" />
+      <property name="contrast" type="real" code="CVco" access="r" />
+      <property name="saturation" type="real" code="CVsa" access="r" />
+    </class>
+  </suite>
+</dictionary>

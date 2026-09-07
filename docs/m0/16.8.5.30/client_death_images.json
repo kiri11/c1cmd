@@ -1,0 +1,16 @@
+[
+  {
+    "height" : 1500,
+    "path" : "\/private\/tmp\/c1-m0-1685-A\/Output\/job-client-death\/variant-2.jpg",
+    "pixelSHA256" : "279d67fbf3de20862db18ba11eb736d21a8c6be0904ffdcc0f6263a4c73061c5",
+    "width" : 1000
+  },
+  {
+    "equalsPreviousPixels" : false,
+    "height" : 1500,
+    "maxChannelDifference" : 3,
+    "path" : "\/private\/tmp\/c1-m0-1685-A\/Output\/job-client-death-foreground\/variant-2.jpg",
+    "pixelSHA256" : "4ef9aa3ffd29e927f18e10e809cdf3b00a3b4849d02c0c3623cec0b536d6dae5",
+    "width" : 1000
+  }
+]

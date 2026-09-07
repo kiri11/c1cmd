@@ -1,9 +1,11 @@
-# M0 Spike: Empirical Findings & Answers to Open Questions
+# M0 Spike: Historical 16.7.1.11 Findings
+
+> **Status:** Historical evidence only. This report does not qualify the current build or establish that all current M0 exit gates passed. See [16.8.5.30 runtime requalification](m0_requalification_16.8.5.30.md) and its explicit remaining gates. Several conclusions below have been narrowed to match the retained evidence.
 
 **Target Build**: Capture One Pro 16.7.1.11 (`com.captureone.captureone16`)  
 **Environment**: macOS 15.7.2 (Sequoia), Apple Silicon (M4)  
 **Test Data**: Production catalog `C1` (115,022 total images; 1,753 active variants in test collection) + dedicated test fixture session `M0_Test.cosessiondb` with Canon EOS R6 Mark II CR3 RAW files.  
-**SDEF Snapshot**: Saved at [`sdef/16.7.1.11.sdef`](file:///Users/shusha/projects/c1cmd/sdef/16.7.1.11.sdef)  
+**SDEF Snapshot**: Saved at [`sdef/16.7.1.11.sdef`](../sdef/16.7.1.11.sdef)  
 
 ---
 
@@ -18,7 +20,7 @@
   3. Terminated Capture One completely (`Cap1SiQt`), verified the process died via `pgrep`.
   4. Relaunched Capture One and re-opened `M0_Test.cosessiondb`.
   5. Queried variant IDs: exactly `[1, 6, 7, 8, 2, 3, 4, 5]`.
-* **Conclusion**: Native IDs are stable across restarts. The `Locator` struct (`{docToken, sourcePath, variantIndex, nativeId}`) can rely on `nativeId` as a durable reference for open documents.
+* **Qualified conclusion**: IDs survived this fixture restart. This does not establish persistent document identity, safe rebinding after replacement, or an open-document lifetime token. Native IDs alone do not authorize writes.
 
 ---
 
@@ -28,7 +30,7 @@
   1. **Isolation**: Clone variant (`id: "7"`) of original variant (`id: "1"`) had initial exposure `0.0 EV`. Mutating clone exposure to `+1.5 EV` and contrast to `+25` left original variant 1 completely untouched (`0.0 EV`).
   2. **Copy/Apply**: Executing `copy adjustments vClone` followed by `apply adjustments vTarget` successfully transferred the entire adjustments clipboard state to the target clone in a single operation.
   3. **Rollback**: Executing `delete variant id "<cloneId>"` cleanly removed the cloned variant and associated SQLite records with zero side effects on the original variant.
-* **Conclusion**: Working variants provide absolute safety. Agents can safely run styles and multi-step mutations on clones; rolling back is an instantaneous `delete variant`.
+* **Qualified conclusion**: The recorded exposure/contrast and deletion checks support clone isolation for that fixture. They do not establish absolute safety, arbitrary style safety, preservation of all unmodeled state, or rollback of shared state. Deletion removes a proposal; it is not a general rollback.
 
 ---
 
@@ -47,7 +49,7 @@
 ---
 
 ### Q4: Does the batch-done callback fire reliably and with output paths, or is polling still needed?
-* **Answer**: **`processing done script` fires reliably and provides full output paths; polling is only a fallback.**
+* **Observed**: `processing done script` delivered output paths in the recorded export. Reliable completion and crash-safe shared-state recovery require additional tests.
 * **Verification**:
   1. Configured `processing done script` to a compiled AppleScript handler `/tmp/c1_test_callback.scpt`.
   2. Triggered export using `process v recipe "c1-preview"`.
@@ -59,12 +61,12 @@
   - Initial value is `missing value`.
   - **Gotcha**: Setting `processing done script to missing value` errors with `-1700 (Can’t make missing value into type text or file)`.
   - **Fix**: Setting `processing done script to ""` (empty string) resets the property back to `missing value` without error.
-* **Conclusion**: Use `processing done script` for export completion. Pair with a timeout and file-existence polling fallback in case Capture One or the callback script encounters an unhandled exception.
+* **Qualified conclusion**: A callback is a candidate completion signal. Its job ID, source and output list must be reconciled with the operation journal and decoded output. File existence alone is not a successful-completion fallback. Installation and recovery require normalized file identity and preservation of intervening changes.
 
 ---
 
 ### Q5: Which adjustment properties does `aelint --dynamic` report as declared-writable-but-rejecting?
-* **Answer**: **NONE of the `adjustment settings` properties fail. All 90 adjustment properties are 100% readable and writable.**
+* **Observed**: The retained adjustment probe reports reads and same-value writes for 90 properties. This is not qualification of meaningful changed values, valid ranges, resets, or isolation. The retained `aelint_report.json` has zero dynamic coverage and does not substantiate the narrated dynamic run below.
 * **AELint Dynamic Test Summary**:
   - Out of 191 tested properties across the entire application, `aelint` reported 80 writable and 17 failed.
   - A systematic automated probe tested all 90 properties of `adjustment settings`: **90 passed, 0 failed**.
@@ -98,7 +100,7 @@
   - **Shutter**: `EXIF shutter speed of parent image of (variants ...)`
   - **Aperture**: `EXIF aperture of parent image of (variants ...)`
   - **Capture Time**: `EXIF capture date of parent image of (variants ...)`
-  - **As-Shot WB**: `temperature of adjustments of (variants ...)`, `tint of adjustments of (variants ...)`
+  - **Current adjustment WB (not verified as-shot metadata)**: `temperature of adjustments of (variants ...)`, `tint of adjustments of (variants ...)`
   - **Library**: `rating`, `color tag`, `name`, `id` of `(variants ...)`
 * **Dump Speed**:
   - Querying 15 metadata + adjustment fields across **1,000 variants** completed in **3.15 seconds** (3.15 ms / variant).
@@ -128,8 +130,8 @@ Tested against collection `August 28, 2026 at 15:14` (1,753 variants) in `docume
 | **Strategy B** | Batched loop ($1$ Apple Event, AppleScript `repeat` loop) | 37.1 ms | 184.3 ms | 1,757.1 ms | 17,719.1 ms (17.7 s) | *~177 s (3 min)* |
 | **Strategy C** | Bulk range queries (`get ... of (variants 1 thru N)`) | **4.5 ms** | **3.6 ms** | **10.9 ms** | **44.2 ms** | **~0.44 s** |
 
-### Key Insight
-Strategy C is **400x faster** than Strategy A or B at $N=1000$. Looping in AppleScript still incurs $O(N)$ Apple Event object-specifier resolution overhead inside the Cocoa scripting bridge. Strategy C executes vector queries in Capture One's internal C++ core, returning packed arrays in a single Apple Event descriptor.
+### Qualified interpretation
+The recorded measurements favor bulk queries strongly. A single handler invocation can still send many Apple Events; the table does not establish exact event counts or Capture One's internal implementation. The 10k results are extrapolations, not measurements. Do not transfer these absolute timings to another environment.
 
 ---
 
@@ -141,12 +143,12 @@ Strategy C is **400x faster** than Strategy A or B at $N=1000$. Looping in Apple
   - Parent process acquired lock.
   - Concurrent worker process polled every 50ms with a 2.0s timeout. While the parent held the lock, the worker correctly reported `WORKER_BUSY after 2.040s`.
   - When the parent released the lock after 500ms, the worker immediately acquired the lock in `0.526s`.
-* Architecture decision: `c1` CLI and MCP will acquire `flock` keyed by `(Capture One PID, Document UUID)` with a 5-second acquisition timeout, returning `capture-one-busy` on failure.
+* **Superseded decision**: The primitive test used a document-scoped lock. The current plan requires one application-instance lock shared across documents; the 2026 requalification tests that scope.
 
 ### Apple Event Responsiveness Under Export Load
 * Tested Apple Event latency while Capture One was actively rendering a batch export of 5 full-size RAW images.
 * Measured Apple Event latencies: `[2.69 ms, 2.31 ms, 2.03 ms, 2.90 ms, 2.87 ms]`.
-* Conclusion: Capture One renders on background worker threads (`BatchJobDirtyQueue`, Metal/OpenCL); the main thread remains responsive. Event timeouts occur only during modal dialogs, large imports, or blocking database operations.
+* **Qualified conclusion**: Reads remained responsive during this small export. This does not identify all possible timeout causes or establish responsiveness under other loads.
 
 ---
 
@@ -178,17 +180,12 @@ Strategy C is **400x faster** than Strategy A or B at $N=1000$. Looping in Apple
 
 ---
 
-## 6. Architecture & Implementation Checklist for M1
+## 6. Superseded implementation checklist
 
-1. **Working-Variant Model**:
-   - Every mutation command (`set`, `add`, `reset`) will first execute `variant clone` on the target variant.
-   - Working variants will be tagged with a distinct color tag (e.g. Green = 3) and `content description` note.
-2. **Batch-Oriented Handlers**:
-   - `Handlers.applescript` must use direct range object specifiers `(variants 1 thru N)` to achieve sub-50ms query speeds.
-3. **Execution Order**:
-   - Mutate orientation/rotation first, then adjustment parameters, then crop.
-4. **Export Engine**:
-   - Create and manage one hidden process recipe `c1-preview` (JPEG, Long Edge 1500px, quality 80).
-   - Hook `processing done script` with temporary redirect and automatic restore (setting `""` when unset).
-5. **Locking**:
-   - Wrap all CLI mutations in a POSIX advisory `flock` keyed by `(C1 PID, Document UUID)`.
+Follow [the current plan](../c1_plan.md) and [the new qualification report](m0_requalification_16.8.5.30.md):
+
+- Clone explicitly once and retain a provenance-bound working reference; do not clone before every mutation. Notes/color tags remain deferred.
+- Prefer verified bulk scalar forms; validate returned shapes per build. No sub-50ms guarantee.
+- Geometry, resets and arbitrary styles remain outside the initial five-field qualification.
+- Use an owned recipe, verify every effective setting and completed output, and gate callbacks on durable recovery. A matching name is not ownership.
+- Use an application-instance-wide lock, independent of document.

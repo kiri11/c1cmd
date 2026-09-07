@@ -1,0 +1,28 @@
+{
+  "sameDocumentBlocked": true,
+  "differentDocumentBlocked": true,
+  "acquiredAfterRelease": true,
+  "acquiredAfterHolderDeath": true,
+  "workers": [
+    {
+      "document": "A",
+      "acquired": false,
+      "seconds": 6.395799573510885e-05
+    },
+    {
+      "document": "B",
+      "acquired": false,
+      "seconds": 5.429098382592201e-05
+    },
+    {
+      "document": "B",
+      "acquired": true,
+      "seconds": 5.908397724851966e-05
+    },
+    {
+      "document": "B",
+      "acquired": true,
+      "seconds": 5.3750001825392246e-05
+    }
+  ]
+}

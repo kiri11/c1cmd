@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-07",
+  "application": {
+    "CFBundleIdentifier": "com.captureone.captureone16",
+    "CFBundleVersion": "16.8.5.30",
+    "CFBundleShortVersionString": "16.8.5.30"
+  },
+  "macOS": "26.4.1 (25E253)",
+  "chip": "Apple M1 Pro",
+  "memoryGiB": 32,
+  "architecture": "arm64",
+  "swift": "6.3.1",
+  "sdefSHA256": "c5e56ab4f1af4e39163c0eb89ebb2936db42a5675aa33c6afa30d1f86d544fe5",
+  "fixture": {
+    "camera": "Canon EOS R",
+    "file": "fixture.CR3",
+    "bytes": 13775650,
+    "beforeAndAfterSHA256": "be59cd53391ef12e0a4de65036112f18564fdfaf8c02ab556304e1f791094721",
+    "sessionA": "/private/tmp/c1-m0-1685-A",
+    "sessionB": "/private/tmp/c1-m0-1685-B",
+    "benchmark": "1000 copies of a 1000x1500 JPEG exported from the RAW; not 1000 independent RAW captures"
+  },
+  "bridgeRevision": "58946d7fd5b38b6a92c13ccb413d30ba1f0e9179",
+  "aelintRevision": "a56f5d0be22c6bc21957e5c1d0355809a2c477a5"
+}

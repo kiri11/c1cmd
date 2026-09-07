@@ -6,7 +6,7 @@ Goal: let coding agents (Codex, Claude Code, GPT-6 Astra, etc.) read and write C
 
 ### v0.1 (first public release)
 
-- macOS only, Apple Silicon, **one pinned Capture One build**, selected and recorded in M0. Sessions only in v0.1. Read-only Catalog support comes later; catalog mutations are outside the initial roadmap.
+- macOS only, Apple Silicon, **one pinned Capture One build**, selected and recorded in M0. The current candidate is **16.8.5.30**; its [2026-09-07 requalification](docs/m0_requalification_16.8.5.30.md) is partial and does **not** yet enable a writable release. Sessions only in v0.1. Read-only Catalog support comes later; catalog mutations are outside the initial roadmap.
 - Primary layer only. No layers/masks, no Color Editor skin-tone, no tethering, no GUI scripting.
 - First release proves one complete workflow: `doctor` → `doc info` → `variants list` → `variant clone` → loop(`get` → `set|add` → `preview`) → photographer review → optional `variant delete`. Start with exposure, white balance, and a small set of adjustments verified in M0.
 - Machine-readable JSON is available for every operation; human-readable input and output sit on the same contract.
@@ -31,7 +31,7 @@ agent ──▶ c1 (CLI)  /  c1-mcp (stdio MCP adapter)
               │
         CaptureOneCore (Swift library)
               │  FieldSpec registry · Codable structs ⇄ AppleScript records · lock · state hashes
-        AppleScriptBridge (emorydunn, pinned to an exact commit; fork if patches needed)
+        AppleScriptBridge (emorydunn, 58946d7fd5b38b6a92c13ccb413d30ba1f0e9179; fork if patches needed)
               │  batch-oriented handlers in Handlers.applescript (bundled resource)
         Capture One (running, licensed, GUI up)
 ```
@@ -107,6 +107,7 @@ c1 reset <working-ref> --if-state <hash> exposure wb              # later, verif
 ### Identity
 
 - Resolve the app via `NSWorkspace` by bundle identifier and running process, not a versioned display name. Pin the actual running bundle/build and reject ambiguous application instances.
+- **16.8.5.30 evidence:** AppleScript document `id` is a path, and stale document specifiers resolve again after reopen. Neither path nor native `exists` supplies an open-instance token. Native variant IDs survived the tested restart/reorder, but same-path replacement and copied-database ambiguity remain unqualified. Opening another Session closed the previous Session in this environment. Prove lifetime detection before accepting working references across CLI invocations; until then, writable release remains gated.
 - Separate persistent document identity from the token for one open instance. Record canonical document path and verified identity evidence in the sidecar; path moves, duplicates, and document replacement require explicit reconciliation rather than guessing.
 - **Read/source reference:** native variant ID scoped to an open-document token. It can address originals for reads or cloning, but cannot authorize edits to them.
 - **Working reference:** document-bound reference validated against c1 provenance before every mutation. After a reopen it must be rebound using verified durable identity before writes resume.
@@ -118,19 +119,21 @@ c1 reset <working-ref> --if-state <hash> exposure wb              # later, verif
 
 - Handlers return records with **user-defined keys**, never `properties of adjustments` (app-defined keys decode as four-char codes).
 - `missing value` ⇄ `nil` handled explicitly in the codec; verify AppleScriptBridge does this for nested records, patch the fork if not.
-- Nested objects (white balance, crop, color corrections) are their own records/structs.
+- Nested objects (white balance, crop, color corrections) are their own records/structs. The current dictionary returns crop batches as N four-element lists in the tested fixtures, not the old report's flattened 4N form. Validate shape; keep geometry unavailable until qualified.
 
 ### Units and ranges
 
 - Confirm units for every field against the dictionary and UI (EV, kelvin/tint, crop pixels vs. normalized, rotation sign). They live in the FieldSpec and surface in `schema`.
+- Initial candidate fields are exposure, contrast, saturation, temperature (`kelvin` alias), and tint. Recorded endpoint pairs are [-4, 4], [-50, 50], [-100, 100], [800, 14000], and [-50, 50], respectively; tested above-maximum writes fail with -50. Temperature/tint must be read together after either write. Provisional comparison tolerances are 1e-5 for exposure/contrast/saturation, 0.01 K for temperature, and 0.0001 for tint; qualify canonical hashing separately because tiny WB values also changed after reopen. Current adjustment WB is not as-shot metadata.
 - Validate ranges and the result of deltas in Swift before sending. Record coupled fields and ordering requirements; do not expose crop/rotation until those interactions are tested.
 - Resetting selected supported fields does not remove unsupported settings or layers. A default-render baseline requires separately verified native New Variant/reset behavior and records the application build, camera profile, tone curve, custom defaults, and processing context. “Default” must not silently mean “all numeric fields are zero.”
 
 ### Preview / export
 
 - One c1-owned process recipe (`c1-preview`, approximately 1500px sRGB JPEG), explicitly targeted for each job. Do not overwrite an existing recipe merely because its name matches. Verify whether hiding it is supported; hidden status is not a requirement. Never modify user recipes or rely on whichever recipes are currently enabled.
+- **16.8.5.30 recipe requirements:** read back profile, root type/location, format, scale and naming before dispatch. `sRGB IEC61966-2.1` was silently ignored as a setter value; `sRGB Color Space Profile` produced an sRGB JPEG. Setting the root location can leave/reset the type to `output location`; set the location first, then `custom location`, and verify both. Recipes appeared in another Session and default output routing followed the frontmost Session. Require the bound document to be current as an additional precondition; never silently switch it for the user.
 - Each job has an operation ID and a unique c1-owned output location to avoid collisions, stale-file detection, and overwrites. Return only a verified completed, readable image associated with the requested variant/job. Existing-file appearance or a quiet queue alone is not proof of successful completion.
-- **Prefer polling**, if M0 establishes reliable job correlation and completion detection. If callbacks are necessary, their global state needs a durable recovery record written before installation. Restore prior settings only when current values still match c1's installed values; preserve intervening user changes. Recover after crashes, and test unrelated exports while the callback is installed. Plain save/restore in a `finally` block is insufficient.
+- **Prefer polling**, if M0 establishes reliable job correlation and completion detection. On 16.8.5.30, queue disappearance and output history alone are not qualified: history remained stale, and disabling the queue did not hold the tested explicit `process` exports. Callbacks returned the matching job UUID, RAW path and a **list** of output paths in the fixture tests. This makes callbacks a candidate, not a completed recovery implementation. If callbacks are necessary, their global state needs a durable recovery record written before installation. Normalize text/file descriptors and `/tmp` versus `/private/tmp` before comparing installed callback identity. Restore prior settings only when current values still match c1's installed values; preserve intervening user changes. Recover after crashes, and test unrelated exports while the callback is installed. Plain save/restore in a `finally` block is insufficient.
 - **No preview cache in v0.1, including in-process MCP caching.** Unsupported UI edits can invalidate either kind. Revisit only with measured need and a complete invalidation mechanism.
 - CLI returns the output path plus operation/variant identity and render context. MCP returns an **image content block** alongside structured metadata; do not embed image data in the adjustment JSON. General recipe export is deferred and inherits the same completion/recovery contract.
 
@@ -138,7 +141,7 @@ c1 reset <working-ref> --if-state <hash> exposure wb              # later, verif
 
 - Serialize c1 application access with a **cross-process application-wide advisory lock**, keyed by verified application instance, not document. Different documents can share recipes, callbacks, and other application state. Wait within a bound, then return `capture-one-busy`.
 - Hold the lock through precondition checks, dispatch, readback, and any shared-state cleanup; preview ownership extends through completion or recorded uncertainty. On process death the lock releases, but the application may still be working. Subsequent invocations inspect unresolved journal entries and reconcile before further writes. The lock does not control UI actions or third-party scripts.
-- Separate Apple Event response timeouts from total render/job deadlines; choose measured defaults in M0 rather than imposing one 10-second limit on every operation. Apply the retry policy in §3, including reconciliation of uncertain mutations.
+- Separate Apple Event response timeouts from total render/job deadlines. Start qualification with 100-variant read chunks, a configurable 60-second event deadline and a separate provisional 120-second preview deadline; these are conservative candidates, not measured upper bounds. The M1 Pro run observed a 27-second query during fixture discovery. A controlled one-second write timeout returned -1712 and applied after the target resumed; never interpret timeout as cancellation. Apply the retry policy in §3, including reconciliation of uncertain mutations.
 - Compile the handler script once per process. `c1-mcp` amortizes it; no daemon for the CLI.
 
 ### Permissions and signing
@@ -150,7 +153,7 @@ c1 reset <working-ref> --if-state <hash> exposure wb              # later, verif
 
 - Snapshot `sdef` from the resolved application bundle per supported build under `sdef/`, with version/build provenance. Diff on each candidate Capture One update and retain the derived capability report.
 - `capabilities` and `unsupported-field` derive from the exact-build test matrix plus document/variant applicability. Unknown builds fail with `unsupported-version`; do not infer compatibility from a larger version number.
-- Pin `aelint` and run `--dynamic` against disposable fixtures; keep its coverage report with M0 findings. Its setter probe writes the existing value back, which is useful but does not validate changed values, coupled fields, reset behavior, or isolation. Add explicit change → readback → restore tests for every exposed field.
+- Pin `aelint` to `a56f5d0be22c6bc21957e5c1d0355809a2c477a5`. Run full-dictionary static validation and bounded `--dynamic` tests against a retained command-free, read-only SDEF subset, with explicit changed-value probes for supported fields. Unrestricted dynamic command probing is excluded: the tool can invoke commands such as `silently quit`. Label reduced coverage clearly; its score does not describe the full dictionary. Keep reports with M0 findings. Its setter probe writes the existing value back, which is useful but does not validate changed values, coupled fields, reset behavior, or isolation. Add explicit change → readback → restore tests for every exposed field.
 
 ### Testing
 
@@ -238,7 +241,7 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 
 ## 6. Milestones
 
-**M0 — Feasibility spike (initial 2–3 day timebox).** Discover blockers and retain repeatable probes. The timebox is not a promise to resolve every question. Select the exact build; record fixture details, evidence, measured latency, and unresolved risks in `docs/spike.md`.
+**M0 — Feasibility spike (initial 2–3 day timebox).** Discover blockers and retain repeatable probes. The timebox is not a promise to resolve every question. Select the exact build; record fixture details, evidence, measured latency, and unresolved risks in `docs/m0_requalification_<build>.md`, with machine-readable evidence under `docs/m0/<build>/`. The original 16.7.1.11 report remains at `docs/m0_spike.md`.
 
 - Verify clone preservation, variant-only deletion, and isolation of original/source/sibling state, including pre-existing layers and changes in selection.
 - Test unique addressing and document binding; exercise restart, reopen, reorder, and deletion to decide reference lifetimes and whether durable identity is feasible.
@@ -246,6 +249,8 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 - Exercise two concurrent c1 invocations across the same and different documents, stale preconditions, and document switching. Test partial patches/batches, lost replies, application timeouts, and c1 termination while Capture One continues work. Establish which outcomes can be reconciled and which must remain unknown.
 - Prove one explicitly targeted preview recipe, unique output/job association, and reliable completion. Prefer polling; if callbacks are needed, prove crash recovery and preservation of intervening user changes.
 - Benchmark 1/10/100/1000 variants where feasible, distinguishing handler overhead from actual Apple Events and nested bulk behavior. Select bounded batch sizes and separate event/job deadlines. Large-catalog throughput is a later measurement, not a core feasibility blocker.
+
+**Current M0 status (2026-09-07):** Runtime requalification on 16.8.5.30 / macOS 26.4.1 / M1 Pro is **partial; no-go for a writable release**. Five-field writes, fixture clone preservation/deletion, native-ID restart/reorder, bridge codecs, and application-wide lock primitives have positive evidence. Open-document lifetime/replacement detection, an integrated stale-precondition/journal implementation, pending-operation recovery after client death, and crash-safe callback ownership/coexistence remain gates. The client-death tests lost their final reply but did not establish an outstanding queued job. Continue focused M0 work; read-only M1 scaffolding may proceed without treating this build as write-qualified. See the [capability evidence matrix](docs/m0/16.8.5.30/capabilities.json).
 
 **M0 exit decision:**
 

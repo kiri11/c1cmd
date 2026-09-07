@@ -1,0 +1,218 @@
+{
+  "appInfo" : {
+    "bundleID" : "com.captureone.captureone16",
+    "path" : "\/Applications\/Capture One.app",
+    "version" : "16.8.5.30"
+  },
+  "findings" : [
+    {
+      "category" : "ambiguous-code",
+      "context" : "AppleScript maps a code to one name when decompiling a raw Apple Event; multiple names are ambiguous",
+      "message" : "Code 'COaf' is used by multiple terms: property 'available filters', enumerator 'display before'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-code",
+      "context" : "AppleScript maps a code to one name when decompiling a raw Apple Event; multiple names are ambiguous",
+      "message" : "Code 'CRst' is used by multiple terms: enumeration 'scalingType', property 'sharpening'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'export crop method' is used by multiple codes: property 'CRxc', enumeration 'Cxce'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'naming method' is used by multiple codes: property 'Cenm', enumeration 'Crme'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'camera' is used by multiple codes: class 'CObj', property 'COco'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'exists' is used by multiple codes: property 'Cxst', command 'coredoex'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'Default' is used by multiple codes: enumerator 'CNmd', enumerator 'NCda'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'clarity method' is used by multiple codes: property 'CVcl', enumeration 'Ccle'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'centimeters' is used by multiple codes: enumerator 'MUcm', enumerator 'Rdcm'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'None' is used by multiple codes: enumerator 'CRWn', enumerator 'Cfln'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'inches' is used by multiple codes: enumerator 'MUin', enumerator 'Rdin'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'import collection action' is used by multiple codes: enumeration 'Ciae', property 'Ciia'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'off' is used by multiple codes: enumerator 'CTdo', enumerator 'Coff'",
+      "severity" : "error"
+    },
+    {
+      "category" : "ambiguous-term",
+      "context" : "AppleScript maps a name to one code when compiling source; multiple codes are ambiguous",
+      "message" : "Term 'image' is used by multiple codes: property 'CRwg', class 'cimg'",
+      "severity" : "error"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'user crop aspect ratio' has no explicit plural (defaults to 'user crop aspect ratios')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'toolbar item' has no explicit plural (defaults to 'toolbar items')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'attribute' has no explicit plural (defaults to 'attributes')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'output event' has no explicit plural (defaults to 'output events')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'advanced color correction' has no explicit plural (defaults to 'advanced color corrections')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'document' has no explicit plural (defaults to 'documents')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'tool tab' has no explicit plural (defaults to 'tool tabs')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'tool' has no explicit plural (defaults to 'tools')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'readout' has no explicit plural (defaults to 'readouts')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'window' has no explicit plural (defaults to 'windows')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'collection' has no explicit plural (defaults to 'collections')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'recipe' has no explicit plural (defaults to 'recipes')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'curve point' has no explicit plural (defaults to 'curve points')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'layer' has no explicit plural (defaults to 'layers')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'job' has no explicit plural (defaults to 'jobs')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'basic color correction' has no explicit plural (defaults to 'basic color corrections')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'variant' has no explicit plural (defaults to 'variants')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'client viewer' has no explicit plural (defaults to 'client viewers')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'guide' has no explicit plural (defaults to 'guides')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'keyword' has no explicit plural (defaults to 'keywords')",
+      "severity" : "info"
+    },
+    {
+      "category" : "missing-plural",
+      "message" : "Class 'focus meter' has no explicit plural (defaults to 'focus meters')",
+      "severity" : "info"
+    },
+    {
+      "category" : "documentation",
+      "message" : "4 of 43 classes (9%) have no description",
+      "severity" : "info"
+    },
+    {
+      "category" : "invalid-name",
+      "context" : "sdef(5), Common Attributes → name: \"Names must be one or more C identifiers (i.e., [A-Za-z_][A-Za-z0-9_]*) separated by a space.\"",
+      "message" : "Enumerator in 'auto select mode': name 'when ready (without ai)' is not a valid AppleScript term",
+      "severity" : "warning"
+    },
+    {
+      "category" : "hidden-items",
+      "message" : "Hidden items: 18 properties, 4 commands",
+      "severity" : "info"
+    }
+  ],
+  "qualityScore" : {
+    "grade" : "F",
+    "score" : 59
+  }
+}
