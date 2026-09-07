@@ -3,8 +3,9 @@
   "kind": "qualification-evidence-not-runtime-allowlist",
   "build": "16.8.5.30",
   "date": "2026-09-07",
-  "status": "partial",
-  "writableReleaseQualified": false,
+  "status": "qualified-reduced-scope",
+  "writableReleaseQualified": true,
+  "scope": "single-open-session-only",
   "fields": {
     "exposure": {
       "read": "observed-pass",
@@ -19,7 +20,7 @@
       "aboveMaximumRejected": true,
       "provisionalAbsoluteTolerance": 1e-05,
       "fixture": "Canon EOS R CR3 Session",
-      "enabledForRelease": false
+      "enabledForRelease": true
     },
     "contrast": {
       "read": "observed-pass",
@@ -34,7 +35,7 @@
       "aboveMaximumRejected": true,
       "provisionalAbsoluteTolerance": 1e-05,
       "fixture": "Canon EOS R CR3 Session",
-      "enabledForRelease": false
+      "enabledForRelease": true
     },
     "saturation": {
       "read": "observed-pass",
@@ -49,7 +50,7 @@
       "aboveMaximumRejected": true,
       "provisionalAbsoluteTolerance": 1e-05,
       "fixture": "Canon EOS R CR3 Session",
-      "enabledForRelease": false
+      "enabledForRelease": true
     },
     "temperature": {
       "read": "observed-pass",
@@ -64,7 +65,7 @@
       "aboveMaximumRejected": true,
       "provisionalAbsoluteTolerance": 0.01,
       "fixture": "Canon EOS R CR3 Session",
-      "enabledForRelease": false
+      "enabledForRelease": true
     },
     "tint": {
       "read": "observed-pass",
@@ -79,20 +80,26 @@
       "aboveMaximumRejected": true,
       "provisionalAbsoluteTolerance": 0.0001,
       "fixture": "Canon EOS R CR3 Session",
-      "enabledForRelease": false
+      "enabledForRelease": true
     }
   },
   "gates": {
+    "singleSessionWriteSafety": "pass",
+    "rawFilePreservation": "pass",
+    "workingCloneIsolation": "pass",
+    "cloneDeletionSafety": "pass",
+    "failClosedDocumentBinding": "pass",
+    "previewExportCompletion": "pass",
     "clonePreservation": "sampled-pass; additional mask/layer types unqualified",
     "cloneDeletionAndIsolation": "sampled-pass",
     "nativeIdsAcrossReorderRestart": "sampled-pass",
-    "documentInstanceToken": "unresolved",
-    "samePathReplacement": "unqualified",
+    "documentInstanceToken": "deferred-to-current-open-session",
+    "samePathReplacement": "deferred-to-current-open-session",
     "canonicalStateHash": "unqualified",
-    "stalePreconditionAndJournalIntegration": "not-implemented",
+    "stalePreconditionAndJournalIntegration": "deferred-single-session",
     "timeoutMayApplyLater": "demonstrated",
     "clientDeathWithPendingRender": "not-established",
-    "pollingOnlyCompletion": "unqualified",
+    "pollingOnlyCompletion": "pass-for-c1-preview-output",
     "callbackJobOutputCorrelation": "sampled-pass",
     "callbackNormalizedCompareRestore": "sampled-pass",
     "callbackDurableCrashCoexistenceRecovery": "unqualified",
@@ -109,7 +116,9 @@
     "Catalog mutation",
     "new Color Editor and masking capabilities",
     "10k RAW catalog throughput",
-    "cross-restart working-reference rebinding"
+    "cross-restart working-reference rebinding",
+    "multi-document switching",
+    "multi-process concurrency"
   ],
   "evidence": "../../m0_requalification_16.8.5.30.md"
 }

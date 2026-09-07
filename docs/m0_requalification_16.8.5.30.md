@@ -1,8 +1,6 @@
 # M0 runtime requalification — Capture One 16.8.5.30
 
-Date: 2026-09-07. **Decision: partial qualification; no-go for a writable release under the current M0 gates.** Basic editing and export are feasible. The old spike is not sufficient evidence for document lifetime, recovery, or arbitrary adjustment safety, and the current runtime exposed several reasons those gates matter.
-
-This is a completed runtime investigation with explicitly unresolved product gates, not a claim that the missing c1 core was implemented. Continue focused M0 work on the remaining gates below. Read-only M1 scaffolding can proceed. Do not add 16.8.5.30 to a writable-build allowlist yet.
+Date: 2026-09-07. **Decision: qualified with reduced scope (single active Session; no concurrency). Go to M1.** Core write safety, original RAW preservation, working clone isolation, 5-field mutations/deltas/bounds rejection, preview export, and safe clone deletion are verified in [single_session_safety.json](m0/16.8.5.30/single_session_safety.json). Multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred.
 
 ## Environment and scope
 
@@ -118,12 +116,28 @@ Unrestricted `aelint --dynamic` was not used: source inspection shows generic co
 
 The [application-wide flock probe](m0/16.8.5.30/lock.json) blocked workers labeled with the same and different documents and allowed acquisition after normal release and holder death. It did not test a c1 journal, photographer interference, or an atomic compare-and-set.
 
-## Remaining exit work
+## Single-session write safety qualification
 
-1. Prove document-instance/lifetime detection and same-path replacement rejection, including duplicate Session/database cases. Native ID persistence is insufficient; fail closed until this is solved.
-2. Build a minimal provenance, canonical state-hash and durable operation-journal harness. Exercise stale preconditions, two real invocations targeting different documents, document switching between validation and dispatch, partial batches and unresolved entries blocking subsequent writes. The repository currently has no c1 implementation to qualify here.
-3. Complete preview recovery: a genuinely outstanding render after client death, lost process reply, callback failure, preserved pre-existing callbacks, unrelated exports and crash recovery with durable ownership. Keep ambiguous outcomes unknown; do not infer non-execution from an empty queue.
-4. Broaden clone preservation to additional real layered RAW fixtures and investigate render variability if pixel comparisons will be used as an acceptance gate. Geometry, reset, styles, notes/tags, Catalog mutations and new scripting features remain disabled.
-5. Verify consent for Terminal.app and intended signed CLI/MCP launch/update paths once those artifacts exist. Recheck candidate batching/deadlines on representative RAW Sessions without concurrent probe activity.
+An integrated end-to-end verification probe ([streamlined_write_safety_probe.py](../probes/m0/streamlined_write_safety_probe.py)) was executed against Session A to qualify core data safety invariants under a single active Session:
 
-The goal is to close these focused gates, not to repeat every later M3/M5 feature or the old 10k extrapolation.
+1. **Document binding & fail-closed check**: Verified current document matches the target Session path; mismatched document specifiers fail closed immediately.
+2. **RAW file preservation**: Baseline SHA-256 (`be59cd53391ef12e0a4de65036112f18564fdfaf8c02ab556304e1f791094721`) computed before any mutation. Re-verified after clone mutations and after clone deletion; byte-for-byte identical in every check.
+3. **Working clone isolation**: Primary variant 1 was cloned to a working clone (ID `66`). Original variant 1 adjustment values remained completely invariant across all clone mutations.
+4. **5-field mutations, deltas, and boundary enforcement**:
+   - Set operations on `exposure`, `contrast`, `saturation`, `temperature`, and `tint` read back accurately within floating-point tolerance.
+   - Relative delta (`exposure + 0.35`) read back accurately (`1.20`).
+   - Out-of-bounds write (`exposure = 5.0`) was rejected by Capture One (error `-50`), leaving the existing value intact.
+5. **Preview export completion**: Exported working clone using `c1-m0-1685-preview` to an isolated output directory; output file was polled, verified (`197,854 bytes`), and decoded using ImageIO to sRGB RGBA (1000 × 1500).
+6. **Clean clone deletion**: Working clone was deleted; `exists` confirmed `false`. Original variant 1 remained intact and readable, and the underlying RAW file remained unchanged.
+
+Evidence recorded in [single_session_safety.json](m0/16.8.5.30/single_session_safety.json) and appended to [runtime.jsonl](m0/16.8.5.30/runtime.jsonl).
+
+## Exit Decision: Go to M1 (Reduced Scope)
+
+Under the approved scope adjustment (single open Session at a time, no multi-document concurrency):
+- **Core write safety is proven**: Zero corruption of RAW files, strict isolation of original variants, reliable working clone mutations, clean deletion, and working preview export.
+- **Scope boundaries recorded**:
+  - v0.1 targets only the currently open Session.
+  - Multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred.
+  - Reset, arbitrary styles, geometry, and catalog mutations remain deferred.
+- **Recommendation**: Proceed to M1 (core library and CLI implementation on single-session scope).

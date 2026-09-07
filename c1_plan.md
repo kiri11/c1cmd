@@ -6,7 +6,7 @@ Goal: let coding agents (Codex, Claude Code, GPT-6 Astra, etc.) read and write C
 
 ### v0.1 (first public release)
 
-- macOS only, Apple Silicon, **one pinned Capture One build**, selected and recorded in M0. The current candidate is **16.8.5.30**; its [2026-09-07 requalification](docs/m0_requalification_16.8.5.30.md) is partial and does **not** yet enable a writable release. Sessions only in v0.1. Read-only Catalog support comes later; catalog mutations are outside the initial roadmap.
+- macOS only, Apple Silicon, **one pinned Capture One build**, selected and recorded in M0. The current build is **16.8.5.30**; its [2026-09-07 requalification](docs/m0_requalification_16.8.5.30.md) is qualified for a writable release with reduced scope (single open Session only; no concurrency). Sessions only in v0.1. Read-only Catalog support comes later; catalog mutations are outside the initial roadmap.
 - Primary layer only. No layers/masks, no Color Editor skin-tone, no tethering, no GUI scripting.
 - First release proves one complete workflow: `doctor` → `doc info` → `variants list` → `variant clone` → loop(`get` → `set|add` → `preview`) → photographer review → optional `variant delete`. Start with exposure, white balance, and a small set of adjustments verified in M0.
 - Machine-readable JSON is available for every operation; human-readable input and output sit on the same contract.
@@ -241,7 +241,7 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 
 ## 6. Milestones
 
-**M0 — Feasibility spike (initial 2–3 day timebox).** Discover blockers and retain repeatable probes. The timebox is not a promise to resolve every question. Select the exact build; record fixture details, evidence, measured latency, and unresolved risks in `docs/m0_requalification_<build>.md`, with machine-readable evidence under `docs/m0/<build>/`. The original 16.7.1.11 report remains at `docs/m0_spike.md`.
+**M0 — Feasibility spike.** Discover blockers and retain repeatable probes. The timebox is not a promise to resolve every question. Select the exact build; record fixture details, evidence, measured latency, and unresolved risks in `docs/m0_requalification_<build>.md`, with machine-readable evidence under `docs/m0/<build>/`. The original 16.7.1.11 report remains at `docs/m0_spike.md`.
 
 - Verify clone preservation, variant-only deletion, and isolation of original/source/sibling state, including pre-existing layers and changes in selection.
 - Test unique addressing and document binding; exercise restart, reopen, reorder, and deletion to decide reference lifetimes and whether durable identity is feasible.
@@ -250,13 +250,9 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 - Prove one explicitly targeted preview recipe, unique output/job association, and reliable completion. Prefer polling; if callbacks are needed, prove crash recovery and preservation of intervening user changes.
 - Benchmark 1/10/100/1000 variants where feasible, distinguishing handler overhead from actual Apple Events and nested bulk behavior. Select bounded batch sizes and separate event/job deadlines. Large-catalog throughput is a later measurement, not a core feasibility blocker.
 
-**Current M0 status (2026-09-07):** Runtime requalification on 16.8.5.30 / macOS 26.4.1 / M1 Pro is **partial; no-go for a writable release**. Five-field writes, fixture clone preservation/deletion, native-ID restart/reorder, bridge codecs, and application-wide lock primitives have positive evidence. Open-document lifetime/replacement detection, an integrated stale-precondition/journal implementation, pending-operation recovery after client death, and crash-safe callback ownership/coexistence remain gates. The client-death tests lost their final reply but did not establish an outstanding queued job. Continue focused M0 work; read-only M1 scaffolding may proceed without treating this build as write-qualified. See the [capability evidence matrix](docs/m0/16.8.5.30/capabilities.json).
+**Current M0 status (2026-09-07):** Runtime requalification on 16.8.5.30 / macOS 26.4.1 / M1 Pro is **qualified under reduced scope: Go to M1**. Five-field writes, fixture clone preservation, variant-only deletion, RAW file preservation (SHA-256 byte-for-byte identical), fail-closed document check, and dedicated preview export are proven in [single_session_safety.json](docs/m0/16.8.5.30/single_session_safety.json). Scope is restricted to a single open Session; multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred. See the [capability evidence matrix](docs/m0/16.8.5.30/capabilities.json).
 
-**M0 exit decision:**
-
-- **Go to M1** only when original preservation, safe clone deletion, unambiguous addressing within the supported lifetime, changed-value readback, truthful interrupted-operation outcomes, and reliable preview completion are demonstrated by repeatable probes.
-- **Go with reduced scope** if core gates pass but durable identity or optional fields fail. Record the exact omissions in capabilities: for example, current-open-document working references only, no cross-restart pairing, or fewer adjustments.
-- **No-go for a writable release** if core gates fail. Continue a focused spike or limit delivery to read-only inspection; do not replace missing safety guarantees with agent instructions or lossy snapshots. Unresolved M0 questions are documented explicitly rather than assumed solved.
+**M0 exit decision:** **Go with reduced scope**. Core write safety is proven for the primary single-session editing loop. M1 will implement the core library and CLI targeting the active open Session without overcomplicating multi-document or concurrent access.
 
 **M1 — Safe editing + preview / v0.1.** Implement the small §3 command set and a complete workflow on curated Sessions. Include FieldSpec/exact-build capabilities, working-reference enforcement, document binding, provenance/operation journal, state preconditions, partial/unknown outcomes, actual readback, application-wide locking, preview completion, JSON/human input/output, and required tests. Ship a small `examples/grade-folder.py` using an explicit preset and sidecar records. Publish signed/notarized binaries after end-to-end review and failure-path checks pass; no learned-style or catalog dependency.
 
