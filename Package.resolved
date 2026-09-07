@@ -1,0 +1,22 @@
+{
+  "pins" : [
+    {
+      "identity" : "applescriptbridge",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/emorydunn/AppleScriptBridge.git",
+      "state" : {
+        "revision" : "58946d7fd5b38b6a92c13ccb413d30ba1f0e9179"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    }
+  ],
+  "version" : 2
+}
