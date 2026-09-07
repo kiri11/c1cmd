@@ -92,14 +92,14 @@ struct DoctorCommand: ParsableCommand {
             if !report.allChecksPassed {
                 if !report.appRunning {
                     throw C1Error.appNotRunning("Capture One is not running.")
-                } else if !report.exactBuildMatched {
-                    throw C1Error.unsupportedVersion("Running version '\(report.appVersion)' does not match pinned build '\(report.pinnedBuild)'.")
                 } else if !report.hasDocument {
                     throw C1Error.noDocument("No document is currently open in Capture One.")
                 } else if !report.lockAcquired {
                     throw C1Error.captureOneBusy("Capture One application lock could not be acquired.")
-                } else {
+                } else if report.unresolvedOperationsCount > 0 {
                     throw C1Error.invalidRequest("Doctor diagnostic detected unresolved operations.")
+                } else {
+                    throw C1Error.unsupportedVersion("Running version '\(report.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(report.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override.")
                 }
             }
         }
@@ -116,16 +116,22 @@ struct VersionCommand: ParsableCommand {
 
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) {
-            let info: [String: String] = [
+            let info: [String: Any] = [
                 "c1Version": "0.1.0",
+                "testedCaptureOneBuilds": SessionController.testedBuilds,
                 "pinnedCaptureOneBuild": SessionController.pinnedBuild,
+                "supportedVersionRange": "16.4+ through 16.x",
                 "schemaVersion": "1.0.0",
                 "platform": "macOS-arm64"
             ]
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
-                print(OutputFormatter.formatJson(info))
+                if let data = try? JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]),
+                   let str = String(data: data, encoding: .utf8) {
+                    print(str)
+                }
             } else {
-                print("c1 version 0.1.0 (pinned for Capture One \(SessionController.pinnedBuild))")
+                print("c1 version 0.1.0 (tested for Capture One: \(SessionController.testedBuilds.joined(separator: ", ")))")
+                print("Supported Capture One versions: 16.4+ through 16.x")
                 print("Schema version: 1.0.0")
             }
         }

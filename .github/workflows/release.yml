@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Package Release (macOS arm64)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift environment
+        run: |
+          swift --version
+          xcode-select -p
+
+      - name: Run Unit Tests
+        run: swift run CaptureOneCoreTests
+
+      - name: Build Release Binaries
+        run: swift build -c release -v
+
+      - name: Package Release Archive
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          ARCHIVE_NAME="c1-${TAG_NAME}-macos-arm64"
+          STAGE_DIR="dist/${ARCHIVE_NAME}"
+
+          mkdir -p "${STAGE_DIR}/bin"
+          cp .build/release/c1 "${STAGE_DIR}/bin/c1"
+          cp .build/release/c1-mcp "${STAGE_DIR}/bin/c1-mcp"
+          cp README.md LICENSE AGENTS.md "${STAGE_DIR}/"
+
+          # Ad-hoc codesign binaries
+          codesign -s - --force "${STAGE_DIR}/bin/c1"
+          codesign -s - --force "${STAGE_DIR}/bin/c1-mcp"
+
+          cd dist
+          tar -czvf "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
+          shasum -a 256 "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: true

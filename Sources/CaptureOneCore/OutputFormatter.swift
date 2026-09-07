@@ -39,7 +39,13 @@ public struct OutputFormatter {
         lines.append("c1 Doctor Diagnostic Report")
         lines.append("===========================")
         lines.append("Capture One Process : \(r.appRunning ? "Running (OK)" : "Not Running (FAIL)")")
-        lines.append("Capture One Version : \(r.appVersion) \(r.exactBuildMatched ? "(Pinned build matched: \(r.pinnedBuild))" : "(Expected \(r.pinnedBuild))")")
+        let versionDetail: String
+        if r.exactBuildMatched {
+            versionDetail = "(Tested build matched)"
+        } else {
+            versionDetail = "(Untested; tested: \(r.testedBuilds.joined(separator: ", ")))"
+        }
+        lines.append("Capture One Version : \(r.appVersion) \(versionDetail)")
         lines.append("Active Document     : \(r.hasDocument ? (r.docName ?? "Unknown") : "None (FAIL)")")
         lines.append("Document Type       : \(r.isSession ? "Session (Full Read/Write)" : (r.hasDocument ? "Catalog (Read-Only Mode)" : "None (FAIL)"))")
         if let p = r.docPath {
@@ -47,8 +53,19 @@ public struct OutputFormatter {
         }
         lines.append("Advisory Lock       : \(r.lockAcquired ? "Available (OK)" : "Contended / Failed (FAIL)")")
         lines.append("Unresolved Ops      : \(r.unresolvedOperationsCount == 0 ? "0 (Clean)" : "\(r.unresolvedOperationsCount) (Warning: pending/failed ops in journal)")")
+        if let w = r.warning {
+            lines.append("Warning             : \(w)")
+        }
         lines.append("---------------------------")
-        lines.append("Status              : \(r.allChecksPassed ? "READY (All checks passed)" : "ISSUES DETECTED")")
+        let statusStr: String
+        if !r.allChecksPassed {
+            statusStr = "ISSUES DETECTED"
+        } else if r.warning != nil {
+            statusStr = "READY (All checks passed, with warnings)"
+        } else {
+            statusStr = "READY (All checks passed)"
+        }
+        lines.append("Status              : \(statusStr)")
         return lines.joined(separator: "\n")
     }
 

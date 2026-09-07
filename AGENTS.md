@@ -86,10 +86,10 @@ When using `c1-mcp`:
 
 - `app-not-running`: Launch Capture One and ensure GUI is active.
 - `no-document`: Open a Session in Capture One.
-- `unsupported-version`: Capture One build does not match pinned build (`16.8.5.30`).
+- `unsupported-version`: Capture One version is outside supported range (16.4+ through 16.x) or unverified (<16.4 or 17+). Override with `C1_ALLOW_UNTESTED_BUILD=1`.
 - `unmanaged-variant`: Attempted mutation on an unmanaged original; clone first.
 - `capture-one-busy`: Cross-process advisory lock timed out; wait or check for hung processes.
 - `document-changed`: The active Session was closed or replaced during execution.
 - `state-changed`: Optimistic concurrency check failed (`--if-state` mismatch).
 - `readback-mismatch`: Capture One returned values outside tolerance.
-- `permission-denied`: Automation permission missing in macOS System Settings.
+- `permission-denied`: Automation permission missing in macOS System Settings. Ensure parent app (Terminal, Claude Desktop, Cursor) has Capture One enabled under Privacy & Security > Automation.

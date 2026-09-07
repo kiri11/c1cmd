@@ -34,9 +34,13 @@
 
 ## System Requirements
 
-- **macOS:** macOS 13.0+ (Ventura or later), Apple Silicon (`arm64`).
-- **Capture One:** Pinned to build **16.8.5.30** (tested and verified).
-  > Untested builds fail closed with `unsupported-version`. To bypass this check for testing, set `C1_ALLOW_UNTESTED_BUILD=1`.
+- **macOS:** macOS 13.0+ (Ventura, Sonoma, Sequoia, or later).
+  > **macOS Compatibility Details:**
+  > - **macOS 13.0+ (Ventura, Sonoma, Sequoia):** Fully supported. Core Apple Events, ImageIO decoding, and POSIX advisory locking behave identically across these releases.
+  > - **macOS < 13.0 (Monterey, Big Sur):** Unsupported. The official Swift Model Context Protocol SDK and Swift 5.9+ concurrency dependencies require macOS 13+.
+  > - **Hardware Architecture:** Tested on Apple Silicon (`arm64`). Can also compile for Intel (`x86_64`) as a Universal binary.
+- **Capture One:** Tested and verified on builds in `testedBuilds` (**16.8.5.30**). Compatibility is supported by default for **Capture One 16.4+ through 16.x** (untested 16.x builds emit an informational warning). Builds `< 16.4` or `>= 17.0` fail closed with `unsupported-version` unless overridden by `C1_ALLOW_UNTESTED_BUILD=1`.
+  > See [Qualifying New Builds](docs/QUALIFYING_NEW_BUILDS.md) to test and register newly released Capture One versions.
 - **Permissions:** macOS Automation permissions (`System Settings > Privacy & Security > Automation`).
 - **Build Tools:** Swift 5.9+ / Xcode command line tools.
 
@@ -63,26 +67,43 @@ swift build -c release
 # Binaries are in .build/release/c1 and .build/release/c1-mcp
 ```
 
+### Running Tests
+
+```bash
+# Run unit test suite (237 assertions, no Xcode.app required)
+make test
+# or
+swift run CaptureOneCoreTests
+```
+
 ---
 
 ## Configuring the MCP Server
 
-`c1-mcp` runs over `stdio` and connects seamlessly to any MCP-compliant client.
+`c1-mcp` runs over `stdio` and connects seamlessly to any MCP-compliant AI client.
+
+> [!IMPORTANT]
+> **macOS Automation Permissions for MCP Clients**  
+> When an MCP client (Claude Desktop, Cursor, Zed) invokes `c1-mcp` to communicate with Capture One, macOS prompts for permission for **the client application** (e.g. *"Claude would like to control Capture One"*), **not** `c1-mcp`. If tool calls fail with `permission-denied (-1743)`, ensure the client application has **Capture One** enabled under **System Settings > Privacy & Security > Automation**.
 
 ### Claude Desktop
 
-Edit your Claude Desktop configuration file:
+Edit your Claude Desktop configuration file:  
 `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "c1": {
-      "command": "/usr/local/bin/c1-mcp"
+      "command": "/usr/local/bin/c1-mcp",
+      "env": {
+        "C1_ALLOW_UNTESTED_BUILD": "1"
+      }
     }
   }
 }
 ```
+*(The `"env"` block is optional; set `C1_ALLOW_UNTESTED_BUILD` if testing on an unverified Capture One build outside 16.4+).*
 
 ### Cursor
 
@@ -93,7 +114,7 @@ In Cursor settings under **Features > MCP Servers**, add a new server:
 
 ### Claude Code
 
-Run Claude Code with the server configured:
+Add the server via the CLI:
 ```bash
 claude mcp add c1 -- /usr/local/bin/c1-mcp
 ```
@@ -233,14 +254,26 @@ AI Agent / Script ──▶ c1 (CLI)  /  c1-mcp (stdio MCP server)
 ---
 
 ## Troubleshooting & Permissions
-
+ 
 - **Apple Event Permission Denied (`-1743` / `errAEEventNotPermitted`):**  
-  macOS requires authorization for applications to control Capture One. Go to **System Settings > Privacy & Security > Automation**, find your terminal app (Terminal, iTerm2, Cursor, Claude Desktop), and ensure **Capture One** is toggled ON.
+  macOS requires authorization for applications to control Capture One via Apple Events.
+  - **Terminal / CLI:** Go to **System Settings > Privacy & Security > Automation**, find your terminal app (Terminal, iTerm2), and ensure **Capture One** is toggled ON.
+  - **MCP Clients (Claude Desktop, Cursor, Zed):** When `c1-mcp` runs as a subprocess of an AI interface, macOS prompts for permission for **the parent application** (e.g., *"Claude"* or *"Cursor"*), **not** `c1-mcp`. If tool calls fail with `-1743`, ensure the parent app is enabled under **Automation**.
+  - **Resetting Stuck Permissions:** If permissions become stuck or unprompted after an OS update, reset Apple Event permissions for Capture One in Terminal:
+    ```bash
+    tccutil reset AppleEvents com.captureone.captureone16
+    ```
+- **macOS Gatekeeper / Quarantine Flags (macOS 15 Sequoia):**  
+  If running pre-compiled release binaries on macOS 15+, Gatekeeper may block un-notarized command-line executables. Remove the quarantine attribute if prompted:
+  ```bash
+  xattr -d com.apple.quarantine /path/to/c1 /path/to/c1-mcp
+  ```
 - **Unsupported Version (`unsupported-version`):**  
-  `c1` pins against tested Capture One builds (`16.8.5.30`). To run against another build at your own risk, set:
+  `c1` supports **Capture One 16.4+ through 16.x** and maintains a list of verified builds in `testedBuilds` (`16.8.5.30`). Builds older than 16.4 or future major versions (17+) fail closed. To run against an unsupported build at your own risk, set:
   ```bash
   export C1_ALLOW_UNTESTED_BUILD=1
   ```
+  To test and qualify a newly released Capture One build, follow the runbook in [docs/QUALIFYING_NEW_BUILDS.md](docs/QUALIFYING_NEW_BUILDS.md).
 - **Unresolved Operations:**  
   If a process crashes during a mutation, run `c1 operation status <operationId>` or check `.c1/journal.jsonl` in the Session directory.
 

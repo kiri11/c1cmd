@@ -2,10 +2,23 @@ import Foundation
 import AppleScriptBridge
 import AppKit
 
+public struct VersionCompatibility: Codable, Equatable {
+    public let isTestedMatch: Bool
+    public let isAllowed: Bool
+    public let warning: String?
+
+    public init(isTestedMatch: Bool, isAllowed: Bool, warning: String? = nil) {
+        self.isTestedMatch = isTestedMatch
+        self.isAllowed = isAllowed
+        self.warning = warning
+    }
+}
+
 public struct DoctorReport: Codable, Equatable {
     public let appRunning: Bool
     public let appVersion: String
     public let exactBuildMatched: Bool
+    public let testedBuilds: [String]
     public let pinnedBuild: String
     public let hasDocument: Bool
     public let docName: String?
@@ -14,6 +27,37 @@ public struct DoctorReport: Codable, Equatable {
     public let lockAcquired: Bool
     public let unresolvedOperationsCount: Int
     public let allChecksPassed: Bool
+    public let warning: String?
+
+    public init(
+        appRunning: Bool,
+        appVersion: String,
+        exactBuildMatched: Bool,
+        testedBuilds: [String] = SessionController.testedBuilds,
+        pinnedBuild: String = SessionController.pinnedBuild,
+        hasDocument: Bool,
+        docName: String?,
+        docPath: String?,
+        isSession: Bool,
+        lockAcquired: Bool,
+        unresolvedOperationsCount: Int,
+        allChecksPassed: Bool,
+        warning: String? = nil
+    ) {
+        self.appRunning = appRunning
+        self.appVersion = appVersion
+        self.exactBuildMatched = exactBuildMatched
+        self.testedBuilds = testedBuilds
+        self.pinnedBuild = pinnedBuild
+        self.hasDocument = hasDocument
+        self.docName = docName
+        self.docPath = docPath
+        self.isSession = isSession
+        self.lockAcquired = lockAcquired
+        self.unresolvedOperationsCount = unresolvedOperationsCount
+        self.allChecksPassed = allChecksPassed
+        self.warning = warning
+    }
 }
 
 public struct DocumentInfo: Codable, Equatable {
@@ -148,7 +192,41 @@ public struct DumpRecord: Codable, Equatable {
 
 public final class SessionController {
     public static let shared = SessionController()
-    public static let pinnedBuild = "16.8.5.30"
+    public static let testedBuilds: [String] = ["16.8.5.30"]
+    public static var pinnedBuild: String { testedBuilds.first ?? "16.8.5.30" }
+
+    // MARK: - Version Compatibility Evaluation
+    public static func evaluateVersionCompatibility(
+        _ version: String,
+        allowUntestedOverride: Bool = false
+    ) -> VersionCompatibility {
+        let isOverrideActive = allowUntestedOverride
+            || ProcessInfo.processInfo.environment["C1_ALLOW_UNTESTED_BUILD"] == "1"
+
+        // 1. Check exact match against tested builds list
+        if testedBuilds.contains(version) {
+            return VersionCompatibility(isTestedMatch: true, isAllowed: true, warning: nil)
+        }
+
+        // 2. Check 16.4+ through 16.x range
+        let parts = version.split(separator: ".")
+        if parts.count >= 2,
+           let major = Int(parts[0]),
+           let minor = Int(parts[1]) {
+            if major == 16 && minor >= 4 {
+                let warningMsg = "Running on unverified Capture One build '\(version)' (tested: \(testedBuilds.joined(separator: ", "))). Compatibility allowed for Capture One 16.4+. Core safety guards and readback checks remain active."
+                return VersionCompatibility(isTestedMatch: false, isAllowed: true, warning: warningMsg)
+            }
+        }
+
+        // 3. Check environment override
+        if isOverrideActive {
+            let warningMsg = "Running on unverified Capture One build '\(version)' (override C1_ALLOW_UNTESTED_BUILD=1 active; tested: \(testedBuilds.joined(separator: ", ")))."
+            return VersionCompatibility(isTestedMatch: false, isAllowed: true, warning: warningMsg)
+        }
+
+        return VersionCompatibility(isTestedMatch: false, isAllowed: false, warning: nil)
+    }
 
     private let executor = AppleScriptExecutor.shared
     private let lock = CaptureOneLock.shared
@@ -184,7 +262,8 @@ public final class SessionController {
             }
         }
 
-        let buildMatched = (appVersion == Self.pinnedBuild)
+        let compat = Self.evaluateVersionCompatibility(appVersion)
+        let buildMatched = compat.isTestedMatch
 
         var lockOk = false
         do {
@@ -201,12 +280,13 @@ public final class SessionController {
             unresolvedCount = journal.unresolvedEntries().count
         }
 
-        let allPassed = appRunning && buildMatched && hasDoc && lockOk && (unresolvedCount == 0)
+        let allPassed = appRunning && compat.isAllowed && hasDoc && lockOk && (unresolvedCount == 0)
 
         return DoctorReport(
             appRunning: appRunning,
             appVersion: appVersion,
             exactBuildMatched: buildMatched,
+            testedBuilds: Self.testedBuilds,
             pinnedBuild: Self.pinnedBuild,
             hasDocument: hasDoc,
             docName: docName,
@@ -214,7 +294,8 @@ public final class SessionController {
             isSession: isSession,
             lockAcquired: lockOk,
             unresolvedOperationsCount: unresolvedCount,
-            allChecksPassed: allPassed
+            allChecksPassed: allPassed,
+            warning: compat.warning
         )
     }
 
@@ -228,13 +309,10 @@ public final class SessionController {
             throw C1Error.noDocument("No document is currently open in Capture One.")
         }
 
-        let isBuildAllowed = allowUntestedBuild
-            || ProcessInfo.processInfo.environment["C1_ALLOW_UNTESTED_BUILD"] == "1"
-            || info.appVersion == Self.pinnedBuild
-
-        guard isBuildAllowed else {
+        let compat = Self.evaluateVersionCompatibility(info.appVersion, allowUntestedOverride: allowUntestedBuild)
+        guard compat.isAllowed else {
             throw C1Error.unsupportedVersion(
-                "Running Capture One build '\(info.appVersion)' is not verified (pinned: '\(Self.pinnedBuild)'). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
+                "Running Capture One build '\(info.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(Self.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
             )
         }
 
@@ -269,11 +347,10 @@ public final class SessionController {
 
     // MARK: - Mutation Guard
     public func assertSessionWritable(docInfo: DocumentInfo, operation: String) throws {
-        let isBuildAllowed = ProcessInfo.processInfo.environment["C1_ALLOW_UNTESTED_BUILD"] == "1"
-            || docInfo.appVersion == Self.pinnedBuild
-        guard isBuildAllowed else {
+        let compat = Self.evaluateVersionCompatibility(docInfo.appVersion)
+        guard compat.isAllowed else {
             throw C1Error.unsupportedVersion(
-                "Running Capture One build '\(docInfo.appVersion)' is not verified (pinned: '\(Self.pinnedBuild)'). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
+                "Running Capture One build '\(docInfo.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(Self.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
             )
         }
         guard docInfo.isSession else {
@@ -1012,6 +1089,8 @@ public final class SessionController {
     public func capabilities() -> [String: Any] {
         [
             "pinnedBuild": Self.pinnedBuild,
+            "testedBuilds": Self.testedBuilds,
+            "supportedVersionRange": "16.4+ through 16.x",
             "documentScope": "sessions-and-catalogs",
             "catalogReadOnly": true,
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
