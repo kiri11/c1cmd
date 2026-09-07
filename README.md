@@ -119,6 +119,9 @@ Add the server via the CLI:
 claude mcp add c1 -- /usr/local/bin/c1-mcp
 ```
 
+> [!TIP]
+> For a full step-by-step setup guide covering **ChatGPT macOS App (Codex Mode)**, **Claude Desktop**, and **Antigravity**, see the [MCP Client Setup Guide](docs/MCP_SETUP.md).
+
 ---
 
 ## CLI Usage & Workflow
