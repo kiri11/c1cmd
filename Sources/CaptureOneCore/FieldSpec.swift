@@ -75,6 +75,10 @@ public struct Adjustments: Codable, Equatable {
         exposure == nil && contrast == nil && saturation == nil && temperature == nil && tint == nil
     }
 
+    public var hasAnyField: Bool {
+        !isEmpty
+    }
+
     public func value(for field: String) -> Double? {
         switch field.lowercased() {
         case "exposure", "exp": return exposure

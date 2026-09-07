@@ -684,7 +684,19 @@ public final class SessionController {
                 args: [docNameDesc, sourceIdDesc]
             )
 
-            let baselineVarRes = try self.get(ref: baselineRes.baselineId)
+            var baselineVarResOpt: GetResult?
+            for attempt in 1...5 {
+                do {
+                    baselineVarResOpt = try self.get(ref: baselineRes.baselineId)
+                    break
+                } catch {
+                    if attempt == 5 { throw error }
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
+            }
+            guard let baselineVarRes = baselineVarResOpt else {
+                throw C1Error.variantNotFound("Failed to resolve baseline variant '\(baselineRes.baselineId)'.")
+            }
 
             let rec = ProvenanceRecord(
                 workingRef: workingRef.rawValue,

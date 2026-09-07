@@ -266,21 +266,23 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 
 **M1 — Safe editing + preview / v0.1 (Completed).** Core library, working-variant enforcement, 12 core CLI commands, dedicated preview export, and integration harness.
 
-**M2 — CLI Full-Featured & Core Capabilities (Next up; formerly M3).**
+**M2 — CLI Full-Featured & Core Capabilities (Completed).**
 Make the CLI interface comprehensive before introducing the MCP adapter layer:
-- **`reset`**: Implement verified field resets on working variants in `Handlers.applescript` and `SessionController.swift` (`c1 reset <working-ref> --if-state <hash> [fields...]`).
-- **`diff`**: Add standalone diff comparison command (`c1 diff <ref1> [ref2]`) to compare variants or compare working variant against baseline.
+- **`reset`**: Implemented verified field resets on working variants in `Handlers.applescript` and `SessionController.swift` (`c1 reset <working-ref> --if-state <hash> [fields...]`).
+- **`diff`**: Added standalone diff comparison command (`c1 diff <ref1> [ref2]`) to compare variants or compare working variant against baseline.
 - **`dump`**: Batched export of variants, adjustments, and metadata as JSONL (`c1 dump [--collection <name>] [--format jsonl]`).
-- **Catalog read-only detection and guards**: Add detection for open Catalogs, allowing read-only inspection, listing, `get`, `dump`, and `preview`, while enforcing strict fail-closed guards blocking any mutation commands (`clone`, `delete`, `set`, `add`, `reset`).
-- **Managed default-baseline creation**: Add command for creating a managed default-settings baseline variant after native New Variant behavior is verified for Sessions.
-- **Unit and fixture tests**: Extend test suite to cover reset, diff, dump, and Catalog read-only guards.
+- **Catalog read-only detection and guards**: Added detection for open Catalogs, allowing read-only inspection, listing, `get`, `dump`, and `preview`, while enforcing strict fail-closed guards blocking any mutation commands (`clone`, `delete`, `set`, `add`, `reset`).
+- **Managed default-baseline creation**: Added command for creating a managed default-settings baseline variant (`c1 variant baseline <source-ref>`).
+- **Unit and fixture tests**: Extended test suite covering reset, diff, dump, and Catalog read-only guards (146/146 unit test assertions passing).
 
-**M3 — Full-Featured MCP Server `c1-mcp` (formerly M2).**
-Build a thin stdio MCP adapter over the complete core library:
-- Add official Swift MCP SDK dependency to `Package.swift`.
-- Create `Sources/c1-mcp/` executable target running over stdio.
-- Expose the full suite of tools (`doctor`, `doc_info`, `variants_list`, `variant_clone`, `variant_delete`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`) with image content blocks and JSON schemas.
-- Serialize core access and test from local MCP client tools.
+**M3 — Full-Featured MCP Server `c1-mcp` (Completed).**
+Built a thin, robust stdio MCP adapter over the complete core library:
+- Added official Swift MCP SDK dependency (`modelcontextprotocol/swift-sdk` v0.12.1) to `Package.swift`.
+- Created `Sources/c1-mcp/` executable target running over stdio with `@MainActor` dispatching for Apple Events.
+- Exposed the full suite of 16 tools (`doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`, `operation_status`).
+- Added dual text (JSON metadata) + image (`image/jpeg` base64 payload) content blocks for `preview`.
+- Maintained strict working-variant safety guards and Catalog fail-closed mutation barriers over MCP.
+- Implemented comprehensive automated test suite (`Tests/mcp_test.py`) passing 10/10 test steps against live Capture One.
 
 **M4 — Experimental style loop.** Add `learn-style.py`, the versioned `style/` artifact, explicit review records, `harvest-corrections.py`, and `propose-revision.py`. Start with curated reviewed Sessions and separate development/held-out shoots. Require declared evaluation criteria and photographer approval. Exercise the full loop on real shoots before considering format stability; two shoots alone are insufficient evidence of generalization.
 
