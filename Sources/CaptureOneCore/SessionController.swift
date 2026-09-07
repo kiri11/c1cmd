@@ -967,20 +967,22 @@ public final class SessionController {
 
     public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0) throws -> PreviewResult {
         let docInfo = try getDocumentInfo()
+        guard docInfo.isSession else {
+            throw C1Error.invalidRequest("Catalogs are strictly read-only and do not have a default Output folder. Preview export is supported on Sessions only. Open a Session to render previews.")
+        }
+
         var nativeId = ref
         var workingRefStr: String?
 
-        if docInfo.isSession {
-            let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-            let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-            if WorkingRef.isWorkingRefString(ref) {
-                let record = try provenance.resolveManagedWorkingReference(
-                    ref,
-                    currentDocumentPath: docInfo.documentPath
-                )
-                nativeId = record.cloneVariantId
-                workingRefStr = record.workingRef
-            }
+        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
+        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
+        if WorkingRef.isWorkingRefString(ref) {
+            let record = try provenance.resolveManagedWorkingReference(
+                ref,
+                currentDocumentPath: docInfo.documentPath
+            )
+            nativeId = record.cloneVariantId
+            workingRefStr = record.workingRef
         }
 
         return try lock.withLock {
@@ -988,14 +990,12 @@ public final class SessionController {
             let jobOutputDir: URL
             if let custom = outputDirOverride {
                 jobOutputDir = URL(fileURLWithPath: custom)
-            } else if docInfo.isSession {
-                jobOutputDir = URL(fileURLWithPath: docInfo.documentPath).appendingPathComponent("Output/c1-previews/\(opId)", isDirectory: true)
             } else {
-                jobOutputDir = URL(fileURLWithPath: "/private/tmp/c1-previews/\(opId)", isDirectory: true)
+                jobOutputDir = URL(fileURLWithPath: docInfo.documentPath).appendingPathComponent("Output/c1-previews/\(opId)", isDirectory: true)
             }
             try FileManager.default.createDirectory(at: jobOutputDir, withIntermediateDirectories: true)
 
-            let recipeOutputFolder = docInfo.isSession ? docInfo.outputFolder : jobOutputDir.path
+            let recipeOutputFolder = docInfo.outputFolder
 
             // Configure recipe
             let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
@@ -1007,25 +1007,20 @@ public final class SessionController {
                 args: [docNameDesc, recipeDesc, outputFolderDesc]
             )
 
-            var journal: OperationJournal?
-            if docInfo.isSession {
-                let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-                let j = OperationJournal(sessionDirectory: sessUrl)
-                journal = j
-                let opRecord = OperationRecord(
-                    operationId: opId,
-                    operationType: "preview",
-                    workingRef: workingRefStr ?? nativeId,
-                    documentPath: docInfo.documentPath,
-                    status: "pending",
-                    previewOutputPath: jobOutputDir.path
-                )
-                try? j.append(entry: opRecord)
-            }
+            let journal = OperationJournal(sessionDirectory: sessUrl)
+            let opRecord = OperationRecord(
+                operationId: opId,
+                operationType: "preview",
+                workingRef: workingRefStr ?? nativeId,
+                documentPath: docInfo.documentPath,
+                status: "pending",
+                previewOutputPath: jobOutputDir.path
+            )
+            try? journal.append(entry: opRecord)
 
             // Dispatch processPreview
             let varIdDesc = NSAppleEventDescriptor(string: nativeId)
-            let subfolderDesc = NSAppleEventDescriptor(string: docInfo.isSession ? "c1-previews/\(opId)" : "")
+            let subfolderDesc = NSAppleEventDescriptor(string: "c1-previews/\(opId)")
             let filenameDesc = NSAppleEventDescriptor(string: "preview")
 
             do {
@@ -1034,7 +1029,7 @@ public final class SessionController {
                     args: [docNameDesc, varIdDesc, recipeDesc, outputFolderDesc, subfolderDesc, filenameDesc]
                 )
             } catch {
-                try? journal?.update(operationId: opId, status: "outcome-unknown", error: error.localizedDescription)
+                try? journal.update(operationId: opId, status: "outcome-unknown", error: error.localizedDescription)
                 throw error
             }
 
@@ -1043,7 +1038,7 @@ public final class SessionController {
             do {
                 outputFile = try self.previewMgr.pollForOutputFile(inDirectory: jobOutputDir, timeout: timeout)
             } catch {
-                try? journal?.update(operationId: opId, status: "failed", error: error.localizedDescription)
+                try? journal.update(operationId: opId, status: "failed", error: error.localizedDescription)
                 throw error
             }
 
@@ -1052,7 +1047,7 @@ public final class SessionController {
             let fileAttrs = try FileManager.default.attributesOfItem(atPath: outputFile.path)
             let size = (fileAttrs[.size] as? NSNumber)?.int64Value ?? 0
 
-            try journal?.update(
+            try journal.update(
                 operationId: opId,
                 status: "succeeded",
                 previewOutputPath: outputFile.path

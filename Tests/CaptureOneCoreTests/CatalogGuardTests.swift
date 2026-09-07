@@ -47,5 +47,18 @@ public struct CatalogGuardTests {
                 "Session mutation '\(op)' must be accepted"
             )
         }
+
+        // 3. Preview export is rejected on Catalog documents
+        XCTAssertThrowsError(
+            try SessionController.shared.preview(ref: "1"),
+            "Preview export must fail closed on Catalog"
+        ) { err in
+            if case let C1Error.invalidRequest(msg) = err {
+                XCTAssertTrue(msg.contains("Catalog"), "Error message should mention Catalog")
+                XCTAssertTrue(msg.contains("Sessions only"), "Error message should mention Sessions only")
+            } else {
+                XCTFail("Expected C1Error.invalidRequest but got \(err)")
+            }
+        }
     }
 }
