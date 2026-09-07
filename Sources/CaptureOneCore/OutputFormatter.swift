@@ -41,7 +41,7 @@ public struct OutputFormatter {
         lines.append("Capture One Process : \(r.appRunning ? "Running (OK)" : "Not Running (FAIL)")")
         lines.append("Capture One Version : \(r.appVersion) \(r.exactBuildMatched ? "(Pinned build matched: \(r.pinnedBuild))" : "(Expected \(r.pinnedBuild))")")
         lines.append("Active Document     : \(r.hasDocument ? (r.docName ?? "Unknown") : "None (FAIL)")")
-        lines.append("Document Type       : \(r.isSession ? "Session (OK)" : "Catalog or unsupported (FAIL)")")
+        lines.append("Document Type       : \(r.isSession ? "Session (Full Read/Write)" : (r.hasDocument ? "Catalog (Read-Only Mode)" : "None (FAIL)"))")
         if let p = r.docPath {
             lines.append("Document Path       : \(p)")
         }
@@ -57,14 +57,24 @@ public struct OutputFormatter {
             return formatJson(info)
         }
         var lines: [String] = []
-        lines.append("Session Document Information")
+        lines.append("\(info.isSession ? "Session" : "Catalog") Document Information")
         lines.append("----------------------------")
         lines.append("Name          : \(info.documentName)")
+        lines.append("Type          : \(info.isSession ? "Session (Read/Write)" : "Catalog (Read-Only)")")
         lines.append("Path          : \(info.documentPath)")
-        lines.append("Capture Folder: \(info.captureFolder)")
-        lines.append("Output Folder : \(info.outputFolder)")
+        if info.isSession {
+            lines.append("Capture Folder: \(info.captureFolder)")
+            lines.append("Output Folder : \(info.outputFolder)")
+        }
         lines.append("Open Token    : \(info.openToken)")
         return lines.joined(separator: "\n")
+    }
+
+    public static func padRight(_ str: String, _ length: Int) -> String {
+        if str.count >= length {
+            return String(str.prefix(length))
+        }
+        return str.padding(toLength: length, withPad: " ", startingAt: 0)
     }
 
     public static func renderVariants(_ variants: [VariantSummary], format: OutputFormat) -> String {
@@ -75,19 +85,11 @@ public struct OutputFormatter {
             return "No variants found."
         }
         var lines: [String] = []
-        lines.append(String(format: "%-6s  %-24s  %-8s  %-5s  %-6s  %-36s", "ID", "NAME", "SELECTED", "STARS", "TAG", "MANAGED WORKING REF"))
+        lines.append("\(padRight("ID", 6))  \(padRight("NAME", 24))  \(padRight("SELECTED", 8))  \(padRight("STARS", 5))  \(padRight("TAG", 6))  \(padRight("MANAGED WORKING REF", 36))")
         lines.append(String(repeating: "-", count: 90))
         for v in variants {
             let workingRefDisplay = v.workingRef ?? (v.isManagedWorkingClone ? "(managed)" : "-")
-            lines.append(String(
-                format: "%-6s  %-24s  %-8s  %-5d  %-6d  %-36s",
-                v.id,
-                String(v.name.prefix(24)),
-                v.isSelected ? "yes" : "no",
-                v.rating,
-                v.colorTag,
-                workingRefDisplay
-            ))
+            lines.append("\(padRight(v.id, 6))  \(padRight(v.name, 24))  \(padRight(v.isSelected ? "yes" : "no", 8))  \(padRight(String(v.rating), 5))  \(padRight(String(v.colorTag), 6))  \(padRight(workingRefDisplay, 36))")
         }
         return lines.joined(separator: "\n")
     }
@@ -134,14 +136,73 @@ public struct OutputFormatter {
         lines.append("Working Ref : \(res.workingRef)")
         lines.append("New Hash    : \(res.stateHash)")
         lines.append("")
-        lines.append(String(format: "%-14s  %-14s  %-14s  %-10s", "FIELD", "BEFORE", "AFTER", "DELTA"))
+        lines.append("\(padRight("FIELD", 14))  \(padRight("BEFORE", 14))  \(padRight("AFTER", 14))  \(padRight("DELTA", 10))")
         lines.append(String(repeating: "-", count: 56))
         for (field, diff) in res.diff.sorted(by: { $0.key < $1.key }) {
             let bStr = diff.before != nil ? String(format: "%.4f", diff.before!) : "null"
             let aStr = diff.after != nil ? String(format: "%.4f", diff.after!) : "null"
             let dStr = diff.delta != nil ? String(format: "%+.4f", diff.delta!) : "-"
-            lines.append(String(format: "%-14s  %-14s  %-14s  %-10s", field, bStr, aStr, dStr))
+            lines.append("\(padRight(field, 14))  \(padRight(bStr, 14))  \(padRight(aStr, 14))  \(padRight(dStr, 10))")
         }
+        return lines.joined(separator: "\n")
+    }
+
+    public static func renderDiffResult(_ res: DiffResult, format: OutputFormat) -> String {
+        if resolveFormat(format) == .json {
+            return formatJson(res)
+        }
+        var lines: [String] = []
+        lines.append("Variant Adjustments Diff: \(res.ref1) -> \(res.ref2)")
+        lines.append("------------------------------------------")
+        lines.append("Ref 1 (Before) State Hash: \(res.stateHash1)")
+        lines.append("Ref 2 (After)  State Hash: \(res.stateHash2)")
+        lines.append("")
+        if res.diff.isEmpty {
+            lines.append("No adjustment differences found between \(res.ref1) and \(res.ref2).")
+            return lines.joined(separator: "\n")
+        }
+        lines.append("\(padRight("FIELD", 14))  \(padRight("BEFORE", 14))  \(padRight("AFTER", 14))  \(padRight("DELTA", 10))")
+        lines.append(String(repeating: "-", count: 56))
+        for (field, diff) in res.diff.sorted(by: { $0.key < $1.key }) {
+            let bStr = diff.before != nil ? String(format: "%.4f", diff.before!) : "null"
+            let aStr = diff.after != nil ? String(format: "%.4f", diff.after!) : "null"
+            let dStr = diff.delta != nil ? String(format: "%+.4f", diff.delta!) : "-"
+            lines.append("\(padRight(field, 14))  \(padRight(bStr, 14))  \(padRight(aStr, 14))  \(padRight(dStr, 10))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    public static func renderDump(_ records: [DumpRecord], format: OutputFormat, jsonl: Bool = true) -> String {
+        if jsonl {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            var lines: [String] = []
+            for r in records {
+                if let data = try? encoder.encode(r), let str = String(data: data, encoding: .utf8) {
+                    lines.append(str)
+                }
+            }
+            return lines.joined(separator: "\n")
+        }
+        if resolveFormat(format) == .json {
+            return formatJson(records)
+        }
+        if records.isEmpty {
+            return "No variants dumped."
+        }
+        var lines: [String] = []
+        lines.append("\(padRight("ID", 6))  \(padRight("NAME", 20))  \(padRight("EXP", 10))  \(padRight("CONT", 10))  \(padRight("SAT", 10))  \(padRight("TEMP", 10))  \(padRight("TINT", 10))")
+        lines.append(String(repeating: "-", count: 85))
+        for r in records {
+            let exp = r.adjustments.exposure != nil ? String(format: "%+.2f", r.adjustments.exposure!) : "-"
+            let cont = r.adjustments.contrast != nil ? String(format: "%+.1f", r.adjustments.contrast!) : "-"
+            let sat = r.adjustments.saturation != nil ? String(format: "%+.1f", r.adjustments.saturation!) : "-"
+            let temp = r.adjustments.temperature != nil ? String(format: "%.0fK", r.adjustments.temperature!) : "-"
+            let tint = r.adjustments.tint != nil ? String(format: "%+.1f", r.adjustments.tint!) : "-"
+            lines.append("\(padRight(r.id, 6))  \(padRight(r.name, 20))  \(padRight(exp, 10))  \(padRight(cont, 10))  \(padRight(sat, 10))  \(padRight(temp, 10))  \(padRight(tint, 10))")
+        }
+        lines.append("-------------------------------------------------------------------------------------")
+        lines.append("Total variants dumped: \(records.count)")
         return lines.joined(separator: "\n")
     }
 
@@ -153,7 +214,7 @@ public struct OutputFormatter {
         lines.append("Preview Export Completed")
         lines.append("------------------------")
         lines.append("Operation ID: \(res.operationId)")
-        lines.append("Working Ref : \(res.workingRef)")
+        lines.append("Working Ref : \(res.workingRef ?? "(none/native)")")
         lines.append("Output Path : \(res.outputPath)")
         lines.append("File Size   : \(res.fileSizeBytes) bytes")
         lines.append("Dimensions  : \(res.width) x \(res.height) px")

@@ -145,7 +145,7 @@ public final class FieldRegistry {
                 minValue: -4.0,
                 maxValue: 4.0,
                 tolerance: 1e-5,
-                operations: [.get, .set, .add]
+                operations: [.get, .set, .add, .reset]
             ),
             FieldSpec(
                 name: "contrast",
@@ -154,7 +154,7 @@ public final class FieldRegistry {
                 minValue: -50.0,
                 maxValue: 50.0,
                 tolerance: 1e-5,
-                operations: [.get, .set, .add]
+                operations: [.get, .set, .add, .reset]
             ),
             FieldSpec(
                 name: "saturation",
@@ -163,7 +163,7 @@ public final class FieldRegistry {
                 minValue: -100.0,
                 maxValue: 100.0,
                 tolerance: 1e-5,
-                operations: [.get, .set, .add]
+                operations: [.get, .set, .add, .reset]
             ),
             FieldSpec(
                 name: "temperature",
@@ -173,7 +173,7 @@ public final class FieldRegistry {
                 minValue: 800.0,
                 maxValue: 14000.0,
                 tolerance: 0.05,
-                operations: [.get, .set, .add],
+                operations: [.get, .set, .add, .reset],
                 dependencies: ["tint"]
             ),
             FieldSpec(
@@ -183,7 +183,7 @@ public final class FieldRegistry {
                 minValue: -50.0,
                 maxValue: 50.0,
                 tolerance: 0.001,
-                operations: [.get, .set, .add],
+                operations: [.get, .set, .add, .reset],
                 dependencies: ["temperature"]
             )
         ]
@@ -291,5 +291,48 @@ public final class FieldRegistry {
     public func valuesMatchWithinTolerance(field: String, expected: Double, actual: Double) -> Bool {
         guard let spec = findAdjustmentSpec(named: field) else { return false }
         return abs(expected - actual) <= spec.tolerance
+    }
+
+    public func computeResetValues(fields: [String], baseline: Adjustments) throws -> Adjustments {
+        var targets = Adjustments()
+        let fieldsToReset: Set<String>
+        if fields.isEmpty || fields.contains(where: { $0.lowercased() == "all" }) {
+            fieldsToReset = Set(["exposure", "contrast", "saturation", "temperature", "tint"])
+        } else {
+            var set = Set<String>()
+            for f in fields {
+                let lower = f.lowercased().trimmingCharacters(in: .whitespaces)
+                if lower == "wb" || lower == "whitebalance" {
+                    set.insert("temperature")
+                    set.insert("tint")
+                } else if let spec = findAdjustmentSpec(named: lower) {
+                    guard spec.operations.contains(.reset) else {
+                        throw C1Error.invalidRequest("Field '\(spec.name)' does not support reset.")
+                    }
+                    set.insert(spec.name)
+                } else {
+                    throw C1Error.unsupportedField("Field '\(f)' is not a recognized adjustment field.")
+                }
+            }
+            fieldsToReset = set
+        }
+
+        if fieldsToReset.contains("exposure") {
+            targets.exposure = 0.0
+        }
+        if fieldsToReset.contains("contrast") {
+            targets.contrast = 0.0
+        }
+        if fieldsToReset.contains("saturation") {
+            targets.saturation = 0.0
+        }
+        if fieldsToReset.contains("temperature") {
+            targets.temperature = baseline.temperature ?? 5500.0
+        }
+        if fieldsToReset.contains("tint") {
+            targets.tint = baseline.tint ?? 0.0
+        }
+
+        return targets
     }
 }

@@ -24,6 +24,10 @@ public struct CloneVariantResult: Codable, Equatable {
     public let cloneId: String
 }
 
+public struct CreateBaselineVariantResult: Codable, Equatable {
+    public let baselineId: String
+}
+
 public struct DeleteVariantResult: Codable, Equatable {
     public let deleted: Bool
     public let existsNow: Bool

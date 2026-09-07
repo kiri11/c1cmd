@@ -5,7 +5,7 @@ import CryptoKit
 
 public struct PreviewResult: Codable, Equatable {
     public let operationId: String
-    public let workingRef: String
+    public let workingRef: String?
     public let outputPath: String
     public let fileSizeBytes: Int64
     public let width: Int
@@ -14,7 +14,7 @@ public struct PreviewResult: Codable, Equatable {
 
     public init(
         operationId: String,
-        workingRef: String,
+        workingRef: String?,
         outputPath: String,
         fileSizeBytes: Int64,
         width: Int,

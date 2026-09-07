@@ -7,11 +7,12 @@ on getAppAndDocInfo()
         set d to missing value
         try
             set d to current document
-        on error
+        end try
+        if d is missing value then
             try
                 set d to first document
             end try
-        end try
+        end if
         if d is missing value then
             return {appVersion:appVer, hasDocument:false, docName:missing value, docPath:missing value, docId:missing value, isSession:false}
         end if
@@ -30,6 +31,11 @@ on getAppAndDocInfo()
         on error
             set dPath to dId
         end try
+        if dId ends with ".cocatalog" then
+            set dPath to dId
+        else if dId ends with ".cosessiondb" then
+            set dPath to dId
+        end if
         
         set isSess to false
         try
@@ -55,11 +61,12 @@ on listVariants(collectionName, selectedOnly)
         set d to missing value
         try
             set d to current document
-        on error
+        end try
+        if d is missing value then
             try
                 set d to first document
             end try
-        end try
+        end if
         set varList to {}
         set sourceVariants to {}
         if d is missing value then
@@ -259,3 +266,49 @@ on processPreview(docName, variantId, recipeName, outputFolder, outputSubFolder,
         return {jobId:(jobId as text)}
     end tell
 end processPreview
+
+on createBaselineVariant(docName, sourceId)
+    tell application "/Applications/Capture One.app"
+        set d to document docName
+        set srcVar to (variant id (sourceId as text) of d)
+        set img to parent image of srcVar
+        set beforeIds to {}
+        repeat with itemV in (every variant of img)
+            set end of beforeIds to (id of itemV as text)
+        end repeat
+        
+        tell img to add variant
+        
+        set afterVariants to (every variant of img)
+        set newVar to missing value
+        repeat with cand in afterVariants
+            set candId to (id of cand as text)
+            if candId is not in beforeIds then
+                set newVar to cand
+                exit repeat
+            end if
+        end repeat
+        
+        if newVar is missing value then
+            error "Failed to locate newly created baseline variant."
+        end if
+        
+        return {baselineId:(id of newVar as text)}
+    end tell
+end createBaselineVariant
+
+on resetVariantAdjustments(docName, variantId)
+    tell application "/Applications/Capture One.app"
+        set d to document docName
+        set v to variant id (variantId as text) of d
+        reset adjustments v
+        set adj to adjustments of v
+        set expVal to (exposure of adj as real)
+        set contVal to (contrast of adj as real)
+        set satVal to (saturation of adj as real)
+        set tempVal to (temperature of adj as real)
+        set tintVal to (tint of adj as real)
+        return {variantId:(variantId as text), afterExposureVal:expVal, afterContrastVal:contVal, afterSaturationVal:satVal, afterTemperatureVal:tempVal, afterTintVal:tintVal}
+    end tell
+end resetVariantAdjustments
+

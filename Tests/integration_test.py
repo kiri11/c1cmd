@@ -46,6 +46,11 @@ def run_c1(args: list[str]) -> tuple[int, dict]:
             pass
     return res.returncode, parsed
 
+def run_c1_raw(args: list[str]) -> tuple[int, str, str]:
+    cmd = [str(C1_BIN)] + args
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    return res.returncode, res.stdout.strip(), res.stderr.strip()
+
 def main():
     print("=== c1 M1 End-to-End Integration Verification ===")
     assert C1_BIN.exists(), f"Binary {C1_BIN} does not exist. Run swift build first."
@@ -111,7 +116,13 @@ def main():
 
         # 4. c1 variants list
         print("\n[Step 4] Testing c1 variants list...")
-        code, vars_res = run_c1(["variants", "list"])
+        vars_res = []
+        code = 1
+        for _ in range(12):
+            code, vars_res = run_c1(["variants", "list"])
+            if code == 0 and len(vars_res) >= 1:
+                break
+            time.sleep(0.5)
         assert code == 0, f"variants list failed: {vars_res}"
         assert len(vars_res) >= 1, f"Expected at least 1 variant, got {len(vars_res)}"
         source_id = vars_res[0]["id"]
@@ -229,8 +240,187 @@ def main():
         print(grade_res.stdout)
         print("PASS: examples/grade-folder.py completed successfully!")
 
+        # =========================================================================
+        # MILESTONE 2 VERIFICATION STEPS
+        # =========================================================================
+
+        # 15. Baseline Variant Creation (c1 variant baseline)
+        print("\n[Step 15] Testing c1 variant baseline on source variant...")
+        code, base_res = run_c1(["variant", "baseline", source_id])
+        assert code == 0, f"variant baseline failed: {base_res}"
+        base_wrk_ref = base_res["workingRef"]
+        base_variant_id = base_res["cloneVariantId"]
+        assert base_wrk_ref.startswith("c1_wrk_")
+        assert base_variant_id != source_id
+        base_hash = base_res["baselineStateHash"]
+        print(f"PASS: created managed baseline variant {base_wrk_ref} (native ID: {base_variant_id})")
+
+        code, get_base = run_c1(["get", base_wrk_ref])
+        assert code == 0
+        assert get_base["workingRef"] == base_wrk_ref
+        print(f"PASS: retrieved baseline adjustments: {get_base['adjustments']}")
+
+        # 16. Adjustment Diffing (c1 diff)
+        print(f"\n[Step 16] Testing c1 diff on mutated working variant...")
+        # Mutate the baseline variant first
+        code, set_m2_res = run_c1([
+            "set", base_wrk_ref,
+            "--if-state", base_hash,
+            "exposure=0.60", "contrast=12.0", "saturation=-8.0", "kelvin=6100", "tint=4.0"
+        ])
+        assert code == 0, f"set failed on baseline variant: {set_m2_res}"
+        mutated_m2_hash = set_m2_res["stateHash"]
+
+        # Single-reference diff (working variant vs its baseline)
+        code, diff_res = run_c1(["diff", base_wrk_ref])
+        assert code == 0, f"diff failed: {diff_res}"
+        assert diff_res["ref1"] == "baseline"
+        assert diff_res["ref2"] == base_wrk_ref
+        assert "exposure" in diff_res["diff"]
+        assert abs(diff_res["diff"]["exposure"]["delta"] - 0.60) < 1e-4
+        assert "contrast" in diff_res["diff"]
+        assert "saturation" in diff_res["diff"]
+        print("PASS: single-ref diff accurately computed against baseline")
+
+        # Two-reference diff (source variant vs baseline variant)
+        code, diff_2res = run_c1(["diff", source_id, base_variant_id])
+        assert code == 0, f"two-ref diff failed: {diff_2res}"
+        assert diff_2res["ref1"] == source_id
+        assert diff_2res["ref2"] == base_variant_id
+        print(f"PASS: two-ref diff accurately computed between native variants {source_id} and {base_variant_id}")
+
+        # Human-formatted diff
+        code, human_diff_out, _ = run_c1_raw(["diff", base_wrk_ref, "--format", "human"])
+        assert code == 0
+        assert "Variant Adjustments Diff" in human_diff_out
+        assert "exposure" in human_diff_out
+        print("PASS: human-formatted diff output verified")
+
+        # 17. Adjustment Reset (c1 reset)
+        print(f"\n[Step 17] Testing c1 reset on mutated working variant...")
+        # Selective reset: exposure only
+        code, reset_sel_res = run_c1(["reset", base_wrk_ref, "--if-state", mutated_m2_hash, "exposure"])
+        assert code == 0, f"selective reset failed: {reset_sel_res}"
+        after_sel_hash = reset_sel_res["stateHash"]
+        assert abs(reset_sel_res["after"]["exposure"] - 0.0) < 1e-4
+        assert abs(reset_sel_res["after"]["contrast"] - 12.0) < 1e-4  # contrast untouched
+        print("PASS: selective reset of exposure verified (contrast remained untouched)")
+
+        # Full reset: all fields back to baseline
+        code, reset_full_res = run_c1(["reset", base_wrk_ref, "--if-state", after_sel_hash])
+        assert code == 0, f"full reset failed: {reset_full_res}"
+        assert abs(reset_full_res["after"]["exposure"] - 0.0) < 1e-4
+        assert abs(reset_full_res["after"]["contrast"] - 0.0) < 1e-4
+        assert abs(reset_full_res["after"]["saturation"] - 0.0) < 1e-4
+        assert reset_full_res["stateHash"] == base_hash, f"Full reset stateHash ({reset_full_res['stateHash']}) does not match baseline ({base_hash})"
+        print(f"PASS: full reset restored all fields and returned stateHash to baseline {base_hash}")
+
+        # Delete baseline variant
+        code, del_base_res = run_c1(["variant", "delete", base_wrk_ref])
+        assert code == 0
+
+        # 18. Bulk JSONL Dump (c1 dump)
+        print("\n[Step 18] Testing c1 dump in Session...")
+        code, dump_raw, _ = run_c1_raw(["dump"])
+        assert code == 0, f"dump failed: {dump_raw}"
+        dump_lines = [line.strip() for line in dump_raw.splitlines() if line.strip()]
+        assert len(dump_lines) >= 1, f"Expected at least 1 dump record, got {len(dump_lines)}"
+        first_record = json.loads(dump_lines[0])
+        assert "id" in first_record
+        assert "name" in first_record
+        assert "adjustments" in first_record
+        assert "metadata" in first_record
+        assert "stateHash" in first_record
+        print(f"PASS: c1 dump produced {len(dump_lines)} valid JSONL records")
+
+        # Dump human format
+        code, human_dump_out, _ = run_c1_raw(["dump", "--dump-format", "human"])
+        assert code == 0
+        assert "Total variants dumped:" in human_dump_out
+        print("PASS: c1 dump human table verified")
+
+        # 19. Catalog Read-Only Detection & Mutation Guards
+        print("\n[Step 19] Testing Catalog read-only detection & mutation guards...")
+        # Close test session and switch to Capture One Catalog
+        run_applescript(f'''
+            if exists document "{SESSION_NAME}" then
+                close document "{SESSION_NAME}" without saving
+            end if
+            if not (exists document "Capture One Catalog") then
+                open POSIX file "/Users/kiri11/Pictures/Capture One Catalog.cocatalog"
+            end if
+        ''')
+        cat_doc_res = {}
+        code = 1
+        for _ in range(10):
+            code, cat_doc_res = run_c1(["doctor"])
+            if code == 0 and cat_doc_res.get("allChecksPassed") and not cat_doc_res.get("isSession"):
+                break
+            time.sleep(0.5)
+        assert code == 0, f"doctor failed on catalog: {cat_doc_res}"
+        assert cat_doc_res.get("allChecksPassed") is True
+        assert cat_doc_res.get("isSession") is False
+        assert "Capture One Catalog" in cat_doc_res.get("docName", "")
+        print("PASS: c1 doctor passes on Catalog (isSession=False, allChecksPassed=True)")
+
+        # doc info on catalog
+        code, cat_info_res = run_c1(["doc", "info"])
+        assert code == 0
+        assert cat_info_res.get("isSession") is False
+        assert "cocatalog" in cat_info_res.get("documentId", "")
+        print(f"PASS: c1 doc info correctly identifies Catalog document: {cat_info_res.get('documentId')}")
+
+        # variants list on catalog
+        code, cat_vars_res = run_c1(["variants", "list"])
+        assert code == 0
+        assert len(cat_vars_res) > 0, "Expected catalog to have variants"
+        cat_var_id = cat_vars_res[0]["id"]
+        print(f"PASS: c1 variants list found {len(cat_vars_res)} variants in Catalog (sample ID: {cat_var_id})")
+
+        # get on catalog
+        code, cat_get_res = run_c1(["get", cat_var_id])
+        assert code == 0
+        assert cat_get_res["id"] == cat_var_id
+        assert "adjustments" in cat_get_res
+        assert "metadata" in cat_get_res
+        print(f"PASS: c1 get successfully read variant {cat_var_id} from Catalog")
+
+        # dump on catalog
+        code, cat_dump_raw, _ = run_c1_raw(["dump"])
+        assert code == 0
+        cat_dump_lines = [l.strip() for l in cat_dump_raw.splitlines() if l.strip()]
+        assert len(cat_dump_lines) == len(cat_vars_res)
+        print(f"PASS: c1 dump successfully exported {len(cat_dump_lines)} variants from Catalog as JSONL")
+
+        # diff on catalog (two native variants)
+        if len(cat_vars_res) >= 2:
+            code, cat_diff_res = run_c1(["diff", cat_vars_res[0]["id"], cat_vars_res[1]["id"]])
+            assert code == 0
+            assert "diff" in cat_diff_res
+            print(f"PASS: c1 diff successfully compared catalog variants {cat_vars_res[0]['id']} and {cat_vars_res[1]['id']}")
+
+        # Strict fail-closed mutation guards on Catalog
+        print("\nVerifying fail-closed mutation guards on Catalog...")
+        guard_checks = [
+            (["variant", "clone", cat_var_id], "clone"),
+            (["variant", "baseline", cat_var_id], "baseline"),
+            (["set", cat_var_id, "--if-state", "dummy", "exposure=0.1"], "set"),
+            (["add", cat_var_id, "--if-state", "dummy", "exposure=0.1"], "add"),
+            (["reset", cat_var_id, "--if-state", "dummy"], "reset"),
+            (["variant", "delete", "c1_wrk_dummy"], "delete"),
+        ]
+
+        for cmd_args, op_name in guard_checks:
+            code, rej_res = run_c1(cmd_args)
+            assert code == 1, f"Catalog mutation '{op_name}' should have failed with exit code 1, got {code}"
+            err_code = rej_res.get("error", {}).get("code")
+            err_msg = rej_res.get("error", {}).get("message", "")
+            assert err_code == "invalid-request", f"Expected 'invalid-request' for {op_name}, got {err_code}"
+            assert "read-only" in err_msg.lower() or "catalog" in err_msg.lower(), f"Unexpected error msg: {err_msg}"
+            print(f"PASS: Catalog guard strictly blocked '{op_name}' ({err_msg})")
+
         print("\n=======================================================")
-        print("ALL M1 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!")
+        print("ALL M1 & M2 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!")
         print("=======================================================")
 
     finally:

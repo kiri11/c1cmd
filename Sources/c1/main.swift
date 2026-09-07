@@ -70,6 +70,9 @@ struct C1: ParsableCommand {
             GetCommand.self,
             SetCommand.self,
             AddCommand.self,
+            ResetCommand.self,
+            DiffCommand.self,
+            DumpCommand.self,
             PreviewCommand.self,
             OperationCommand.self
         ]
@@ -78,7 +81,7 @@ struct C1: ParsableCommand {
 
 // MARK: - Doctor
 struct DoctorCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "doctor", abstract: "Check environment, app status, exact build, and session readiness.")
+    static let configuration = CommandConfiguration(commandName: "doctor", abstract: "Check environment, app status, exact build, and document readiness.")
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
@@ -93,8 +96,6 @@ struct DoctorCommand: ParsableCommand {
                     throw C1Error.unsupportedVersion("Running version '\(report.appVersion)' does not match pinned build '\(report.pinnedBuild)'.")
                 } else if !report.hasDocument {
                     throw C1Error.noDocument("No document is currently open in Capture One.")
-                } else if !report.isSession {
-                    throw C1Error.invalidRequest("Currently open document is not a Session. v0.1 only supports Sessions.")
                 } else if !report.lockAcquired {
                     throw C1Error.captureOneBusy("Capture One application lock could not be acquired.")
                 } else {
@@ -243,12 +244,12 @@ struct VariantsListCommand: ParsableCommand {
     }
 }
 
-// MARK: - Variant (clone / delete)
+// MARK: - Variant (clone / delete / baseline)
 struct VariantCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "variant",
-        abstract: "Manage individual variants (clone, delete).",
-        subcommands: [VariantCloneCommand.self, VariantDeleteCommand.self]
+        abstract: "Manage individual variants (clone, delete, baseline).",
+        subcommands: [VariantCloneCommand.self, VariantDeleteCommand.self, VariantBaselineCommand.self]
     )
 }
 
@@ -293,6 +294,30 @@ struct VariantDeleteCommand: ParsableCommand {
                 print("  Working Ref: \(res.workingRef)")
                 print("  Clone ID   : \(res.cloneVariantId)")
                 print("  Deleted    : \(res.deleted)")
+            }
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+struct VariantBaselineCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "baseline", abstract: "Create a managed default-settings baseline variant using native New Variant behavior.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Source variant native ID or name.")
+    var sourceRef: String
+
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let res = try SessionController.shared.createBaselineVariant(sourceRef: sourceRef)
+            if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
+                print(OutputFormatter.formatJson(res))
+            } else {
+                print("Created managed baseline variant:")
+                print("  Working Ref     : \(res.workingRef)")
+                print("  Baseline Nat ID : \(res.cloneVariantId)")
+                print("  Source Nat ID   : \(res.sourceVariantId)")
+                print("  Baseline Hash   : \(res.baselineStateHash)")
             }
         }
         if code != .success { throw ExitCode(code.rawValue) }
@@ -427,13 +452,101 @@ struct AddCommand: ParsableCommand {
     }
 }
 
-// MARK: - Preview
-struct PreviewCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "preview", abstract: "Export and verify dedicated preview JPEG for a managed working clone.")
+// MARK: - Reset
+struct ResetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "reset", abstract: "Reset verified adjustment fields on a managed working clone.")
     @OptionGroup var globals: GlobalOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
     var workingRef: String
+
+    @Option(help: "Expected stateHash before applying mutation (precondition).")
+    var ifState: String
+
+    @Flag(help: "Predict diff and target hash without mutating.")
+    var dryRun: Bool = false
+
+    @Argument(parsing: .remaining, help: "Optional fields to reset (e.g. exposure wb contrast). If omitted, resets all verified fields.")
+    var fields: [String] = []
+
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let res = try SessionController.shared.reset(
+                workingRefString: workingRef,
+                ifState: ifState,
+                fields: fields,
+                isDryRun: dryRun
+            )
+            print(OutputFormatter.renderMutationResult(res, format: globals.outputFormat))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+// MARK: - Diff
+struct DiffCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "diff", abstract: "Compare adjustments between two variants or compare a working variant against its baseline.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "First variant reference (or working reference to compare against its baseline).")
+    var ref1: String
+
+    @Argument(help: "Optional second variant reference to compare against ref1.")
+    var ref2: String?
+
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let res = try SessionController.shared.diff(ref1: ref1, ref2: ref2)
+            print(OutputFormatter.renderDiffResult(res, format: globals.outputFormat))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+// MARK: - Dump
+struct DumpCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "dump", abstract: "Batched export of variants, adjustments, and metadata as JSONL.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Option(help: "Name of collection to dump variants from.")
+    var collection: String?
+
+    @Flag(help: "Dump only selected variants.")
+    var selected: Bool = false
+
+    @Option(help: "Chunk size for batched variant queries.")
+    var batchSize: Int = 100
+
+    @Option(help: "Dump format: jsonl (default), json, or human.")
+    var dumpFormat: String = "jsonl"
+
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let records = try SessionController.shared.dump(
+                collectionName: collection,
+                selectedOnly: selected,
+                batchSize: batchSize
+            )
+            let isJsonl = dumpFormat.lowercased() == "jsonl" || (dumpFormat.lowercased() != "json" && dumpFormat.lowercased() != "human" && globals.outputFormat != .human)
+            if isJsonl {
+                print(OutputFormatter.renderDump(records, format: globals.outputFormat, jsonl: true))
+            } else if dumpFormat.lowercased() == "json" || globals.outputFormat == .json {
+                print(OutputFormatter.renderDump(records, format: .json, jsonl: false))
+            } else {
+                print(OutputFormatter.renderDump(records, format: .human, jsonl: false))
+            }
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+// MARK: - Preview
+struct PreviewCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "preview", abstract: "Export and verify dedicated preview JPEG for a variant or working clone.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Variant reference (working ref c1_wrk_<uuid> or native variant ID).")
+    var ref: String
 
     @Option(help: "Custom output directory.")
     var outputDir: String?
@@ -444,7 +557,7 @@ struct PreviewCommand: ParsableCommand {
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) {
             let res = try SessionController.shared.preview(
-                workingRefString: workingRef,
+                ref: ref,
                 outputDirOverride: outputDir,
                 timeout: timeout
             )
