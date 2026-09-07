@@ -36,7 +36,7 @@ agent ──▶ c1 (CLI)  /  c1-mcp (stdio MCP adapter)
         Capture One (running, licensed, GUI up)
 ```
 
-- One Swift package: core library and CLI first, then a third target for MCP in M2. Dependencies: AppleScriptBridge and swift-argument-parser; the official Swift MCP SDK is added only with the adapter and kept out of the core.
+- One Swift package: core library and CLI first, then a third target for MCP in M3. Dependencies: AppleScriptBridge and swift-argument-parser; the official Swift MCP SDK is added only with the adapter in M3 and kept out of the core.
 - All AppleScript lives in one resource file of named handlers. Swift never builds AppleScript source at runtime.
 - **Handlers accept batches from day one**: `getAdjustments(ids)`, `applyPatch(ids, patch)`, `getVariants(ids)`. One handler call may still issue many Apple Events. M0 measures actual application calls and latency, comparing loops with `... of every variant` bulk forms, including nested properties. Bound chunk sizes; do not assume batching makes writes atomic or always faster.
 
@@ -88,8 +88,9 @@ c1 reset <working-ref> --if-state <hash> exposure wb              # later, verif
 
 ### Verbs and release scope
 
-- **v0.1 / M1:** `doctor` · `version` · `capabilities` · `schema` · `doc info` · `variants list [--selected|--collection]` · `variant clone|delete` · `get` · `set` · `add` · `preview` · `operation status`. Mutation responses already include diffs; no separate diff command is needed for the first workflow.
-- **M3:** verified `reset` · `diff` · `dump` (bulk adjustments + metadata as JSONL) · read-only Catalog access. A command for creating a managed default-settings baseline variant is added only after native New Variant behavior is verified.
+- **v0.1 / M1 (Completed):** `doctor` · `version` · `capabilities` · `schema` · `doc info` · `variants list [--selected|--collection]` · `variant clone|delete` · `get` · `set` · `add` · `preview` · `operation status`. Mutation responses already include diffs; proven on single-session scope.
+- **M2 (CLI Full-Featured & Core Capabilities):** verified `reset` · `diff` · `dump` (bulk adjustments + metadata as JSONL) · read-only Catalog detection and access guards. A command for creating a managed default-settings baseline variant is added only after native New Variant behavior is verified.
+- **M3 (Full-Featured MCP Server `c1-mcp`):** stdio MCP adapter exposing the full suite of tools (`doctor`, `doc_info`, `variants_list`, `variant_clone`, `variant_delete`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`) with image content blocks and JSON schemas.
 - **M5, on demand:** `note` · `style list|apply` · `tag` · `export --recipe` · `snapshot save|restore`, plus broader adjustments. All variant mutations retain working-reference enforcement.
 
 `get`, and later `dump`, include verified capture metadata alongside adjustments. Camera, lens, ISO, shutter speed, as-shot WB, and capture time are read-only in c1. Rating and color tag are initially read-only; any later write support requires separate variant-isolation tests and capability entries.
@@ -241,24 +242,45 @@ Batched `dump` with coverage information; actual mutation readback; managed base
 
 ## 6. Milestones
 
-**M0 — Feasibility spike.** Discover blockers and retain repeatable probes. The timebox is not a promise to resolve every question. Select the exact build; record fixture details, evidence, measured latency, and unresolved risks in `docs/m0_requalification_<build>.md`, with machine-readable evidence under `docs/m0/<build>/`. The original 16.7.1.11 report remains at `docs/m0_spike.md`.
+**Current Status (2026-09-07):**
+- **M0 — Feasibility spike: COMPLETED.** Requalified on 16.8.5.30 / macOS 26.4.1 / M1 Pro under single-session scope. Core write safety, RAW byte-for-byte preservation (`be59cd...`), working clone isolation, 5-field mutations/deltas, boundary rejection, dedicated preview export, and safe variant deletion verified in [single_session_safety.json](docs/m0/16.8.5.30/single_session_safety.json).
+- **M1 — Safe editing + preview / v0.1: COMPLETED.**
+  - Implemented `CaptureOneCore` Swift library and `c1` CLI executable.
+  - FieldSpec registry for 5 verified fields (`exposure`, `contrast`, `saturation`, `temperature`, `tint`), 8 read-only metadata fields, and coupled WB handling.
+  - Working-variant safety model enforced in the core: mutations to unmanaged native IDs or originals are rejected with `unmanaged-variant`. Provenance stored in `<SessionDir>/.c1/provenance.json`.
+  - Document-bound execution, advisory flock locking, and pre-dispatch operation journaling in `<SessionDir>/.c1/journal.jsonl`.
+  - Precondition checks (`--if-state`) using canonical 64-char hex SHA-256 state hashing with tolerance-aware precision rounding.
+  - Bundled pre-compiled `Handlers.applescript` using non-reserved user-defined record keys (`usrf`).
+  - Dedicated `c1-preview` recipe export with ImageIO verification and pixel SHA-256.
+  - Implemented 12 CLI commands: `doctor`, `version`, `capabilities`, `schema`, `doc info`, `variants list`, `variant clone`, `variant delete`, `get`, `set`, `add`, `preview`, `operation status`.
+  - 66/66 automated unit test assertions passing (`swift run CaptureOneCoreTests`).
+  - 14/14 automated end-to-end integration steps passing on live Session with real Canon EOS R CR3 file, confirming zero corruption of RAW file (byte-for-byte identical SHA-256), original variant invariance, and clean clone deletion.
+  - `examples/grade-folder.py` grading workflow with daylight preset and decision sidecars.
+- **Roadmap Sequence Update:** Swapped M2 and M3 to make the CLI fully featured first before building the stdio MCP adapter.
 
-- Verify clone preservation, variant-only deletion, and isolation of original/source/sibling state, including pre-existing layers and changes in selection.
-- Test unique addressing and document binding; exercise restart, reopen, reorder, and deletion to decide reference lifetimes and whether durable identity is feasible.
-- For the initial fields, test changed-value writes, actual readback, precision, deltas, and coupled behavior. Check codec round-trips for nested records, missing values, nulls, and arrays. Snapshot the dictionary and capture `aelint` coverage alongside explicit probes.
-- Exercise two concurrent c1 invocations across the same and different documents, stale preconditions, and document switching. Test partial patches/batches, lost replies, application timeouts, and c1 termination while Capture One continues work. Establish which outcomes can be reconciled and which must remain unknown.
-- Prove one explicitly targeted preview recipe, unique output/job association, and reliable completion. Prefer polling; if callbacks are needed, prove crash recovery and preservation of intervening user changes.
-- Benchmark 1/10/100/1000 variants where feasible, distinguishing handler overhead from actual Apple Events and nested bulk behavior. Select bounded batch sizes and separate event/job deadlines. Large-catalog throughput is a later measurement, not a core feasibility blocker.
+---
 
-**Current M0 status (2026-09-07):** Runtime requalification on 16.8.5.30 / macOS 26.4.1 / M1 Pro is **qualified under reduced scope: Go to M1**. Five-field writes, fixture clone preservation, variant-only deletion, RAW file preservation (SHA-256 byte-for-byte identical), fail-closed document check, and dedicated preview export are proven in [single_session_safety.json](docs/m0/16.8.5.30/single_session_safety.json). Scope is restricted to a single open Session; multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred. See the [capability evidence matrix](docs/m0/16.8.5.30/capabilities.json).
+### Milestone Roadmap
 
-**M0 exit decision:** **Go with reduced scope**. Core write safety is proven for the primary single-session editing loop. M1 will implement the core library and CLI targeting the active open Session without overcomplicating multi-document or concurrent access.
+**M0 — Feasibility spike (Completed).** Discover blockers and retain repeatable probes. See [m0_requalification_16.8.5.30.md](docs/m0_requalification_16.8.5.30.md).
 
-**M1 — Safe editing + preview / v0.1.** Implement the small §3 command set and a complete workflow on curated Sessions. Include FieldSpec/exact-build capabilities, working-reference enforcement, document binding, provenance/operation journal, state preconditions, partial/unknown outcomes, actual readback, application-wide locking, preview completion, JSON/human input/output, and required tests. Ship a small `examples/grade-folder.py` using an explicit preset and sidecar records. Publish signed/notarized binaries after end-to-end review and failure-path checks pass; no learned-style or catalog dependency.
+**M1 — Safe editing + preview / v0.1 (Completed).** Core library, working-variant enforcement, 12 core CLI commands, dedicated preview export, and integration harness.
 
-**M2 — Thin MCP adapter.** Add `c1-mcp` over stdio using the official Swift MCP SDK. Expose the same core contract, working references, preconditions, and recovery behavior; previews use image content blocks. Serialize core access and test from clients supporting local stdio servers. CLI remains the recommended path for shell-capable agents. MCP does not require the style loop.
+**M2 — CLI Full-Featured & Core Capabilities (Next up; formerly M3).**
+Make the CLI interface comprehensive before introducing the MCP adapter layer:
+- **`reset`**: Implement verified field resets on working variants in `Handlers.applescript` and `SessionController.swift` (`c1 reset <working-ref> --if-state <hash> [fields...]`).
+- **`diff`**: Add standalone diff comparison command (`c1 diff <ref1> [ref2]`) to compare variants or compare working variant against baseline.
+- **`dump`**: Batched export of variants, adjustments, and metadata as JSONL (`c1 dump [--collection <name>] [--format jsonl]`).
+- **Catalog read-only detection and guards**: Add detection for open Catalogs, allowing read-only inspection, listing, `get`, `dump`, and `preview`, while enforcing strict fail-closed guards blocking any mutation commands (`clone`, `delete`, `set`, `add`, `reset`).
+- **Managed default-baseline creation**: Add command for creating a managed default-settings baseline variant after native New Variant behavior is verified for Sessions.
+- **Unit and fixture tests**: Extend test suite to cover reset, diff, dump, and Catalog read-only guards.
 
-**M3 — Dataset and baseline support.** Add `dump`/`diff`, verified field resets, and managed default-baseline creation for Sessions. Qualify read-only Catalog `get`/`dump`/`preview`, including offline/missing sources, coverage, chunking, and 10k-image throughput. Validate a scratch-Session path before offering Catalog-derived baseline pairs. Resolve durable identity before enabling automatic cross-restart pairing; if unavailable, keep the corresponding workflows disabled.
+**M3 — Full-Featured MCP Server `c1-mcp` (formerly M2).**
+Build a thin stdio MCP adapter over the complete core library:
+- Add official Swift MCP SDK dependency to `Package.swift`.
+- Create `Sources/c1-mcp/` executable target running over stdio.
+- Expose the full suite of tools (`doctor`, `doc_info`, `variants_list`, `variant_clone`, `variant_delete`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`) with image content blocks and JSON schemas.
+- Serialize core access and test from local MCP client tools.
 
 **M4 — Experimental style loop.** Add `learn-style.py`, the versioned `style/` artifact, explicit review records, `harvest-corrections.py`, and `propose-revision.py`. Start with curated reviewed Sessions and separate development/held-out shoots. Require declared evaluation criteria and photographer approval. Exercise the full loop on real shoots before considering format stability; two shoots alone are insufficient evidence of generalization.
 
