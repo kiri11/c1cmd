@@ -15,7 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 C1_BIN = ROOT / ".build" / "debug" / "c1"
 SESSION_DIR = Path("/private/tmp/c1-m1-e2e")
 SESSION_NAME = "c1-m1-e2e.cosessiondb"
-SOURCE_CR3 = Path(os.environ.get("C1_TEST_RAW_FIXTURE", "/Users/kiri11/Desktop/papochka/2U6A7082.CR3"))
+DISPOSABLE_CAT_NAME = "c1-cat-guard-test"
+DISPOSABLE_CAT_DIR = Path(f"/private/tmp/{DISPOSABLE_CAT_NAME}.cocatalog")
+
+raw_fixture_env = os.environ.get("C1_TEST_RAW_FIXTURE")
+SOURCE_CR3 = Path(raw_fixture_env) if raw_fixture_env else None
 
 def run_applescript(script: str) -> str:
     res = subprocess.run(["osascript", "-s", "s", "-e", f'tell application "/Applications/Capture One.app"\n{script}\nend tell'], capture_output=True, text=True)
@@ -55,25 +59,37 @@ def run_c1_raw(args: list[str]) -> tuple[int, str, str]:
 def main():
     print("=== c1 M1 End-to-End Integration Verification ===")
     assert C1_BIN.exists(), f"Binary {C1_BIN} does not exist. Run swift build first."
-    assert SOURCE_CR3.exists(), f"Source RAW fixture {SOURCE_CR3} does not exist."
+    if SOURCE_CR3 is None or not SOURCE_CR3.exists():
+        print("\n[ERROR] C1_TEST_RAW_FIXTURE environment variable not set or file not found.")
+        print("Live integration tests require a local RAW image (e.g. Canon CR3, Nikon NEF, Sony ARW).")
+        print("Usage:")
+        print("  export C1_TEST_RAW_FIXTURE=/path/to/image.CR3")
+        print("  python3 Tests/integration_test.py\n")
+        sys.exit(1)
 
     # Record initial open document
-    initial_doc = run_applescript('''
-        set d to missing value
-        try
-            set d to current document
-        on error
+    initial_doc_path = None
+    try:
+        doc_path_out = run_applescript('''
+            set d to missing value
             try
-                set d to first document
+                set d to current document
+            on error
+                try
+                    set d to first document
+                end try
             end try
-        end try
-        if d is not missing value then
-            return {name of d, path of d}
-        else
-            return "none"
-        end if
-    ''')
-    print(f"Initial document: {initial_doc}")
+            if d is not missing value then
+                return POSIX path of ((path of d) as text)
+            else
+                return "none"
+            end if
+        ''')
+        if doc_path_out and doc_path_out != "none":
+            initial_doc_path = doc_path_out
+    except Exception:
+        pass
+    print(f"Initial document path: {initial_doc_path}")
 
     try:
         # 1. Setup disposable session
@@ -342,14 +358,14 @@ def main():
 
         # 19. Catalog Read-Only Detection & Mutation Guards
         print("\n[Step 19] Testing Catalog read-only detection & mutation guards...")
-        # Close test session and switch to Capture One Catalog
+        # Close test session and create disposable test Catalog
+        if DISPOSABLE_CAT_DIR.exists():
+            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
         run_applescript(f'''
             if exists document "{SESSION_NAME}" then
                 close document "{SESSION_NAME}" without saving
             end if
-            if not (exists document "Capture One Catalog") then
-                open POSIX file "/Users/kiri11/Pictures/Capture One Catalog.cocatalog"
-            end if
+            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"/private/tmp"}}
         ''')
         cat_doc_res = {}
         code = 1
@@ -361,61 +377,58 @@ def main():
         assert code == 0, f"doctor failed on catalog: {cat_doc_res}"
         assert cat_doc_res.get("allChecksPassed") is True
         assert cat_doc_res.get("isSession") is False
-        assert "Capture One Catalog" in cat_doc_res.get("docName", "")
+        assert DISPOSABLE_CAT_NAME in cat_doc_res.get("docName", "")
         print("PASS: c1 doctor passes on Catalog (isSession=False, allChecksPassed=True)")
 
         # doc info on catalog
         code, cat_info_res = run_c1(["doc", "info"])
         assert code == 0
         assert cat_info_res.get("isSession") is False
-        assert "cocatalog" in cat_info_res.get("documentId", "")
-        print(f"PASS: c1 doc info correctly identifies Catalog document: {cat_info_res.get('documentId')}")
+        assert DISPOSABLE_CAT_NAME in cat_info_res.get("documentName", "")
+        print("PASS: c1 doc info returns isSession=False on Catalog")
 
-        # variants list on catalog
-        code, cat_vars_res = run_c1(["variants", "list"])
-        assert code == 0
-        assert len(cat_vars_res) > 0, "Expected catalog to have variants"
-        cat_var_id = cat_vars_res[0]["id"]
-        print(f"PASS: c1 variants list found {len(cat_vars_res)} variants in Catalog (sample ID: {cat_var_id})")
+        # Test mutation guards on Catalog
+        # 1. clone
+        code, err_res = run_c1(["variant", "clone", "1"])
+        assert code != 0
+        err_code = err_res.get("error", {}).get("code")
+        assert err_code == "invalid-request", f"Expected 'invalid-request', got {err_code}"
+        print(f"PASS: Catalog guard strictly blocked clone ({err_res.get('error', {}).get('message')})")
 
-        # get on catalog
-        code, cat_get_res = run_c1(["get", cat_var_id])
-        assert code == 0
-        assert cat_get_res["id"] == cat_var_id
-        assert "adjustments" in cat_get_res
-        assert "metadata" in cat_get_res
-        print(f"PASS: c1 get successfully read variant {cat_var_id} from Catalog")
+        # 2. mutate (set)
+        code, err_res = run_c1(["set", "1", "exposure=0.5", "--if-state", "dummy"])
+        assert code != 0
+        err_code = err_res.get("error", {}).get("code")
+        assert err_code == "invalid-request", f"Expected 'invalid-request', got {err_code}"
+        print(f"PASS: Catalog guard strictly blocked set ({err_res.get('error', {}).get('message')})")
 
-        # dump on catalog
-        code, cat_dump_raw, _ = run_c1_raw(["dump"])
-        assert code == 0
-        cat_dump_lines = [l.strip() for l in cat_dump_raw.splitlines() if l.strip()]
-        assert len(cat_dump_lines) == len(cat_vars_res)
-        print(f"PASS: c1 dump successfully exported {len(cat_dump_lines)} variants from Catalog as JSONL")
+        # 3. reset
+        code, err_res = run_c1(["reset", "1", "exposure", "--if-state", "dummy"])
+        assert code != 0
+        err_code = err_res.get("error", {}).get("code")
+        assert err_code == "invalid-request", f"Expected 'invalid-request', got {err_code}"
+        print(f"PASS: Catalog guard strictly blocked reset ({err_res.get('error', {}).get('message')})")
 
-        # diff on catalog (two native variants)
-        if len(cat_vars_res) >= 2:
-            code, cat_diff_res = run_c1(["diff", cat_vars_res[0]["id"], cat_vars_res[1]["id"]])
-            assert code == 0
-            assert "diff" in cat_diff_res
-            print(f"PASS: c1 diff successfully compared catalog variants {cat_vars_res[0]['id']} and {cat_vars_res[1]['id']}")
+        # 4. baseline
+        code, err_res = run_c1(["variant", "baseline", "1"])
+        assert code != 0
+        err_code = err_res.get("error", {}).get("code")
+        assert err_code == "invalid-request", f"Expected 'invalid-request', got {err_code}"
+        print(f"PASS: Catalog guard strictly blocked baseline ({err_res.get('error', {}).get('message')})")
 
-        # Strict fail-closed mutation guards on Catalog
-        print("\nVerifying fail-closed mutation guards on Catalog...")
-        guard_checks = [
-            (["variant", "clone", cat_var_id], "clone"),
-            (["variant", "baseline", cat_var_id], "baseline"),
-            (["set", cat_var_id, "--if-state", "dummy", "exposure=0.1"], "set"),
-            (["add", cat_var_id, "--if-state", "dummy", "exposure=0.1"], "add"),
-            (["reset", cat_var_id, "--if-state", "dummy"], "reset"),
-            (["variant", "delete", "c1_wrk_dummy"], "delete"),
-        ]
+        # 5. delete
+        code, err_res = run_c1(["variant", "delete", "1"])
+        assert code != 0
+        err_code = err_res.get("error", {}).get("code")
+        assert err_code == "invalid-request", f"Expected 'invalid-request', got {err_code}"
+        print(f"PASS: Catalog guard strictly blocked delete ({err_res.get('error', {}).get('message')})")
 
-        for cmd_args, op_name in guard_checks:
-            code, rej_res = run_c1(cmd_args)
-            assert code == 1, f"Catalog mutation '{op_name}' should have failed with exit code 1, got {code}"
-            err_code = rej_res.get("error", {}).get("code")
-            err_msg = rej_res.get("error", {}).get("message", "")
+        # Test all remaining mutation subcommands
+        for op_name, op_args in [("add", ["add", "1", "exposure=0.1", "--if-state", "dummy"])]:
+            code, err_res = run_c1(op_args)
+            assert code != 0
+            err_code = err_res.get("error", {}).get("code")
+            err_msg = err_res.get("error", {}).get("message", "")
             assert err_code == "invalid-request", f"Expected 'invalid-request' for {op_name}, got {err_code}"
             assert "read-only" in err_msg.lower() or "catalog" in err_msg.lower(), f"Unexpected error msg: {err_msg}"
             print(f"PASS: Catalog guard strictly blocked '{op_name}' ({err_msg})")
@@ -426,21 +439,25 @@ def main():
 
     finally:
         # Cleanup
-        print("\n[Cleanup] Cleaning up test session...")
+        print("\n[Cleanup] Cleaning up test session and temporary documents...")
         try:
             run_applescript(f'''
                 if exists document "{SESSION_NAME}" then
                     close document "{SESSION_NAME}" without saving
                 end if
-                if not (exists document "Capture One Catalog") then
-                    open POSIX file "/Users/kiri11/Pictures/Capture One Catalog.cocatalog"
+                if exists document "{DISPOSABLE_CAT_NAME}" then
+                    close document "{DISPOSABLE_CAT_NAME}" without saving
                 end if
             ''')
+            if initial_doc_path and os.path.exists(initial_doc_path):
+                run_applescript(f'open POSIX file "{initial_doc_path}"')
         except Exception as e:
             print(f"Cleanup warning: {e}")
         
         if SESSION_DIR.exists():
             shutil.rmtree(SESSION_DIR, ignore_errors=True)
+        if DISPOSABLE_CAT_DIR.exists():
+            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
         print("Cleanup completed.")
 
 if __name__ == "__main__":

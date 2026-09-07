@@ -24,6 +24,7 @@ public struct DocumentInfo: Codable, Equatable {
     public let openToken: String
     public let captureFolder: String
     public let outputFolder: String
+    public let appVersion: String
 
     public init(
         documentId: String,
@@ -32,7 +33,8 @@ public struct DocumentInfo: Codable, Equatable {
         isSession: Bool,
         openToken: String,
         captureFolder: String = "",
-        outputFolder: String = ""
+        outputFolder: String = "",
+        appVersion: String = SessionController.pinnedBuild
     ) {
         self.documentId = documentId
         self.documentName = documentName
@@ -41,6 +43,7 @@ public struct DocumentInfo: Codable, Equatable {
         self.openToken = openToken
         self.captureFolder = captureFolder
         self.outputFolder = outputFolder
+        self.appVersion = appVersion
     }
 }
 
@@ -216,13 +219,23 @@ public final class SessionController {
     }
 
     // MARK: - Document Info
-    public func getDocumentInfo() throws -> DocumentInfo {
+    public func getDocumentInfo(allowUntestedBuild: Bool = false) throws -> DocumentInfo {
         let info: AppAndDocInfoResult = try executor.executeAndDecode(
             handler: "getAppAndDocInfo",
             args: []
         )
         guard info.hasDocument, let name = info.docName, let path = info.docPath else {
             throw C1Error.noDocument("No document is currently open in Capture One.")
+        }
+
+        let isBuildAllowed = allowUntestedBuild
+            || ProcessInfo.processInfo.environment["C1_ALLOW_UNTESTED_BUILD"] == "1"
+            || info.appVersion == Self.pinnedBuild
+
+        guard isBuildAllowed else {
+            throw C1Error.unsupportedVersion(
+                "Running Capture One build '\(info.appVersion)' is not verified (pinned: '\(Self.pinnedBuild)'). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
+            )
         }
 
         var docDir = path
@@ -249,12 +262,20 @@ public final class SessionController {
             isSession: info.isSession,
             openToken: openToken,
             captureFolder: captureDir,
-            outputFolder: outputDir
+            outputFolder: outputDir,
+            appVersion: info.appVersion
         )
     }
 
     // MARK: - Mutation Guard
     public func assertSessionWritable(docInfo: DocumentInfo, operation: String) throws {
+        let isBuildAllowed = ProcessInfo.processInfo.environment["C1_ALLOW_UNTESTED_BUILD"] == "1"
+            || docInfo.appVersion == Self.pinnedBuild
+        guard isBuildAllowed else {
+            throw C1Error.unsupportedVersion(
+                "Running Capture One build '\(docInfo.appVersion)' is not verified (pinned: '\(Self.pinnedBuild)'). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
+            )
+        }
         guard docInfo.isSession else {
             throw C1Error.invalidRequest("Catalogs are strictly read-only. Mutation operation '\(operation)' cannot be performed on Catalog '\(docInfo.documentName)'. Open a Session to mutate variants.")
         }

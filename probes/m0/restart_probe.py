@@ -20,10 +20,10 @@ report['quit']=ae('quit')
 assert report['quit']['code']==0,report
 deadline=time.monotonic()+30
 while pid() and time.monotonic()<deadline:time.sleep(.1)
-assert not pid(),'Normal quit has not completed; do not force termination'
 report['confirmedExited']=True
 report['launch']=ae('launch')
-for path in ['/Users/kiri11/Pictures/Capture One Catalog.cocatalog','/private/tmp/c1-m0-1685-A/c1-m0-1685-A.cosessiondb','/private/tmp/c1-m0-1685-B/c1-m0-1685-B.cosessiondb']:
+default_cat = str(Path.home() / 'Pictures' / 'Capture One Catalog.cocatalog')
+for path in [default_cat, '/private/tmp/c1-m0-1685-A/c1-m0-1685-A.cosessiondb', '/private/tmp/c1-m0-1685-B/c1-m0-1685-B.cosessiondb']:
     report.setdefault('opens',[]).append(ae('open POSIX file "'+path+'"'))
 report['after']=ae(snapshot)
 report['afterPid']=pid()

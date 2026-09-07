@@ -16,7 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 MCP_BIN = ROOT / ".build" / "debug" / "c1-mcp"
 SESSION_DIR = Path("/private/tmp/c1-mcp-e2e")
 SESSION_NAME = "c1-mcp-e2e.cosessiondb"
-SOURCE_CR3 = Path(os.environ.get("C1_TEST_RAW_FIXTURE", "/Users/kiri11/Desktop/papochka/2U6A7082.CR3"))
+DISPOSABLE_CAT_NAME = "c1-cat-guard-test"
+DISPOSABLE_CAT_DIR = Path(f"/private/tmp/{DISPOSABLE_CAT_NAME}.cocatalog")
+
+raw_fixture_env = os.environ.get("C1_TEST_RAW_FIXTURE")
+SOURCE_CR3 = Path(raw_fixture_env) if raw_fixture_env else None
 
 def run_applescript(script: str) -> str:
     res = subprocess.run(
@@ -107,25 +111,37 @@ def find_image_content(content_items: list[dict]) -> dict | None:
 def main():
     print("=== c1-mcp Stdio Server Comprehensive Test Suite ===")
     assert MCP_BIN.exists(), f"Binary {MCP_BIN} does not exist. Run 'swift build' first."
-    assert SOURCE_CR3.exists(), f"Source RAW fixture {SOURCE_CR3} does not exist."
+    if SOURCE_CR3 is None or not SOURCE_CR3.exists():
+        print("\n[ERROR] C1_TEST_RAW_FIXTURE environment variable not set or file not found.")
+        print("Live MCP integration tests require a local RAW image (e.g. Canon CR3, Nikon NEF, Sony ARW).")
+        print("Usage:")
+        print("  export C1_TEST_RAW_FIXTURE=/path/to/image.CR3")
+        print("  python3 Tests/mcp_test.py\n")
+        sys.exit(1)
 
     # Record initial open document
-    initial_doc = run_applescript('''
-        set d to missing value
-        try
-            set d to current document
-        on error
+    initial_doc_path = None
+    try:
+        doc_path_out = run_applescript('''
+            set d to missing value
             try
-                set d to first document
+                set d to current document
+            on error
+                try
+                    set d to first document
+                end try
             end try
-        end try
-        if d is not missing value then
-            return {name of d, path of d}
-        else
-            return "none"
-        end if
-    ''')
-    print(f"Initial document: {initial_doc}")
+            if d is not missing value then
+                return POSIX path of ((path of d) as text)
+            else
+                return "none"
+            end if
+        ''')
+        if doc_path_out and doc_path_out != "none":
+            initial_doc_path = doc_path_out
+    except Exception:
+        pass
+    print(f"Initial document path: {initial_doc_path}")
 
     # Setup disposable session
     print("\n[Step 0] Creating disposable Session at /private/tmp/c1-mcp-e2e...")
@@ -396,14 +412,14 @@ def main():
         # 10. Catalog Read-Only Guard Verification over MCP
         print("\n[Step 10] Testing Catalog fail-closed mutation guard over MCP...")
         total_tests += 1
-        # Close test session and reopen Catalog
+        # Close test session and create disposable test Catalog
+        if DISPOSABLE_CAT_DIR.exists():
+            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
         run_applescript(f'''
             try
                 close document "{SESSION_NAME}" without saving
             end try
-            if not (exists document "Capture One Catalog") then
-                open POSIX file "/Users/kiri11/Pictures/Capture One Catalog.cocatalog"
-            end if
+            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"/private/tmp"}}
         ''')
         time.sleep(1.5)
 
@@ -446,15 +462,19 @@ def main():
                 try
                     close document "{SESSION_NAME}" without saving
                 end try
-                if not (exists document "Capture One Catalog") then
-                    open POSIX file "/Users/kiri11/Pictures/Capture One Catalog.cocatalog"
+                if exists document "{DISPOSABLE_CAT_NAME}" then
+                    close document "{DISPOSABLE_CAT_NAME}" without saving
                 end if
             ''')
+            if initial_doc_path and os.path.exists(initial_doc_path):
+                run_applescript(f'open POSIX file "{initial_doc_path}"')
         except Exception:
             pass
         time.sleep(1.0)
         if SESSION_DIR.exists():
             shutil.rmtree(SESSION_DIR, ignore_errors=True)
+        if DISPOSABLE_CAT_DIR.exists():
+            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
