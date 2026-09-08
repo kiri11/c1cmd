@@ -13,6 +13,7 @@ DiffTests.run()
 DumpTests.run()
 CatalogGuardTests.run()
 VersionCompatibilityTests.run()
+ReleaseSafetyTests.run()
 
 print("\n=== Test Results ===")
 print("Total Assertions : \(totalTestCount)")

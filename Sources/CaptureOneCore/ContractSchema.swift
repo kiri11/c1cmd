@@ -1,0 +1,138 @@
+import Foundation
+import CoreFoundation
+
+/// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
+public enum ContractSchema {
+    public static let version = "1.0.0"
+    static let string: [String: Any] = ["type": "string", "minLength": 1]
+    static let boolean: [String: Any] = ["type": "boolean"]
+    static let number: [String: Any] = ["type": "number"]
+    public static func object(_ properties: [String: Any], required: [String] = []) -> [String: Any] {
+        ["type": "object", "properties": properties, "required": required, "additionalProperties": false]
+    }
+    static func array(_ item: [String: Any]) -> [String: Any] { ["type": "array", "items": item] }
+    static func adjustments(delta: Bool = false, aliases: Bool = false) -> [String: Any] {
+        var props: [String: Any] = [:]
+        for field in FieldRegistry.shared.supportedAdjustmentFields {
+            var schema = number
+            if !delta { schema["minimum"] = field.minValue; schema["maximum"] = field.maxValue }
+            props[field.name] = schema
+            if aliases { for alias in field.aliases { props[alias] = schema } }
+        }
+        var result = object(props)
+        result["minProperties"] = 1
+        return result
+    }
+    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "reset", "diff", "dump", "preview", "operation_status"]
+    public static func input(_ name: String) -> [String: Any] {
+        switch name {
+        case "variants_list": return object(["collection": string, "selected": boolean])
+        case "variant_clone", "variant_baseline": return object(["sourceRef": string], required: ["sourceRef"])
+        case "variant_delete": return object(["workingRef": string], required: ["workingRef"])
+        case "get": return object(["ref": string], required: ["ref"])
+        case "set", "add":
+            let adj = adjustments(delta: name == "add", aliases: true)
+            var props = adj["properties"] as! [String: Any]
+            props["workingRef"] = string; props["ifState"] = string; props["dryRun"] = boolean; props["adjustments"] = adj
+            var result = object(props, required: ["workingRef", "ifState"])
+            let fields = (adj["properties"] as! [String: Any]).keys.sorted()
+            result["anyOf"] = (["adjustments"] + fields).map { ["required": [$0]] }
+            result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
+            return result
+        case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
+        case "diff": return object(["ref1": string, "ref2": string], required: ["ref1"])
+        case "dump": return object(["collection": string, "selected": boolean, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
+        case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300]], required: ["ref"])
+        case "operation_status": return object(["operationId": string], required: ["operationId"])
+        default: return object([:])
+        }
+    }
+
+    public static func parseAdjustments(_ values: [String: Any], delta: Bool) throws -> Adjustments {
+        try validate(tool: delta ? "add" : "set", arguments: ["workingRef": "validation", "ifState": "validation", "adjustments": values])
+        var result = Adjustments()
+        for (name, value) in values {
+            result.setValue((value as! NSNumber).doubleValue, for: FieldRegistry.shared.canonicalName(for: name)!)
+        }
+        return result
+    }
+
+    public static func validate(tool: String, arguments: [String: Any]) throws {
+        guard names.contains(tool) else { throw C1Error.invalidRequest("Unknown tool: \(tool)") }
+        try validateValue(arguments, schema: input(tool), path: tool)
+        if tool == "set" || tool == "add" {
+            let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
+            let top = arguments.filter { !controls.contains($0.key) }
+            let nested = arguments["adjustments"] as? [String: Any]
+            guard nested == nil || top.isEmpty else { throw C1Error.invalidRequest("Use nested or flat adjustments, not both.") }
+            let values = nested ?? top
+            guard !values.isEmpty else { throw C1Error.invalidRequest("At least one adjustment is required.") }
+            var canonical = Set<String>()
+            for key in values.keys {
+                guard let name = FieldRegistry.shared.canonicalName(for: key), canonical.insert(name).inserted else {
+                    throw C1Error.invalidRequest("Duplicate adjustment aliases: \(key)")
+                }
+            }
+        }
+        if tool == "reset", let fields = arguments["fields"] as? [String] {
+            _ = try FieldRegistry.shared.computeResetValues(fields: fields, baseline: Adjustments(temperature: 5000, tint: 0))
+        }
+    }
+
+    static func validateValue(_ value: Any, schema: [String: Any], path: String) throws {
+        func invalid() -> C1Error { .invalidRequest("Invalid value for \(path). Expected \(schema["type"] ?? "value").") }
+        switch schema["type"] as? String {
+        case "object":
+            guard let object = value as? [String: Any] else { throw invalid() }
+            let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
+            for key in schema["required"] as? [String] ?? [] { guard object[key] != nil else { throw C1Error.invalidRequest("Missing required argument: \(path).\(key)") } }
+            if let min = schema["minProperties"] as? Int, object.count < min { throw invalid() }
+            for (key, item) in object {
+                guard let spec = properties[key] else { throw C1Error.invalidRequest("Unknown argument: \(path).\(key)") }
+                try validateValue(item, schema: spec, path: "\(path).\(key)")
+            }
+        case "array":
+            guard let items = value as? [Any], let spec = schema["items"] as? [String: Any] else { throw invalid() }
+            for item in items { try validateValue(item, schema: spec, path: path) }
+        case "string": guard let text = value as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw invalid() }
+        case "boolean": guard let num = value as? NSNumber, CFGetTypeID(num) == CFBooleanGetTypeID() else { throw invalid() }
+        case "number", "integer":
+            guard let num = value as? NSNumber, CFGetTypeID(num) != CFBooleanGetTypeID(), num.doubleValue.isFinite else { throw invalid() }
+            let n = num.doubleValue
+            if schema["type"] as? String == "integer", n.rounded() != n { throw invalid() }
+            if let min = (schema["minimum"] as? NSNumber)?.doubleValue, n < min { throw invalid() }
+            if let min = (schema["exclusiveMinimum"] as? NSNumber)?.doubleValue, n <= min { throw invalid() }
+            if let max = (schema["maximum"] as? NSNumber)?.doubleValue, n > max { throw invalid() }
+        default: throw invalid()
+        }
+    }
+
+    public static func document() -> [String: Any] {
+        var requests: [String: Any] = [:]
+        for name in names { requests[name] = input(name) }
+        let diff = object(["before": ["type": ["number", "null"]], "after": ["type": ["number", "null"]], "delta": number])
+        let diffs: [String: Any] = ["type": "object", "additionalProperties": diff]
+        let adj = adjustments()
+        let metadata: [String: Any] = ["type": "object", "properties": Dictionary(uniqueKeysWithValues: ["camera", "lens", "iso", "shutterSpeed", "asShotWB", "captureDate"].map { ($0, string) }).merging(["rating": ["type": "integer"], "colorTag": ["type": "integer"]]) { _, b in b }]
+        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "stateHash": string], required: ["id", "adjustments", "metadata", "stateHash"])
+        let mutation = object(["operationId": string, "workingRef": string, "before": adj, "after": adj, "diff": diffs, "stateHash": string, "isDryRun": boolean], required: ["operationId", "workingRef", "before", "after", "diff", "stateHash", "isDryRun"])
+        let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
+        let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
+        var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string
+        let responses: [String: Any] = [
+            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
+            "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
+            "capabilities": ["type": "object"], "schema": ["type": "object"],
+            "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,
+            "variant_delete": object(["deleted": boolean, "workingRef": string, "cloneVariantId": string]),
+            "get": get, "set": mutation, "add": mutation, "reset": mutation,
+            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs]),
+            "dump": array(object(dumpProps)),
+            "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string]),
+            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string)])
+        ]
+        return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
+                "requests": requests, "responses": responses,
+                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string], required: ["code", "message"])], required: ["error"])]]
+    }
+}

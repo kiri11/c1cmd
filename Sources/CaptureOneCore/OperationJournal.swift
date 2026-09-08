@@ -18,6 +18,12 @@ public struct DoubleDiff: Codable, Equatable {
 
 public struct OperationRecord: Codable, Equatable {
     public let operationId: String
+    public var appInstance: String?
+    public var documentIdentity: String?
+    public var nativeVariantId: String?
+    public var parentImagePath: String?
+    public var variantIdsBefore: [String]?
+    public var observedVariantIds: [String]?
     public let timestamp: String
     public let operationType: String
     public let workingRef: String?
@@ -79,82 +85,63 @@ public final class OperationJournal {
         }
     }
 
-    public func loadEntries() -> [OperationRecord] {
-        guard FileManager.default.fileExists(atPath: journalFile.path),
-              let content = try? String(contentsOf: journalFile, encoding: .utf8) else {
-            return []
+    public func validatedEntries() throws -> [OperationRecord] {
+        guard FileManager.default.fileExists(atPath: journalFile.path) else { return [] }
+        let data = try Data(contentsOf: journalFile)
+        guard let content = String(data: data, encoding: .utf8) else {
+            throw C1Error.invalidRequest("Journal is not UTF-8; preserve it for recovery.")
         }
-        var entries: [OperationRecord] = []
-        let decoder = JSONDecoder()
-        for line in content.components(separatedBy: .newlines) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
-            if let data = trimmed.data(using: .utf8),
-               let record = try? decoder.decode(OperationRecord.self, from: data) {
-                entries.append(record)
-            }
+        var latest: [String: OperationRecord] = [:]
+        var order: [String] = []
+        for line in content.split(separator: "\n") {
+            let record = try JSONDecoder().decode(OperationRecord.self, from: Data(line.utf8))
+            if latest[record.operationId] == nil { order.append(record.operationId) }
+            latest[record.operationId] = record
         }
-        return entries
+        return order.compactMap { latest[$0] }
     }
 
+    public func loadEntries() -> [OperationRecord] { (try? validatedEntries()) ?? [] }
+
+    /// Append snapshots rather than rewriting history. A failed durable append prevents dispatch.
     public func append(entry: OperationRecord) throws {
         try ensureDirectoryExists()
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(entry)
-        guard var line = String(data: data, encoding: .utf8) else { return }
-        line += "\n"
-
-        if FileManager.default.fileExists(atPath: journalFile.path) {
-            if let handle = try? FileHandle(forWritingTo: journalFile) {
-                handle.seekToEndOfFile()
-                if let lineData = line.data(using: .utf8) {
-                    handle.write(lineData)
-                }
-                try? handle.close()
-            }
-        } else {
-            try line.write(to: journalFile, atomically: true, encoding: .utf8)
-        }
-    }
-
-    public func update(
-        operationId: String,
-        status: String,
-        afterAdjustments: Adjustments? = nil,
-        diff: [String: DoubleDiff]? = nil,
-        error: String? = nil,
-        previewOutputPath: String? = nil
-    ) throws {
-        var entries = loadEntries()
-        guard let idx = entries.firstIndex(where: { $0.operationId == operationId }) else {
-            return
-        }
-        entries[idx].status = status
-        if let after = afterAdjustments { entries[idx].afterAdjustments = after }
-        if let d = diff { entries[idx].diff = d }
-        if let err = error { entries[idx].error = err }
-        if let pop = previewOutputPath { entries[idx].previewOutputPath = pop }
-
-        // Rewrite entire journal atomically
-        try ensureDirectoryExists()
-        let encoder = JSONEncoder()
-        var fullContent = ""
-        for entry in entries {
-            let data = try encoder.encode(entry)
-            if let line = String(data: data, encoding: .utf8) {
-                fullContent += line + "\n"
+        _ = try validatedEntries()
+        var data = try JSONEncoder().encode(entry)
+        data.append(0x0a)
+        if !FileManager.default.fileExists(atPath: journalFile.path) {
+            guard FileManager.default.createFile(atPath: journalFile.path, contents: nil) else {
+                throw C1Error.invalidRequest("Cannot create operation journal.")
             }
         }
-        try fullContent.write(to: journalFile, atomically: true, encoding: .utf8)
+        let handle = try FileHandle(forWritingTo: journalFile)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: data)
+        try handle.synchronize()
     }
 
-    public func find(operationId: String) -> OperationRecord? {
-        loadEntries().first { $0.operationId == operationId }
+    public func update(operationId: String, status: String, afterAdjustments: Adjustments? = nil,
+                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil) throws {
+        guard var entry = try validatedEntries().first(where: { $0.operationId == operationId }) else {
+            throw C1Error.invalidRequest("Operation not found: \(operationId)")
+        }
+        entry.status = status
+        if let value = afterAdjustments { entry.afterAdjustments = value }
+        if let value = diff { entry.diff = value }
+        if let value = error { entry.error = value }
+        if let value = previewOutputPath { entry.previewOutputPath = value }
+        try append(entry: entry)
     }
 
-    public func unresolvedEntries() -> [OperationRecord] {
-        loadEntries().filter {
-            $0.status == "pending" || $0.status == "partial-failure" || $0.status == "outcome-unknown"
+    public func find(operationId: String) -> OperationRecord? { loadEntries().first { $0.operationId == operationId } }
+    public func unresolvedEntries() -> [OperationRecord] { loadEntries().filter(Self.isUnresolved) }
+    public static func isUnresolved(_ entry: OperationRecord) -> Bool {
+        ["pending", "partial-failure", "outcome-unknown"].contains(entry.status)
+    }
+    public func assertReady() throws {
+        if let entry = try validatedEntries().first(where: Self.isUnresolved) {
+            throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. Restart Capture One to end in-flight work, then inspect operation status."))
         }
     }
 }

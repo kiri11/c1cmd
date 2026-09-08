@@ -9,6 +9,7 @@ public struct AppAndDocInfoResult: Codable, Equatable {
     public let docPath: String?
     public let docId: String?
     public let isSession: Bool
+    public let documentCount: Int?
 }
 
 public struct VariantSummaryRecord: Codable, Equatable {
@@ -35,6 +36,7 @@ public struct DeleteVariantResult: Codable, Equatable {
 
 public struct AdjustmentBatchItemRecord: Codable, Equatable {
     public let variantId: String
+    public let parentImagePath: String?
     public let exposureVal: Double
     public let contrastVal: Double
     public let saturationVal: Double
@@ -73,7 +75,11 @@ public struct ProcessPreviewResult: Codable, Equatable {
     public let jobId: String
 }
 
-public final class AppleScriptExecutor {
+public protocol ScriptExecuting {
+    func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T
+}
+
+public final class AppleScriptExecutor: ScriptExecuting {
     public static let shared = AppleScriptExecutor()
 
     private var compiledScript: NSAppleScript?
@@ -90,18 +96,6 @@ public final class AppleScriptExecutor {
         }
         #endif
 
-        // Fallback to relative or current directory paths
-        let paths = [
-            "Sources/CaptureOneCore/Resources/Handlers.applescript",
-            "../Sources/CaptureOneCore/Resources/Handlers.applescript",
-            "../../Sources/CaptureOneCore/Resources/Handlers.applescript"
-        ]
-        for path in paths {
-            let url = URL(fileURLWithPath: path)
-            if let content = try? String(contentsOf: url, encoding: .utf8) {
-                return content
-            }
-        }
         throw C1Error.scriptError("Could not locate Handlers.applescript resource.", code: nil)
     }
 
@@ -154,6 +148,9 @@ public final class AppleScriptExecutor {
         if let err = errorDict {
             let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown execution error"
             let num = err[NSAppleScript.errorNumber] as? Int
+            if num == -27001 { throw C1Error.documentChanged(msg) }
+            if num == -27002 { throw C1Error.stateChanged(msg) }
+            if num == -27003 { throw C1Error.identityAmbiguous(msg) }
             if num == -1712 {
                 throw C1Error.timeout("Capture One Apple Event timed out (-1712): \(msg)")
             }

@@ -30,6 +30,11 @@ public final class ProvenanceStore {
         }
     }
 
+    public func validatedRecords() throws -> [String: ProvenanceRecord] {
+        guard FileManager.default.fileExists(atPath: storeFile.path) else { return [:] }
+        return try JSONDecoder().decode([String: ProvenanceRecord].self, from: Data(contentsOf: storeFile))
+    }
+
     public func saveRecords(_ records: [String: ProvenanceRecord]) throws {
         try ensureDirectoryExists()
         let encoder = JSONEncoder()
@@ -40,7 +45,7 @@ public final class ProvenanceStore {
     }
 
     public func register(record: ProvenanceRecord) throws {
-        var records = loadRecords()
+        var records = try validatedRecords()
         records[record.workingRef] = record
         try saveRecords(records)
     }
@@ -56,7 +61,7 @@ public final class ProvenanceStore {
     }
 
     public func remove(workingRef: String) throws {
-        var records = loadRecords()
+        var records = try validatedRecords()
         records.removeValue(forKey: workingRef)
         try saveRecords(records)
     }
@@ -70,13 +75,13 @@ public final class ProvenanceStore {
         guard WorkingRef.isWorkingRefString(refString) else {
             throw C1Error.unmanagedVariant("Reference '\(refString)' is not a c1-managed working reference. The core rejects mutations to original variants or raw native IDs.")
         }
-        guard let record = find(workingRef: refString) else {
+        guard let record = try validatedRecords()[refString] else {
             throw C1Error.unmanagedVariant("Working reference '\(refString)' has no provenance record in this Session.")
         }
         // Normalize paths for comparison
         let recPath = (record.documentPath as NSString).standardizingPath
         let curPath = (currentDocumentPath as NSString).standardizingPath
-        guard recPath == curPath || recPath.contains(curPath) || curPath.contains(recPath) else {
+        guard URL(fileURLWithPath: recPath).resolvingSymlinksInPath().path == URL(fileURLWithPath: curPath).resolvingSymlinksInPath().path else {
             throw C1Error.documentChanged("Working reference '\(refString)' is bound to document '\(record.documentPath)', but current document is '\(currentDocumentPath)'.")
         }
         return record

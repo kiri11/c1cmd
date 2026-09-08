@@ -1,6 +1,22 @@
 -- Handlers.applescript: Central AppleScript handlers for Capture One 16.8.5.30
 -- Returns user-defined records exclusively with non-reserved key names.
 
+on checkedDocument(expectedId)
+    tell application "/Applications/Capture One.app"
+        if (count of documents) is not 1 then error "Exactly one open document is required." number -27001
+        set d to first document
+        if (id of d as text) is not expectedId then error "Active document changed before dispatch." number -27001
+        return d
+    end tell
+end checkedDocument
+
+on assertParent(v, expectedPath)
+    tell application "/Applications/Capture One.app"
+        set actualPath to POSIX path of (path of parent image of v as text)
+        if actualPath is not expectedPath then error "Variant parent image changed." number -27003
+    end tell
+end assertParent
+
 on getAppAndDocInfo()
     tell application "/Applications/Capture One.app"
         set appVer to (version as text)
@@ -14,7 +30,7 @@ on getAppAndDocInfo()
             end try
         end if
         if d is missing value then
-            return {appVersion:appVer, hasDocument:false, docName:missing value, docPath:missing value, docId:missing value, isSession:false}
+            return {appVersion:appVer, hasDocument:false, docName:missing value, docPath:missing value, docId:missing value, isSession:false, documentCount:(count of documents)}
         end if
         set dName to ""
         try
@@ -24,19 +40,11 @@ on getAppAndDocInfo()
         try
             set dId to (id of d as text)
         end try
-        set dPath to ""
-        try
-            set p to path of d
-            set dPath to (POSIX path of (p as text))
-        on error
-            set dPath to dId
-        end try
-        if dId ends with ".cocatalog" then
-            set dPath to dId
-        else if dId ends with ".cosessiondb" then
-            set dPath to dId
-        end if
-        
+        -- Capture One's path property may be the creation parent. Its ID is the
+        -- actual Session directory (or database path on some builds).
+        if dId does not start with "/" then error "Document ID is not an absolute path." number -27003
+        set dPath to dId
+
         set isSess to false
         try
             set k to (kind of d as text)
@@ -52,21 +60,13 @@ on getAppAndDocInfo()
             set isSess to true
         end if
 
-        return {appVersion:appVer, hasDocument:true, docName:dName, docPath:dPath, docId:dId, isSession:isSess}
+        return {appVersion:appVer, hasDocument:true, docName:dName, docPath:dPath, docId:dId, isSession:isSess, documentCount:(count of documents)}
     end tell
 end getAppAndDocInfo
 
-on listVariants(collectionName, selectedOnly)
+on listVariants(docName, collectionName, selectedOnly)
+    set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
-        set d to missing value
-        try
-            set d to current document
-        end try
-        if d is missing value then
-            try
-                set d to first document
-            end try
-        end if
         set varList to {}
         set sourceVariants to {}
         if d is missing value then
@@ -115,24 +115,25 @@ end listVariants
 
 on cloneVariant(docName, sourceId)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         set c to clone variant (variant id sourceId of d)
         return {cloneId:(id of c as text)}
     end tell
 end cloneVariant
 
-on deleteVariant(docName, variantId)
+on deleteVariant(docName, variantId, expectedPath)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
+        my assertParent(variant id variantId of d, expectedPath)
         delete variant id variantId of d
         set existsAfter to (exists variant id variantId of d)
-        return {deleted:true, existsNow:existsAfter}
+        return {deleted:(not existsAfter), existsNow:existsAfter}
     end tell
 end deleteVariant
 
 on getAdjustmentsBatch(docName, variantIds)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         set results to {}
         repeat with vid in variantIds
             set v to variant id (vid as text) of d
@@ -183,15 +184,16 @@ on getAdjustmentsBatch(docName, variantIds)
                 set tagVal to (color tag of v as integer)
             end try
             
-            set end of results to {variantId:(vid as text), exposureVal:expVal, contrastVal:contVal, saturationVal:satVal, temperatureVal:tempVal, tintVal:tintVal, cameraVal:cVal, lensVal:lVal, isoVal:iVal, shutterSpeedVal:sVal, asShotWBVal:wVal, captureDateVal:dtVal, starRating:rVal, colorTagVal:tagVal}
+            set parentPath to POSIX path of (path of parent image of v as text)
+            set end of results to {parentImagePath:parentPath, variantId:(vid as text), exposureVal:expVal, contrastVal:contVal, saturationVal:satVal, temperatureVal:tempVal, tintVal:tintVal, cameraVal:cVal, lensVal:lVal, isoVal:iVal, shutterSpeedVal:sVal, asShotWBVal:wVal, captureDateVal:dtVal, starRating:rVal, colorTagVal:tagVal}
         end repeat
         return results
     end tell
 end getAdjustmentsBatch
 
-on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVal)
+on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVal, expectedValues, expectedPath)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         set v to variant id (variantId as text) of d
         set adj to adjustments of v
         
@@ -202,6 +204,13 @@ on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVa
         set beforeTemp to (temperature of adj as real)
         set beforeTint to (tint of adj as real)
         
+        my assertParent(v, expectedPath)
+        set actualValues to {beforeExp, beforeCont, beforeSat, beforeTemp, beforeTint}
+        set tolerances to {0.00001, 0.00001, 0.00001, 0.01, 0.0001}
+        repeat with n from 1 to 5
+            set deltaValue to (item n of actualValues) - (item n of expectedValues)
+            if deltaValue > (item n of tolerances) or deltaValue < (0 - (item n of tolerances)) then error "State changed immediately before write." number -27002
+        end repeat
         -- Apply in verified order
         if expVal is not missing value then
             set exposure of adj to (expVal as real)
@@ -232,7 +241,7 @@ end applyAdjustments
 
 on ensurePreviewRecipe(docName, recipeName, outputFolder)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         if exists recipe recipeName of d then
             set r to recipe recipeName of d
         else
@@ -255,7 +264,7 @@ end ensurePreviewRecipe
 
 on processPreview(docName, variantId, recipeName, outputFolder, outputSubFolder, outputName)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         set r to recipe recipeName of d
         set root folder location of r to POSIX file outputFolder
         set root folder type of r to custom location
@@ -269,7 +278,7 @@ end processPreview
 
 on createBaselineVariant(docName, sourceId)
     tell application "/Applications/Capture One.app"
-        set d to document docName
+        set d to my checkedDocument(docName)
         set srcVar to (variant id (sourceId as text) of d)
         set img to parent image of srcVar
         set beforeIds to {}

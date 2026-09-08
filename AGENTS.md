@@ -16,15 +16,20 @@ This file provides rules, architectural constraints, and standard operating proc
    - For editing workflows, ensure a Session (`.cosessiondb`) is active.
 
 3. **Optimistic Concurrency Is Mandatory:**
-   - Every mutation command requires a state precondition: `--if-state <hash>` (or `ifState` in MCP).
+   - Adjustment mutations (`set`, `add`, `reset`) require a state precondition: `--if-state <hash>` (or `ifState` in MCP).
    - Obtain the current `stateHash` using `c1 get <working-ref>` immediately before calculating and applying adjustments.
    - If a mutation fails with `state-changed`, re-read the variant state with `get`, reconcile differences, and retry with the updated state hash.
 
 4. **Never Guess or Retry Blindly on Failure/Timeout:**
-   - If an operation times out or returns `outcome-unknown`, Capture One may still be executing the Apple Event.
+   - If an operation times out or returns `outcome-unknown`, Capture One may still be executing the Apple Event. Error JSON includes `operationId`; unresolved operations block further writes.
+   - Restart Capture One and reopen the same database before reconciliation can clear the block. `reconciled` records observations, not proof of historical success. Old working references stay invalid after restart.
    - Do **not** issue duplicate mutations. Check the status using `c1 operation status <operationId>` or inspect `.c1/journal.jsonl`.
 
 ---
+
+## Supported Scope
+
+Use exactly one open document and sequential calls. Do not edit in the UI, switch/reopen/replace documents, or launch competing exports during a workflow. Same-file close/reopen within one app launch is not reliably observable; it is unsupported. Database replacement and application restart invalidate references. Only Capture One 16.8.5.30 has retained runtime qualification; other allowed 16.x builds are unverified.
 
 ## 2. Canonical Grading Workflow
 
@@ -89,7 +94,7 @@ When using `c1-mcp`:
 - `unsupported-version`: Capture One version is outside supported range (16.4+ through 16.x) or unverified (<16.4 or 17+). Override with `C1_ALLOW_UNTESTED_BUILD=1`.
 - `unmanaged-variant`: Attempted mutation on an unmanaged original; clone first.
 - `capture-one-busy`: Cross-process advisory lock timed out; wait or check for hung processes.
-- `document-changed`: The active Session was closed or replaced during execution.
+- `document-changed`: Document count, exact identity, or application lifetime no longer matches. Same-file reopening in one app launch is not reliably detected.
 - `state-changed`: Optimistic concurrency check failed (`--if-state` mismatch).
 - `readback-mismatch`: Capture One returned values outside tolerance.
 - `permission-denied`: Automation permission missing in macOS System Settings. Ensure parent app (Terminal, Claude Desktop, Cursor) has Capture One enabled under Privacy & Security > Automation.

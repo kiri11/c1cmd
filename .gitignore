@@ -61,3 +61,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Local Python test bytecode and release staging
+__pycache__/
+*.pyc
+/dist/

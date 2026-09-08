@@ -10,16 +10,20 @@ import shutil
 import subprocess
 import sys
 import time
+import tempfile
+from contract_test import validate_response
 
 ROOT = Path(__file__).resolve().parents[1]
-C1_BIN = ROOT / ".build" / "debug" / "c1"
-SESSION_DIR = Path("/private/tmp/c1-m1-e2e")
+C1_BIN = Path(os.environ.get("C1_TEST_BIN", str(ROOT / ".build" / "debug" / "c1")))
+TEST_ROOT = Path(tempfile.mkdtemp(prefix="c1-m1-e2e-", dir="/private/tmp"))
+SESSION_DIR = TEST_ROOT / "c1-m1-e2e"
 SESSION_NAME = "c1-m1-e2e.cosessiondb"
 DISPOSABLE_CAT_NAME = "c1-cat-guard-test"
-DISPOSABLE_CAT_DIR = Path(f"/private/tmp/{DISPOSABLE_CAT_NAME}.cocatalog")
+DISPOSABLE_CAT_DIR = TEST_ROOT / f"{DISPOSABLE_CAT_NAME}.cocatalog"
 
 raw_fixture_env = os.environ.get("C1_TEST_RAW_FIXTURE")
 SOURCE_CR3 = Path(raw_fixture_env) if raw_fixture_env else None
+CONTRACT = None
 
 def run_applescript(script: str) -> str:
     res = subprocess.run(["osascript", "-s", "s", "-e", f'tell application "/Applications/Capture One.app"\n{script}\nend tell'], capture_output=True, text=True)
@@ -49,6 +53,10 @@ def run_c1(args: list[str]) -> tuple[int, dict]:
             parsed = json.loads(res.stderr.strip())
         except Exception:
             pass
+    if CONTRACT is not None and parsed:
+        name = {'doc': 'doc_info', 'variants': 'variants_list', 'variant': 'variant_' + args[1]}.get(args[0], args[0]) if len(args) > 1 else args[0]
+        schema = CONTRACT['definitions']['Error'] if 'error' in parsed else CONTRACT['responses'].get(name)
+        if schema: validate_response(parsed, schema, name)
     return res.returncode, parsed
 
 def run_c1_raw(args: list[str]) -> tuple[int, str, str]:
@@ -57,6 +65,8 @@ def run_c1_raw(args: list[str]) -> tuple[int, str, str]:
     return res.returncode, res.stdout.strip(), res.stderr.strip()
 
 def main():
+    global CONTRACT
+    CONTRACT = json.loads(subprocess.check_output([str(C1_BIN), "schema"], text=True))
     print("=== c1 M1 End-to-End Integration Verification ===")
     assert C1_BIN.exists(), f"Binary {C1_BIN} does not exist. Run swift build first."
     if SOURCE_CR3 is None or not SOURCE_CR3.exists():
@@ -80,11 +90,17 @@ def main():
                 end try
             end try
             if d is not missing value then
-                return POSIX path of ((path of d) as text)
+                set docIdentity to id of d as text
+                set docTitle to name of d as text
+                if docTitle ends with ".cosessiondb" and docIdentity does not end with ".cosessiondb" then
+                    return docIdentity & "/" & docTitle
+                end if
+                return docIdentity
             else
                 return "none"
             end if
         ''')
+        doc_path_out = json.loads(doc_path_out) if doc_path_out.startswith('"') else doc_path_out
         if doc_path_out and doc_path_out != "none":
             initial_doc_path = doc_path_out
     except Exception:
@@ -97,12 +113,12 @@ def main():
         if SESSION_DIR.exists():
             shutil.rmtree(SESSION_DIR)
         
-        run_applescript(f'make new document with properties {{name:"c1-m1-e2e", kind:session, path:"/private/tmp"}}')
+        run_applescript(f'make new document with properties {{name:"c1-m1-e2e", kind:session, path:"{TEST_ROOT}"}}')
         time.sleep(1.0)
         
         capture_dir = SESSION_DIR / "Capture"
         capture_dir.mkdir(parents=True, exist_ok=True)
-        fixture_raw = capture_dir / "fixture.CR3"
+        fixture_raw = capture_dir / ("fixture" + SOURCE_CR3.suffix)
         shutil.copy2(SOURCE_CR3, fixture_raw)
         
         baseline_raw_sha = compute_sha256(fixture_raw)
@@ -218,6 +234,18 @@ def main():
         assert prev_res["width"] > 0 and prev_res["height"] > 0
         assert len(prev_res["pixelSha256"]) == 64
         print(f"PASS: preview generated and decoded: {preview_file} ({prev_res['width']}x{prev_res['height']} px, size: {prev_res['fileSizeBytes']} B)")
+
+        custom_dir = SESSION_DIR / "custom-preview"
+        custom_dir.mkdir()
+        stale = custom_dir / "old.jpg"
+        shutil.copy2(preview_file, stale)
+        code, custom_preview = run_c1(["preview", working_ref, "--output-dir", str(custom_dir)])
+        assert code == 0, custom_preview
+        assert Path(custom_preview["outputPath"]).is_relative_to(custom_dir / "c1-previews")
+        assert custom_preview["outputPath"] != str(stale)
+        assert custom_preview["nativeVariantId"] == clone_id
+        assert custom_preview["stateHash"] == after_add_hash
+        print("PASS: custom output routing ignores stale JPEG and associates variant/state")
 
         # 12. Invariance verification
         print(f"\n[Step 12] Verifying core invariants (Original variant & RAW file)...")
@@ -365,7 +393,7 @@ def main():
             if exists document "{SESSION_NAME}" then
                 close document "{SESSION_NAME}" without saving
             end if
-            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"/private/tmp"}}
+            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"{TEST_ROOT}"}}
         ''')
         cat_doc_res = {}
         code = 1
@@ -458,6 +486,7 @@ def main():
             shutil.rmtree(SESSION_DIR, ignore_errors=True)
         if DISPOSABLE_CAT_DIR.exists():
             shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
+        shutil.rmtree(TEST_ROOT, ignore_errors=True)
         print("Cleanup completed.")
 
 if __name__ == "__main__":

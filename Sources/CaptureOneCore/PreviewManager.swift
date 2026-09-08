@@ -10,6 +10,8 @@ public struct PreviewResult: Codable, Equatable {
     public let fileSizeBytes: Int64
     public let width: Int
     public let height: Int
+    public let stateHash: String?
+    public let nativeVariantId: String?
     public let pixelSha256: String
 
     public init(
@@ -19,8 +21,12 @@ public struct PreviewResult: Codable, Equatable {
         fileSizeBytes: Int64,
         width: Int,
         height: Int,
-        pixelSha256: String
+        pixelSha256: String,
+        stateHash: String? = nil,
+        nativeVariantId: String? = nil
     ) {
+        self.stateHash = stateHash
+        self.nativeVariantId = nativeVariantId
         self.operationId = operationId
         self.workingRef = workingRef
         self.outputPath = outputPath
@@ -40,6 +46,7 @@ public final class PreviewManager {
     public func verifyAndDecodeImage(atPath path: String) throws -> (width: Int, height: Int, pixelSha256: String) {
         let url = URL(fileURLWithPath: path)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              CGImageSourceGetStatus(source) == .statusComplete,
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw C1Error.readbackMismatch("Failed to decode exported preview image with ImageIO at '\(path)'.")
         }
@@ -74,6 +81,8 @@ public final class PreviewManager {
     public func pollForOutputFile(inDirectory dir: URL, timeout: TimeInterval = 30.0) throws -> URL {
         let deadline = Date().addingTimeInterval(timeout)
         let fm = FileManager.default
+        var previous: [String: Int64] = [:]
+        var stable: [String: Int] = [:]
 
         while Date() < deadline {
             if let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) {
@@ -81,9 +90,13 @@ public final class PreviewManager {
                     if file.pathExtension.lowercased() == "jpg" || file.pathExtension.lowercased() == "jpeg" {
                         let attrs = try? fm.attributesOfItem(atPath: file.path)
                         let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-                        if size > 0 {
-                            return file
-                        }
+                        if size > 0, previous[file.path] == size {
+                            stable[file.path, default: 0] += 1
+                            if stable[file.path, default: 0] >= 2,
+                               let data = try? Data(contentsOf: file), data.suffix(2) == Data([0xff, 0xd9]),
+                               (try? verifyAndDecodeImage(atPath: file.path)) != nil { return file }
+                        } else { stable[file.path] = 0 }
+                        previous[file.path] = size
                     }
                 }
             }

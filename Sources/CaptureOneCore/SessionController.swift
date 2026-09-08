@@ -122,6 +122,7 @@ public struct GetResult: Codable, Equatable {
     public let adjustments: Adjustments
     public let metadata: Metadata
     public let stateHash: String
+    public let parentImagePath: String?
 }
 
 public struct MutationResult: Codable, Equatable {
@@ -228,12 +229,43 @@ public final class SessionController {
         return VersionCompatibility(isTestedMatch: false, isAllowed: false, warning: nil)
     }
 
-    private let executor = AppleScriptExecutor.shared
+    private let executor: ScriptExecuting
+    private let appInstance: () throws -> String
+    private let databaseIdentity: (String) throws -> String
     private let lock = CaptureOneLock.shared
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
 
-    private init() {}
+    public init(executor: ScriptExecuting = AppleScriptExecutor.shared,
+                appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
+                databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity) {
+        self.executor = executor
+        self.appInstance = appInstance
+        self.databaseIdentity = databaseIdentity
+    }
+
+    private func databasePath(_ doc: DocumentInfo) -> String {
+        doc.isSession && !doc.documentId.hasSuffix(".cosessiondb")
+            ? URL(fileURLWithPath: doc.documentPath).appendingPathComponent(doc.documentName).path
+            : doc.documentId
+    }
+
+    private func checkedDocument(_ expected: DocumentInfo, writes: Bool = true) throws {
+        let actual = try getDocumentInfo()
+        guard expected.documentId == actual.documentId, expected.openToken == actual.openToken else {
+            throw C1Error.documentChanged("Active database changed before dispatch.")
+        }
+        if writes { try OperationJournal(sessionDirectory: URL(fileURLWithPath: actual.documentPath)).assertReady() }
+    }
+
+    private func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
+        var result = entry
+        result.appInstance = try appInstance()
+        result.documentIdentity = try databaseIdentity(databasePath(doc))
+        result.nativeVariantId = source?.id
+        result.parentImagePath = source?.parentImagePath
+        return result
+    }
 
     // MARK: - Doctor
     public func doctor() throws -> DoctorReport {
@@ -245,6 +277,7 @@ public final class SessionController {
         var docName: String?
         var docPath: String?
         var isSession = false
+        var documentCount = 0
 
         if appRunning {
             do {
@@ -257,6 +290,7 @@ public final class SessionController {
                 docName = info.docName
                 docPath = info.docPath
                 isSession = info.isSession
+                documentCount = info.documentCount ?? 0
             } catch {
                 appVersion = "error"
             }
@@ -277,10 +311,10 @@ public final class SessionController {
         var unresolvedCount = 0
         if let p = docPath, let sessUrl = sessionUrl(forDocPath: p) {
             let journal = OperationJournal(sessionDirectory: sessUrl)
-            unresolvedCount = journal.unresolvedEntries().count
+            unresolvedCount = (try? journal.validatedEntries().filter(OperationJournal.isUnresolved).count) ?? 1
         }
 
-        let allPassed = appRunning && compat.isAllowed && hasDoc && lockOk && (unresolvedCount == 0)
+        let allPassed = appRunning && compat.isAllowed && hasDoc && documentCount == 1 && lockOk && (unresolvedCount == 0)
 
         return DoctorReport(
             appRunning: appRunning,
@@ -309,6 +343,9 @@ public final class SessionController {
             throw C1Error.noDocument("No document is currently open in Capture One.")
         }
 
+        guard info.documentCount == 1 else {
+            throw C1Error.documentChanged("Exactly one open document is supported. Close other documents before continuing.")
+        }
         let compat = Self.evaluateVersionCompatibility(info.appVersion, allowUntestedOverride: allowUntestedBuild)
         guard compat.isAllowed else {
             throw C1Error.unsupportedVersion(
@@ -329,12 +366,13 @@ public final class SessionController {
             }
         }
 
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.captureone.captureone16")
-        let pid = apps.first?.processIdentifier ?? 0
-        let openToken = "\(name):\(pid):\(path)"
+        let nativeId = info.docId ?? path
+        let database = info.isSession && !nativeId.hasSuffix(".cosessiondb")
+            ? URL(fileURLWithPath: docDir).appendingPathComponent(name).path : nativeId
+        let openToken = try "\(appInstance())|\(databaseIdentity(database))"
 
         return DocumentInfo(
-            documentId: path,
+            documentId: nativeId,
             documentName: name,
             documentPath: docDir,
             isSession: info.isSession,
@@ -374,7 +412,7 @@ public final class SessionController {
 
         let records: [VariantSummaryRecord] = try executor.executeAndDecode(
             handler: "listVariants",
-            args: [colDesc, selDesc]
+            args: [NSAppleEventDescriptor(string: docInfo.documentId), colDesc, selDesc]
         )
 
         return records.map { rec in
@@ -394,102 +432,81 @@ public final class SessionController {
 
     // MARK: - Clone Variant
     public func cloneVariant(sourceRef: String) throws -> CloneResult {
-        let docInfo = try getDocumentInfo()
-        try assertSessionWritable(docInfo: docInfo, operation: "clone")
+        try createVariant(sourceRef: sourceRef, baseline: false)
+    }
 
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        let journal = OperationJournal(sessionDirectory: sessUrl)
-
+    private func createVariant(sourceRef: String, baseline: Bool) throws -> CloneResult {
         return try lock.withLock {
-            // Read source baseline
-            let getRes = try self.get(ref: sourceRef)
-            let workingRef = WorkingRef()
-            let opId = UUID().uuidString.lowercased()
-
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
-            let sourceIdDesc = NSAppleEventDescriptor(string: getRes.id)
-
-            let cloneRes: CloneVariantResult = try self.executor.executeAndDecode(
-                handler: "cloneVariant",
-                args: [docNameDesc, sourceIdDesc]
-            )
-
-            let rec = ProvenanceRecord(
-                workingRef: workingRef.rawValue,
-                sourceVariantId: getRes.id,
-                cloneVariantId: cloneRes.cloneId,
-                documentPath: docInfo.documentPath,
-                documentName: docInfo.documentName,
-                parentImagePath: nil,
-                creationOperationId: opId,
-                baselineAdjustments: getRes.adjustments,
-                baselineStateHash: getRes.stateHash
-            )
-            try provenance.register(record: rec)
-
-            let opEntry = OperationRecord(
-                operationId: opId,
-                operationType: "clone",
-                workingRef: workingRef.rawValue,
-                documentPath: docInfo.documentPath,
-                preconditionStateHash: nil,
-                intendedAdjustments: nil,
-                beforeAdjustments: getRes.adjustments,
-                afterAdjustments: getRes.adjustments,
-                status: "succeeded"
-            )
-            try journal.append(entry: opEntry)
-
-            return CloneResult(
-                workingRef: workingRef.rawValue,
-                cloneVariantId: cloneRes.cloneId,
-                sourceVariantId: getRes.id,
-                documentPath: docInfo.documentPath,
-                baselineStateHash: getRes.stateHash
-            )
+            let doc = try getDocumentInfo()
+            let operation = baseline ? "baseline" : "clone"
+            try assertSessionWritable(docInfo: doc, operation: operation)
+            try checkedDocument(doc)
+            let source = try get(ref: sourceRef)
+            guard let parent = source.parentImagePath, !parent.isEmpty else {
+                throw C1Error.identityAmbiguous("Source parent image path is unavailable.")
+            }
+            let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            _ = try store.validatedRecords()
+            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
+            let ref = WorkingRef().rawValue
+            var entry = try prepare(OperationRecord(operationType: operation, workingRef: ref,
+                documentPath: doc.documentPath, beforeAdjustments: source.adjustments), doc: doc, source: source)
+            entry.variantIdsBefore = try listVariants().filter { $0.parentImagePath == parent }.map { $0.id }
+            try journal.append(entry: entry)
+            do {
+                let args = [NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: source.id)]
+                let id: String
+                if baseline {
+                    let result: CreateBaselineVariantResult = try executor.executeAndDecode(handler: "createBaselineVariant", args: args)
+                    id = result.baselineId
+                } else {
+                    let result: CloneVariantResult = try executor.executeAndDecode(handler: "cloneVariant", args: args)
+                    id = result.cloneId
+                }
+                guard id != source.id, !(entry.variantIdsBefore ?? []).contains(id) else {
+                    throw C1Error.identityAmbiguous("Creation did not return a new variant ID.")
+                }
+                let created = try get(ref: id)
+                guard created.parentImagePath == parent else { throw C1Error.identityAmbiguous("Created variant has the wrong parent image.") }
+                try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
+                    cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
+                    parentImagePath: parent, creationOperationId: entry.operationId,
+                    baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken))
+                try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: created.adjustments)
+                return CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
+                                   documentPath: doc.documentPath, baselineStateHash: created.stateHash)
+            } catch {
+                try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
+                throw OperationFailure(operationId: entry.operationId, cause: error)
+            }
         }
     }
 
     // MARK: - Delete Variant
     public func deleteVariant(workingRefString: String) throws -> DeleteResult {
-        let docInfo = try getDocumentInfo()
-        try assertSessionWritable(docInfo: docInfo, operation: "delete")
-
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        let journal = OperationJournal(sessionDirectory: sessUrl)
-
-        let record = try provenance.resolveManagedWorkingReference(
-            workingRefString,
-            currentDocumentPath: docInfo.documentPath
-        )
-
         return try lock.withLock {
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
-            let varIdDesc = NSAppleEventDescriptor(string: record.cloneVariantId)
-
-            let delRes: DeleteVariantResult = try self.executor.executeAndDecode(
-                handler: "deleteVariant",
-                args: [docNameDesc, varIdDesc]
-            )
-
-            try provenance.remove(workingRef: record.workingRef)
-
-            let opEntry = OperationRecord(
-                operationId: UUID().uuidString.lowercased(),
-                operationType: "delete",
-                workingRef: record.workingRef,
-                documentPath: docInfo.documentPath,
-                status: delRes.deleted ? "succeeded" : "failed"
-            )
-            try journal.append(entry: opEntry)
-
-            return DeleteResult(
-                deleted: delRes.deleted,
-                workingRef: record.workingRef,
-                cloneVariantId: record.cloneVariantId
-            )
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "delete")
+            try checkedDocument(doc)
+            let current = try get(ref: workingRefString)
+            let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            let record = try store.resolveManagedWorkingReference(workingRefString, currentDocumentPath: doc.documentPath)
+            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
+            let entry = try prepare(OperationRecord(operationType: "delete", workingRef: workingRefString,
+                documentPath: doc.documentPath, beforeAdjustments: current.adjustments), doc: doc, source: current)
+            try journal.append(entry: entry)
+            do {
+                let result: DeleteVariantResult = try executor.executeAndDecode(handler: "deleteVariant", args: [
+                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: record.cloneVariantId),
+                    NSAppleEventDescriptor(string: record.parentImagePath!)])
+                guard result.deleted && !result.existsNow else { throw C1Error.readbackMismatch("Deleted variant still exists.") }
+                try store.remove(workingRef: workingRefString)
+                try journal.update(operationId: entry.operationId, status: "succeeded")
+                return DeleteResult(deleted: true, workingRef: workingRefString, cloneVariantId: record.cloneVariantId)
+            } catch {
+                try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
+                throw OperationFailure(operationId: entry.operationId, cause: error)
+            }
         }
     }
 
@@ -498,6 +515,7 @@ public final class SessionController {
         let docInfo = try getDocumentInfo()
         var nativeId = ref
         var workingRefStr: String?
+        var managedRecord: ProvenanceRecord?
 
         if docInfo.isSession && WorkingRef.isWorkingRefString(ref) {
             let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
@@ -506,11 +524,12 @@ public final class SessionController {
                 ref,
                 currentDocumentPath: docInfo.documentPath
             )
+            managedRecord = record
             nativeId = record.cloneVariantId
             workingRefStr = record.workingRef
         }
 
-        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
+        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
         let idListDesc = NSAppleEventDescriptor(list: [NSAppleEventDescriptor(string: nativeId)])
 
         let results: [AdjustmentBatchItemRecord] = try executor.executeAndDecode(
@@ -522,6 +541,9 @@ public final class SessionController {
             throw C1Error.variantNotFound("Variant '\(ref)' (native ID '\(nativeId)') not found in current document.")
         }
 
+        if let record = managedRecord {
+            try DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: first.parentImagePath ?? "")
+        }
         let adjustments = Adjustments(
             exposure: first.exposureVal,
             contrast: first.contrastVal,
@@ -546,7 +568,8 @@ public final class SessionController {
             workingRef: workingRefStr,
             adjustments: adjustments,
             metadata: metadata,
-            stateHash: hash.hex
+            stateHash: hash.hex,
+            parentImagePath: first.parentImagePath
         )
     }
 
@@ -559,6 +582,9 @@ public final class SessionController {
         isDryRun: Bool = false,
         operationType: String? = nil
     ) throws -> MutationResult {
+        guard (setAdjustments != nil) != (addAdjustments != nil), (setAdjustments ?? addAdjustments)?.hasAnyField == true else {
+            throw C1Error.invalidRequest("Provide exactly one nonempty set or add adjustment patch.")
+        }
         let docInfo = try getDocumentInfo()
         let resolvedOpType = operationType ?? (setAdjustments != nil ? "set" : "add")
         try assertSessionWritable(docInfo: docInfo, operation: resolvedOpType)
@@ -574,6 +600,7 @@ public final class SessionController {
         )
 
         return try lock.withLock {
+            try checkedDocument(docInfo, writes: !isDryRun)
             // 1. Read current state
             let current = try self.get(ref: record.workingRef)
             guard current.stateHash == expectedHash else {
@@ -594,23 +621,7 @@ public final class SessionController {
             }
             try self.registry.validateAdjustments(target)
 
-            // Calculate predicted diff
-            var diff: [String: DoubleDiff] = [:]
-            if let b = current.adjustments.exposure, let a = target.exposure, b != a {
-                diff["exposure"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.contrast, let a = target.contrast, b != a {
-                diff["contrast"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.saturation, let a = target.saturation, b != a {
-                diff["saturation"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.temperature, let a = target.temperature, b != a {
-                diff["temperature"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.tint, let a = target.tint, b != a {
-                diff["tint"] = DoubleDiff(before: b, after: a)
-            }
+            let diff = self.computeDiff(before: current.adjustments, after: target)
 
             let predictedHash = StateHash.compute(for: target).hex
 
@@ -628,7 +639,7 @@ public final class SessionController {
 
             // 3. Pre-dispatch journal entry
             let opId = UUID().uuidString.lowercased()
-            let journalEntry = OperationRecord(
+            let journalEntry = try prepare(OperationRecord(
                 operationId: opId,
                 operationType: resolvedOpType,
                 workingRef: record.workingRef,
@@ -637,27 +648,37 @@ public final class SessionController {
                 intendedAdjustments: target,
                 beforeAdjustments: current.adjustments,
                 status: "pending"
-            )
+            ), doc: docInfo, source: current)
             try journal.append(entry: journalEntry)
 
             // 4. Dispatch write
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
+            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
             let varIdDesc = NSAppleEventDescriptor(string: record.cloneVariantId)
-            let expDesc = target.exposure != nil ? NSAppleEventDescriptor(double: target.exposure!) : NSAppleEventDescriptor.missingValue()
-            let contDesc = target.contrast != nil ? NSAppleEventDescriptor(double: target.contrast!) : NSAppleEventDescriptor.missingValue()
-            let satDesc = target.saturation != nil ? NSAppleEventDescriptor(double: target.saturation!) : NSAppleEventDescriptor.missingValue()
-            let tempDesc = target.temperature != nil ? NSAppleEventDescriptor(double: target.temperature!) : NSAppleEventDescriptor.missingValue()
-            let tintDesc = target.tint != nil ? NSAppleEventDescriptor(double: target.tint!) : NSAppleEventDescriptor.missingValue()
+            var patch = Adjustments()
+            for field in self.registry.supportedAdjustmentFields {
+                if setAdjustments?.value(for: field.name) != nil || addAdjustments?.value(for: field.name) != nil {
+                    patch.setValue(target.value(for: field.name), for: field.name)
+                }
+            }
+            // White balance must be written and verified as a pair.
+            if patch.temperature != nil || patch.tint != nil { patch.temperature = target.temperature; patch.tint = target.tint }
+            let expDesc = patch.exposure != nil ? NSAppleEventDescriptor(double: patch.exposure!) : NSAppleEventDescriptor.missingValue()
+            let contDesc = patch.contrast != nil ? NSAppleEventDescriptor(double: patch.contrast!) : NSAppleEventDescriptor.missingValue()
+            let satDesc = patch.saturation != nil ? NSAppleEventDescriptor(double: patch.saturation!) : NSAppleEventDescriptor.missingValue()
+            let tempDesc = patch.temperature != nil ? NSAppleEventDescriptor(double: patch.temperature!) : NSAppleEventDescriptor.missingValue()
+            let tintDesc = patch.tint != nil ? NSAppleEventDescriptor(double: patch.tint!) : NSAppleEventDescriptor.missingValue()
 
             let applyRes: ApplyAdjustmentsResult
             do {
                 applyRes = try self.executor.executeAndDecode(
                     handler: "applyAdjustments",
-                    args: [docNameDesc, varIdDesc, expDesc, contDesc, satDesc, tempDesc, tintDesc]
+                    args: [docNameDesc, varIdDesc, expDesc, contDesc, satDesc, tempDesc, tintDesc,
+                           NSAppleEventDescriptor(list: self.registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) }),
+                           NSAppleEventDescriptor(string: current.parentImagePath ?? "")]
                 )
             } catch {
                 try? journal.update(operationId: opId, status: "outcome-unknown", error: error.localizedDescription)
-                throw error
+                throw OperationFailure(operationId: opId, cause: error)
             }
 
             // 5. Readback verification
@@ -690,34 +711,16 @@ public final class SessionController {
             if !mismatches.isEmpty {
                 let errStr = "Readback mismatch after mutation: " + mismatches.joined(separator: ", ")
                 try? journal.update(operationId: opId, status: "partial-failure", afterAdjustments: after, error: errStr)
-                throw C1Error.readbackMismatch(errStr)
+                throw OperationFailure(operationId: opId, cause: C1Error.readbackMismatch(errStr))
             }
 
             // 6. Compute actual diff & stateHash
             let actualHash = StateHash.compute(for: after).hex
-            var actualDiff: [String: DoubleDiff] = [:]
-            if let b = current.adjustments.exposure, let a = after.exposure, b != a {
-                actualDiff["exposure"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.contrast, let a = after.contrast, b != a {
-                actualDiff["contrast"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.saturation, let a = after.saturation, b != a {
-                actualDiff["saturation"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.temperature, let a = after.temperature, b != a {
-                actualDiff["temperature"] = DoubleDiff(before: b, after: a)
-            }
-            if let b = current.adjustments.tint, let a = after.tint, b != a {
-                actualDiff["tint"] = DoubleDiff(before: b, after: a)
-            }
+            let actualDiff = self.computeDiff(before: current.adjustments, after: after)
 
-            try journal.update(
-                operationId: opId,
-                status: "succeeded",
-                afterAdjustments: after,
-                diff: actualDiff
-            )
+            do {
+                try journal.update(operationId: opId, status: "succeeded", afterAdjustments: after, diff: actualDiff)
+            } catch { throw OperationFailure(operationId: opId, cause: error) }
 
             return MutationResult(
                 operationId: opId,
@@ -762,74 +765,7 @@ public final class SessionController {
 
     // MARK: - Create Baseline Variant (New Variant)
     public func createBaselineVariant(sourceRef: String) throws -> CloneResult {
-        let docInfo = try getDocumentInfo()
-        try assertSessionWritable(docInfo: docInfo, operation: "baseline")
-
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        let journal = OperationJournal(sessionDirectory: sessUrl)
-
-        return try lock.withLock {
-            let sourceRes = try self.get(ref: sourceRef)
-            let workingRef = WorkingRef()
-            let opId = UUID().uuidString.lowercased()
-
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
-            let sourceIdDesc = NSAppleEventDescriptor(string: sourceRes.id)
-
-            let baselineRes: CreateBaselineVariantResult = try self.executor.executeAndDecode(
-                handler: "createBaselineVariant",
-                args: [docNameDesc, sourceIdDesc]
-            )
-
-            var baselineVarResOpt: GetResult?
-            for attempt in 1...5 {
-                do {
-                    baselineVarResOpt = try self.get(ref: baselineRes.baselineId)
-                    break
-                } catch {
-                    if attempt == 5 { throw error }
-                    Thread.sleep(forTimeInterval: 0.1)
-                }
-            }
-            guard let baselineVarRes = baselineVarResOpt else {
-                throw C1Error.variantNotFound("Failed to resolve baseline variant '\(baselineRes.baselineId)'.")
-            }
-
-            let rec = ProvenanceRecord(
-                workingRef: workingRef.rawValue,
-                sourceVariantId: sourceRes.id,
-                cloneVariantId: baselineRes.baselineId,
-                documentPath: docInfo.documentPath,
-                documentName: docInfo.documentName,
-                parentImagePath: nil,
-                creationOperationId: opId,
-                baselineAdjustments: baselineVarRes.adjustments,
-                baselineStateHash: baselineVarRes.stateHash
-            )
-            try provenance.register(record: rec)
-
-            let opEntry = OperationRecord(
-                operationId: opId,
-                operationType: "baseline",
-                workingRef: workingRef.rawValue,
-                documentPath: docInfo.documentPath,
-                preconditionStateHash: nil,
-                intendedAdjustments: nil,
-                beforeAdjustments: baselineVarRes.adjustments,
-                afterAdjustments: baselineVarRes.adjustments,
-                status: "succeeded"
-            )
-            try journal.append(entry: opEntry)
-
-            return CloneResult(
-                workingRef: workingRef.rawValue,
-                cloneVariantId: baselineRes.baselineId,
-                sourceVariantId: sourceRes.id,
-                documentPath: docInfo.documentPath,
-                baselineStateHash: baselineVarRes.stateHash
-            )
-        }
+        try createVariant(sourceRef: sourceRef, baseline: true)
     }
 
     // MARK: - Diff
@@ -899,12 +835,13 @@ public final class SessionController {
         selectedOnly: Bool = false,
         batchSize: Int = 100
     ) throws -> [DumpRecord] {
+        guard (1...1000).contains(batchSize) else { throw C1Error.invalidRequest("batchSize must be between 1 and 1000.") }
         let docInfo = try getDocumentInfo()
         let variants = try listVariants(collectionName: collectionName, selectedOnly: selectedOnly)
         guard !variants.isEmpty else { return [] }
 
         var records: [DumpRecord] = []
-        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
+        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
 
         for chunkStart in stride(from: 0, to: variants.count, by: max(1, batchSize)) {
             let chunkEnd = min(chunkStart + batchSize, variants.count)
@@ -966,118 +903,85 @@ public final class SessionController {
     }
 
     public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0) throws -> PreviewResult {
-        let docInfo = try getDocumentInfo()
-        guard docInfo.isSession else {
-            throw C1Error.invalidRequest("Catalogs are strictly read-only and do not have a default Output folder. Preview export is supported on Sessions only. Open a Session to render previews.")
-        }
-
-        var nativeId = ref
-        var workingRefStr: String?
-
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        if WorkingRef.isWorkingRefString(ref) {
-            let record = try provenance.resolveManagedWorkingReference(
-                ref,
-                currentDocumentPath: docInfo.documentPath
-            )
-            nativeId = record.cloneVariantId
-            workingRefStr = record.workingRef
-        }
-
+        guard timeout.isFinite && timeout > 0 && timeout <= 300 else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
         return try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "preview")
+            try checkedDocument(doc)
+            let current = try get(ref: ref)
+            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
             let opId = UUID().uuidString.lowercased()
-            let jobOutputDir: URL
-            if let custom = outputDirOverride {
-                jobOutputDir = URL(fileURLWithPath: custom)
-            } else {
-                jobOutputDir = URL(fileURLWithPath: docInfo.documentPath).appendingPathComponent("Output/c1-previews/\(opId)", isDirectory: true)
-            }
-            try FileManager.default.createDirectory(at: jobOutputDir, withIntermediateDirectories: true)
-
-            let recipeOutputFolder = docInfo.outputFolder
-
-            // Configure recipe
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentName)
-            let recipeDesc = NSAppleEventDescriptor(string: PreviewManager.defaultRecipeName)
-            let outputFolderDesc = NSAppleEventDescriptor(string: recipeOutputFolder)
-
-            let _: PreviewRecipeResult = try self.executor.executeAndDecode(
-                handler: "ensurePreviewRecipe",
-                args: [docNameDesc, recipeDesc, outputFolderDesc]
-            )
-
-            let journal = OperationJournal(sessionDirectory: sessUrl)
-            let opRecord = OperationRecord(
-                operationId: opId,
-                operationType: "preview",
-                workingRef: workingRefStr ?? nativeId,
-                documentPath: docInfo.documentPath,
-                status: "pending",
-                previewOutputPath: jobOutputDir.path
-            )
-            try? journal.append(entry: opRecord)
-
-            // Dispatch processPreview
-            let varIdDesc = NSAppleEventDescriptor(string: nativeId)
-            let subfolderDesc = NSAppleEventDescriptor(string: "c1-previews/\(opId)")
-            let filenameDesc = NSAppleEventDescriptor(string: "preview")
-
+            let root = URL(fileURLWithPath: outputDirOverride ?? doc.outputFolder).resolvingSymlinksInPath()
+            let subfolder = "c1-previews/\(opId)"
+            let jobDir = root.appendingPathComponent(subfolder, isDirectory: true)
+            try FileManager.default.createDirectory(at: jobDir, withIntermediateDirectories: true)
+            let entry = try prepare(OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
+                documentPath: doc.documentPath, preconditionStateHash: current.stateHash,
+                beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path), doc: doc, source: current)
+            try journal.append(entry: entry)
             do {
-                let _: ProcessPreviewResult = try self.executor.executeAndDecode(
-                    handler: "processPreview",
-                    args: [docNameDesc, varIdDesc, recipeDesc, outputFolderDesc, subfolderDesc, filenameDesc]
-                )
+                let args = [NSAppleEventDescriptor(string: doc.documentId),
+                            NSAppleEventDescriptor(string: PreviewManager.defaultRecipeName), NSAppleEventDescriptor(string: root.path)]
+                let _: PreviewRecipeResult = try executor.executeAndDecode(handler: "ensurePreviewRecipe", args: args)
+                let _: ProcessPreviewResult = try executor.executeAndDecode(handler: "processPreview", args: [
+                    args[0], NSAppleEventDescriptor(string: current.id), args[1], args[2],
+                    NSAppleEventDescriptor(string: subfolder), NSAppleEventDescriptor(string: "preview")])
+                let file = try previewMgr.pollForOutputFile(inDirectory: jobDir, timeout: timeout)
+                let image = try previewMgr.verifyAndDecodeImage(atPath: file.path)
+                let after = try get(ref: ref)
+                guard after.stateHash == current.stateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
+                let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
+                try journal.update(operationId: opId, status: "succeeded", previewOutputPath: file.path)
+                return PreviewResult(operationId: opId, workingRef: current.workingRef, outputPath: file.path,
+                    fileSizeBytes: size, width: image.width, height: image.height, pixelSha256: image.pixelSha256,
+                    stateHash: current.stateHash, nativeVariantId: current.id)
             } catch {
-                try? journal.update(operationId: opId, status: "outcome-unknown", error: error.localizedDescription)
-                throw error
+                try? journal.update(operationId: opId, status: "outcome-unknown", error: String(describing: error))
+                throw OperationFailure(operationId: opId, cause: error)
             }
-
-            // Poll for output file
-            let outputFile: URL
-            do {
-                outputFile = try self.previewMgr.pollForOutputFile(inDirectory: jobOutputDir, timeout: timeout)
-            } catch {
-                try? journal.update(operationId: opId, status: "failed", error: error.localizedDescription)
-                throw error
-            }
-
-            // Verify and decode image
-            let imgAttrs = try self.previewMgr.verifyAndDecodeImage(atPath: outputFile.path)
-            let fileAttrs = try FileManager.default.attributesOfItem(atPath: outputFile.path)
-            let size = (fileAttrs[.size] as? NSNumber)?.int64Value ?? 0
-
-            try journal.update(
-                operationId: opId,
-                status: "succeeded",
-                previewOutputPath: outputFile.path
-            )
-
-            return PreviewResult(
-                operationId: opId,
-                workingRef: workingRefStr,
-                outputPath: outputFile.path,
-                fileSizeBytes: size,
-                width: imgAttrs.width,
-                height: imgAttrs.height,
-                pixelSha256: imgAttrs.pixelSha256
-            )
         }
     }
 
     // MARK: - Operation Status & Reconciliation
+    /// A restarted app cannot still execute an Apple Event from its previous process.
+    /// Reconciliation records observations, never retries an uncertain mutation or rebinds a reference.
     public func operationStatus(operationId: String) throws -> OperationRecord {
-        let docInfo = try getDocumentInfo()
-        guard docInfo.isSession else {
-            throw C1Error.invalidRequest("Operation status is only available for Sessions.")
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "operation status")
+            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            guard var entry = try journal.validatedEntries().first(where: { $0.operationId == operationId }) else {
+                throw C1Error.invalidRequest("Operation ID '\(operationId)' not found in journal.")
+            }
+            guard OperationJournal.isUnresolved(entry) else { return entry }
+            guard let originalInstance = entry.appInstance, originalInstance != (try appInstance()) else { return entry }
+            guard entry.documentIdentity == (try databaseIdentity(databasePath(doc))) else {
+                throw C1Error.documentChanged("Cannot reconcile against a replaced database.")
+            }
+            let variants = try listVariants()
+            if ["clone", "baseline"].contains(entry.operationType) {
+                guard let before = entry.variantIdsBefore, let parent = entry.parentImagePath else {
+                    throw C1Error.identityAmbiguous("Creation lacks recovery identity evidence.")
+                }
+                entry.observedVariantIds = variants.filter { $0.parentImagePath == parent && !before.contains($0.id) }.map { $0.id }
+                // Other photographer-created variants are indistinguishable; do not adopt or delete them.
+                entry.status = "reconciled"
+                entry.error = "Previous app instance ended. Review observedVariantIds manually; no variants were adopted, deleted, or recreated."
+            } else if let id = entry.nativeVariantId {
+                if let variant = variants.first(where: { $0.id == id }) {
+                    guard variant.parentImagePath == entry.parentImagePath else { throw C1Error.identityAmbiguous("Recovery variant parent changed.") }
+                    let current = try get(ref: id)
+                    entry.afterAdjustments = current.adjustments
+                    entry.status = "reconciled"
+                    entry.error = "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone."
+                } else {
+                    entry.status = "reconciled"
+                    entry.error = "Previous app instance ended; the target variant is absent. No retry was performed."
+                }
+            } else { throw C1Error.identityAmbiguous("Operation lacks a native variant recovery identity.") }
+            try journal.append(entry: entry)
+            return entry
         }
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let journal = OperationJournal(sessionDirectory: sessUrl)
-
-        guard let entry = journal.find(operationId: operationId) else {
-            throw C1Error.invalidRequest("Operation ID '\(operationId)' not found in journal.")
-        }
-        return entry
     }
 
     // MARK: - Capabilities

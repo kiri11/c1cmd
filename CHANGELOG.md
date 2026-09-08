@@ -1,3 +1,13 @@
+## Unreleased — v0.1 release hardening
+
+- Bind managed clones to exact database/app identity and parent image; enforce one open document.
+- Journal all write paths before dispatch, preserve append-only recovery snapshots, block unresolved writes, and return operation IDs on uncertain failures.
+- Write only requested fields and recheck state in the AppleScript handler.
+- Fix custom preview routing; require a complete image in a unique job directory.
+- Share CLI/MCP schemas and reject malformed requests before application access.
+- Install/package the required resource bundle; test relocated archives and keep automated releases as drafts until validation.
+- Add offline fault regressions; narrow support claims to demonstrated sequential single-document operation.
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

@@ -33,6 +33,8 @@ install: build
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install -m 755 $(BUILD_DIR)/c1 $(DESTDIR)$(BINDIR)/c1
 	install -m 755 $(BUILD_DIR)/c1-mcp $(DESTDIR)$(BINDIR)/c1-mcp
+	rm -rf $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
+	cp -R $(BUILD_DIR)/c1_CaptureOneCore.bundle $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
 	codesign -s - --force $(DESTDIR)$(BINDIR)/c1 2>/dev/null || true
 	codesign -s - --force $(DESTDIR)$(BINDIR)/c1-mcp 2>/dev/null || true
 	@echo "Successfully installed c1 and c1-mcp to $(DESTDIR)$(BINDIR)"
@@ -44,7 +46,12 @@ install: build
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/c1 $(DESTDIR)$(BINDIR)/c1-mcp
+	rm -rf $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
 	@echo "Successfully uninstalled c1 and c1-mcp from $(DESTDIR)$(BINDIR)"
 
 clean:
 	swift package clean
+
+.PHONY: archive
+archive: build
+	./scripts/package-release.sh v0.1.0 $(BUILD_DIR) dist

@@ -29,24 +29,12 @@ jobs:
         run: swift build -c release -v
 
       - name: Package Release Archive
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          ARCHIVE_NAME="c1-${TAG_NAME}-macos-arm64"
-          STAGE_DIR="dist/${ARCHIVE_NAME}"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/package-release.sh "$RELEASE_TAG" .build/release dist
 
-          mkdir -p "${STAGE_DIR}/bin"
-          cp .build/release/c1 "${STAGE_DIR}/bin/c1"
-          cp .build/release/c1-mcp "${STAGE_DIR}/bin/c1-mcp"
-          cp README.md LICENSE AGENTS.md "${STAGE_DIR}/"
-
-          # Ad-hoc codesign binaries
-          codesign -s - --force "${STAGE_DIR}/bin/c1"
-          codesign -s - --force "${STAGE_DIR}/bin/c1-mcp"
-
-          cd dist
-          tar -czvf "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
-          shasum -a 256 "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
-          cd ..
+      - name: Test Packaged Archive
+        run: python3 Tests/archive_test.py dist/*.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -54,6 +42,6 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.sha256
-          draft: false
+          draft: true
           prerelease: false
           generate_release_notes: true

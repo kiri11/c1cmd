@@ -1,3 +1,5 @@
+> Release hardening update: milestone completion below is historical implementation status, not qualification of concurrency or document lifetime. Current support and verification are in [README.md](README.md) and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md).
+
 # c1 — an unofficial CLI + MCP interface for Capture One
 
 Goal: let coding agents (Codex, Claude Code, GPT-6 Astra, etc.) read and write Capture One adjustments through a stable, self-describing API, so a photographer's grading pipeline can be automated and reviewed inside Capture One itself — and so the photographer's own style, learned from their library, is preserved and refined shoot over shoot rather than replaced by a generic one.

@@ -9,15 +9,18 @@ import shutil
 import subprocess
 import sys
 import time
+import tempfile
+from contract_test import validate_response
 
 sys.stdout.reconfigure(line_buffering=True)
 
 ROOT = Path(__file__).resolve().parents[1]
-MCP_BIN = ROOT / ".build" / "debug" / "c1-mcp"
-SESSION_DIR = Path("/private/tmp/c1-mcp-e2e")
+MCP_BIN = Path(os.environ.get("C1_TEST_MCP_BIN", str(ROOT / ".build" / "debug" / "c1-mcp")))
+TEST_ROOT = Path(tempfile.mkdtemp(prefix="c1-mcp-e2e-", dir="/private/tmp"))
+SESSION_DIR = TEST_ROOT / "c1-mcp-e2e"
 SESSION_NAME = "c1-mcp-e2e.cosessiondb"
 DISPOSABLE_CAT_NAME = "c1-cat-guard-test"
-DISPOSABLE_CAT_DIR = Path(f"/private/tmp/{DISPOSABLE_CAT_NAME}.cocatalog")
+DISPOSABLE_CAT_DIR = TEST_ROOT / f"{DISPOSABLE_CAT_NAME}.cocatalog"
 
 raw_fixture_env = os.environ.get("C1_TEST_RAW_FIXTURE")
 SOURCE_CR3 = Path(raw_fixture_env) if raw_fixture_env else None
@@ -43,6 +46,7 @@ class MCPClient:
             bufsize=0
         )
         self.msg_id = 0
+        self.contract = None
 
     def send_request(self, method: str, params: dict | None = None) -> dict:
         self.msg_id += 1
@@ -83,7 +87,12 @@ class MCPClient:
         resp = self.send_request("tools/call", params)
         if "error" in resp:
             raise RuntimeError(f"JSON-RPC protocol error: {resp['error']}")
-        return resp.get("result", {})
+        result = resp.get("result", {})
+        if self.contract is not None:
+            payload = parse_text_content(result.get("content", []))
+            spec = self.contract['definitions']['Error'] if result.get('isError') else self.contract['responses'][name]
+            validate_response(payload, spec, name)
+        return result
 
     def close(self):
         try:
@@ -132,11 +141,17 @@ def main():
                 end try
             end try
             if d is not missing value then
-                return POSIX path of ((path of d) as text)
+                set docIdentity to id of d as text
+                set docTitle to name of d as text
+                if docTitle ends with ".cosessiondb" and docIdentity does not end with ".cosessiondb" then
+                    return docIdentity & "/" & docTitle
+                end if
+                return docIdentity
             else
                 return "none"
             end if
         ''')
+        doc_path_out = json.loads(doc_path_out) if doc_path_out.startswith('"') else doc_path_out
         if doc_path_out and doc_path_out != "none":
             initial_doc_path = doc_path_out
     except Exception:
@@ -156,12 +171,12 @@ def main():
     if SESSION_DIR.exists():
         shutil.rmtree(SESSION_DIR, ignore_errors=True)
     
-    run_applescript('make new document with properties {name:"c1-mcp-e2e", kind:session, path:"/private/tmp"}')
+    run_applescript(f'make new document with properties {{name:"c1-mcp-e2e", kind:session, path:"{TEST_ROOT}"}}')
     time.sleep(1.0)
     
     capture_dir = SESSION_DIR / "Capture"
     capture_dir.mkdir(parents=True, exist_ok=True)
-    fixture_raw = capture_dir / "fixture.CR3"
+    fixture_raw = capture_dir / ("fixture" + SOURCE_CR3.suffix)
     shutil.copy2(SOURCE_CR3, fixture_raw)
     
     run_applescript(f'''
@@ -172,7 +187,7 @@ def main():
 
     print("Waiting for Capture One to index fixture variant...")
     for _ in range(20):
-        res = subprocess.run([str(ROOT / ".build" / "debug" / "c1"), "variants", "list", "--format", "json"], capture_output=True, text=True)
+        res = subprocess.run([os.environ.get("C1_TEST_BIN", str(ROOT / ".build" / "debug" / "c1")), "variants", "list", "--format", "json"], capture_output=True, text=True)
         if "fixture" in res.stdout:
             print("  ✓ RAW variant indexed by Capture One")
             break
@@ -230,6 +245,7 @@ def main():
 
         schema_res = client.call_tool("schema")
         schema_data = parse_text_content(schema_res.get("content", []))
+        client.contract = schema_data
         assert schema_data.get("title") == "c1-contract-schema", f"Invalid schema title: {schema_data}"
 
         doc_res = client.call_tool("doc_info")
@@ -371,8 +387,12 @@ def main():
         # 9. Preview (with Image Block) & Variant Delete
         print("\n[Step 9] Testing preview (with MCP image block) and variant_delete...")
         total_tests += 1
+        custom_preview_dir = SESSION_DIR / "custom-preview"
+        custom_preview_dir.mkdir()
+        (custom_preview_dir / "stale.jpg").write_bytes(b"not the requested image")
         preview_res = client.call_tool("preview", {
             "ref": working_ref,
+            "outputDir": str(custom_preview_dir),
             "timeout": 35.0
         })
         assert preview_res.get("isError") is not True, f"Preview failed: {preview_res}"
@@ -380,6 +400,9 @@ def main():
         
         # Verify JSON metadata text block
         preview_data = parse_text_content(content_items)
+        assert Path(preview_data["outputPath"]).is_relative_to(custom_preview_dir / "c1-previews")
+        assert preview_data["nativeVariantId"] == clone_data["cloneVariantId"]
+        assert preview_data["stateHash"] == reset_data["stateHash"]
         assert "outputPath" in preview_data and "pixelSha256" in preview_data, f"Invalid preview metadata: {preview_data}"
         assert preview_data.get("width", 0) > 0 and preview_data.get("height", 0) > 0
         print(f"  ✓ Preview metadata: {preview_data['width']}x{preview_data['height']} ({preview_data['fileSizeBytes']} bytes), SHA-256: {preview_data['pixelSha256'][:12]}...")
@@ -419,7 +442,7 @@ def main():
             try
                 close document "{SESSION_NAME}" without saving
             end try
-            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"/private/tmp"}}
+            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"{TEST_ROOT}"}}
         ''')
         time.sleep(1.5)
 
@@ -475,6 +498,8 @@ def main():
             shutil.rmtree(SESSION_DIR, ignore_errors=True)
         if DISPOSABLE_CAT_DIR.exists():
             shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
+
+        shutil.rmtree(TEST_ROOT, ignore_errors=True)
 
 if __name__ == "__main__":
     main()

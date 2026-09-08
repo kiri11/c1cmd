@@ -45,6 +45,7 @@ public struct ProvenanceRecord: Codable, Equatable {
     public let parentImagePath: String?
     public let creationOperationId: String
     public let createdAt: String
+    public let documentToken: String?
     public let baselineAdjustments: Adjustments
     public let baselineStateHash: String
 
@@ -58,8 +59,10 @@ public struct ProvenanceRecord: Codable, Equatable {
         creationOperationId: String,
         createdAt: String = ISO8601DateFormatter().string(from: Date()),
         baselineAdjustments: Adjustments,
-        baselineStateHash: String
+        baselineStateHash: String,
+        documentToken: String? = nil
     ) {
+        self.documentToken = documentToken
         self.workingRef = workingRef
         self.sourceVariantId = sourceVariantId
         self.cloneVariantId = cloneVariantId

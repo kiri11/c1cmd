@@ -19,38 +19,14 @@ func handleExecution<T>(format: OutputFormat, _ block: () throws -> T) -> ExitCo
     do {
         _ = try block()
         return ExitCode.success
-    } catch let err as C1Error {
-        if OutputFormatter.resolveFormat(format) == .json {
-            let errObj: [String: Any] = [
-                "error": [
-                    "code": err.errorCode,
-                    "message": err.description
-                ]
-            ]
-            if let data = try? JSONSerialization.data(withJSONObject: errObj, options: [.prettyPrinted, .sortedKeys]),
-               let str = String(data: data, encoding: .utf8) {
-                FileHandle.standardError.write(Data((str + "\n").utf8))
-            }
-        } else {
-            FileHandle.standardError.write(Data("Error (\(err.errorCode)): \(err.description)\n".utf8))
-        }
-        return ExitCode(err.exitCode)
     } catch {
-        if OutputFormatter.resolveFormat(format) == .json {
-            let errObj: [String: Any] = [
-                "error": [
-                    "code": "unexpected-error",
-                    "message": error.localizedDescription
-                ]
-            ]
-            if let data = try? JSONSerialization.data(withJSONObject: errObj, options: [.prettyPrinted, .sortedKeys]),
-               let str = String(data: data, encoding: .utf8) {
-                FileHandle.standardError.write(Data((str + "\n").utf8))
-            }
+        if OutputFormatter.resolveFormat(format) == .json,
+           let data = try? JSONSerialization.data(withJSONObject: ErrorResponse.payload(error), options: [.prettyPrinted, .sortedKeys]) {
+            FileHandle.standardError.write(data + Data("\n".utf8))
         } else {
-            FileHandle.standardError.write(Data("Unexpected error: \(error.localizedDescription)\n".utf8))
+            FileHandle.standardError.write(Data("\(error)\n".utf8))
         }
-        return ExitCode(1)
+        return ExitCode(error is OperationFailure ? 4 : (error as? C1Error)?.exitCode ?? 1)
     }
 }
 
@@ -98,6 +74,8 @@ struct DoctorCommand: ParsableCommand {
                     throw C1Error.captureOneBusy("Capture One application lock could not be acquired.")
                 } else if report.unresolvedOperationsCount > 0 {
                     throw C1Error.invalidRequest("Doctor diagnostic detected unresolved operations.")
+                } else if SessionController.evaluateVersionCompatibility(report.appVersion).isAllowed {
+                    throw C1Error.documentChanged("Exactly one open document is required.")
                 } else {
                     throw C1Error.unsupportedVersion("Running version '\(report.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(report.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override.")
                 }
@@ -121,7 +99,7 @@ struct VersionCommand: ParsableCommand {
                 "testedCaptureOneBuilds": SessionController.testedBuilds,
                 "pinnedCaptureOneBuild": SessionController.pinnedBuild,
                 "supportedVersionRange": "16.4+ through 16.x",
-                "schemaVersion": "1.0.0",
+                "schemaVersion": ContractSchema.version,
                 "platform": "macOS-arm64"
             ]
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
@@ -162,37 +140,7 @@ struct SchemaCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let schema: [String: Any] = [
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "title": "c1-contract-schema",
-            "version": "1.0.0",
-            "definitions": [
-                "Adjustments": [
-                    "type": "object",
-                    "properties": [
-                        "exposure": ["type": "number", "minimum": -4.0, "maximum": 4.0, "unit": "EV"],
-                        "contrast": ["type": "number", "minimum": -50.0, "maximum": 50.0],
-                        "saturation": ["type": "number", "minimum": -100.0, "maximum": 100.0],
-                        "temperature": ["type": "number", "minimum": 800.0, "maximum": 14000.0, "unit": "K"],
-                        "tint": ["type": "number", "minimum": -50.0, "maximum": 50.0]
-                    ],
-                    "additionalProperties": false
-                ],
-                "MutationResponse": [
-                    "type": "object",
-                    "properties": [
-                        "operationId": ["type": "string"],
-                        "workingRef": ["type": "string"],
-                        "before": ["$ref": "#/definitions/Adjustments"],
-                        "after": ["$ref": "#/definitions/Adjustments"],
-                        "diff": ["type": "object"],
-                        "stateHash": ["type": "string"],
-                        "isDryRun": ["type": "boolean"]
-                    ],
-                    "required": ["operationId", "workingRef", "before", "after", "diff", "stateHash"]
-                ]
-            ]
-        ]
+        let schema = ContractSchema.document()
         if let data = try? JSONSerialization.data(withJSONObject: schema, options: [.prettyPrinted, .sortedKeys]),
            let str = String(data: data, encoding: .utf8) {
             print(str)
@@ -348,36 +296,19 @@ struct GetCommand: ParsableCommand {
 }
 
 // MARK: - Helper to parse input adjustments
-func parseAdjustmentInputs(keyValues: [String], jsonStr: String?, filePath: String?) throws -> Adjustments {
-    if let json = jsonStr {
-        guard let data = json.data(using: .utf8),
-              let adj = try? JSONDecoder().decode(Adjustments.self, from: data) else {
-            throw C1Error.invalidRequest("Failed to decode JSON adjustments payload.")
-        }
-        return adj
+func parseAdjustmentInputs(keyValues: [String], jsonStr: String?, filePath: String?, delta: Bool = false) throws -> Adjustments {
+    let sources = (keyValues.isEmpty ? 0 : 1) + (jsonStr == nil ? 0 : 1) + (filePath == nil ? 0 : 1)
+    guard sources == 1 else { throw C1Error.invalidRequest("Provide exactly one of key=value pairs, --json, or --file.") }
+    let data: Data
+    if let json = jsonStr { data = Data(json.utf8) }
+    else if let path = filePath {
+        data = path == "-" ? FileHandle.standardInput.readDataToEndOfFile()
+            : try Data(contentsOf: URL(fileURLWithPath: path.hasPrefix("@") ? String(path.dropFirst()) : path))
+    } else { return try FieldRegistry.shared.parseKeyValueArguments(keyValues) }
+    guard let values = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw C1Error.invalidRequest("Adjustments must be a JSON object.")
     }
-    if let path = filePath {
-        let url: URL
-        if path == "-" {
-            let inputData = FileHandle.standardInput.readDataToEndOfFile()
-            guard let adj = try? JSONDecoder().decode(Adjustments.self, from: inputData) else {
-                throw C1Error.invalidRequest("Failed to decode adjustments from standard input.")
-            }
-            return adj
-        } else {
-            let cleanPath = path.hasPrefix("@") ? String(path.dropFirst()) : path
-            url = URL(fileURLWithPath: cleanPath)
-            guard let data = try? Data(contentsOf: url),
-                  let adj = try? JSONDecoder().decode(Adjustments.self, from: data) else {
-                throw C1Error.invalidRequest("Failed to decode adjustments from file '\(cleanPath)'.")
-            }
-            return adj
-        }
-    }
-    guard !keyValues.isEmpty else {
-        throw C1Error.invalidRequest("No adjustment parameters provided. Provide key=value pairs or --json/--file.")
-    }
-    return try FieldRegistry.shared.parseKeyValueArguments(keyValues)
+    return try ContractSchema.parseAdjustments(values, delta: delta)
 }
 
 // MARK: - Set
@@ -444,7 +375,7 @@ struct AddCommand: ParsableCommand {
 
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) {
-            let adjustments = try parseAdjustmentInputs(keyValues: keyValues, jsonStr: json, filePath: file)
+            let adjustments = try parseAdjustmentInputs(keyValues: keyValues, jsonStr: json, filePath: file, delta: true)
             let res = try SessionController.shared.mutate(
                 workingRefString: workingRef,
                 ifState: ifState,

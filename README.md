@@ -1,287 +1,135 @@
 # c1 — Unofficial Capture One CLI & MCP Server
 
 [![CI](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml/badge.svg)](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![macOS](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-lightgrey.svg)]()
-[![Capture One](https://img.shields.io/badge/Capture%20One-16.8.5.30%20(pinned)-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`c1` provides an unofficial CLI and Model Context Protocol (MCP) server for automating [Capture One](https://www.captureone.com/). It allows coding and reasoning agents (Claude Code, Cursor, Windsurf, Codex, etc.) as well as scripts to read, adjust, diff, and export variants inside Capture One through a stable, self-describing JSON and MCP interface.
+`c1` reads, adjusts, compares, and previews Capture One variants through a CLI and a stdio MCP server. Both adapters share `CaptureOneCore` and one versioned request/response schema. Creative judgment and photographer review belong in the caller.
 
----
+Capture One is a trademark of Capture One A/S. This independent project is not affiliated with, endorsed by, or sponsored by Capture One A/S. Capture One and RAW fixtures are not distributed with the project.
 
-> [!IMPORTANT]
-> **Legal Disclaimer & Trademark Notice**  
-> Capture One is a registered trademark of Capture One A/S.  
-> `c1` is an independent, unofficial open-source project and is **not** affiliated with, endorsed by, or sponsored by Capture One A/S. No proprietary Capture One code, binaries, or assets are contained within this repository.
+## Support boundary for v0.1
 
----
+- **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. The retained M0 evidence is from an M1 Pro running macOS 26.4.1. See the [qualification report](docs/m0_requalification_16.8.5.30.md) and [release validation](docs/RELEASE_VALIDATION.md).
+- **One open document:** the implementation rejects operations when more than one document is open. Editing and preview export require a Session (`.cosessiondb`); Catalogs support read-only inspection.
+- **One operator, sequential calls:** keep the Session open throughout a workflow. Do not switch/reopen/replace databases, edit in the UI, or launch competing exports during a command. The advisory lock serializes cooperating c1 writers; it does not lock the photographer UI, other automation, or delayed Apple Events. Multi-process workflows remain unqualified.
+- **Reference lifetime:** a working reference is bound to the canonical database file identity, Capture One process/launch, and parent-image path. Restarting Capture One or replacing the database invalidates it; create a fresh clone. Capture One does not expose a reliable same-file close/reopen token within one application launch. Such workflows remain unsupported, rather than being presented as automatically detected.
+- **Other builds:** 16.4+ through 16.x are permitted by the compatibility check, but are **unverified**, not qualified support. Older/future major builds require `C1_ALLOW_UNTESTED_BUILD=1`. Check `doctor` for the tested-build match before editing.
+- **Platform:** the package targets macOS 13+, but this is a deployment target, not evidence that every macOS version is tested. Intel and older macOS runtime qualification are deferred.
 
-## Key Features
-
-- **Hands, Not Brain:** `c1` executes adjustments with precision, safety guarantees, and deterministic readbacks. AI agents or external scripts provide the creative judgment.
-- **Fail-Closed Safety Architecture:**
-  - **Working-Variant Model:** Originals and native variants are strictly protected and cannot be mutated. Edits only occur on managed working clones (`c1_wrk_<uuid>`).
-  - **Zero RAW Mutation:** RAW source files are never touched or modified (cryptographically verified via SHA-256).
-  - **Catalog Guard:** Catalogs are strictly read-only; mutation verbs (`clone`, `delete`, `set`, `add`, `reset`, `baseline`) fail closed. Full editing is supported on Sessions.
-  - **Optimistic Concurrency:** State hashing (`--if-state <hash>`) prevents race conditions between agents and photographer UI edits.
-  - **Cross-Process Locking:** Advisory `flock` serialization ensures multiple CLI processes and MCP instances do not collide.
-  - **Pre-Dispatch Journaling:** Every mutation is journaled (`.c1/journal.jsonl`) before dispatch, enabling audit trails and status reconciliation.
-- **Dual Interfaces:**
-  - **`c1` CLI:** 15 subcommands formatted for both human inspection and pipeable JSON.
-  - **`c1-mcp` Server:** Full-featured stdio MCP adapter exposing 16 tools, dual text/JSON responses, and base64-encoded visual JPEG previews for AI chat interfaces.
-
----
-
-## System Requirements
-
-- **macOS:** macOS 13.0+ (Ventura, Sonoma, Sequoia, or later).
-  > **macOS Compatibility Details:**
-  > - **macOS 13.0+ (Ventura, Sonoma, Sequoia):** Fully supported. Core Apple Events, ImageIO decoding, and POSIX advisory locking behave identically across these releases.
-  > - **macOS < 13.0 (Monterey, Big Sur):** Unsupported. The official Swift Model Context Protocol SDK and Swift 5.9+ concurrency dependencies require macOS 13+.
-  > - **Hardware Architecture:** Tested on Apple Silicon (`arm64`). Can also compile for Intel (`x86_64`) as a Universal binary.
-- **Capture One:** Tested and verified on builds in `testedBuilds` (**16.8.5.30**). Compatibility is supported by default for **Capture One 16.4+ through 16.x** (untested 16.x builds emit an informational warning). Builds `< 16.4` or `>= 17.0` fail closed with `unsupported-version` unless overridden by `C1_ALLOW_UNTESTED_BUILD=1`.
-  > See [Qualifying New Builds](docs/QUALIFYING_NEW_BUILDS.md) to test and register newly released Capture One versions.
-- **Permissions:** macOS Automation permissions (`System Settings > Privacy & Security > Automation`).
-- **Build Tools:** Swift 5.9+ / Xcode command line tools.
-
----
+This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, geometry, style learning, and general recipe export are outside v0.1.
 
 ## Installation
 
-### Building from Source
+Building requires Swift 5.9+ and the macOS command line tools. Capture One must be installed at `/Applications/Capture One.app` and running for application operations.
 
-```bash
+```sh
 git clone https://github.com/kiri11/c1cmd.git
 cd c1cmd
-
-# Build release binaries
 make build
-
-# Install to /usr/local/bin (requires sudo) or ~/.local/bin
 make install
 ```
 
-Alternatively, build with the Swift Package Manager directly:
-```bash
-swift build -c release
-# Binaries are in .build/release/c1 and .build/release/c1-mcp
-```
+`make install` chooses a writable prefix, falling back to `~/.local`. Override with `make install PREFIX="$HOME/.local"`. Add its `bin` directory to `PATH` if necessary.
 
-### Running Tests
+Both executables require **`c1_CaptureOneCore.bundle` beside them**. The Makefile installs it. When using a release archive, keep its `bin` directory intact; copying only `c1` or `c1-mcp` is insufficient.
 
-```bash
-# Run unit test suite (237 assertions, no Xcode.app required)
-make test
-# or
-swift run CaptureOneCoreTests
-```
+Release binaries are ad-hoc signed, not Developer ID notarized. Source builds are available if macOS policy blocks a downloaded binary.
 
----
+## MCP setup
 
-## Configuring the MCP Server
-
-`c1-mcp` runs over `stdio` and connects seamlessly to any MCP-compliant AI client.
-
-> [!IMPORTANT]
-> **macOS Automation Permissions for MCP Clients**  
-> When an MCP client (Claude Desktop, Cursor, Zed) invokes `c1-mcp` to communicate with Capture One, macOS prompts for permission for **the client application** (e.g. *"Claude would like to control Capture One"*), **not** `c1-mcp`. If tool calls fail with `permission-denied (-1743)`, ensure the client application has **Capture One** enabled under **System Settings > Privacy & Security > Automation**.
-
-### Claude Desktop
-
-Edit your Claude Desktop configuration file:  
-`~/Library/Application Support/Claude/claude_desktop_config.json`
+Configure your MCP client to launch the installed server over stdio:
 
 ```json
 {
   "mcpServers": {
     "c1": {
-      "command": "/usr/local/bin/c1-mcp",
-      "env": {
-        "C1_ALLOW_UNTESTED_BUILD": "1"
-      }
+      "command": "/absolute/path/to/bin/c1-mcp"
     }
   }
 }
 ```
-*(The `"env"` block is optional; set `C1_ALLOW_UNTESTED_BUILD` if testing on an unverified Capture One build outside 16.4+).*
 
-### Cursor
+macOS Automation permission must allow the launching application to control Capture One. If calls return `permission-denied`, inspect **System Settings → Privacy & Security → Automation**. See [MCP setup](docs/MCP_SETUP.md) for client examples. Do not enable the untested-build override unless deliberately qualifying another build.
 
-In Cursor settings under **Features > MCP Servers**, add a new server:
-- **Name:** `c1`
-- **Type:** `command`
-- **Command:** `/usr/local/bin/c1-mcp`
+The server exposes 16 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`, and `operation_status`.
 
-### Claude Code
+`preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
-Add the server via the CLI:
-```bash
-claude mcp add c1 -- /usr/local/bin/c1-mcp
-```
+## Editing workflow
 
-> [!TIP]
-> For a full step-by-step setup guide covering **ChatGPT macOS App (Codex Mode)**, **Claude Desktop**, and **Antigravity**, see the [MCP Client Setup Guide](docs/MCP_SETUP.md).
+Open one Session in Capture One, then:
 
----
-
-## CLI Usage & Workflow
-
-### 1. Check Health & Environment
-
-Verify Capture One status, active document, and advisory lock:
-```bash
+```sh
 c1 doctor
-```
-
-Output:
-```json
-{
-  "allChecksPassed" : true,
-  "appRunning" : true,
-  "appVersion" : "16.8.5.30",
-  "docName" : "Shoot2026.cosessiondb",
-  "exactBuildMatched" : true,
-  "hasDocument" : true,
-  "isSession" : true,
-  "lockAcquired" : true,
-  "pinnedBuild" : "16.8.5.30",
-  "unresolvedOperationsCount" : 0
-}
-```
-
-### 2. List Variants
-
-```bash
-# List all variants in the active session
+c1 doc info
 c1 variants list
-
-# Or list variants in a specific collection
-c1 variants list --collection Capture
+c1 variant clone <source-id>
+c1 get <working-ref>
+c1 set <working-ref> --if-state <stateHash-from-get> exposure=0.35 contrast=5
+c1 preview <working-ref>
+c1 diff <working-ref>
 ```
 
-### 3. Clone to a Managed Working Variant
+Review the preview before keeping the proposal. To discard it:
 
-Originals cannot be adjusted directly. First create a managed working clone:
-```bash
-c1 variant clone 1
-```
-Output:
-```json
-{
-  "baselineStateHash" : "3307611ef4f7831f0db0089e17b3f9ff4ff9a7c36a282f1b0a72ad41ec3ee989",
-  "cloneVariantId" : "4",
-  "documentPath" : "/Volumes/Work/Shoot2026",
-  "sourceVariantId" : "1",
-  "workingRef" : "c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4"
-}
+```sh
+c1 variant delete <working-ref>
 ```
 
-### 4. Read Adjustments & Metadata
+Only managed working clones (`c1_wrk_<uuid>`) can be adjusted or deleted. Native IDs and original variants are rejected by mutation methods. The RAW byte-preservation evidence is from fixture tests; c1 does not hash every user's RAW before every command.
 
-```bash
-c1 get c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4
+`set` applies absolute values; `add` applies deltas. `reset` restores exposure/contrast/saturation defaults and the working reference's baseline white balance. Use `variant baseline <source-id>` to create a managed variant with native New Variant defaults. `diff <ref1> <ref2>` compares two variants; `dump` exports batched JSONL.
+
+### Supported adjustments
+
+| Field | Aliases | Absolute range |
+|---|---|---|
+| exposure | exp | -4 to 4 EV |
+| contrast | — | -50 to 50 |
+| saturation | sat | -100 to 100 |
+| temperature | kelvin, temp | 800 to 14000 K |
+| tint | — | -50 to 50 |
+
+All values must be finite. Writes touch requested fields only; white balance is written and checked as a temperature/tint pair. Bounds, managed identity, and the state precondition are checked before dispatch. The handler checks the expected five-field state again immediately before its setters. Apple Event property writes are sequential, not atomic transactions: a later failure can leave an earlier field applied. Do not edit concurrently in the UI.
+
+MCP accepts either a nested `adjustments` object or flat fields. Mixed forms, duplicate aliases, unknown fields, and wrong types are rejected. `dump.batchSize` must be 1–1000; preview timeout must be greater than zero and at most 300 seconds.
+
+### Preview files
+
+Each preview uses a unique `c1-previews/<operationId>` subdirectory beneath the Session's default `Output`, or beneath the supplied output directory. Existing JPEGs in a custom directory are never reused. Polling requires stable size and a complete decodable JPEG. Metadata includes the native variant ID and five-field state hash; that hash does **not** cover layers, crops, curves, or every setting affecting rendering. Preview caching based on it is unsupported.
+
+The reserved `c1-preview` recipe is configured by c1 and may remain in the Session. Do not use that recipe for your own exports.
+
+## Errors and recovery
+
+Every dispatched write, including clone, baseline, delete, recipe setup, and preview export, has a durable pre-dispatch journal entry in the Session's `.c1/journal.jsonl`. The journal appends state snapshots instead of rewriting history. Failed journal writes prevent dispatch; corrupted journals and provenance fail closed on writes.
+
+Failures after dispatch include an **`operationId`** in CLI/MCP error JSON. Do not repeat a timed-out command:
+
+```sh
+c1 operation status <operationId>
 ```
 
-### 5. Mutate Adjustments (Optimistic Concurrency)
+An unresolved operation blocks further writes. While the original Capture One process is running, status remains unresolved: a timeout does not cancel its Apple Event. Restart Capture One, reopen the same database, and inspect status again. Reconciliation then records observed adjustments or candidate created IDs and ends the write block. **`reconciled` means the old process has ended and observations were recorded; it does not prove historical success.** Review those observations. No uncertain command is retried, no candidate clone is automatically adopted/deleted, and old working references are not rebound. Create a fresh working clone to resume.
 
-Apply absolute (`set`) or relative (`add`) adjustments with `--if-state`:
-```bash
-# Absolute adjustment
-c1 set c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4 \
-  --if-state 3307611ef4f7831f0db0089e17b3f9ff4ff9a7c36a282f1b0a72ad41ec3ee989 \
-  exposure=0.35 kelvin=5600 tint=-2.0
+Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a replaced database, or a corrupt journal requires manual inspection; deleting evidence to bypass the write gate is not a recovery workflow.
 
-# Relative delta
-c1 add c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4 \
-  --if-state <new-state-hash> \
-  exposure=-0.15 contrast=5.0
+## Contract and development
+
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.0.0`; package version is `0.1.0`.
+
+```sh
+make test                              # offline Swift regression suite
+python3 Tests/contract_test.py          # offline CLI/MCP protocol and input checks
+export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
+python3 Tests/integration_test.py       # disposable Session; requires Capture One
+python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
+make archive
+python3 Tests/archive_test.py dist/*.tar.gz
 ```
 
-### 6. Export Verified Preview
+Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
 
-Renders an sRGB JPEG preview via a dedicated `c1-preview` recipe and validates ImageIO decoding and pixel SHA-256:
-```bash
-c1 preview c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4
-```
+Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. M4 style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
 
-### 7. Compare Changes
-
-```bash
-# Compare working clone against its baseline
-c1 diff c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4
-
-# Or compare two variants
-c1 diff 1 4
-```
-
-### 8. Cleanup Unwanted Clones
-
-```bash
-c1 variant delete c1_wrk_b74ad0a1-d576-47b1-b924-a7442ebbe8e4
-```
-*(Only managed working clones can be deleted; deleting original variants is blocked.)*
-
----
-
-## Supported Adjustment Fields (v0.1)
-
-| Field | Aliases | Range | Unit | Notes |
-|---|---|---|---|---|
-| `exposure` | `exp` | `[-4.0, 4.0]` | EV | Tolerance: `1e-5` |
-| `contrast` | - | `[-50.0, 50.0]` | - | Tolerance: `1e-5` |
-| `saturation` | `sat` | `[-100.0, 100.0]` | - | Tolerance: `1e-5` |
-| `temperature` | `kelvin`, `temp` | `[800.0, 14000.0]` | Kelvin | Coupled with tint; tolerance: `0.01` |
-| `tint` | - | `[-50.0, 50.0]` | - | Coupled with temp; tolerance: `0.0001` |
-
-Read-only capture metadata includes: `camera`, `lens`, `iso`, `shutterSpeed`, `asShotWB`, `captureDate`, `starRating`, and `colorTag`.
-
----
-
-## Safety & Architecture
-
-```
-AI Agent / Script ──▶ c1 (CLI)  /  c1-mcp (stdio MCP server)
-                            │
-                      CaptureOneCore (Swift Library)
-                            │  FieldSpec Registry · Advisory Lock · Provenance Store
-                            │  Operation Journal · State Hashing · Catalog Guards
-                      AppleScriptBridge
-                            │  Pre-compiled Handlers.applescript
-                      Capture One 16.8.5.30 (macOS GUI active)
-```
-
-1. **No Runtime AppleScript Generation:** All Apple Events are dispatched through pre-compiled handler routines in bundled `Handlers.applescript` using non-reserved AppleScript user keys (`usrf`).
-2. **Advisory File Lock:** A system flock protects against concurrent operations.
-3. **Strict Document Context:** Operations are bound to the open document; switching documents or sessions between commands invalidates stale references (`document-changed`).
-
----
-
-## Troubleshooting & Permissions
- 
-- **Apple Event Permission Denied (`-1743` / `errAEEventNotPermitted`):**  
-  macOS requires authorization for applications to control Capture One via Apple Events.
-  - **Terminal / CLI:** Go to **System Settings > Privacy & Security > Automation**, find your terminal app (Terminal, iTerm2), and ensure **Capture One** is toggled ON.
-  - **MCP Clients (Claude Desktop, Cursor, Zed):** When `c1-mcp` runs as a subprocess of an AI interface, macOS prompts for permission for **the parent application** (e.g., *"Claude"* or *"Cursor"*), **not** `c1-mcp`. If tool calls fail with `-1743`, ensure the parent app is enabled under **Automation**.
-  - **Resetting Stuck Permissions:** If permissions become stuck or unprompted after an OS update, reset Apple Event permissions for Capture One in Terminal:
-    ```bash
-    tccutil reset AppleEvents com.captureone.captureone16
-    ```
-- **macOS Gatekeeper / Quarantine Flags (macOS 15 Sequoia):**  
-  If running pre-compiled release binaries on macOS 15+, Gatekeeper may block un-notarized command-line executables. Remove the quarantine attribute if prompted:
-  ```bash
-  xattr -d com.apple.quarantine /path/to/c1 /path/to/c1-mcp
-  ```
-- **Unsupported Version (`unsupported-version`):**  
-  `c1` supports **Capture One 16.4+ through 16.x** and maintains a list of verified builds in `testedBuilds` (`16.8.5.30`). Builds older than 16.4 or future major versions (17+) fail closed. To run against an unsupported build at your own risk, set:
-  ```bash
-  export C1_ALLOW_UNTESTED_BUILD=1
-  ```
-  To test and qualify a newly released Capture One build, follow the runbook in [docs/QUALIFYING_NEW_BUILDS.md](docs/QUALIFYING_NEW_BUILDS.md).
-- **Unresolved Operations:**  
-  If a process crashes during a mutation, run `c1 operation status <operationId>` or check `.c1/journal.jsonl` in the Session directory.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+[MIT License](LICENSE).

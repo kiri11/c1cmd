@@ -219,6 +219,7 @@ public final class FieldRegistry {
     }
 
     public func validateValue(_ val: Double, for spec: FieldSpec) throws {
+        guard val.isFinite else { throw C1Error.invalidRequest("Adjustment values must be finite.") }
         if let min = spec.minValue, val < min {
             throw C1Error.invalidRequest("Value \(val) for field '\(spec.name)' is below minimum \(min)")
         }
@@ -229,6 +230,7 @@ public final class FieldRegistry {
 
     public func parseKeyValueArguments(_ args: [String]) throws -> Adjustments {
         var adj = Adjustments()
+        var seen = Set<String>()
         for arg in args {
             let parts = arg.split(separator: "=", maxSplits: 1).map(String.init)
             guard parts.count == 2 else {
@@ -240,7 +242,8 @@ public final class FieldRegistry {
             guard let spec = findAdjustmentSpec(named: key) else {
                 throw C1Error.unsupportedField("Field '\(key)' is not a recognized or supported adjustment field.")
             }
-            guard let doubleVal = Double(valStr) else {
+            guard seen.insert(spec.name).inserted else { throw C1Error.invalidRequest("Duplicate adjustment field or alias: \(key)") }
+            guard let doubleVal = Double(valStr), doubleVal.isFinite else {
                 throw C1Error.invalidRequest("Cannot parse numeric value for field '\(spec.name)': '\(valStr)'")
             }
             adj.setValue(doubleVal, for: spec.name)

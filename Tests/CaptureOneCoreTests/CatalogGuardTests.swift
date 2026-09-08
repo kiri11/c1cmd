@@ -50,12 +50,12 @@ public struct CatalogGuardTests {
 
         // 3. Preview export is rejected on Catalog documents
         XCTAssertThrowsError(
-            try SessionController.shared.preview(ref: "1"),
+            try SessionController.shared.assertSessionWritable(docInfo: catalogDoc, operation: "preview"),
             "Preview export must fail closed on Catalog"
         ) { err in
             if case let C1Error.invalidRequest(msg) = err {
                 XCTAssertTrue(msg.contains("Catalog"), "Error message should mention Catalog")
-                XCTAssertTrue(msg.contains("Sessions only"), "Error message should mention Sessions only")
+                XCTAssertTrue(msg.contains("read-only"), "Error message should explain read-only scope")
             } else {
                 XCTFail("Expected C1Error.invalidRequest but got \(err)")
             }
