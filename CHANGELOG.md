@@ -7,6 +7,9 @@
 - Share CLI/MCP schemas and reject malformed requests before application access.
 - Install/package the required resource bundle; test relocated archives and keep automated releases as drafts until validation.
 - Add offline fault regressions; narrow support claims to demonstrated sequential single-document operation.
+- Retry only transient reads of the reference returned by cloning; never repeat the clone command after an uncertain result.
+- Add packaged live recovery qualification for actual Apple Event timeout, eventual preview output and MCP client death, with retained command/journal evidence and explicit coverage limits.
+- Make release validation the current decision authority; reconcile historical identity, preview, Catalog and signing statements.
 
 # Changelog
 

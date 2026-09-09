@@ -1,0 +1,2 @@
+PASS: shared CLI/MCP schemas, 16 tool schemas, 13 invalid requests, server survival
+PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation

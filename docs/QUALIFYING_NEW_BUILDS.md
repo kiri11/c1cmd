@@ -10,11 +10,11 @@ This document provides the standard operating procedure for testing, verifying, 
 
 1. **Tested Builds (`testedBuilds`)**:
    - Explicitly verified builds (e.g. `16.8.5.30`).
-   - `exactBuildMatched: true`, `allChecksPassed: true`.
+   - `exactBuildMatched: true`; `allChecksPassed` also requires the other health checks.
    - Executes with **zero warnings**.
 2. **Allowed Untested Builds (`16.4+ < 17.0`)**:
    - Modern Capture One 16 builds that have not yet been explicitly added to `testedBuilds`.
-   - `exactBuildMatched: false`, `allChecksPassed: true`.
+   - `exactBuildMatched: false`; `allChecksPassed` can still be true and is not a qualification signal.
    - Executes with an informational warning:  
      `"Running on unverified Capture One build '<version>' (tested: ...). Compatibility allowed for Capture One 16.4+. Core safety guards and readback checks remain active."`
 3. **Unsupported Builds (`< 16.4` or `>= 17.0`)**:
@@ -83,9 +83,13 @@ python3 Tests/mcp_test.py
 - Dual text/JSON metadata + `image/jpeg` base64 preview rendering.
 - Catalog protection barriers.
 
-### Step 4: Add the Build to `SessionController.testedBuilds`
+### Step 4: Qualify the packaged recovery paths
 
-Once all live integration tests pass, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
+Run `Tests/release_integration_test.py` against the candidate archive, then close all documents and run `Tests/recovery_integration_test.py` sequentially. The recovery harness is intentionally pinned to 16.8.5.30; adapting its explicit build assertion for a new candidate is qualification work, not permission to label that build tested. Retain successful and failed runs, artifact/executable hashes, app/OS/toolchain identity, RAW checksums and journal evidence. Review the limited claims and remaining gates in [release validation](RELEASE_VALIDATION.md).
+
+### Step 5: Add the Build to `SessionController.testedBuilds`
+
+Once the packaged workflow and recovery qualification pass and their scope has been reviewed, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
 
 ```swift
 public static let testedBuilds: [String] = [
@@ -94,7 +98,7 @@ public static let testedBuilds: [String] = [
 ]
 ```
 
-### Step 5: Run Unit Tests
+### Step 6: Run Unit Tests
 
 Execute the unit test suite to ensure no regressions:
 
@@ -102,7 +106,7 @@ Execute the unit test suite to ensure no regressions:
 swift run CaptureOneCoreTests
 ```
 
-### Step 6: Submit Pull Request
+### Step 7: Submit Pull Request
 
 Commit your changes:
 1. `sdef/<version>.sdef` (new dictionary snapshot)

@@ -9,7 +9,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 
 ## Support boundary for v0.1
 
-- **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. The retained M0 evidence is from an M1 Pro running macOS 26.4.1. See the [qualification report](docs/m0_requalification_16.8.5.30.md) and [release validation](docs/RELEASE_VALIDATION.md).
+- **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. The retained M0 evidence is from an M1 Pro running macOS 26.4.1. See [release validation](docs/RELEASE_VALIDATION.md) for the current decision and remaining distribution gates; the [M0 report](docs/m0_requalification_16.8.5.30.md) is historical evidence.
 - **One open document:** the implementation rejects operations when more than one document is open. Editing and preview export require a Session (`.cosessiondb`); Catalogs support read-only inspection.
 - **One operator, sequential calls:** keep the Session open throughout a workflow. Do not switch/reopen/replace databases, edit in the UI, or launch competing exports during a command. The advisory lock serializes cooperating c1 writers; it does not lock the photographer UI, other automation, or delayed Apple Events. Multi-process workflows remain unqualified.
 - **Reference lifetime:** a working reference is bound to the canonical database file identity, Capture One process/launch, and parent-image path. Restarting Capture One or replacing the database invalidates it; create a fresh clone. Capture One does not expose a reliable same-file close/reopen token within one application launch. Such workflows remain unsupported, rather than being presented as automatically detected.
@@ -126,6 +126,8 @@ python3 Tests/integration_test.py       # disposable Session; requires Capture O
 python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
 make archive
 python3 Tests/archive_test.py dist/*.tar.gz
+# Exclusive app use, zero open documents; pauses/restarts Capture One:
+python3 Tests/recovery_integration_test.py dist/c1-v0.1.0-macos-arm64.tar.gz /path/to/new-evidence-dir
 ```
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.

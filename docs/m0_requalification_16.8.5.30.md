@@ -1,6 +1,10 @@
 # M0 runtime requalification — Capture One 16.8.5.30
 
-Date: 2026-09-07. **Decision: qualified with reduced scope (single active Session; no concurrency). Go to M1.** Core write safety, original RAW preservation, working clone isolation, 5-field mutations/deltas/bounds rejection, preview export, and safe clone deletion are verified in [single_session_safety.json](m0/16.8.5.30/single_session_safety.json). Multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred.
+Date: 2026-09-07. **Historical M0 decision: proceed to M1 with reduced scope (single active Session; no concurrency). This is not the current shipped-product release decision.** Core write safety, original RAW preservation, working clone isolation, 5-field mutations/deltas/bounds rejection, preview export, and safe clone deletion are verified in [single_session_safety.json](m0/16.8.5.30/single_session_safety.json). Multi-document switching, cross-restart durable rebinding, and multi-process concurrency are deferred.
+
+## Status of this historical report
+
+The report below preserves observations at the time of the feasibility spike. Statements such as "no c1 implementation exists yet" and "neither route is approved" describe that stage only. The implementation now exists. [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md) is the sole current release authority, covering integrated recovery, limited reference lifetime, unique-directory preview polling and remaining distribution gates. Callback recovery is deferred because production v0.1 does not install callbacks. Same-file reopening and competing operators remain unsupported; those limitations are not relabeled as solved.
 
 ## Environment and scope
 
@@ -21,7 +25,7 @@ Only copies in `/private/tmp/c1-m0-1685-A` and `-B` were adjusted. No catalog va
 
 The unsandboxed Codex shell could send Apple Events through `osascript` and a compiled Swift probe. The first sandboxed application-ID lookup failed with -1728; that was not an observed Capture One compatibility failure. Terminal.app launch, release signing, notarization and consent across signed updates were not tested.
 
-## Results against the M0 gates
+## Historical results against the M0 gates
 
 | Gate | Result | Limits |
 |---|---|---|
@@ -87,7 +91,7 @@ Two export clients were killed after dispatch and before returning their final r
 - `processing done script` delivered a matching job UUID, source RAW path and **list of output paths** for four fixture exports. The final two JPEGs decoded successfully as 1000 × 1500 images. [Callback evidence](m0/16.8.5.30/callback.json), [image verification](m0/16.8.5.30/callback_images.json).
 - A recovery record was written before installation. Recovery from a separate process restored an unchanged installed value; a simulated intervening replacement was preserved. The initial string comparison failed because the getter returns a file descriptor/HFS text and POSIX conversion uses `/tmp` while installation used `/private/tmp`. The failed run is retained; the corrected normalized comparison passed, and final cleanup returned `missing value`.
 
-This is positive callback feasibility evidence, **not** completed crash recovery: durable fsync/atomic journal transitions, actual controller death while the callback owns pending work, unrelated exports using another recipe/document, callback loss/failure, and lost `process` replies still need a production-quality harness. The recovery probe intentionally starts from an unset callback; preserving a pre-existing user callback remains unqualified. A callback is the leading current candidate because polling evidence is insufficient, but neither route is approved for release yet.
+This is positive callback feasibility evidence, **not** completed crash recovery: durable fsync/atomic journal transitions, actual controller death while the callback owns pending work, unrelated exports using another recipe/document, callback loss/failure, and lost `process` replies still need a production-quality harness. The recovery probe intentionally starts from an unset callback; preserving a pre-existing user callback remains unqualified. A callback is the leading current candidate because polling evidence is insufficient, but neither route was approved for release at this historical stage. The current limited polling decision supersedes this gate; see release validation.
 
 ### Bulk performance and shapes
 

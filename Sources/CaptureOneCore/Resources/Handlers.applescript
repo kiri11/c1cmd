@@ -117,7 +117,20 @@ on cloneVariant(docName, sourceId)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
         set c to clone variant (variant id sourceId of d)
-        return {cloneId:(id of c as text)}
+        -- Capture One can return a collection-scoped reference before its ID
+        -- becomes readable. Retry only that exact reference's read, never clone.
+        repeat with attempt from 1 to 20
+            try
+                set createdId to (id of c as text)
+                return {cloneId:createdId}
+            on error errorMessage number errorNumber
+                if (errorNumber is not -1700 and errorNumber is not -1728) or attempt is 20 then
+                    error errorMessage number errorNumber
+                end if
+            end try
+            delay 0.1
+            set d to my checkedDocument(docName)
+        end repeat
     end tell
 end cloneVariant
 
