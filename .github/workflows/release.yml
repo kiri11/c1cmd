@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-release:
     name: Build & Package Release (macOS arm64)
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -19,8 +19,10 @@ jobs:
 
       - name: Show Swift environment
         run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
           swift --version
           xcode-select -p
+          xcodebuild -version
 
       - name: Run Unit Tests
         run: swift run CaptureOneCoreTests

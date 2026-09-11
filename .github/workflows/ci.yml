@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     name: Build & Test (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -17,8 +17,10 @@ jobs:
 
       - name: Show Swift version and environment
         run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
           swift --version
           xcode-select -p
+          xcodebuild -version
 
       - name: Build Debug
         run: swift build -v
