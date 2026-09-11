@@ -139,6 +139,14 @@ public struct OutputFormatter {
         if let v = res.metadata.captureDate { lines.append("  date        : \(v)") }
         if let v = res.metadata.rating { lines.append("  rating      : \(v)") }
         if let v = res.metadata.colorTag { lines.append("  colorTag    : \(v)") }
+        if let g = res.geometry {
+            lines.append("\nGeometry (rotated canvas, bottom-left pixels):")
+            lines.append("  crop        : \(g.crop.centerX), \(g.crop.centerY), \(g.crop.width), \(g.crop.height)")
+            lines.append("  rotation    : \(g.rotation) degrees")
+            lines.append("  orientation : \(g.orientation) degrees")
+            lines.append("  state       : \(res.geometryStateHash ?? "unavailable")")
+        }
+        if let reason = res.geometryUnavailableReason { lines.append("Geometry writes: \(reason)") }
         return lines.joined(separator: "\n")
     }
 
@@ -169,9 +177,12 @@ public struct OutputFormatter {
         lines.append("")
         if res.diff.isEmpty {
             lines.append("No adjustment differences found between \(res.ref1) and \(res.ref2).")
-            return lines.joined(separator: "\n")
         }
-        lines.append(contentsOf: renderDiffTable(res.diff))
+        if !res.diff.isEmpty { lines.append(contentsOf: renderDiffTable(res.diff)) }
+        if let geometryDiff = res.geometryDiff, !geometryDiff.isEmpty {
+            lines.append("\nCrop / rotation differences:")
+            lines.append(contentsOf: renderDiffTable(geometryDiff))
+        }
         return lines.joined(separator: "\n")
     }
 

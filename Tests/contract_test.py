@@ -9,8 +9,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 class Client:
-    def __init__(self, binary):
-        self.process = subprocess.Popen([str(binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    def __init__(self, binary, env=None):
+        self.process = subprocess.Popen([str(binary)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.id = 0
         self.selector = selectors.DefaultSelector()
         self.selector.register(self.process.stdout, selectors.EVENT_READ)
@@ -67,12 +67,20 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 16
+        assert len(tools) == 17
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
         for name in ['preview', 'operation_status']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
         for name, args in [
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h'}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':46}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':True}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'keystone':1}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'aspectRatio':0}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'width':3}}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'centerX':10,'centerY':10,'width':3,'height':2},'aspectRatio':1.5}),
+            ('preview', {'ref':'x','fullFrame':'yes'}),
             ('reset', {'workingRef': 'x', 'ifState': 'h', 'fields': [123]}),
             ('reset', {'workingRef': 'x', 'ifState': 'h', 'fields': 'exposure'}),
             ('set', {'workingRef': 'x', 'ifState': 'h', 'exposure': 'oops', 'contrast': 1}),
@@ -90,10 +98,24 @@ def run(cli, mcp):
             result = subprocess.run([str(cli), 'set', 'x', '--if-state', 'h', '--json', payload], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
             assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+        for crop in ['1,2,bad,3,4', '1,2,,3,4', '1,2,3', '1,2,nan,4']:
+            result = subprocess.run([str(cli), 'geometry', 'set', 'x', '--if-geometry-state', 'h', '--crop', crop, '--format', 'json'], capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0
+            assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 16 tool schemas, 13 invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 17 tool schemas, invalid requests, server survival')
     finally:
         client.close()
+    composition = Client(mcp, env=dict(os.environ, C1_MCP_PROFILE='composition'))
+    try:
+        names = {t['name'] for t in composition.request('tools/list', {})['tools']}
+        assert 'geometry_set' in names
+        assert not names.intersection({'set','add','reset','variant_baseline'})
+        result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
+        assert result['isError'] and 'not enabled' in result['content'][0]['text']
+        print('PASS: composition profile hides and rejects tonal mutation tools')
+    finally:
+        composition.close()
 
 if __name__ == '__main__':
     run(Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1')),

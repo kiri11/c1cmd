@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.0.0"
+    public static let version = "1.1.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,9 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "reset", "diff", "dump", "preview", "operation_status"]
+    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "reset", "diff", "dump", "preview", "operation_status"]
+    static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
+    static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
         switch name {
         case "variants_list": return object(["collection": string, "selected": boolean])
@@ -39,10 +41,15 @@ public enum ContractSchema {
             result["anyOf"] = (["adjustments"] + fields).map { ["required": [$0]] }
             result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
             return result
+        case "geometry_set":
+            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "rotation":["type":"number", "minimum":-45, "maximum":45], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
+            result["anyOf"] = ["crop", "rotation", "aspectRatio"].map { ["required": [$0]] }
+            result["not"] = ["required": ["crop", "aspectRatio"]]
+            return result
         case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
         case "diff": return object(["ref1": string, "ref2": string], required: ["ref1"])
         case "dump": return object(["collection": string, "selected": boolean, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
-        case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300]], required: ["ref"])
+        case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean], required: ["ref"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
         default: return object([:])
         }
@@ -72,6 +79,11 @@ public enum ContractSchema {
                 guard let name = FieldRegistry.shared.canonicalName(for: key), canonical.insert(name).inserted else {
                     throw C1Error.invalidRequest("Duplicate adjustment aliases: \(key)")
                 }
+            }
+        }
+        if tool == "geometry_set" {
+            guard ["crop", "rotation", "aspectRatio"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
+                throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio; crop and aspectRatio are mutually exclusive.")
             }
         }
         if tool == "reset", let fields = arguments["fields"] as? [String] {
@@ -114,11 +126,11 @@ public enum ContractSchema {
         let diffs: [String: Any] = ["type": "object", "additionalProperties": diff]
         let adj = adjustments()
         let metadata: [String: Any] = ["type": "object", "properties": Dictionary(uniqueKeysWithValues: ["camera", "lens", "iso", "shutterSpeed", "asShotWB", "captureDate"].map { ($0, string) }).merging(["rating": ["type": "integer"], "colorTag": ["type": "integer"]]) { _, b in b }]
-        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "stateHash": string], required: ["id", "adjustments", "metadata", "stateHash"])
+        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
         let mutation = object(["operationId": string, "workingRef": string, "before": adj, "after": adj, "diff": diffs, "stateHash": string, "isDryRun": boolean], required: ["operationId", "workingRef", "before", "after", "diff", "stateHash", "isDryRun"])
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
         let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
-        var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string
+        var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string; dumpProps["geometry"] = geometrySchema; dumpProps["geometryStateHash"] = string; dumpProps["geometryUnavailableReason"] = string
         let responses: [String: Any] = [
             "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
             "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
@@ -126,10 +138,11 @@ public enum ContractSchema {
             "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,
             "variant_delete": object(["deleted": boolean, "workingRef": string, "cloneVariantId": string]),
             "get": get, "set": mutation, "add": mutation, "reset": mutation,
-            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs]),
+            "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
+            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs]),
             "dump": array(object(dumpProps)),
-            "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string]),
-            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string)])
+            "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
+            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "afterGeometry":geometrySchema])
         ]
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses,

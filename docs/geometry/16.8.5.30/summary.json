@@ -1,0 +1,175 @@
+{
+  "dateUTC": "2026-09-11T02:16:30.760943+00:00",
+  "decision": "PASS for scoped crop/rotation technical milestone; photographer composition evaluation and distribution gates remain open",
+  "environment": {
+    "appVersion": "16.8.5.30",
+    "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+    "architecture": "arm64",
+    "swift": "Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)\nTarget: arm64-apple-macosx26.0\n",
+    "commit": "16faf53dc0242024c6c4022fee1fcdb454eb0954"
+  },
+  "runtimeCandidate": {
+    "archive": "c1-v0.1.0-macos-arm64.tar.gz",
+    "archiveSHA256": "b767fef5aa52d210f73219a4b05ed9a132ce53498a8d729a1a3fb60177819210",
+    "cliSHA256": "e8288a739f83e2b855e22f2c0855eb61ed148e94065ab5c836b11c191b09c4bb",
+    "mcpSHA256": "76ce56faa5bc861409e131f20b1da65b9c424738542113c9aa406b8ea64277a0",
+    "handlersSHA256": "91bc50c4de5a9b80648214466982c6c676b46debc41098fc55ab1e2755f218e5",
+    "harnessSHA256": "86d7b9f51c90daf4acbff8ef471de8b1a230dc0ac8017a1ae1e47a64da9559f1"
+  },
+  "sourceEvidence": "Source hashes include new files; the raw harness git diff omitted untracked files and is not the complete source authority.",
+  "sourceSHA256": {
+    "Package.resolved": "78518a60ab7f33f19e409b40c6bc5306cc5c3b11dc689047b82c228ba7ec22c6",
+    "Sources/CaptureOneCore/AppleScriptExecutor.swift": "133f61a7a7047af7b60afaf0f10d0f0209c748c1acf98c98b77c07a00b904aec",
+    "Sources/CaptureOneCore/C1Error.swift": "2915b3a656170e31c6d1d405c5c3a7254920ec895d89594b6187a62b423a1adf",
+    "Sources/CaptureOneCore/CaptureOneLock.swift": "9e827d7f5e9148ac0f81ffabf8f3eb854a2998b2a5a57685fd6dd7f798c68632",
+    "Sources/CaptureOneCore/ContractSchema.swift": "d72be6b41b61e0c0533bc3929376f6617c1adae6cdf9099f0563b1ff249b7a27",
+    "Sources/CaptureOneCore/FieldSpec.swift": "8b96fcddc9e16fee0cccaccfad98f8a85f84481a314f86d6ff0f3b13dc78be3d",
+    "Sources/CaptureOneCore/Geometry.swift": "b509aea11f8a7ac63fd5bdc7a10718dcd43e3df54d13fc4799e058d1767d6ed0",
+    "Sources/CaptureOneCore/OperationJournal.swift": "72668757072ca0a470774cdb5d039d9679f27d9a3a064728f119dbe39daf72ae",
+    "Sources/CaptureOneCore/OutputFormatter.swift": "7ae4e48865fcd80a7eabe2e3304aa1b9ff929d407c6d3c8570b49ab5d98af630",
+    "Sources/CaptureOneCore/PreviewManager.swift": "7178689847710ff056ce0d656897aa52d2784faec08ec4446af3ad77ad730a35",
+    "Sources/CaptureOneCore/ProvenanceStore.swift": "326945b2dd13f1286b35f98e9d7ee768911c7dff238c4c4cd5c2298d7c3b34ff",
+    "Sources/CaptureOneCore/Resources/Handlers.applescript": "91bc50c4de5a9b80648214466982c6c676b46debc41098fc55ab1e2755f218e5",
+    "Sources/CaptureOneCore/SafetyContext.swift": "b220d848a04103153a821e0b8c3c11d8885af2e0c13a44e36cb1e9662f493f6c",
+    "Sources/CaptureOneCore/SessionController.swift": "9757fff86c200a1e0600da96eef068fa1b0f5e4240198c6e1c6a5360e27baa8f",
+    "Sources/CaptureOneCore/StateHash.swift": "b880f7610fb3bdf978b07b690d0c33745301937ee1f81b3986de6a17ffeaa50f",
+    "Sources/CaptureOneCore/WorkingReference.swift": "12ee2c8f580e03ad970e187c3f692d50956407bfb09ffb89a21635d4bc8f4e5f",
+    "Sources/c1/main.swift": "389385b76ed19abe54e492183fd6ae7a6f4744884857ab5450d7878ab6a07e21",
+    "Sources/c1-mcp/main.swift": "39ae37be42c06c12e2d8750a5202e1de573c70eb7de310e9769e63d7e05b0887",
+    "Tests/CaptureOneCoreTests/CatalogGuardTests.swift": "94dd5835f8b8da332e0893ac951b4b6bd96fc8bd76c99455ae89f0ecb7b6b19e",
+    "Tests/CaptureOneCoreTests/DiffTests.swift": "9e50c3bfe6fd6311523383104308fccfa5834d6c38d8df1f587c85b6eed85002",
+    "Tests/CaptureOneCoreTests/DumpTests.swift": "98a3988decdbbc0087e906d3524a6de6e410f43e2f88f59bf830848a7a4ac06c",
+    "Tests/CaptureOneCoreTests/FieldSpecTests.swift": "9c48d8a74a14e99b2de66c491090a0caf5c3e5d585a5b3f01a620e6649bf48a0",
+    "Tests/CaptureOneCoreTests/GeometryTests.swift": "1c8bda3453af95d678567dfc532b9ec2541c222b42d4ebc572d3f4988153c696",
+    "Tests/CaptureOneCoreTests/LockTests.swift": "cfd79e1a6233dd871e6183125aa0bfb447a5ffeff38b2019010dc2d27d801854",
+    "Tests/CaptureOneCoreTests/OperationJournalTests.swift": "50f4104df51c430ac09d0bd31dc49fac2b3c7902ab9bc785166dc22e13447a3d",
+    "Tests/CaptureOneCoreTests/ProvenanceStoreTests.swift": "ddf1fdf04adf9226fb5c89dc623a2d44c6120e550ede1dc486efa9bc576819d3",
+    "Tests/CaptureOneCoreTests/ReleaseSafetyTests.swift": "530ee19eca07938bc81f814be17542f2bd6308b730cd5f932f8527a6fcf129e8",
+    "Tests/CaptureOneCoreTests/ResetTests.swift": "95fb62911b2c469d5a921108865d1537249932b5433aa0e4853d99882d447ab3",
+    "Tests/CaptureOneCoreTests/StateHashTests.swift": "f635376bf8be63c486eb354713e7a9b0dfe4c56ac9f0ddb2814c2fd363b26211",
+    "Tests/CaptureOneCoreTests/TestHarness.swift": "caa0548ffe286e08d62d6a0b9fe575193eb8f62660079475ed03593d064f2329",
+    "Tests/CaptureOneCoreTests/VersionCompatibilityTests.swift": "fed5a493e2d3f9a8cef2a20d9ff489419e4106695b6d0f261e72a1632bee7e13",
+    "Tests/CaptureOneCoreTests/WorkingReferenceTests.swift": "3aad097835b3d1ef5b36cc4cd16dbfb63f1db8f3e9bd57aa37664c33f32fe175",
+    "Tests/CaptureOneCoreTests/main.swift": "4ff65950ab5ee2e457a1e1895c71800ab86c689fda81e0f09b1083aa9cecdb83",
+    "Tests/archive_test.py": "66c6e6f6210b3cde31cca28cc8a11beb51a1c36cdc3a2ae260dece84a686926c",
+    "Tests/contract_test.py": "2dd2623f63bc0a396c87f7b90bb3a39c3f24410410d98fa80660538169d16476",
+    "Tests/geometry_integration_test.py": "d44599b4d1296aae714910801e74dc3b9d7d531e76702d78e14035dfb447a189",
+    "Tests/integration_test.py": "aece7b2994acbfb72bf48299509599c0ea02843790921f37ceb209134823af6e",
+    "Tests/mcp_test.py": "41a16c476dd149a3f59206fffb888cf5304255e677968ae08f37d4067fbd1554",
+    "Tests/recovery_integration_test.py": "86d7b9f51c90daf4acbff8ef471de8b1a230dc0ac8017a1ae1e47a64da9559f1",
+    "Tests/release_integration_test.py": "ce1776dc61410997fdd3d614cc208370a5d598acf528972a8a748091df38bdc5",
+    "examples/crop-proposals.py": "082b6daa12ab1ae58272641f3e4f6c621230ea04d5e952839ec69ba3c7dfb888",
+    "probes/geometry/probe.py": "dad119762dce3da01a913fce834c42b487fae480ab0a1f0a4c92dbd3619ee5f4",
+    "scripts/package-release.sh": "43b1ae91a0a828265bfd01809f3949e021f661ec104d22d40df443cf0423152f"
+  },
+  "fixture": {
+    "camera": "Canon EOS R6m2",
+    "format": "CR3",
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "coverage": "One copied RAW; native orientations 0, 90, 180, 270. No camera/lens generalization or aesthetic acceptance claim."
+  },
+  "results": {
+    "offlineAssertions": {
+      "passed": 448,
+      "total": 448
+    },
+    "contract": "CLI/MCP schema 1.1.0, 17 tools, strict invalid input checks, composition profile 13 tools",
+    "packagedCLI": {
+      "passed": 19,
+      "total": 19
+    },
+    "packagedMCP": {
+      "passed": 10,
+      "total": 10
+    },
+    "packagedGeometry": "PASS: crop/rotation, 3:2 and 3:4, preset coupling, full-frame helper cleanup, off-center crop, baseline restoration, all four orientations, -45/+45 boundaries, unsupported perspective/distortion rejection, packaged proposal sidecars, unchanged original and RAW",
+    "packagedRecovery": {
+      "passed": 4,
+      "total": 4,
+      "cases": [
+        {
+          "case": "real-apple-event-timeout",
+          "operationId": "b1a045a7-f0bc-43e5-aa61-87ce3b20efd2",
+          "status": "reconciled"
+        },
+        {
+          "case": "geometry-apple-event-timeout",
+          "operationId": "e98033cd-7f04-42b7-972e-c386705db757",
+          "status": "reconciled"
+        },
+        {
+          "case": "preview-timeout-with-eventual-output",
+          "operationId": "8c5004db-d790-4857-b60b-f641a1012147",
+          "status": "reconciled"
+        },
+        {
+          "case": "mcp-death-after-export-dispatch",
+          "operationId": "14d98d83-c765-4516-9af6-c10fb806645c",
+          "status": "reconciled"
+        }
+      ]
+    },
+    "cleanup": {
+      "time": "2026-09-11T02:16:30.760943+00:00",
+      "event": "cleanup",
+      "openDocuments": 0,
+      "retainedSession": "/private/tmp/c1-recovery-m1rxzk6d/recovery"
+    }
+  },
+  "scope": [
+    "Exactly one open Session; sequential calls and exclusive application use",
+    "Managed clones only, source variants and RAWs preserved",
+    "Writes limited to crop and rotation on Capture One 16.8.5.30",
+    "Conservative rotated bounds; nonzero perspective/distortion/shift, flips and crop-outside-image require manual review",
+    "Geometry token is not a fingerprint of every layer, curve or render setting",
+    "Timeout proves outcome uncertainty; does not prove a delayed setter executed",
+    "Reconciled records observations, not historical success; old references remain invalid"
+  ],
+  "priorRuns": [
+    {
+      "result": "Initial native probe harness errors before geometry writes",
+      "details": "Incorrect version property and missing-value parsing corrected; no failed attempt relabeled as passed."
+    },
+    {
+      "result": "Initial integrated tonal precondition mismatch before geometry setters",
+      "evidence": [
+        "initial-failure.json"
+      ]
+    },
+    {
+      "result": "Expanded preset probe failed before preset setter on an object-reference coercion; normal restart reconciliation succeeded",
+      "details": "Fetch list values before iteration; disposable Session was retained until requested cleanup."
+    },
+    {
+      "result": "Earlier complete recovery run passed all four cases before final CLI crop parser/schema changes",
+      "details": "Superseded by retained final archive recovery; redundant scratch evidence removed during requested cleanup."
+    }
+  ],
+  "documentationRepack": "A later documentation-only repack must preserve and verify executable/resource hashes; its archive checksum will differ.",
+  "evidenceCuration": {
+    "excerpts": {
+      "journal.jsonl": {
+        "originalSHA256": "47e7da4154265d3352f5cd18294a5f244f579ab09c616b69196152e37481fe6b",
+        "originalRecords": 80,
+        "retainedRecords": 30
+      },
+      "recovery-journal.jsonl": {
+        "originalSHA256": "1f8c554b2e3ceca29f041b244b74361d8509806d632c26407d4c15bd35940d11",
+        "originalRecords": 85,
+        "retainedRecords": 11
+      },
+      "recovery-events.jsonl": {
+        "originalSHA256": "7f3288b4a0bc33341cd73a75689c6e266302ce933d830b6301b797acc6b0c6ac",
+        "originalRecords": 127,
+        "retainedRecords": 44
+      }
+    },
+    "omitted": "Duplicate console logs, the generated review sidecar, and separate reconciliation copy; results and source hashes are retained. initial-failure.json includes its reconciliation."
+  },
+  "artifactCleanup": {
+    "requestedByUser": true,
+    "scratchEntriesRemoved": 52,
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "note": "Historical Session and preview paths in observations no longer exist. Pre-existing build/output folders and the source RAW remain intact."
+  }
+}

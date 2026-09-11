@@ -229,11 +229,11 @@ def main():
         }
         missing = expected_tools - tool_names
         assert not missing, f"Missing required tools in tools/list: {missing}"
-        assert len(tools) == 16, f"Expected 16 tools, found {len(tools)}"
+        assert len(tools) == 17, f"Expected 17 tools, found {len(tools)}"
         for t in tools:
             assert "description" in t and t["description"], f"Tool {t['name']} missing description"
             assert "inputSchema" in t and isinstance(t["inputSchema"], dict), f"Tool {t['name']} invalid schema"
-        print(f"  ✓ All 16 tools discovered with complete schemas: {sorted(list(tool_names))}")
+        print(f"  ✓ All 17 tools discovered with complete schemas: {sorted(list(tool_names))}")
         passed_tests += 1
 
         # 3. Read-Only Tools (capabilities, schema, doc_info)
@@ -469,6 +469,9 @@ def main():
                 f"Expected 'Catalogs are strictly read-only' error message, got: {cat_err_data}"
             )
             print(f"  ✓ Catalog mutation guard verified over MCP: {cat_err_data['error']['message']}")
+            geometry_err = cat_client.call_tool("geometry_set", {"workingRef":"1", "ifGeometryState":"dummy", "rotation":1})
+            assert geometry_err.get("isError")
+            assert "Catalogs are strictly read-only" in parse_text_content(geometry_err['content'])['error']['message']
             passed_tests += 1
         finally:
             cat_client.close()

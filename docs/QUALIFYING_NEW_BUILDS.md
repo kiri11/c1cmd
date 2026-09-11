@@ -78,7 +78,7 @@ python3 Tests/mcp_test.py
 ```
 
 **Verification criteria:**
-- Protocol handshake and tool listing (16 tools).
+- Protocol handshake and tool listing (17 tools; 13 in the composition profile).
 - Mutation operations through MCP tool calls.
 - Dual text/JSON metadata + `image/jpeg` base64 preview rendering.
 - Catalog protection barriers.
@@ -87,7 +87,9 @@ python3 Tests/mcp_test.py
 
 Run `Tests/release_integration_test.py` against the candidate archive, then close all documents and run `Tests/recovery_integration_test.py` sequentially. The recovery harness is intentionally pinned to 16.8.5.30; adapting its explicit build assertion for a new candidate is qualification work, not permission to label that build tested. Retain successful and failed runs, artifact/executable hashes, app/OS/toolchain identity, RAW checksums and journal evidence. Review the limited claims and remaining gates in [release validation](RELEASE_VALIDATION.md).
 
-### Step 5: Add the Build to `SessionController.testedBuilds`
+### Step 5: Qualify geometry and add the build
+
+Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Both geometry harnesses and the production geometry gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
 
 Once the packaged workflow and recovery qualification pass and their scope has been reviewed, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
 

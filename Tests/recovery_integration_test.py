@@ -142,19 +142,26 @@ class Run:
         assert blocked['error']['code'] == 'outcome-unknown'
         reconciled = self.cli('operation', 'status', operation)
         assert reconciled['status'] == 'reconciled'
+        if label == 'geometry-apple-event-timeout':
+            assert reconciled.get('beforeGeometry') and reconciled.get('intendedGeometry') and reconciled.get('afterGeometry')
         stale = self.cli('get', clone['workingRef'], ok=False)
         assert stale['error']['code'] == 'document-changed', stale
         assert self.identities() == before, 'Recovery must not create/adopt/delete variants'
-        assert self.cli('get', self.source)['stateHash'] == self.original['stateHash']
+        original_now = self.cli('get', self.source)
+        assert original_now['stateHash'] == self.original['stateHash']
+        assert original_now.get('geometry') == self.original.get('geometry')
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
+        if label == 'geometry-apple-event-timeout':
+            geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
+            self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
         self.cli('variant', 'delete', fresh['workingRef'])
         assert self.identities() == before
         self.log('case-passed', case=label, operationId=operation,
                  rawSHA256=sha(self.raw), observations=reconciled)
 
-    def apple_event_timeout(self):
+    def apple_event_timeout(self, geometry=False):
         clone, current = self.clone()
         known = {r['operationId'] for r in self.records()}
         pid = self.pid()
@@ -162,8 +169,10 @@ class Run:
         watchdog = subprocess.Popen([sys.executable, '-c',
             'import os,signal,sys,time; time.sleep(150); os.kill(int(sys.argv[1]),signal.SIGCONT)', str(pid)])
         try:
-            self.child = subprocess.Popen([str(self.c1), 'set', clone['workingRef'], '--if-state',
-                current['stateHash'], 'exposure=0.625', '--format', 'json'],
+            command = ([str(self.c1), 'geometry', 'set', clone['workingRef'], '--if-geometry-state',
+                        current['geometryStateHash'], '--rotation', '3', '--aspect-ratio', '1.5'] if geometry else
+                       [str(self.c1), 'set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.625'])
+            self.child = subprocess.Popen(command + ['--format', 'json'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             pending = wait_for(lambda: next((r for r in self.records()
                 if r['operationId'] not in known and r['status'] == 'pending'), None))
@@ -188,7 +197,7 @@ class Run:
                 self.child.kill()
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
-        self.recovery(pending['operationId'], clone, 'real-apple-event-timeout')
+        self.recovery(pending['operationId'], clone, 'geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
 
     def preview_timeout(self):
         clone, _ = self.clone()
@@ -289,10 +298,11 @@ class Run:
         assert len(self.cli('variants', 'list')) == 1
         self.log('clone-readback-regression-passed', cycles=10)
         self.apple_event_timeout()
+        self.apple_event_timeout(geometry=True)
         self.preview_timeout()
         self.mcp_death()
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=3, rawSHA256=sha(self.raw))
+        self.log('all-cases-passed', cases=4, rawSHA256=sha(self.raw))
 
     def finish(self):
         if self.hidden_bundle:

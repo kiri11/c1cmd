@@ -2,7 +2,7 @@
 
 ## First milestone: crop, straighten, and align
 
-The first agent workflow proposes composition corrections on managed working clones in a Session. It preserves the photographer's existing color, exposure, layers, lens corrections, and other edits. The first version changes crop and rotation only. Keystone correction is reserved for rare exceptional cases and is an optional later feature, not a release requirement. Style extraction and learned tonal presets come later. This is planned work: the current CLI/MCP supports only five tonal adjustment fields, and crop and rotation writes are not yet qualified.
+The first agent workflow proposes composition corrections on managed working clones in a Session. It preserves the photographer's existing color, exposure, layers, lens corrections, and other edits. The first version changes crop and rotation only. Keystone correction is reserved for rare exceptional cases and is an optional later feature, not a release requirement. Style extraction and learned tonal presets come later. Crop and rotation are now implemented alongside the existing five tonal fields. Technical qualification and limitations are recorded in [geometry qualification](docs/geometry/16.8.5.30/README.md). Photographer evaluation on separate reviewed shoots remains pending; fixture tests do not establish aesthetic quality.
 
 ### Photographer's composition policy
 
@@ -24,7 +24,7 @@ Photographer-supplied reference: [The Importance of Straightening the Horizon an
 
 ### Required shared-core and MCP capabilities
 
-These are proposed interfaces, not tools available today. Keep the CLI and MCP on the same core implementation and schema.
+These interfaces are implemented through the shared core and contract 1.1.0. `geometryStateHash` is independent of the existing tonal `stateHash`; preview mapping and conservative bounds are documented in the [README](README.md#crop-and-rotation).
 
 | Capability | Required behavior |
 |---|---|
@@ -35,15 +35,15 @@ These are proposed interfaces, not tools available today. Keep the CLI and MCP o
 | Baselines and `diff` | Retain source geometry at cloning and compare geometry alongside the existing supported adjustments. Preserve the five-field readback checks and test that geometry edits do not change unrelated settings or originals. |
 | Agent tool scope | Expose geometry writes and necessary clone/preview/recovery operations to the composition agent; exclude tonal mutation tools from its allowed tool set. Composition judgment and review records remain in the caller/example workflow. |
 
-The checked-in [Capture One 16.8.5.30 dictionary](sdef/16.8.5.30.sdef) exposes crop rectangles, rotation, and maximum-crop calculation. Dictionary availability does not establish safe runtime behavior. Confirm crop origin, units, rotation sign, orientation conventions, transform order, aspect-ratio interactions, and valid bounds with exact-build probes before choosing the public coordinate contract. In particular, a maximum-crop query must explicitly avoid applying a change; the dictionary's `apply` parameter defaults to true.
+The checked-in [Capture One 16.8.5.30 dictionary](sdef/16.8.5.30.sdef) exposes crop rectangles, rotation, and maximum-crop calculation. The retained exact-build probes and workflow checks establish the initial coordinate contract, transform order, aspect-ratio interactions, and conservative bounds within their documented fixture coverage. Other builds and transform combinations require separate qualification. A maximum-crop query must explicitly avoid applying a change; the dictionary's `apply` parameter defaults to true.
 
 A geometry request is one logical proposal, not an atomic Capture One transaction. Preserve pre-dispatch journaling, partial/unknown outcome handling, restart-based reconciliation, and clone lifetime rules across all geometry setters.
 
 ### Implementation sequence and acceptance
 
-1. **Qualify geometry:** retain read/write/readback probes on copied RAWs and disposable managed clones. Cover landscape and portrait orientations, existing crops, positive/negative rotation, aspect-ratio coupling, boundary rejection, and existing perspective/lens corrections. Verify originals, sibling variants, and unrelated edits remain intact.
-2. **Ship crop and rotation:** implement the shared geometry contract, preview mapping, baseline/diff and recovery integration, then run offline, CLI/MCP, and extracted-archive tests. Crop and rotation satisfy the first-version scope; keystone support is not an acceptance gate.
-3. **Evaluate composition quality:** use photographer-reviewed examples from separate shoots, including cases where no change or an explicit exception is better. Assess alignment, ratio, retained content, natural proportions, and photographer acceptance. Numerical agreement with a crop box alone is not a quality verdict.
+1. **Qualify geometry — scoped technical checks complete:** retained read/write/readback probes use a copied RAW and disposable managed clones. Coverage includes all four orientations, existing crops, signed rotation and boundary angles, preset interactions, rejection of existing perspective/distortion, and original/RAW preservation. Camera, lens, layer, and transform coverage remains limited as recorded in the qualification report.
+2. **Ship crop and rotation — implemented:** shared geometry contract, preview mapping, baseline/diff, recovery, composition-only MCP profile, and proposal sidecars are implemented and tested through CLI/MCP and extracted archives. Crop and rotation satisfy the first-version scope; keystone support is not an acceptance gate. General binary publication retains its separate distribution gates.
+3. **Evaluate composition quality — pending photographer review:** use reviewed examples from separate shoots, including cases where no change or an explicit exception is better. Assess alignment, ratio, retained content, natural proportions, and photographer acceptance. Numerical agreement with a crop box alone is not a quality verdict.
 
 Keystone correction may be added later if recurring exceptional cases justify it, with separate runtime qualification. Existing perspective and lens corrections remain unchanged in the first version.
 

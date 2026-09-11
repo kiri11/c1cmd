@@ -30,4 +30,5 @@ with tempfile.TemporaryDirectory(prefix='c1-archive-') as tmp:
     assert 'Could not locate Handlers' not in result.stderr
     assert '## MCP setup' in (root / 'README.md').read_text()
     assert (root / 'docs/RELEASE_VALIDATION.md').is_file()
+    assert (root / 'examples/crop-proposals.py').is_file()
     print('PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation')

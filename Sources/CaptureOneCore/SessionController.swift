@@ -117,6 +117,10 @@ public struct DeleteResult: Codable, Equatable {
 }
 
 public struct GetResult: Codable, Equatable {
+    public var geometry: Geometry? = nil
+    public var geometryStateHash: String? = nil
+    public var geometryUsableBounds: CropRect? = nil
+    public var geometryUnavailableReason: String? = nil
     public let id: String
     public let workingRef: String?
     public let adjustments: Adjustments
@@ -136,13 +140,18 @@ public struct MutationResult: Codable, Equatable {
 }
 
 public struct DiffResult: Codable, Equatable {
+    public var geometryBefore: Geometry? = nil
+    public var geometryAfter: Geometry? = nil
+    public var geometryDiff: [String: DoubleDiff]? = nil
     public let ref1: String
     public let ref2: String
     public let stateHash1: String
     public let stateHash2: String
     public let diff: [String: DoubleDiff]
 
-    public init(ref1: String, ref2: String, stateHash1: String, stateHash2: String, diff: [String: DoubleDiff]) {
+    public init(ref1: String, ref2: String, stateHash1: String, stateHash2: String, diff: [String: DoubleDiff], geometryBefore: Geometry? = nil, geometryAfter: Geometry? = nil) {
+        self.geometryBefore = geometryBefore; self.geometryAfter = geometryAfter
+        if let before = geometryBefore, let after = geometryAfter { self.geometryDiff = after.changes(from: before) }
         self.ref1 = ref1
         self.ref2 = ref2
         self.stateHash1 = stateHash1
@@ -152,6 +161,9 @@ public struct DiffResult: Codable, Equatable {
 }
 
 public struct DumpRecord: Codable, Equatable {
+    public var geometry: Geometry? = nil
+    public var geometryStateHash: String? = nil
+    public var geometryUnavailableReason: String? = nil
     public let id: String
     public let name: String
     public let parentImagePath: String
@@ -175,8 +187,13 @@ public struct DumpRecord: Codable, Equatable {
         workingRef: String? = nil,
         adjustments: Adjustments,
         metadata: Metadata,
-        stateHash: String
+        stateHash: String,
+        geometry: Geometry? = nil,
+        geometryUnavailableReason: String? = nil
     ) {
+        self.geometry = geometry
+        self.geometryStateHash = geometry?.stateHash(tonalHash: stateHash)
+        self.geometryUnavailableReason = geometryUnavailableReason
         self.id = id
         self.name = name
         self.parentImagePath = parentImagePath
@@ -471,7 +488,7 @@ public final class SessionController {
                 try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
                     cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
                     parentImagePath: parent, creationOperationId: entry.operationId,
-                    baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken))
+                    baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken, baselineGeometry: created.geometry))
                 try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: created.adjustments)
                 return CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
                                    documentPath: doc.documentPath, baselineStateHash: created.stateHash)
@@ -563,7 +580,12 @@ public final class SessionController {
         )
         let hash = StateHash.compute(for: adjustments)
 
+        let geometry = first.geometryRecord?.geometry
         return GetResult(
+            geometry: geometry,
+            geometryStateHash: geometry?.stateHash(tonalHash: hash.hex),
+            geometryUsableBounds: geometry?.unsupportedReason == nil ? geometry?.safeBounds(rotation: geometry?.rotation ?? 0) : nil,
+            geometryUnavailableReason: geometry?.unsupportedReason ?? first.geometryUnavailableReason ?? (geometry == nil ? "Geometry unavailable from this build or source." : nil),
             id: nativeId,
             workingRef: workingRefStr,
             adjustments: adjustments,
@@ -734,6 +756,56 @@ public final class SessionController {
         }
     }
 
+    // MARK: - Crop and rotation
+    public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
+                            rotation: Double? = nil, aspectRatio: Double? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "geometry_set")
+            guard doc.appVersion == "16.8.5.30" else { throw C1Error.unsupportedVersion("Geometry requires Capture One 16.8.5.30.") }
+            let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            _ = try store.resolveManagedWorkingReference(workingRef, currentDocumentPath: doc.documentPath)
+            try checkedDocument(doc, writes: !dryRun)
+            let current = try get(ref: workingRef)
+            guard let before = current.geometry, let state = current.geometryStateHash else {
+                throw C1Error.invalidRequest(current.geometryUnavailableReason ?? "Geometry unavailable.")
+            }
+            guard state == expected else { throw C1Error.stateChanged("Geometry precondition no longer matches; read get again.") }
+            let target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
+            if dryRun {
+                return GeometryMutationResult(operationId: "dry-run", workingRef: workingRef, before: before, after: target,
+                    diff: target.changes(from: before), geometryStateHash: state, isDryRun: true)
+            }
+            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
+            let entry = try prepare(OperationRecord(operationType: "geometry_set", workingRef: workingRef,
+                documentPath: doc.documentPath, preconditionStateHash: expected, beforeAdjustments: current.adjustments,
+                beforeGeometry: before, intendedGeometry: target), doc: doc, source: current)
+            try journal.append(entry: entry)
+            do {
+                let _: GeometryRecord = try executor.executeAndDecode(handler: "applyGeometry", args: [
+                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: current.id),
+                    NSAppleEventDescriptor(string: current.parentImagePath ?? ""), before.eventSnapshot,
+                    NSAppleEventDescriptor(list: registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) }),
+                    NSAppleEventDescriptor(list: target.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target.rotation)])
+                let readback = try get(ref: workingRef)
+                guard let after = readback.geometry else { throw C1Error.readbackMismatch("Geometry missing after write.") }
+                guard after.matchesTarget(target), after.sameContext(as: before), readback.stateHash == current.stateHash else {
+                    try journal.update(operationId: entry.operationId, status: "partial-failure", afterAdjustments: readback.adjustments, afterGeometry: after)
+                    throw C1Error.readbackMismatch("Crop/rotation or preserved settings did not match; inspect operation status.")
+                }
+                let diff = after.changes(from: before)
+                try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: readback.adjustments, diff: diff, afterGeometry: after)
+                return GeometryMutationResult(operationId: entry.operationId, workingRef: workingRef, before: before, after: after,
+                    diff: diff, geometryStateHash: after.stateHash(tonalHash: readback.stateHash), isDryRun: false)
+            } catch {
+                if journal.find(operationId: entry.operationId)?.status != "partial-failure" {
+                    try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
+                }
+                throw OperationFailure(operationId: entry.operationId, cause: error)
+            }
+        }
+    }
+
     // MARK: - Reset Mutation
     public func reset(
         workingRefString: String,
@@ -781,7 +853,7 @@ public final class SessionController {
                 ref2: secondRef,
                 stateHash1: get1.stateHash,
                 stateHash2: get2.stateHash,
-                diff: diffDict
+                diff: diffDict, geometryBefore: get1.geometry, geometryAfter: get2.geometry
             )
         } else {
             guard docInfo.isSession else {
@@ -804,7 +876,7 @@ public final class SessionController {
                 ref2: ref1,
                 stateHash1: baselineHash,
                 stateHash2: get1.stateHash,
-                diff: diffDict
+                diff: diffDict, geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry
             )
         }
     }
@@ -889,7 +961,8 @@ public final class SessionController {
                     workingRef: v.workingRef,
                     adjustments: adjustments,
                     metadata: metadata,
-                    stateHash: stateHash
+                    stateHash: stateHash, geometry: item.geometryRecord?.geometry,
+                    geometryUnavailableReason: item.geometryRecord?.geometry?.unsupportedReason ?? item.geometryUnavailableReason
                 ))
             }
         }
@@ -902,8 +975,22 @@ public final class SessionController {
         try preview(ref: workingRefString, outputDirOverride: outputDirOverride, timeout: timeout)
     }
 
-    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0) throws -> PreviewResult {
+    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, fullFrame: Bool = false) throws -> PreviewResult {
         guard timeout.isFinite && timeout > 0 && timeout <= 300 else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
+        if fullFrame {
+            let source = try get(ref: ref)
+            guard let geometry = source.geometry, geometry.unsupportedReason == nil else { throw C1Error.invalidRequest("Full-frame mapping is unavailable for this geometry.") }
+            let clone = try cloneVariant(sourceRef: ref)
+            let current = try get(ref: clone.workingRef)
+            guard let cloneState = current.geometryStateHash, cloneState == source.geometryStateHash else { throw C1Error.stateChanged("Context clone differs from source; inspect managed clone \(clone.workingRef).") }
+            _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState,
+                                crop: geometry.safeBounds(rotation: geometry.rotation))
+            var result = try preview(ref: clone.workingRef, outputDirOverride: outputDirOverride, timeout: timeout)
+            guard try get(ref: ref).geometryStateHash == source.geometryStateHash else { throw C1Error.stateChanged("Source changed during context preview; discard preview.") }
+            _ = try deleteVariant(workingRefString: clone.workingRef)
+            result.contextSourceRef = ref
+            return result
+        }
         return try lock.withLock {
             let doc = try getDocumentInfo()
             try assertSessionWritable(docInfo: doc, operation: "preview")
@@ -917,7 +1004,7 @@ public final class SessionController {
             try FileManager.default.createDirectory(at: jobDir, withIntermediateDirectories: true)
             let entry = try prepare(OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
                 documentPath: doc.documentPath, preconditionStateHash: current.stateHash,
-                beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path), doc: doc, source: current)
+                beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path, beforeGeometry: current.geometry), doc: doc, source: current)
             try journal.append(entry: entry)
             do {
                 let args = [NSAppleEventDescriptor(string: doc.documentId),
@@ -929,12 +1016,18 @@ public final class SessionController {
                 let file = try previewMgr.pollForOutputFile(inDirectory: jobDir, timeout: timeout)
                 let image = try previewMgr.verifyAndDecodeImage(atPath: file.path)
                 let after = try get(ref: ref)
-                guard after.stateHash == current.stateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
+                guard after.stateHash == current.stateHash, after.geometryStateHash == current.geometryStateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
+                if let geometry = current.geometry {
+                    let ratio = geometry.crop.aspectRatio
+                    guard abs(Double(image.width) - Double(image.height)*ratio) <= max(2,ratio*2) else {
+                        throw C1Error.readbackMismatch("Preview dimensions do not match the crop aspect ratio.")
+                    }
+                }
                 let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
                 try journal.update(operationId: opId, status: "succeeded", previewOutputPath: file.path)
                 return PreviewResult(operationId: opId, workingRef: current.workingRef, outputPath: file.path,
                     fileSizeBytes: size, width: image.width, height: image.height, pixelSha256: image.pixelSha256,
-                    stateHash: current.stateHash, nativeVariantId: current.id)
+                    stateHash: current.stateHash, nativeVariantId: current.id, geometry: current.geometry, geometryStateHash: current.geometryStateHash)
             } catch {
                 try? journal.update(operationId: opId, status: "outcome-unknown", error: String(describing: error))
                 throw OperationFailure(operationId: opId, cause: error)
@@ -972,6 +1065,7 @@ public final class SessionController {
                     guard variant.parentImagePath == entry.parentImagePath else { throw C1Error.identityAmbiguous("Recovery variant parent changed.") }
                     let current = try get(ref: id)
                     entry.afterAdjustments = current.adjustments
+                    entry.afterGeometry = current.geometry
                     entry.status = "reconciled"
                     entry.error = "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone."
                 } else {
@@ -992,6 +1086,7 @@ public final class SessionController {
             "supportedVersionRange": "16.4+ through 16.x",
             "documentScope": "sessions-and-catalogs",
             "catalogReadOnly": true,
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "conservative centered rectangle", "keystoneWrites": false],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,

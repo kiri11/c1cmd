@@ -16,8 +16,8 @@ final class FakeScript: ScriptExecuting {
     var beforeApply: (() -> Void)?
     var preparedBeforeDispatch = true
     var previewRoot: String?
-    static func jpeg() -> Data {
-        let context = CGContext(data: nil, width: 2, height: 2, bitsPerComponent: 8, bytesPerRow: 8, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    static func jpeg(width: Int = 2, height: Int = 2) -> Data {
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
         let data = NSMutableData()
         let destination = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil)!
         CGImageDestinationAddImage(destination, context.makeImage()!, nil)

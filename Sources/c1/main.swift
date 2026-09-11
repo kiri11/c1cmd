@@ -47,6 +47,7 @@ struct C1: ParsableCommand {
             SetCommand.self,
             AddCommand.self,
             ResetCommand.self,
+            GeometryCommand.self,
             DiffCommand.self,
             DumpCommand.self,
             PreviewCommand.self,
@@ -110,7 +111,7 @@ struct VersionCommand: ParsableCommand {
             } else {
                 print("c1 version 0.1.0 (tested for Capture One: \(SessionController.testedBuilds.joined(separator: ", ")))")
                 print("Supported Capture One versions: 16.4+ through 16.x")
-                print("Schema version: 1.0.0")
+                print("Schema version: \(ContractSchema.version)")
             }
         }
         if code != .success { throw ExitCode(code.rawValue) }
@@ -491,12 +492,15 @@ struct PreviewCommand: ParsableCommand {
     @Option(help: "Timeout in seconds for preview render.")
     var timeout: Double = 30.0
 
+    @Flag(help: "Render full-frame context using a temporary managed clone.")
+    var fullFrame: Bool = false
+
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) {
             let res = try SessionController.shared.preview(
                 ref: ref,
                 outputDirOverride: outputDir,
-                timeout: timeout
+                timeout: timeout, fullFrame: fullFrame
             )
             print(OutputFormatter.renderPreviewResult(res, format: globals.outputFormat))
         }
@@ -536,6 +540,40 @@ struct OperationStatusCommand: ParsableCommand {
                     print("Error        : \(err)")
                 }
             }
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+struct GeometryCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop and rotation on managed variants.", subcommands: [GeometrySetCommand.self])
+}
+struct GeometrySetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation; preserves other edits.")
+    @OptionGroup var globals: GlobalOptions
+    @Argument var workingRef: String
+    @Option(help: "geometryStateHash from get, independent of the tonal stateHash.") var ifGeometryState: String
+    @Option(help: "centerX,centerY,width,height in rotated-canvas pixels, bottom-left origin.") var crop: String?
+    @Option(help: "Absolute rotation in degrees (-45 to 45).") var rotation: Double?
+    @Option(help: "Width/height ratio for a centered crop fitted inside safe bounds (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
+    @Flag var dryRun: Bool = false
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            var args: [String: Any] = ["workingRef":workingRef, "ifGeometryState":ifGeometryState, "dryRun":dryRun]
+            var rect: CropRect?
+            if let crop = crop {
+                let parts = crop.split(separator:",", omittingEmptySubsequences:false)
+                let values = parts.compactMap { Double($0) }
+                guard parts.count == 4, values.count == 4 else { throw C1Error.invalidRequest("crop requires centerX,centerY,width,height.") }
+                rect = CropRect(centerX:values[0], centerY:values[1], width:values[2], height:values[3])
+                args["crop"] = ["centerX":values[0], "centerY":values[1], "width":values[2], "height":values[3]]
+            }
+            if let v = rotation { args["rotation"] = v }
+            if let v = aspectRatio { args["aspectRatio"] = v }
+            try ContractSchema.validate(tool: "geometry_set", arguments: args)
+            let result = try SessionController.shared.geometrySet(workingRef:workingRef, ifGeometryState:ifGeometryState,
+                crop:rect, rotation:rotation, aspectRatio:aspectRatio, dryRun:dryRun)
+            print(OutputFormatter.formatJson(result))
         }
         if code != .success { throw ExitCode(code.rawValue) }
     }

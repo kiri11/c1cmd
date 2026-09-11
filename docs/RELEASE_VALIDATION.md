@@ -8,6 +8,10 @@ This is the current release authority. The M0 report preserves historical feasib
 
 The original binary-distribution gates remain open: fresh-user downloaded-artifact launch, Automation consent through Terminal and an intended MCP client, and an explicit decision on Developer ID signing/notarization. Current archives are ad-hoc signed. This recovery/documentation work does not silently waive those gates or qualify other application builds, Intel, or every macOS deployment target.
 
+## Crop and rotation milestone (2026-09-11 UTC)
+
+Contract 1.1.0 adds managed crop/rotation proposals, geometry preconditions and recovery observations, baseline differences, and crop-aware previews. The [geometry qualification report](geometry/16.8.5.30/README.md) and its machine-readable summary identify the candidate payload and new results separately from the September 9 archive below. Geometry writes are restricted to Capture One 16.8.5.30 and qualified transform combinations. Photographer evaluation on separate shoots remains pending; technical fixture checks do not establish composition quality. The distribution gates above remain open.
+
 ## Disposition of historical gates
 
 | Historical question | Current implementation and decision |
@@ -21,7 +25,7 @@ The original binary-distribution gates remain open: fresh-user downloaded-artifa
 
 ## Retained live recovery results (2026-09-09 UTC)
 
-[Run history and limitations](release/recovery-2026-09-09/README.md), [machine-readable summary](release/recovery-2026-09-09/summary.json), [passing run](release/recovery-2026-09-09/run-4/events.jsonl), [journal](release/recovery-2026-09-09/run-4/journal.jsonl), [exact harness](../Tests/recovery_integration_test.py) and [production patch](release/recovery-2026-09-09/run-4/source.patch).
+[Run history and limitations](release/recovery-2026-09-09/README.md), [machine-readable summary](release/recovery-2026-09-09/summary.json), [passing run](release/recovery-2026-09-09/run-4/events.jsonl), [journal](release/recovery-2026-09-09/run-4/journal.jsonl), [current harness](../Tests/recovery_integration_test.py) and [production patch](release/recovery-2026-09-09/run-4/source.patch). The current harness also covers geometry; the historical harness hash is retained in that run's summary.
 
 Capture One **16.8.5.30**, **macOS 26.6.2 / 25G83**, arm64, Swift **6.3.1**, Canon **EOS R6m2** CR3. Base commit `06017b9366cc2f489ddd828a60c2263794e530c7` plus the retained handler patch. The archive's executables and handler were extracted and exercised with build-tree resources hidden.
 

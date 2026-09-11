@@ -16,7 +16,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 - **Other builds:** 16.4+ through 16.x are permitted by the compatibility check, but are **unverified**, not qualified support. Older/future major builds require `C1_ALLOW_UNTESTED_BUILD=1`. Check `doctor` for the tested-build match before editing.
 - **Platform:** the package targets macOS 13+, but this is a deployment target, not evidence that every macOS version is tested. Intel and older macOS runtime qualification are deferred.
 
-This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, geometry, style learning, and general recipe export are outside v0.1.
+This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, keystone correction, style learning, and general recipe export are outside v0.1.
 
 ## Installation
 
@@ -53,7 +53,7 @@ macOS Automation permission must allow the launching application to control Capt
 
 No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `isSession` and `exactBuildMatched` before editing.
 
-The server exposes 16 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`, and `operation_status`.
+The default server exposes 17 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `geometry_set`, `reset`, `diff`, `dump`, `preview`, and `operation_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -96,9 +96,35 @@ All values must be finite. Writes touch requested fields only; white balance is 
 
 MCP accepts either a nested `adjustments` object or flat fields. Mixed forms, duplicate aliases, unknown fields, and wrong types are rejected. `dump.batchSize` must be 1–1000; preview timeout must be greater than zero and at most 300 seconds.
 
+### Crop and rotation
+
+`c1 geometry set` / MCP `geometry_set` applies an absolute crop and rotation to a managed clone. It requires **`geometryStateHash` from `get`**, passed as `--if-geometry-state` / `ifGeometryState`. This versioned token includes geometry and the tonal hash; the existing `stateHash` and tonal commands are unchanged. `get`, `dump`, and `diff` now include geometry; newly cloned variants retain a geometry baseline. Older provenance records remain readable but lack that baseline.
+
+```sh
+c1 get <working-ref>
+c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> --rotation 1.2 --aspect-ratio 1.5
+c1 preview <working-ref> --full-frame
+# Inspect the rotated context, then choose an explicit composition and re-read get:
+c1 geometry set <working-ref> --if-geometry-state <fresh-geometryStateHash> --crop 3000,2100,4500,3000
+c1 preview <working-ref>
+c1 diff <working-ref>
+```
+
+Use **1.5 (3:2) for landscape** and **0.75 (3:4) for portrait** as the usual ratios. `aspectRatio` fits a centered crop inside conservative usable bounds; the agent should choose an explicit crop when centering would weaken the composition. `crop` and `aspectRatio` are mutually exclusive. Preserve meaningful diagonals, subjects, breathing room, and negative space; flag exceptions for photographer review.
+
+MCP accepts `crop: {centerX, centerY, width, height}`, `rotation`, and/or `aspectRatio`, plus `workingRef`, `ifGeometryState`, and optional `dryRun`. Rotation is absolute, in native Capture One degrees (positive clockwise), limited to -45 through +45. A dry run predicts values without dispatch; its `geometryStateHash` is the current precondition, not a reserved or predicted post-write token.
+
+Coordinates are pixels in the **oriented, rotated canvas**, with a bottom-left origin. Preview metadata includes the rendered `geometry.crop` and pixel dimensions. For a normalized preview point `(u, v)` measured from the top left, canvas coordinates are `x = centerX + (u - 0.5) * width`, `y = centerY + (0.5 - v) * height`. This maps to the current rotated canvas, not sensor coordinates. After changing rotation, render again before placing a crop using preview coordinates.
+
+`--full-frame` / `fullFrame: true` renders the largest conservative context rectangle at the current rotation through a temporary managed clone, then deletes that clone. The response's `contextSourceRef` identifies the source; `workingRef` and `nativeVariantId` identify the rendered temporary clone. On failure, retain the clone and journal for inspection and use normal recovery. The source crop is never temporarily reset.
+
+Geometry writes require **Capture One 16.8.5.30**. Existing keystone, lens distortion/shift, flips, crop-outside-image, and unqualified orientation combinations are rejected for editing/context mapping; their settings remain intact. Valid crops are limited to a conservative centered rectangle inside the rotated image, with two-pixel native rounding tolerance. See [geometry qualification](docs/geometry/16.8.5.30/README.md) for fixture coverage and limitations.
+
+For a composition-only MCP agent, set `C1_MCP_PROFILE=composition` in the server environment. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; crop/rotation, inspection, cloning, deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It does not infer aesthetic quality or acceptance.
+
 ### Preview files
 
-Each preview uses a unique `c1-previews/<operationId>` subdirectory beneath the Session's default `Output`, or beneath the supplied output directory. Existing JPEGs in a custom directory are never reused. Polling requires stable size and a complete decodable JPEG. Metadata includes the native variant ID and five-field state hash; that hash does **not** cover layers, crops, curves, or every setting affecting rendering. Preview caching based on it is unsupported.
+Each preview uses a unique `c1-previews/<operationId>` subdirectory beneath the Session's default `Output`, or beneath the supplied output directory. Existing JPEGs in a custom directory are never reused. Polling requires stable size and a complete decodable JPEG. Metadata includes the native variant ID, five-field state hash, and geometry/state token when available; both states are checked across rendering. The tonal hash does **not** cover crops, and neither token covers every layer, curve, or render-affecting setting. Preview caching based on these tokens is unsupported.
 
 The reserved `c1-preview` recipe is configured by c1 and may remain in the Session. Do not use that recipe for your own exports.
 
@@ -118,7 +144,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.0.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.1.0`; package version is `0.1.0`.
 
 ```sh
 make test                              # offline Swift regression suite
@@ -126,6 +152,7 @@ python3 Tests/contract_test.py          # offline CLI/MCP protocol and input che
 export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
 python3 Tests/integration_test.py       # disposable Session; requires Capture One
 python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
+python3 Tests/geometry_integration_test.py # zero open documents; crop/rotation + review workflow
 make archive
 python3 Tests/archive_test.py dist/*.tar.gz
 # Exclusive app use, zero open documents; pauses/restarts Capture One:

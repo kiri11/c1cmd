@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run both live suites through an extracted archive, with build resource fallback unavailable.
+"""Run contract, tonal and geometry suites through an extracted archive without build resources.
 
 Requires Capture One and C1_TEST_RAW_FIXTURE. Do not run concurrently with a build or another live suite.
 """
@@ -25,13 +25,13 @@ with tempfile.TemporaryDirectory(prefix='c1-release-live-', dir='/private/tmp') 
             assert not member.name.startswith('/') and '..' not in Path(member.name).parts
         tf.extractall(tmp)
     root, = Path(tmp).iterdir()
-    environment = dict(os.environ, C1_TEST_BIN=str(root / 'bin/c1'), C1_TEST_MCP_BIN=str(root / 'bin/c1-mcp'))
+    environment = dict(os.environ, C1_TEST_BIN=str(root / 'bin/c1'), C1_TEST_MCP_BIN=str(root / 'bin/c1-mcp'), C1_TEST_CROP_EXAMPLE=str(root / 'examples/crop-proposals.py'))
     moved = False
     try:
         if bundle.exists():
             bundle.rename(hidden)
             moved = True
-        for script in ['contract_test.py', 'integration_test.py', 'mcp_test.py']:
+        for script in ['contract_test.py', 'integration_test.py', 'mcp_test.py', 'geometry_integration_test.py']:
             print(f'Running {script} using extracted binaries with build resources hidden', flush=True)
             subprocess.run([sys.executable, '-u', str(ROOT / 'Tests' / script)], env=environment,
                            cwd=tmp, check=True, timeout=600)

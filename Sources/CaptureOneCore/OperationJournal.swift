@@ -32,6 +32,9 @@ public struct OperationRecord: Codable, Equatable {
     public let intendedAdjustments: Adjustments?
     public let beforeAdjustments: Adjustments?
     public var afterAdjustments: Adjustments?
+    public var beforeGeometry: Geometry?
+    public var intendedGeometry: Geometry?
+    public var afterGeometry: Geometry?
     public var diff: [String: DoubleDiff]?
     public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown"
     public var error: String?
@@ -50,8 +53,12 @@ public struct OperationRecord: Codable, Equatable {
         diff: [String: DoubleDiff]? = nil,
         status: String = "pending",
         error: String? = nil,
-        previewOutputPath: String? = nil
+        previewOutputPath: String? = nil,
+        beforeGeometry: Geometry? = nil,
+        intendedGeometry: Geometry? = nil
     ) {
+        self.beforeGeometry = beforeGeometry
+        self.intendedGeometry = intendedGeometry
         self.operationId = operationId
         self.timestamp = timestamp
         self.operationType = operationType
@@ -122,11 +129,12 @@ public final class OperationJournal {
     }
 
     public func update(operationId: String, status: String, afterAdjustments: Adjustments? = nil,
-                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil) throws {
+                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil, afterGeometry: Geometry? = nil) throws {
         guard var entry = try validatedEntries().first(where: { $0.operationId == operationId }) else {
             throw C1Error.invalidRequest("Operation not found: \(operationId)")
         }
         entry.status = status
+        if let value = afterGeometry { entry.afterGeometry = value }
         if let value = afterAdjustments { entry.afterAdjustments = value }
         if let value = diff { entry.diff = value }
         if let value = error { entry.error = value }

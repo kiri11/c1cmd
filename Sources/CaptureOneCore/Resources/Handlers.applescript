@@ -198,7 +198,14 @@ on getAdjustmentsBatch(docName, variantIds)
             end try
             
             set parentPath to POSIX path of (path of parent image of v as text)
-            set end of results to {parentImagePath:parentPath, variantId:(vid as text), exposureVal:expVal, contrastVal:contVal, saturationVal:satVal, temperatureVal:tempVal, tintVal:tintVal, cameraVal:cVal, lensVal:lVal, isoVal:iVal, shutterSpeedVal:sVal, asShotWBVal:wVal, captureDateVal:dtVal, starRating:rVal, colorTagVal:tagVal}
+            set geo to missing value
+            set geoError to missing value
+            try
+                set geo to my geometryRecordOf(v)
+            on error errText
+                set geoError to errText
+            end try
+            set end of results to {geometryRecord:geo, geometryUnavailableReason:geoError, parentImagePath:parentPath, variantId:(vid as text), exposureVal:expVal, contrastVal:contVal, saturationVal:satVal, temperatureVal:tempVal, tintVal:tintVal, cameraVal:cVal, lensVal:lVal, isoVal:iVal, shutterSpeedVal:sVal, asShotWBVal:wVal, captureDateVal:dtVal, starRating:rVal, colorTagVal:tagVal}
         end repeat
         return results
     end tell
@@ -262,6 +269,8 @@ on ensurePreviewRecipe(docName, recipeName, outputFolder)
         end if
         set output format of r to JPEG
         set JPEG quality of r to 80
+        set export crop method of r to respect
+        if export crop method of r is not respect then error "Preview recipe must respect crop."
         set color profile of r to "sRGB Color Space Profile"
         set scaling method of r to Long_Edge
         set scaling unit of r to pixels
@@ -319,3 +328,40 @@ on createBaselineVariant(docName, sourceId)
     end tell
 end createBaselineVariant
 
+
+
+on geometryRecordOf(v)
+    tell application "/Applications/Capture One.app"
+        set a to adjustments of v
+        set lc to lens correction of v
+        set ratioText to crop aspect ratio of v
+        if ratioText is missing value then set ratioText to ""
+        set maxRect to maximum crop v apply false
+        return {cropValues:crop of v, rotationDegrees:rotation of a, orientationDegrees:orientation of a, sourceDimensions:dimensions of parent image of v, maximumValues:maxRect, flipName:flip of a as text, ratioName:ratioText, keystoneValues:{keystone amount of a, keystone vertical of a, keystone horizontal of a, keystone skew of a, keystone aspect of a}, lensValues:{distortion of lc, focal length of lc, tilt of lc, tilt direction of lc, shift of lc, shift direction of lc, shift x of lc, shift y of lc}, profileName:lens profile of lc, hiddenAreas:hide distorted areas of lc, outsideAllowed:crop outside image of v}
+    end tell
+end geometryRecordOf
+
+on geometrySnapshot(v)
+    set g to my geometryRecordOf(v)
+    return {cropValues of g, rotationDegrees of g, orientationDegrees of g, sourceDimensions of g, flipName of g, ratioName of g, keystoneValues of g, lensValues of g, profileName of g, hiddenAreas of g, outsideAllowed of g}
+end geometrySnapshot
+
+on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation)
+    tell application "/Applications/Capture One.app"
+        set d to my checkedDocument(docName)
+        set v to variant id (variantId as text) of d
+        my assertParent(v, expectedPath)
+        if my geometrySnapshot(v) is not equal to expectedGeometry then error "Geometry changed before dispatch." number -27002
+        set a to adjustments of v
+        set actualTone to {exposure of a as real, contrast of a as real, saturation of a as real, temperature of a as real, tint of a as real}
+        set tolerances to {0.00001, 0.00001, 0.00001, 0.01, 0.0001}
+        repeat with n from 1 to 5
+            set deltaValue to (item n of actualTone) - (item n of expectedTone)
+            if deltaValue > (item n of tolerances) or deltaValue < (0 - (item n of tolerances)) then error "Adjustments changed before geometry dispatch." number -27002
+        end repeat
+        if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
+        -- Rotation can recenter/shrink the native crop. Apply the final crop afterward.
+        set crop of v to targetCrop
+        return my geometryRecordOf(v)
+    end tell
+end applyGeometry

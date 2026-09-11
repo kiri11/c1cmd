@@ -1,3 +1,10 @@
+## Unreleased — crop and rotation
+
+- Add shared CLI/MCP crop and rotation support, geometry reads/diffs/baselines, and independent `geometry-v1` preconditions; preserve the tonal contract.
+- Journal geometry writes and recovery observations, validate readback and preview geometry, and provide temporary-clone context previews.
+- Add the composition-only MCP profile and explicit crop proposal/review sidecar example.
+- Add geometry fault, contract, live orientation/ratio, and extracted-archive checks. Contract version is 1.1.0; keystone writes remain out of scope.
+
 ## Unreleased — v0.1 release hardening
 
 - Bind managed clones to exact database/app identity and parent image; enforce one open document.

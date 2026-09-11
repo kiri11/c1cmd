@@ -83,13 +83,18 @@ struct C1MCPServer {
             ("get", "Get adjustments and metadata for a variant or working reference, including current stateHash.", true),
             ("set", "Set absolute adjustments on a managed working clone. Requires matching ifState precondition.", false),
             ("add", "Apply relative delta adjustments on a managed working clone. Requires matching ifState precondition.", false),
+            ("geometry_set", "Set crop and rotation on a managed clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Keystone is preserved.", false),
             ("reset", "Reset verified adjustment fields on a managed working clone to defaults.", false),
             ("diff", "Compare adjustments between two variants or compare a working variant against its baseline.", true),
             ("dump", "Batched export of variants, adjustments, and metadata in JSON format.", true),
             ("preview", "Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data.", false),
             ("operation_status", "Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),
         ]
-        let tools: [Tool] = try definitions.map { name, description, readOnly in
+        let compositionOnly = ProcessInfo.processInfo.environment["C1_MCP_PROFILE"] == "composition"
+        let excluded: Set<String> = ["set", "add", "reset", "variant_baseline"]
+        let enabled = definitions.filter { !compositionOnly || !excluded.contains($0.0) }
+        let enabledNames = Set(enabled.map { $0.0 })
+        let tools: [Tool] = try enabled.map { name, description, readOnly in
             let data = try JSONSerialization.data(withJSONObject: ContractSchema.input(name))
             let input = try JSONDecoder().decode(Value.self, from: data)
             return Tool(name: name, description: description, inputSchema: input,
@@ -107,6 +112,7 @@ struct C1MCPServer {
                 return try await MainActor.run {
                     let raw = try JSONEncoder().encode(params.arguments ?? [:])
                     let args = try JSONSerialization.jsonObject(with: raw) as! [String: Any]
+                    guard enabledNames.contains(params.name) else { throw C1Error.invalidRequest("Tool is not enabled in this MCP profile: \(params.name)") }
                     try ContractSchema.validate(tool: params.name, arguments: args)
                     switch params.name {
                     case "doctor":
@@ -193,6 +199,14 @@ struct C1MCPServer {
                         let json = OutputFormatter.formatJson(res)
                         return CallTool.Result(content: [textContent(json)], isError: false)
                         
+                    case "geometry_set":
+                        let crop: CropRect?
+                        if let value = args["crop"] { crop = try JSONDecoder().decode(CropRect.self, from: JSONSerialization.data(withJSONObject: value)) } else { crop = nil }
+                        let result = try SessionController.shared.geometrySet(workingRef: args["workingRef"] as! String,
+                            ifGeometryState: args["ifGeometryState"] as! String, crop: crop,
+                            rotation: (args["rotation"] as? NSNumber)?.doubleValue, aspectRatio: (args["aspectRatio"] as? NSNumber)?.doubleValue,
+                            dryRun: args["dryRun"] as? Bool ?? false)
+                        return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
                     case "reset":
                         guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
                             throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
@@ -241,7 +255,7 @@ struct C1MCPServer {
                         let res = try SessionController.shared.preview(
                             ref: ref,
                             outputDirOverride: outputDir,
-                            timeout: timeout
+                            timeout: timeout, fullFrame: extractBool(from: params.arguments, key: "fullFrame") ?? false
                         )
                         let json = OutputFormatter.formatJson(res)
                         

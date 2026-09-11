@@ -62,9 +62,19 @@ flowchart TD
 
 ---
 
+## Crop and Rotation Workflow
+
+For composition corrections, clone the existing edit with `variant_clone`; preserve its look. Use `get.geometryStateHash` with `geometry_set.ifGeometryState` (CLI `geometry set --if-geometry-state`). The existing tonal `stateHash` does not cover crops. Geometry writes support crop rectangles and absolute rotation only, on Capture One 16.8.5.30. Keystone and lens settings remain unchanged. Apply the same journal, timeout, Session-only, and managed-reference rules as tonal edits.
+
+Use 3:2 width:height for horizontal pictures and 3:4 for vertical pictures. Straighten credible horizons/lines with rotation while preserving interesting composition. Flag rare keystone cases and ratio exceptions for review. Do not automatically level natural diagonals or treat an unchanged proposal as accepted.
+
+`geometry_set` accepts `crop: {centerX, centerY, width, height}`, `rotation` (-45 to +45 degrees), or `aspectRatio` (1.5 landscape, 0.75 portrait) for a centered fit. Crop coordinates use the oriented, rotated canvas with bottom-left origin. After rotation, inspect a fresh preview before choosing precise crop coordinates. `preview(fullFrame: true)` uses and cleans up a temporary managed context clone; failed workflows retain evidence for normal recovery. See [README](README.md#crop-and-rotation) for mapping and limitations.
+
+Use the `C1_MCP_PROFILE=composition` server environment for an agent restricted to composition edits. Tonal mutation tools and native default-baseline creation are then disabled.
+
 ## 3. Supported Adjustment Fields & Valid Ranges
 
-Do not attempt to set fields outside this table:
+The tonal `set`, `add`, and `reset` tools support only this table; use `geometry_set` for crop and rotation:
 
 | Parameter | Aliases | Minimum | Maximum | Unit | Description |
 |---|---|---|---|---|---|

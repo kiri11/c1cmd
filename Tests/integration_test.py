@@ -452,7 +452,7 @@ def main():
         print(f"PASS: Catalog guard strictly blocked delete ({err_res.get('error', {}).get('message')})")
 
         # Test all remaining mutation subcommands
-        for op_name, op_args in [("add", ["add", "1", "exposure=0.1", "--if-state", "dummy"])]:
+        for op_name, op_args in [("add", ["add", "1", "exposure=0.1", "--if-state", "dummy"]), ("geometry", ["geometry", "set", "1", "--if-geometry-state", "dummy", "--rotation", "1"])]:
             code, err_res = run_c1(op_args)
             assert code != 0
             err_code = err_res.get("error", {}).get("code")

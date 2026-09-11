@@ -35,6 +35,8 @@ public struct DeleteVariantResult: Codable, Equatable {
 }
 
 public struct AdjustmentBatchItemRecord: Codable, Equatable {
+    var geometryRecord: GeometryRecord?
+    public var geometryUnavailableReason: String?
     public let variantId: String
     public let parentImagePath: String?
     public let exposureVal: Double

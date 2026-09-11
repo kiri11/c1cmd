@@ -4,6 +4,9 @@ import CoreGraphics
 import CryptoKit
 
 public struct PreviewResult: Codable, Equatable {
+    public var contextSourceRef: String? = nil
+    public var geometry: Geometry? = nil
+    public var geometryStateHash: String? = nil
     public let operationId: String
     public let workingRef: String?
     public let outputPath: String
@@ -23,8 +26,11 @@ public struct PreviewResult: Codable, Equatable {
         height: Int,
         pixelSha256: String,
         stateHash: String? = nil,
-        nativeVariantId: String? = nil
+        nativeVariantId: String? = nil,
+        geometry: Geometry? = nil,
+        geometryStateHash: String? = nil
     ) {
+        self.geometry = geometry; self.geometryStateHash = geometryStateHash
         self.stateHash = stateHash
         self.nativeVariantId = nativeVariantId
         self.operationId = operationId
