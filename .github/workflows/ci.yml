@@ -24,7 +24,7 @@ jobs:
         run: swift build -v
 
       - name: Run Unit Tests
-        run: swift run CaptureOneCoreTests
+        run: swift run --skip-build CaptureOneCoreTests
 
       - name: Build Release
         run: swift build -c release -v

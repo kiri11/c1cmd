@@ -147,19 +147,22 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 `c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.1.0`; package version is `0.1.0`.
 
 ```sh
-make test                              # offline Swift regression suite
-python3 Tests/contract_test.py          # offline CLI/MCP protocol and input checks
+make check                             # build once; all offline Swift + CLI/MCP contract checks
+make test                              # Swift assertions only (also available separately)
 export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
+# Full candidate qualification: offline, packaged contract/layout, all live suites,
+# and all four recovery cases. Zero open documents; exclusive Capture One use.
+make qualify EVIDENCE_DIR=/private/tmp/c1-new-qualification
+
+# Individual live suites during development:
 python3 Tests/integration_test.py       # disposable Session; requires Capture One
 python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
 python3 Tests/geometry_integration_test.py # zero open documents; crop/rotation + review workflow
-make archive
-python3 Tests/archive_test.py dist/*.tar.gz
-# Exclusive app use, zero open documents; pauses/restarts Capture One:
-python3 Tests/recovery_integration_test.py dist/c1-v0.1.0-macos-arm64.tar.gz /path/to/new-evidence-dir
 ```
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
+
+`make check` needs no Capture One document or RAW and provides routine feedback in seconds on a warm build. It does not replace release qualification. `make qualify` preserves every assertion and fault case, runs the packaged contract/layout check once within the extracted live runner, and reports timings. The retained recovery run took 373 seconds, including two real 120-second Apple Event timeouts; shortening or mocking those waits would change what that run proves. Live suites remain sequential because they share Capture One's document, recipe and process state. When changing only a harness or documentation, rerun affected checks; do not repeat the entire fault campaign unless its behavior or the runtime candidate changed. Verify executable/resource identity when reusing runtime results after a documentation-only repack.
 
 Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. Style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
 
