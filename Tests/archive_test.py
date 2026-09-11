@@ -28,5 +28,6 @@ with tempfile.TemporaryDirectory(prefix='c1-archive-') as tmp:
     assert result.returncode >= 0, f'Packaged executable crashed: {result.stderr}'
     assert 'could not load resource bundle' not in result.stderr
     assert 'Could not locate Handlers' not in result.stderr
-    assert (root / 'docs/MCP_SETUP.md').is_file()
+    assert '## MCP setup' in (root / 'README.md').read_text()
+    assert (root / 'docs/RELEASE_VALIDATION.md').is_file()
     print('PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation')

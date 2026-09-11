@@ -68,7 +68,7 @@ Explicit document-scoped reads distinguished A's CR3 from B's JPEG despite colli
 
 All five changed values, arithmetic deltas and restoration were exercised with Edit All Selected Variants false and true. Source/sibling reads were unchanged in each case. Boundary tests exercised a separate clone-only sequence; these are observed endpoints, not an exhaustive range/property test.
 
-WB must be read as a pair: setting temperature to 5400 then tint to 5 read back approximately `{5400.001465, 4.999984}`. Reversed ordering produced `{6100.000488, -2.999999}`. Restoring WB left small differences, and a later reopen normalized them again. Candidate comparison tolerances in the plan are deliberately larger than these observed errors; stable hash canonicalization remains a separate implementation test. Exact floating-point equality is unsuitable.
+WB must be read as a pair: setting temperature to 5400 then tint to 5 read back approximately `{5400.001465, 4.999984}`. Reversed ordering produced `{6100.000488, -2.999999}`. Restoring WB left small differences, and a later reopen normalized them again. Candidate comparison tolerances in the original implementation plan are deliberately larger than these observed errors; stable hash canonicalization remains a separate implementation test. Exact floating-point equality is unsuitable.
 
 The metadata read returned camera `Canon EOS R`, ISO as text `ISO 100`, and shutter as text `1/500 s`. Do not assume these fields arrive as normalized numeric types. Temperature/tint from `adjustments` describe current WB, not verified as-shot metadata.
 
@@ -108,11 +108,11 @@ The earlier discovery run saw a 27.22-second bulk query. These are end-to-end Ap
 
 Bulk scalar results were five columns of N values; nested camera metadata worked. Intermediate list dereferencing still failed with -1728, and curves returned object specifiers. **Crop returned N nested four-value lists**, for both RAW and JPEG fixtures, contradicting the old flat-list assumption.
 
-The plan starts further qualification at 100-variant read chunks, configurable 60-second Apple Event deadlines and separate provisional 120-second preview deadlines. These choices are conservative starting points; they are not measured maximum durations or release guarantees.
+The original implementation plan proposed further qualification at 100-variant read chunks, configurable 60-second Apple Event deadlines and separate provisional 120-second preview deadlines. These choices are conservative starting points; they are not measured maximum durations or release guarantees.
 
 ## Tools and coverage
 
-The [pinned bridge probe](../probes/m0/bridge/Package.swift) passed nested records, optional arrays with `missing value`, round trips using both `.null` and `.missingValue`, and a compiled Swift application-version query. [Results](m0/16.8.5.30/bridge.json).
+The pinned bridge probe passed nested records, optional arrays with `missing value`, round trips using both `.null` and `.missingValue`, and a compiled Swift application-version query. [Results](m0/16.8.5.30/bridge.json).
 
 Full dictionary static aelint reported **59/100 (F)** with 14 errors. These include existing ambiguous names/codes; this grade is not a runtime safety score. The new dictionary adds people masking/layer types, processing modes, Color Editor classes and batch-callback output documentation.
 

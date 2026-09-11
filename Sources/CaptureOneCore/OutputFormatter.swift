@@ -153,14 +153,7 @@ public struct OutputFormatter {
         lines.append("Working Ref : \(res.workingRef)")
         lines.append("New Hash    : \(res.stateHash)")
         lines.append("")
-        lines.append("\(padRight("FIELD", 14))  \(padRight("BEFORE", 14))  \(padRight("AFTER", 14))  \(padRight("DELTA", 10))")
-        lines.append(String(repeating: "-", count: 56))
-        for (field, diff) in res.diff.sorted(by: { $0.key < $1.key }) {
-            let bStr = diff.before != nil ? String(format: "%.4f", diff.before!) : "null"
-            let aStr = diff.after != nil ? String(format: "%.4f", diff.after!) : "null"
-            let dStr = diff.delta != nil ? String(format: "%+.4f", diff.delta!) : "-"
-            lines.append("\(padRight(field, 14))  \(padRight(bStr, 14))  \(padRight(aStr, 14))  \(padRight(dStr, 10))")
-        }
+        lines.append(contentsOf: renderDiffTable(res.diff))
         return lines.joined(separator: "\n")
     }
 
@@ -178,15 +171,21 @@ public struct OutputFormatter {
             lines.append("No adjustment differences found between \(res.ref1) and \(res.ref2).")
             return lines.joined(separator: "\n")
         }
+        lines.append(contentsOf: renderDiffTable(res.diff))
+        return lines.joined(separator: "\n")
+    }
+
+    private static func renderDiffTable(_ diffs: [String: DoubleDiff]) -> [String] {
+        var lines: [String] = []
         lines.append("\(padRight("FIELD", 14))  \(padRight("BEFORE", 14))  \(padRight("AFTER", 14))  \(padRight("DELTA", 10))")
         lines.append(String(repeating: "-", count: 56))
-        for (field, diff) in res.diff.sorted(by: { $0.key < $1.key }) {
+        for (field, diff) in diffs.sorted(by: { $0.key < $1.key }) {
             let bStr = diff.before != nil ? String(format: "%.4f", diff.before!) : "null"
             let aStr = diff.after != nil ? String(format: "%.4f", diff.after!) : "null"
             let dStr = diff.delta != nil ? String(format: "%+.4f", diff.delta!) : "-"
             lines.append("\(padRight(field, 14))  \(padRight(bStr, 14))  \(padRight(aStr, 14))  \(padRight(dStr, 10))")
         }
-        return lines.joined(separator: "\n")
+        return lines
     }
 
     public static func renderDump(_ records: [DumpRecord], format: OutputFormat, jsonl: Bool = true) -> String {

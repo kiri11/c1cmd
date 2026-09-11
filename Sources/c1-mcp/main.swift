@@ -28,9 +28,7 @@ func extractStringArray(from args: [String: Value]?, key: String) -> [String]? {
     return arr.compactMap { $0.stringValue }
 }
 
-func parseAdjustments(from args: [String: Value]?) throws -> Adjustments {
-    let data = try JSONEncoder().encode(args ?? [:])
-    let arguments = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+func parseAdjustments(from arguments: [String: Any]) throws -> Adjustments {
     let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
     let values = arguments["adjustments"] as? [String: Any] ?? arguments.filter { !controls.contains($0.key) }
     // The tool-specific contract has already checked absolute bounds for set.
@@ -176,7 +174,7 @@ struct C1MCPServer {
                         let json = OutputFormatter.formatJson(res)
                         return CallTool.Result(content: [textContent(json)], isError: false)
                         
-                    case "set":
+                    case "set", "add":
                         guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
                             throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
                         }
@@ -184,31 +182,12 @@ struct C1MCPServer {
                             throw C1Error.invalidRequest("Missing required argument: 'ifState'")
                         }
                         let dryRun = extractBool(from: params.arguments, key: "dryRun") ?? false
-                        let adjustments = try parseAdjustments(from: params.arguments)
+                        let adjustments = try parseAdjustments(from: args)
                         let res = try SessionController.shared.mutate(
                             workingRefString: workingRef,
                             ifState: ifState,
-                            setAdjustments: adjustments,
-                            addAdjustments: nil,
-                            isDryRun: dryRun
-                        )
-                        let json = OutputFormatter.formatJson(res)
-                        return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                    case "add":
-                        guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
-                            throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
-                        }
-                        guard let ifState = extractString(from: params.arguments, key: "ifState") else {
-                            throw C1Error.invalidRequest("Missing required argument: 'ifState'")
-                        }
-                        let dryRun = extractBool(from: params.arguments, key: "dryRun") ?? false
-                        let adjustments = try parseAdjustments(from: params.arguments)
-                        let res = try SessionController.shared.mutate(
-                            workingRefString: workingRef,
-                            ifState: ifState,
-                            setAdjustments: nil,
-                            addAdjustments: adjustments,
+                            setAdjustments: params.name == "set" ? adjustments : nil,
+                            addAdjustments: params.name == "add" ? adjustments : nil,
                             isDryRun: dryRun
                         )
                         let json = OutputFormatter.formatJson(res)

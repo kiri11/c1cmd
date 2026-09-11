@@ -49,7 +49,9 @@ Configure your MCP client to launch the installed server over stdio:
 }
 ```
 
-macOS Automation permission must allow the launching application to control Capture One. If calls return `permission-denied`, inspect **System Settings → Privacy & Security → Automation**. See [MCP setup](docs/MCP_SETUP.md) for client examples. Do not enable the untested-build override unless deliberately qualifying another build.
+macOS Automation permission must allow the launching application to control Capture One. If calls return `permission-denied`, inspect **System Settings → Privacy & Security → Automation**. Do not enable the untested-build override unless deliberately qualifying another build.
+
+No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `isSession` and `exactBuildMatched` before editing.
 
 The server exposes 16 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `reset`, `diff`, `dump`, `preview`, and `operation_status`.
 
@@ -132,6 +134,6 @@ python3 Tests/recovery_integration_test.py dist/c1-v0.1.0-macos-arm64.tar.gz /pa
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
 
-Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. M4 style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
+Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. Style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
 
 [MIT License](LICENSE).
