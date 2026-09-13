@@ -3,7 +3,13 @@
 [![CI](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml/badge.svg)](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`c1` reads, adjusts, compares, and previews Capture One variants through a CLI and a stdio MCP server. Both adapters share `CaptureOneCore` and one versioned request/response schema. Creative judgment and photographer review belong in the caller.
+Did you ever want to give your agent access to Capture One? Probably not. But now You can!
+
+`c1` reads, adjusts, compares, and previews Capture One variants through a CLI and a stdio MCP server. 
+
+Only **currently open session** is accessable.
+
+Both adapters share `CaptureOneCore` and one versioned request/response schema. Creative judgment and photographer review belong in the caller.
 
 Capture One is a trademark of Capture One A/S. This independent project is not affiliated with, endorsed by, or sponsored by Capture One A/S. Capture One and RAW fixtures are not distributed with the project.
 
