@@ -414,7 +414,11 @@ public final class SessionController {
     }
 
     // MARK: - Variants List
-    public func listVariants(collectionName: String? = nil, selectedOnly: Bool = false) throws -> [VariantSummary] {
+    public func listVariants(collectionName: String? = nil, selectedOnly: Bool = false, rating: Int? = nil, minRating: Int? = nil) throws -> [VariantSummary] {
+        var filters: [String: Any] = [:]
+        if let rating { filters["rating"] = rating }
+        if let minRating { filters["minRating"] = minRating }
+        try ContractSchema.validate(tool: "variants_list", arguments: filters)
         let docInfo = try getDocumentInfo()
         let provenance: ProvenanceStore?
         if docInfo.isSession {
@@ -432,7 +436,10 @@ public final class SessionController {
             args: [NSAppleEventDescriptor(string: docInfo.documentId), colDesc, selDesc]
         )
 
-        return records.map { rec in
+        return records.filter { rec in
+            (rating.map { rec.starRating == $0 } ?? true) &&
+            (minRating.map { rec.starRating >= $0 } ?? true)
+        }.map { rec in
             let prov = provenance?.find(byCloneId: rec.variantId)
             return VariantSummary(
                 id: rec.variantId,

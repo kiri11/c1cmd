@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.1.0"
+    public static let version = "1.2.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -28,7 +28,14 @@ public enum ContractSchema {
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
         switch name {
-        case "variants_list": return object(["collection": string, "selected": boolean])
+        case "variants_list":
+            var result = object([
+                "collection": string, "selected": boolean,
+                "rating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."],
+                "minRating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Inclusive minimum star rating. Mutually exclusive with rating."]
+            ])
+            result["not"] = ["required": ["rating", "minRating"]]
+            return result
         case "variant_clone", "variant_baseline": return object(["sourceRef": string], required: ["sourceRef"])
         case "variant_delete": return object(["workingRef": string], required: ["workingRef"])
         case "get": return object(["ref": string], required: ["ref"])
@@ -67,6 +74,9 @@ public enum ContractSchema {
     public static func validate(tool: String, arguments: [String: Any]) throws {
         guard names.contains(tool) else { throw C1Error.invalidRequest("Unknown tool: \(tool)") }
         try validateValue(arguments, schema: input(tool), path: tool)
+        if tool == "variants_list", arguments["rating"] != nil, arguments["minRating"] != nil {
+            throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
+        }
         if tool == "set" || tool == "add" {
             let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
             let top = arguments.filter { !controls.contains($0.key) }

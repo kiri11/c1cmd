@@ -76,7 +76,7 @@ struct C1MCPServer {
             ("doc_info", "Show current open Session document info, folders, and open token.", true),
             ("capabilities", "Show capability matrix for the running Capture One build.", true),
             ("schema", "Output JSON Schema for c1 requests and responses.", true),
-            ("variants_list", "List variants in the current Session or specified collection.", true),
+            ("variants_list", "List variants in the current Session or specified collection, optionally filtered by exact or minimum star rating. Filters narrow results without changing UI selection.", true),
             ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Originals cannot be mutated directly.", false),
             ("variant_delete", "Delete a c1-managed working clone. (Originals cannot be deleted).", false),
             ("variant_baseline", "Create a managed default-settings baseline variant using native New Variant behavior.", false),
@@ -144,7 +144,9 @@ struct C1MCPServer {
                     case "variants_list":
                         let collection = extractString(from: params.arguments, key: "collection")
                         let selected = extractBool(from: params.arguments, key: "selected") ?? false
-                        let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected)
+                        let rating = (args["rating"] as? NSNumber)?.intValue
+                        let minRating = (args["minRating"] as? NSNumber)?.intValue
+                        let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating)
                         let json = OutputFormatter.formatJson(list)
                         return CallTool.Result(content: [textContent(json)], isError: false)
                         

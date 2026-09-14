@@ -6,6 +6,9 @@ import CoreGraphics
 final class FakeScript: ScriptExecuting {
     let directory: URL
     var values: [String: [Double]] = ["1": [0, 0, 0, 5000, 0]]
+    var ratings: [String: Int] = [:]
+    var selectedIDs: Set<String> = []
+    var listArguments: [NSAppleEventDescriptor] = []
     var documentCount = 1
     var isSession = true
     var calls: [String] = []
@@ -43,7 +46,11 @@ final class FakeScript: ScriptExecuting {
             result = ["appVersion": "16.8.5.30", "hasDocument": true, "docName": "fixture.cosessiondb",
                       "docPath": directory.path, "docId": directory.path,
                       "isSession": isSession, "documentCount": documentCount] as [String: Any]
-        case "listVariants": result = values.keys.sorted().map { ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": false, "starRating": 0, "colorTagVal": 0] as [String: Any] }
+        case "listVariants":
+            listArguments = args
+            result = values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }.map {
+                ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": 0] as [String: Any]
+            }
         case "getAdjustmentsBatch":
             guard let id = args[1].atIndex(1)?.stringValue, values[id] != nil else { throw C1Error.variantNotFound("missing") }
             result = [item(id)]

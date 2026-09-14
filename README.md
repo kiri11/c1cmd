@@ -88,6 +88,27 @@ Only managed working clones (`c1_wrk_<uuid>`) can be adjusted or deleted. Native
 
 `set` applies absolute values; `add` applies deltas. `reset` restores exposure/contrast/saturation defaults and the working reference's baseline white balance. Use `variant baseline <source-id>` to create a managed variant with native New Variant defaults. `diff <ref1> <ref2>` compares two variants; `dump` exports batched JSONL.
 
+### Select culled photos by star rating
+
+Filter the listing before cloning photos for crop or color work:
+
+```sh
+c1 variants list --rating 5                 # Exactly 5 stars (also: more than 4)
+c1 variants list --min-rating 4             # 4 or 5 stars
+c1 variants list --rating 0                 # Unrated
+c1 variants list --collection Capture --selected --rating 5
+```
+
+MCP `variants_list` accepts the same filters:
+
+```json
+{"rating": 5}
+```
+
+Use `{"minRating": 4}` for four stars and above. Both arguments require integers from 0 through 5; choose either `rating` or `minRating`. Filters combine with `collection` and `selected`, narrow the returned variants, and leave Capture One's UI selection unchanged. No matches returns an empty list. Omitting both filters preserves the full listing for the requested scope.
+
+For “crop my five-star picks,” call `variants_list` with `rating: 5`, then clone each intended source and follow the crop workflow below. Results are variants: multiple edits of the same photo can appear, including existing managed clones. Review the IDs and `isManagedWorkingClone` before creating proposals. Filtering is also available in the composition MCP profile and for read-only Catalog inspection.
+
 ### Supported adjustments
 
 | Field | Aliases | Absolute range |

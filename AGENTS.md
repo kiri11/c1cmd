@@ -49,7 +49,7 @@ flowchart TD
 ```
 
 1. **Health Check:** Run `c1 doctor` (or `doctor` tool in MCP). Confirm `allChecksPassed: true` and `isSession: true`.
-2. **Context Discovery:** Run `c1 doc info` and `c1 variants list` to discover available image files and variant IDs.
+2. **Context Discovery:** Run `c1 doc info` and `c1 variants list` to discover available image files and variant IDs. For culled picks, use `--rating 5` (MCP `variants_list: {"rating": 5}`); for four stars and above, use `--min-rating 4` (`{"minRating": 4}`). Choose one filter, using integers 0–5. Filters combine with collection/selection scope and do not change UI selection. Clone only the intended matching sources; results may include existing managed clones or multiple variants of one image.
 3. **Isolate Changes:** Run `c1 variant clone <sourceId>` (e.g. `c1 variant clone 1`). Record the returned `workingRef` (e.g. `c1_wrk_...`) and initial `baselineStateHash`.
 4. **Inspect State:** Run `c1 get <workingRef>`. Inspect adjustments, capture metadata, and note `stateHash`.
 5. **Apply Adjustments:**

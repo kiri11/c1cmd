@@ -70,9 +70,18 @@ def run(cli, mcp):
         assert len(tools) == 17
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
+        rating_schema = cli_schema['requests']['variants_list']
+        for key in ['rating', 'minRating']:
+            assert rating_schema['properties'][key]['type'] == 'integer'
+            assert rating_schema['properties'][key]['minimum'] == 0
+            assert rating_schema['properties'][key]['maximum'] == 5
+        assert rating_schema['not'] == {'required': ['rating', 'minRating']}
         for name in ['preview', 'operation_status']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
         for name, args in [
+            *[('variants_list', {key: value}) for key in ['rating', 'minRating']
+              for value in [-1, 6, 4.5, True, '5', None]],
+            ('variants_list', {'rating': 5, 'minRating': 4}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h'}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':46}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':True}),
@@ -102,6 +111,15 @@ def run(cli, mcp):
             result = subprocess.run([str(cli), 'geometry', 'set', 'x', '--if-geometry-state', 'h', '--crop', crop, '--format', 'json'], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
             assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+        for flags in [['--rating=-1'], ['--rating', '6'], ['--min-rating=-1'],
+                      ['--min-rating', '6'], ['--rating', '5', '--min-rating', '4']]:
+            result = subprocess.run([str(cli), 'variants', 'list', '--format', 'json', *flags], capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0
+            assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+        for key in ['--rating', '--min-rating']:
+            for value in ['4.5', 'true', 'five']:
+                result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
+                assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
         print('PASS: shared CLI/MCP schemas, 17 tool schemas, invalid requests, server survival')
     finally:
@@ -110,6 +128,9 @@ def run(cli, mcp):
     try:
         names = {t['name'] for t in composition.request('tools/list', {})['tools']}
         assert 'geometry_set' in names
+        assert 'variants_list' in names
+        result = composition.tool('variants_list', {'rating': 6})
+        assert result['isError'] and json.loads(result['content'][0]['text'])['error']['code'] == 'invalid-request'
         assert not names.intersection({'set','add','reset','variant_baseline'})
         result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
         assert result['isError'] and 'not enabled' in result['content'][0]['text']

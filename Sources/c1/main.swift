@@ -190,9 +190,15 @@ struct VariantsListCommand: ParsableCommand {
     @Option(help: "Name of the collection to list variants from (e.g. Capture).")
     var collection: String?
 
+    @Option(help: "Exact star rating (0–5; 0 means unrated). Cannot combine with --min-rating.")
+    var rating: Int?
+
+    @Option(help: "Inclusive minimum star rating (0–5). Cannot combine with --rating.")
+    var minRating: Int?
+
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) {
-            let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected)
+            let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating)
             print(OutputFormatter.renderVariants(list, format: globals.outputFormat))
         }
         if code != .success { throw ExitCode(code.rawValue) }
