@@ -2,11 +2,25 @@
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
-## Current decision (2026-09-09 UTC)
+## Existing-variant development candidate (2026-09-14)
 
-**The scoped runtime-recovery and documentation blockers are closed. GO for the documented runtime candidate; HOLD on general binary publication until the distribution gates below are resolved.** The supported candidate is Capture One 16.8.5.30 on Apple Silicon: exactly one open document, Session-only writes/preview, managed working clones, sequential calls, no UI edits, document switching or competing exports. Catalog inspection is read-only.
+Contract **1.4.0** adds `variant_edit` and `geometry_restore` (19 MCP tools). Existing variants can receive all five supported tonal adjustments and crop/rotation through a saved editing reference; cloning is optional. The photographer continues on the same variant after the agent finishes. Existing references cannot authorize deletion. Catalog edits retain the exact-path opt-in and referenced-original storage limit.
+
+[Existing-variant validation](existing-variants/16.8.5.30/README.md) records **592/592 offline assertions**, contract/profile checks, extracted CLI/MCP/geometry/catalog regressions, and both packaged examples editing five-star variants in disposable Sessions and catalogs with no duplicates. Both fixtures ended at their saved tonal/geometry baselines with unchanged ratings and RAW checksums. The report identifies the payloads before and after the final expired-reference guard fix. Two real Session timeout cases passed on the preceding payload; the extended preview-recovery run stopped after an old native ID became absent, and MCP-client death was not reached. A full four-case recovery pass is not claimed for this extension.
+
+The dimension calculation now uses intrinsic source-file metadata: Capture One's parent dimensions can change when its first variant rotates. No main catalog was used. Catalog-stored originals, simultaneous UI operators, and the distribution gates below remain outside this qualification.
+
+## Retained Session release decision (2026-09-09 UTC)
+
+**The scoped runtime-recovery and documentation blockers are closed. GO for the documented runtime candidate; HOLD on general binary publication until the distribution gates below are resolved.** The supported candidate is Capture One 16.8.5.30 on Apple Silicon: exactly one open document, Session-only writes/preview, managed working clones, sequential calls, no UI edits, document switching or competing exports. Catalog inspection is read-only by default. The opt-in development extension below has a separate scope.
 
 The original binary-distribution gates remain open: fresh-user downloaded-artifact launch, Automation consent through Terminal and an intended MCP client, and an explicit decision on Developer ID signing/notarization. Current archives are ad-hoc signed. This recovery/documentation work does not silently waive those gates or qualify other application builds, Intel, or every macOS deployment target.
+
+## Experimental catalog extension (2026-09-14)
+
+`C1_CATALOG_WRITE_PATH` enables one explicitly named catalog on 16.8.5.30, for online **referenced originals only**. State preconditions, journal, app lifetime, and RAW-preservation rules still apply. Contract 1.4.0 also permits existing-variant tonal and geometry edits via saved `c1_edit_` references; cloning is optional, and deletion stays clone-only. Catalog journals are isolated inside each package and bind to the internal database identity. `writesEnabled` is exposed by doctor/document responses (introduced in contract 1.3.0).
+
+See [catalog validation](catalog/16.8.5.30/README.md) for evidence and limits. Native catalog-stored-image import crashed during fixture setup; that storage mode remains blocked. This experimental extension does not inherit full Catalog fault qualification from the Session results below or waive distribution gates.
 
 ## Crop and rotation milestone (2026-09-11 UTC)
 
@@ -20,7 +34,7 @@ Contract 1.1.0 adds managed crop/rotation proposals, geometry preconditions and 
 | Integrated journal recovery | Durable pre-dispatch records, unresolved-operation write block, explicit reconciliation after the old app process ends. `reconciled` records observations, never historical success. Packaged live fault evidence is recorded below. |
 | Preview polling versus callbacks | Accept unique-directory polling only within the sole-operator scope: explicit variant/recipe, fresh operation directory, stable size, JPEG end marker, complete ImageIO decode, matching five-field state before/after. Never infer completion from queue disappearance, history or an old file. Production does not install callbacks; callback ownership/coexistence is deferred. |
 | Preview identity limits | Association relies on exclusive output ownership and the restricted workflow, not independent production reconciliation of the native job ID. Five fields are not a full render fingerprint. Recipe settings use exact-build tested values; not every recipe property is read back before every export. General export and competing operators remain unqualified. |
-| Catalog preview | Rejected: preview configures recipe/output state. Read-only Catalog support does not include preview. |
+| Catalog preview | Default read-only mode rejects export. Exact-path experimental opt-in permits preview of referenced originals; it configures recipe state and initializes a missing default output location. See the catalog report. |
 | Signing | Packaging is ad-hoc signed, not Developer ID signed/notarized. Resolve the distribution gates above separately. |
 
 ## Retained live recovery results (2026-09-09 UTC)

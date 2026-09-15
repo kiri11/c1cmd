@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "document-changed",
+    "message": "document-changed: Working reference predates this application/database identity. Clone the source again; references are not rebound automatically."
+  }
+}

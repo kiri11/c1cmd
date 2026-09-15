@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.2.0"
+    public static let version = "1.4.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "reset", "diff", "dump", "preview", "operation_status"]
+    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status"]
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
@@ -36,6 +36,8 @@ public enum ContractSchema {
             ])
             result["not"] = ["required": ["rating", "minRating"]]
             return result
+        case "variant_edit": return object(["sourceRef": string, "ifState": string, "ifGeometryState": string, "ifDocument": string], required: ["sourceRef", "ifState", "ifDocument"])
+        case "geometry_restore": return object(["workingRef": string, "ifGeometryState": string, "dryRun": boolean], required: ["workingRef", "ifGeometryState"])
         case "variant_clone", "variant_baseline": return object(["sourceRef": string], required: ["sourceRef"])
         case "variant_delete": return object(["workingRef": string], required: ["workingRef"])
         case "get": return object(["ref": string], required: ["ref"])
@@ -141,9 +143,9 @@ public enum ContractSchema {
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
         let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
         var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string; dumpProps["geometry"] = geometrySchema; dumpProps["geometryStateHash"] = string; dumpProps["geometryUnavailableReason"] = string
-        let responses: [String: Any] = [
-            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
-            "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
+        var responses: [String: Any] = [
+            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
+            "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
             "capabilities": ["type": "object"], "schema": ["type": "object"],
             "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,
             "variant_delete": object(["deleted": boolean, "workingRef": string, "cloneVariantId": string]),
@@ -154,6 +156,10 @@ public enum ContractSchema {
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
             "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "afterGeometry":geometrySchema])
         ]
+        responses["geometry_restore"] = responses["geometry_set"]
+        responses["variant_edit"] = object(["workingRef": string, "variantId": string, "documentPath": string, "documentToken": string,
+            "parentImagePath": string, "baselineAdjustments": adj, "baselineGeometry": geometrySchema, "baselineStateHash": string,
+            "baselineGeometryStateHash": string, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses,
                 "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string], required: ["code", "message"])], required: ["error"])]]

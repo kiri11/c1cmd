@@ -1,0 +1,120 @@
+{
+  "environment": {
+    "event": "environment",
+    "doc": {
+      "appVersion": "16.8.5.30",
+      "captureFolder": "/tmp/c1-geometry-live-j99twntf/geometry/Capture",
+      "documentId": "/private/tmp/c1-geometry-live-j99twntf/geometry",
+      "documentName": "geometry.cosessiondb",
+      "documentPath": "/tmp/c1-geometry-live-j99twntf/geometry",
+      "isSession": true,
+      "openToken": "73770:1789436682.541319|/tmp/c1-geometry-live-j99twntf/geometry/geometry.cosessiondb|16777232|4172861|1789436978.2200506",
+      "outputFolder": "/tmp/c1-geometry-live-j99twntf/geometry/Output",
+      "writesEnabled": true
+    },
+    "source": {
+      "adjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 0,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 0,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-geometry-live-j99twntf/geometry/Capture/2U6A7257.CR3",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a"
+    },
+    "clone": {
+      "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "cloneVariantId": "2",
+      "documentPath": "/tmp/c1-geometry-live-j99twntf/geometry",
+      "sourceVariantId": "1",
+      "workingRef": "c1_wrk_d0b305d5-0e27-43c8-920e-1f15b878cc0a"
+    },
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "cliSHA256": "66f3779562ce992a2875844be80b18b8b2710ed972e835def2fd99b79d82f128",
+    "mcpSHA256": "026fb54f8c13c4dd9b0459d9f99d2f89d14c2054149ced98cb13d5d996a01d8a"
+  },
+  "events": [
+    "environment",
+    "landscape",
+    "preview-landscape",
+    "portrait",
+    "preview-portrait",
+    "preview-context",
+    "off-center",
+    "review-example",
+    "aspect-ratio-preset",
+    "unsupported-perspective",
+    "unsupported-distortion",
+    "orientation",
+    "orientation",
+    "orientation",
+    "rotation-boundary",
+    "rotation-boundary",
+    "rotation-boundary",
+    "rotation-boundary",
+    "rotation-boundary",
+    "passed"
+  ],
+  "result": {
+    "event": "passed",
+    "originalUnchanged": true,
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  }
+}

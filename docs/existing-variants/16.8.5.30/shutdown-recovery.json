@@ -1,0 +1,159 @@
+[
+  {
+    "time": "2026-09-15T01:55:38.983209+00:00",
+    "event": "environment",
+    "archive": "c1-v0.1.0-macos-arm64.tar.gz",
+    "archiveSHA256": "7727283d6214649abb535469e911c394d05141a490e1b7e4f6469f0d0312eabd",
+    "cliSHA256": "66f3779562ce992a2875844be80b18b8b2710ed972e835def2fd99b79d82f128",
+    "mcpSHA256": "026fb54f8c13c4dd9b0459d9f99d2f89d14c2054149ced98cb13d5d996a01d8a",
+    "handlersSHA256": "65dc5201cfef49974070520a0a63c7373b088d65a35eed08850874ee66e3c0ac",
+    "commit": "6b98f1ce2fd32973389e66dfc7e8efa262a3b770",
+    "sourcePatchSHA256": "cb7ddacaa55630ec2db120aeb32cc651d0f5c674efdea53a3a0b575ec99e9555",
+    "harnessSHA256": "86d7b9f51c90daf4acbff8ef471de8b1a230dc0ac8017a1ae1e47a64da9559f1",
+    "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+    "architecture": "arm64",
+    "swift": "Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)\nTarget: arm64-apple-macosx26.0\n",
+    "appVersion": "16.8.5.30",
+    "session": "/private/tmp/c1-recovery-vq0xvj6m/recovery",
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  },
+  {
+    "time": "2026-09-15T01:56:23.744586+00:00",
+    "event": "clone-readback-regression-passed",
+    "cycles": 10
+  },
+  {
+    "time": "2026-09-15T01:56:27.137942+00:00",
+    "event": "target-paused-after-pending",
+    "pid": 73770,
+    "pending": {
+      "documentIdentity": "/tmp/c1-recovery-vq0xvj6m/recovery/recovery.cosessiondb|16777232|4175044|1789437339.1785984",
+      "parentImagePath": "/tmp/c1-recovery-vq0xvj6m/recovery/Capture/fixture.CR3",
+      "documentPath": "/tmp/c1-recovery-vq0xvj6m/recovery",
+      "preconditionStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "operationId": "dfbf5a15-2a10-4a36-8dc9-502e37da0734",
+      "intendedAdjustments": {
+        "exposure": 0.625,
+        "saturation": 0,
+        "contrast": 0,
+        "tint": 0.006856377236545086,
+        "temperature": 3200.113037109375
+      },
+      "appInstance": "73770:1789436682.541319",
+      "workingRef": "c1_wrk_72881ea4-c675-46fa-b242-4adf70601ca4",
+      "operationType": "set",
+      "beforeAdjustments": {
+        "exposure": 0,
+        "saturation": 0,
+        "contrast": 0,
+        "tint": 0.006856377236545086,
+        "temperature": 3200.113037109375
+      },
+      "status": "pending",
+      "timestamp": "2026-09-15T01:56:27Z",
+      "nativeVariantId": "12"
+    },
+    "limitation": "External pause races handler execution; does not identify the particular Apple Event in flight."
+  },
+  {
+    "time": "2026-09-15T01:58:27.187885+00:00",
+    "event": "apple-event-timeout-reply",
+    "code": 4,
+    "response": {
+      "error": {
+        "code": "timeout",
+        "message": "Operation dfbf5a15-2a10-4a36-8dc9-502e37da0734: timeout: Capture One Apple Event timed out (-1712): Capture One got an error: AppleEvent timed out.. Inspect operation status; do not retry the write.",
+        "operationId": "dfbf5a15-2a10-4a36-8dc9-502e37da0734",
+        "outcome": "inspect-operation"
+      }
+    }
+  },
+  {
+    "time": "2026-09-15T01:59:29.589408+00:00",
+    "event": "failed",
+    "error": "TimeoutExpired(['osascript', '-s', 's', '-e', 'tell application \"/Applications/Capture One.app\"\\nquit\\nend tell'], 60)"
+  },
+  {
+    "time": "2026-09-15T01:59:30.898461+00:00",
+    "event": "cleanup",
+    "openDocuments": 0,
+    "retainedSession": "/private/tmp/c1-recovery-vq0xvj6m/recovery"
+  },
+  {
+    "event": "manual-reconciliation",
+    "observations": {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "appInstance": "73770:1789436682.541319",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "documentIdentity": "/tmp/c1-recovery-vq0xvj6m/recovery/recovery.cosessiondb|16777232|4175044|1789437339.1785984",
+      "documentPath": "/tmp/c1-recovery-vq0xvj6m/recovery",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "intendedAdjustments": {
+        "contrast": 0,
+        "exposure": 0.625,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "nativeVariantId": "12",
+      "operationId": "dfbf5a15-2a10-4a36-8dc9-502e37da0734",
+      "operationType": "set",
+      "parentImagePath": "/tmp/c1-recovery-vq0xvj6m/recovery/Capture/fixture.CR3",
+      "preconditionStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "status": "reconciled",
+      "timestamp": "2026-09-15T01:56:27Z",
+      "workingRef": "c1_wrk_72881ea4-c675-46fa-b242-4adf70601ca4"
+    }
+  }
+]

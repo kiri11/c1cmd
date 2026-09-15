@@ -81,7 +81,7 @@ try:
     proposal_file.write_text(json.dumps([{'sourceRef':original['id'],'ifGeometryState':original['geometryStateHash'],
         'orientation':'landscape','rotation':0,'rationale':'Technical workflow fixture; photographer review pending.'}]))
     example=Path(os.environ.get('C1_TEST_CROP_EXAMPLE',ROOT/'examples/crop-proposals.py'))
-    completed=subprocess.run([sys.executable,str(example),str(proposal_file),'--output-dir',str(EVIDENCE/'reviews'),'--c1-bin',str(CLI)],capture_output=True,text=True,timeout=120)
+    completed=subprocess.run([sys.executable,str(example),str(proposal_file),'--output-dir',str(EVIDENCE/'reviews'),'--c1-bin',str(CLI),'--clone'],capture_output=True,text=True,timeout=120)
     assert completed.returncode==0,completed.stderr
     proposal_result=json.loads(completed.stdout)
     review=json.loads(Path(proposal_result['reviewRecord']).read_text())

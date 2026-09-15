@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""grade-folder.py: Grade variants in an active Capture One Session using c1 CLI.
+"""grade-folder.py: Grade variants in an active Capture One document using c1 CLI.
 
 Demonstrates the safe v0.1 editing workflow:
 1. Validates environment (c1 doctor & c1 doc info).
-2. Lists variants in Session.
+2. Lists variants in the chosen collection.
 3. For each original variant:
-   a. Clones to a managed working variant (c1 variant clone).
+   a. Prepares editing of the existing variant; --clone creates an optional separate proposal.
    b. Reads state & stateHash (c1 get).
    c. Applies preset adjustments under optimistic concurrency (c1 set --if-state).
    d. Exports and verifies preview render (c1 preview).
@@ -38,11 +38,12 @@ def run_c1(args: list[str], c1_bin: Path) -> dict | list:
     return json.loads(stdout)
 
 def main():
-    parser = argparse.ArgumentParser(description="Grade variants in active Session using c1.")
+    parser = argparse.ArgumentParser(description="Grade existing variants in the active document using c1.")
     parser.add_argument("--preset", type=Path, default=Path(__file__).parent / "presets" / "daylight.json", help="Path to preset adjustments JSON.")
     parser.add_argument("--collection", type=str, default=None, help="Optional collection name.")
     parser.add_argument("--c1-bin", type=Path, default=None, help="Path to c1 executable.")
     parser.add_argument("--dry-run", action="store_true", help="Predict changes without mutating.")
+    parser.add_argument("--clone", action="store_true", help="Create separate proposal variants instead of editing existing variants.")
     args = parser.parse_args()
 
     # Locate c1 executable
@@ -63,16 +64,17 @@ def main():
     print("\n[1/4] Running c1 doctor check...")
     try:
         doc_report = run_c1(["doctor"], c1_bin)
+        assert doc_report['allChecksPassed'] and doc_report['writesEnabled'] and doc_report['exactBuildMatched']
         print(f"Capture One {doc_report.get('appVersion')} running. Document: {doc_report.get('docName')}")
     except Exception as e:
         print(f"Doctor check failed: {e}", file=sys.stderr)
         sys.exit(1)
 
     # 2. Document info
-    print("\n[2/4] Inspecting active Session info...")
+    print("\n[2/4] Inspecting active document info...")
     doc_info = run_c1(["doc", "info"], c1_bin)
     session_dir = Path(doc_info["documentPath"])
-    print(f"Session path : {session_dir}")
+    print(f"Document path: {session_dir}")
     print(f"Open token   : {doc_info['openToken']}")
 
     decisions_dir = session_dir / ".c1" / "decisions"
@@ -90,7 +92,7 @@ def main():
     variants = run_c1(list_args, c1_bin)
     print(f"\n[3/4] Found {len(variants)} total variants.")
 
-    # Filter to unmanaged variants to avoid double-grading
+    # Exclude managed clones; this is not a record of prior processing.
     originals = [v for v in variants if not v.get("isManagedWorkingClone")]
     print(f"Original variants to process: {len(originals)}")
 
@@ -103,12 +105,16 @@ def main():
         vname = v["name"]
         print(f"\n--- [{idx}/{len(originals)}] Variant {vid} ({vname}) ---")
 
-        # a. Clone
-        print(f"  Cloning variant {vid}...")
-        clone_res = run_c1(["variant", "clone", vid], c1_bin)
-        wref = clone_res["workingRef"]
-        clone_id = clone_res["cloneVariantId"]
-        print(f"  Created working clone: {wref} (native ID: {clone_id})")
+        # a. Save a baseline and bind this existing variant (or explicitly clone).
+        source = run_c1(["get", vid], c1_bin)
+        if args.clone:
+            prepared = run_c1(["variant", "clone", vid], c1_bin)
+            clone_id = prepared["cloneVariantId"]
+        else:
+            prepared = run_c1(["variant", "edit", vid, "--if-state", source["stateHash"], "--if-document", doc_info["openToken"]], c1_bin)
+            clone_id = None
+        wref = prepared["workingRef"]
+        print(f"  Editing reference: {wref}")
 
         # b. Get baseline state
         get_res = run_c1(["get", wref], c1_bin)
@@ -137,6 +143,7 @@ def main():
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "workingRef": wref,
             "sourceVariantId": vid,
+            "mode": "clone" if args.clone else "existing",
             "cloneVariantId": clone_id,
             "parentImagePath": v.get("parentImagePath"),
             "preset": str(args.preset),
@@ -161,9 +168,11 @@ def main():
     for r in results:
         prev = r.get("previewPath") or "(dry-run)"
         print(f"{r['workingRef']:<36}  {r['sourceVariantId']:<8}  {'READY':<10}  {prev}")
-    print("\nInspect working variants side-by-side with originals in Capture One.")
-    print("To discard an unwanted proposal, run:")
-    print("  c1 variant delete <workingRef>")
+    if args.clone:
+        print("\nReview the clones. To discard one: c1 variant delete <workingRef>")
+    else:
+        print("\nReview the existing variants and continue editing them in Capture One.")
+        print("To restore tone, inspect the saved beforeAdjustments and use set with a fresh stateHash. Do not delete the variants.")
 
 if __name__ == "__main__":
     main()

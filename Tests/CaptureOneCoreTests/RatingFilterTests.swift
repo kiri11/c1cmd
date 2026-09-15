@@ -37,6 +37,10 @@ struct RatingFilterTests {
             XCTAssertEqual(matches.map(\.id), ["6", clone.cloneVariantId], "Keep distinct variants of the same image")
             XCTAssertEqual(matches.last?.workingRef, clone.workingRef, "Preserve managed clone provenance")
             XCTAssertEqual(matches.last?.isManagedWorkingClone, true)
+            let catalog = dir.appendingPathComponent("ratings.cocatalog")
+            try FileManager.default.createDirectory(at: catalog, withIntermediateDirectories: true)
+            try Data("catalog".utf8).write(to: catalog.appendingPathComponent("ratings.cocatalogdb"))
+            fake.catalogID = catalog.path
             fake.isSession = false
             let catalogMatches = try core.listVariants(minRating: 4)
             XCTAssertEqual(catalogMatches.map(\.rating), [4, 5, 5], "Catalog inspection supports filters")

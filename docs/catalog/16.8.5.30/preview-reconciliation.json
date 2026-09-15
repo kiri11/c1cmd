@@ -1,0 +1,107 @@
+{
+  "afterAdjustments": {
+    "contrast": 0,
+    "exposure": 0,
+    "saturation": 0,
+    "temperature": 3200.113037109375,
+    "tint": 0.006856377236545086
+  },
+  "afterGeometry": {
+    "crop": {
+      "centerX": 3067,
+      "centerY": 2103,
+      "height": 3802,
+      "width": 5703
+    },
+    "cropOutsideImage": false,
+    "flip": "none",
+    "hideDistortedAreas": true,
+    "imageHeight": 4000,
+    "imageWidth": 5999,
+    "keystone": [
+      100,
+      0,
+      0,
+      0,
+      0
+    ],
+    "lensGeometry": [
+      0,
+      35,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "lensProfile": "Canon EF 35mm f/1.4L II USM",
+    "maximumCrop": {
+      "centerX": 3067,
+      "centerY": 2103,
+      "height": 3803,
+      "width": 5704
+    },
+    "orientation": 0,
+    "rotation": 2
+  },
+  "appInstance": "70848:1789430725.561256",
+  "beforeAdjustments": {
+    "contrast": 0,
+    "exposure": 0,
+    "saturation": 0,
+    "temperature": 3200.113037109375,
+    "tint": 0.006856377236545086
+  },
+  "beforeGeometry": {
+    "crop": {
+      "centerX": 3067,
+      "centerY": 2103,
+      "height": 3802,
+      "width": 5703
+    },
+    "cropOutsideImage": false,
+    "flip": "none",
+    "hideDistortedAreas": true,
+    "imageHeight": 4000,
+    "imageWidth": 5999,
+    "keystone": [
+      100,
+      0,
+      0,
+      0,
+      0
+    ],
+    "lensGeometry": [
+      0,
+      35,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "lensProfile": "Canon EF 35mm f/1.4L II USM",
+    "maximumCrop": {
+      "centerX": 3067,
+      "centerY": 2103,
+      "height": 3803,
+      "width": 5704
+    },
+    "orientation": 0,
+    "rotation": 2
+  },
+  "documentIdentity": "/tmp/c1-catalog-live-dt1u4xl8/qualification.cocatalog/qualification.cocatalogdb|16777232|4152980|1789430757.8830795",
+  "documentPath": "/tmp/c1-catalog-live-dt1u4xl8/qualification.cocatalog",
+  "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+  "nativeVariantId": "2",
+  "operationId": "fcf1dd35-4f76-4742-8191-9bd5d11f027e",
+  "operationType": "preview",
+  "parentImagePath": "/tmp/c1-catalog-live-dt1u4xl8/referenced.CR3",
+  "preconditionStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+  "previewOutputPath": "/tmp/c1-catalog-live-dt1u4xl8/qualification.cocatalog.c1-output/c1-previews/fcf1dd35-4f76-4742-8191-9bd5d11f027e",
+  "status": "reconciled",
+  "timestamp": "2026-09-15T00:06:13Z",
+  "workingRef": "c1_wrk_41232ef3-b8ca-4575-9311-0ec6c97a3767"
+}

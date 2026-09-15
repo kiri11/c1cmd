@@ -7,6 +7,7 @@ final class GeometryFake: ScriptExecuting {
     var failure: String?
     var changeDuringPreview = false
     var writeCount = 0
+    var dimensionsFollowRotation = false
     var pendingBeforeWrite = false
     init(directory: URL) { base = FakeScript(directory: directory) }
     func record(_ id: String) -> [String: Any] {
@@ -42,6 +43,7 @@ final class GeometryFake: ScriptExecuting {
             r["rotationDegrees"] = args[6].doubleValue; records[id] = r
             if failure == "partial" { throw C1Error.scriptError("injected failure after rotation", code:-1700) }
             r["cropValues"] = (1...4).map { args[5].atIndex($0)!.doubleValue }
+            if dimensionsFollowRotation { r["sourceDimensions"] = args[6].doubleValue == 0 ? [6000.0, 4000] : [6135.0, 4206] }
             if failure == "mismatch" { r["rotationDegrees"] = 22.0 }
             records[id] = r
             if failure == "lost-reply" { throw C1Error.timeout("applied, reply lost") }
@@ -59,7 +61,7 @@ struct GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "geometry-db"})
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "geometry-db"}, imageDimensions: { _ in [6000, 4000] })
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let cloned = try core.cloneVariant(sourceRef:"1")

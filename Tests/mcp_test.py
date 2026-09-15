@@ -224,16 +224,16 @@ def main():
         tool_names = {t["name"] for t in tools}
         expected_tools = {
             "doctor", "doc_info", "capabilities", "schema",
-            "variants_list", "variant_clone", "variant_delete", "variant_baseline",
+            "variants_list", "variant_edit", "geometry_restore", "variant_clone", "variant_delete", "variant_baseline",
             "get", "set", "add", "reset", "diff", "dump", "preview", "operation_status"
         }
         missing = expected_tools - tool_names
         assert not missing, f"Missing required tools in tools/list: {missing}"
-        assert len(tools) == 17, f"Expected 17 tools, found {len(tools)}"
+        assert len(tools) == 19, f"Expected 19 tools, found {len(tools)}"
         for t in tools:
             assert "description" in t and t["description"], f"Tool {t['name']} missing description"
             assert "inputSchema" in t and isinstance(t["inputSchema"], dict), f"Tool {t['name']} invalid schema"
-        print(f"  ✓ All 17 tools discovered with complete schemas: {sorted(list(tool_names))}")
+        print(f"  ✓ All 19 tools discovered with complete schemas: {sorted(list(tool_names))}")
         passed_tests += 1
 
         # 3. Read-Only Tools (capabilities, schema, doc_info)

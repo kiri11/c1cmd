@@ -73,10 +73,10 @@ public final class ProvenanceStore {
     /// Validates that a reference is a managed working reference and belongs to the specified document path.
     public func resolveManagedWorkingReference(_ refString: String, currentDocumentPath: String) throws -> ProvenanceRecord {
         guard WorkingRef.isWorkingRefString(refString) else {
-            throw C1Error.unmanagedVariant("Reference '\(refString)' is not a c1-managed working reference. The core rejects mutations to original variants or raw native IDs.")
+            throw C1Error.unmanagedVariant("Reference '\(refString)' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.")
         }
         guard let record = try validatedRecords()[refString] else {
-            throw C1Error.unmanagedVariant("Working reference '\(refString)' has no provenance record in this Session.")
+            throw C1Error.unmanagedVariant("Working reference '\(refString)' has no provenance record in this document.")
         }
         // Normalize paths for comparison
         let recPath = (record.documentPath as NSString).standardizingPath

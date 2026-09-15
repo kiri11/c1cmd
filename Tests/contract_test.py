@@ -67,7 +67,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 17
+        assert len(tools) == 19
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
         rating_schema = cli_schema['requests']['variants_list']
@@ -76,12 +76,16 @@ def run(cli, mcp):
             assert rating_schema['properties'][key]['minimum'] == 0
             assert rating_schema['properties'][key]['maximum'] == 5
         assert rating_schema['not'] == {'required': ['rating', 'minRating']}
-        for name in ['preview', 'operation_status']:
+        for name in ['preview', 'operation_status', 'variant_edit', 'geometry_restore']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
         for name, args in [
             *[('variants_list', {key: value}) for key in ['rating', 'minRating']
               for value in [-1, 6, 4.5, True, '5', None]],
             ('variants_list', {'rating': 5, 'minRating': 4}),
+            ('variant_edit', {'sourceRef':'1', 'ifGeometryState':'h'}),
+            ('variant_edit', {'sourceRef':'1', 'ifGeometryState':'h', 'ifDocument':True}),
+            ('geometry_restore', {'workingRef':'x'}),
+            ('geometry_restore', {'workingRef':'x','ifGeometryState':'h','rotation':1}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h'}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':46}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':True}),
@@ -121,13 +125,13 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 17 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 19 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     composition = Client(mcp, env=dict(os.environ, C1_MCP_PROFILE='composition'))
     try:
         names = {t['name'] for t in composition.request('tools/list', {})['tools']}
-        assert 'geometry_set' in names
+        assert {'geometry_set','variant_edit','geometry_restore'} <= names
         assert 'variants_list' in names
         result = composition.tool('variants_list', {'rating': 6})
         assert result['isError'] and json.loads(result['content'][0]['text'])['error']['code'] == 'invalid-request'

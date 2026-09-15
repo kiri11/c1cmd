@@ -134,10 +134,14 @@ on cloneVariant(docName, sourceId)
     end tell
 end cloneVariant
 
-on deleteVariant(docName, variantId, expectedPath)
+on deleteVariant(docName, variantId, expectedPath, sourceId)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
         my assertParent(variant id variantId of d, expectedPath)
+        if sourceId is variantId then error "Cannot delete the source variant." number -27003
+        if not (exists variant id sourceId of d) then error "Source variant is absent; refusing deletion." number -27003
+        my assertParent(variant id sourceId of d, expectedPath)
+        if (count of variants of parent image of variant id variantId of d) < 2 then error "Cannot delete the last variant of an image." number -27003
         delete variant id variantId of d
         set existsAfter to (exists variant id variantId of d)
         return {deleted:(not existsAfter), existsNow:existsAfter}
@@ -262,6 +266,16 @@ end applyAdjustments
 on ensurePreviewRecipe(docName, recipeName, outputFolder)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
+        -- Catalog processing validates its default output even with a custom recipe.
+        -- Preserve a usable default; initialize only a missing/unavailable location.
+        if kind of d is catalog then
+            try
+                set defaultOutput to (output of d) as alias
+            on error
+                set output of d to POSIX file outputFolder
+                set defaultOutput to (output of d) as alias
+            end try
+        end if
         if exists recipe recipeName of d then
             set r to recipe recipeName of d
         else
@@ -341,9 +355,11 @@ on geometryRecordOf(v)
     end tell
 end geometryRecordOf
 
+-- Source-file dimensions are read with ImageIO by the core. The native image
+-- dimensions change with the first variant, so they are not a geometry precondition.
 on geometrySnapshot(v)
     set g to my geometryRecordOf(v)
-    return {cropValues of g, rotationDegrees of g, orientationDegrees of g, sourceDimensions of g, flipName of g, ratioName of g, keystoneValues of g, lensValues of g, profileName of g, hiddenAreas of g, outsideAllowed of g}
+    return {cropValues of g, rotationDegrees of g, orientationDegrees of g, flipName of g, ratioName of g, keystoneValues of g, lensValues of g, profileName of g, hiddenAreas of g, outsideAllowed of g}
 end geometrySnapshot
 
 on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation)

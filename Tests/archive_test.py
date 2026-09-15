@@ -36,6 +36,8 @@ def check_package(root):
     assert '## MCP setup' in (root / 'README.md').read_text()
     assert (root / 'docs/RELEASE_VALIDATION.md').is_file()
     assert (root / 'examples/crop-proposals.py').is_file()
+    assert (root / 'examples/grade-folder.py').is_file()
+    assert (root / 'examples/presets/daylight.json').is_file()
     print('PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation')
 
 

@@ -105,6 +105,11 @@ class Run:
     def restart(self):
         assert Path(ae('return id of first document')).resolve() == self.session.resolve()
         old = self.pid()
+        # Closing the owned fixture first avoids Capture One hanging in quit
+        # with a document open after a timed-out Apple Event. Never reopen it
+        # until the old app process has ended; old references remain invalid.
+        ae('close first document', timeout=60)
+        assert ae('return count of documents') == 0
         ae('quit', timeout=60)
         wait_for(lambda: subprocess.run(['kill', '-0', str(old)], capture_output=True).returncode != 0)
         subprocess.run(['open', '-a', '/Applications/Capture One.app', str(self.db)], check=True)

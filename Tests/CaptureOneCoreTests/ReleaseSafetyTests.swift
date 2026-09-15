@@ -11,6 +11,8 @@ final class FakeScript: ScriptExecuting {
     var listArguments: [NSAppleEventDescriptor] = []
     var documentCount = 1
     var isSession = true
+    var catalogID: String?
+    var version = "16.8.5.30"
     var calls: [String] = []
     var fail: String?
     var mutatePatch: [Bool] = []
@@ -28,7 +30,7 @@ final class FakeScript: ScriptExecuting {
         return data as Data
     }
     init(directory: URL) { self.directory = directory }
-    var parent: String { directory.appendingPathComponent("fixture.CR3").path }
+    var parent: String { (isSession ? directory : directory.deletingLastPathComponent()).appendingPathComponent("fixture.CR3").path }
     func item(_ id: String) -> [String: Any] {
         let a = values[id]!
         return ["variantId": id, "parentImagePath": parentOverride ?? parent,
@@ -43,8 +45,8 @@ final class FakeScript: ScriptExecuting {
         let result: Any
         switch handler {
         case "getAppAndDocInfo":
-            result = ["appVersion": "16.8.5.30", "hasDocument": true, "docName": "fixture.cosessiondb",
-                      "docPath": directory.path, "docId": directory.path,
+            result = ["appVersion": version, "hasDocument": true, "docName": "fixture.cosessiondb",
+                      "docPath": catalogID ?? directory.path, "docId": catalogID ?? directory.path,
                       "isSession": isSession, "documentCount": documentCount] as [String: Any]
         case "listVariants":
             listArguments = args
@@ -113,7 +115,16 @@ struct ReleaseSafetyTests {
             XCTAssertThrowsError(try core.deleteVariant(workingRefString: clone.workingRef))
             fake.parentOverride = nil
             fake.generation = "app-2"
-            XCTAssertThrowsError(try core.get(ref: clone.workingRef))
+            let priorReads = fake.calls.filter { $0 == "getAdjustmentsBatch" }.count
+            fake.fail = "getAdjustmentsBatch"
+            do {
+                _ = try core.get(ref: clone.workingRef)
+                XCTAssertTrue(false, "Expired references must fail before native lookup")
+            } catch let error as C1Error {
+                XCTAssertEqual(error.errorCode, "document-changed")
+            }
+            XCTAssertEqual(fake.calls.filter { $0 == "getAdjustmentsBatch" }.count, priorReads)
+            fake.fail = nil
             fake.generation = "app-1"
             fake.documentCount = 2
             XCTAssertThrowsError(try core.get(ref: clone.workingRef))

@@ -278,7 +278,7 @@ def main():
         preset_path = ROOT / "examples" / "presets" / "daylight.json"
         grade_res = subprocess.run([
             sys.executable, str(ROOT / "examples" / "grade-folder.py"),
-            "--preset", str(preset_path),
+            "--preset", str(preset_path), "--clone",
             "--c1-bin", str(C1_BIN)
         ], capture_output=True, text=True)
         assert grade_res.returncode == 0, f"grade-folder.py failed:\n{grade_res.stderr}\n{grade_res.stdout}"

@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-14",
+  "appVersion": "16.8.5.30",
+  "status": "experimental-referenced-originals-only",
+  "archiveSHA256": "541dac6dbdc9895f235b0b6fc9147cc17c41e4a73d4639230d5cad9e5fc96299",
+  "cliSHA256": "2f9f3773724d34a6c11a5d7439e5eb9de9163734a6a2bed47cff620458e6d704",
+  "mcpSHA256": "f00ee2206ffb475ac5fa038a09a19bae70a81942c1c8cfdd20e4522852e8158b",
+  "handlersSHA256": "5c29072089ef8c38b878bf085bba4f7272ff2b9e16fc66a9adb56446ed551eb2",
+  "catalogHarnessSHA256": "1f1efe2b74dce2f537bcc310f36cc8b60be701c8810044ec52c9aa255965b86b",
+  "offlineAssertions": {
+    "passed": 533,
+    "failed": 0
+  },
+  "contract": "1.3.0",
+  "packagedSuites": [
+    "contract and archive layout",
+    "CLI Session integration",
+    "MCP Session integration",
+    "geometry integration",
+    "referenced Catalog CLI/MCP integration"
+  ],
+  "timingsSeconds": {
+    "archive and contract": 1.711,
+    "integration_test.py": 42.003,
+    "mcp_test.py": 21.104,
+    "geometry_integration_test.py": 99.438,
+    "catalog_integration_test.py": 39.977
+  },
+  "buildResourceFallbackHidden": true,
+  "catalogOperations": 16,
+  "originalsUnchanged": true,
+  "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "catalogStoredOriginals": "blocked; three native importer crashes during fixture setup",
+  "catalogFaultCoverage": "offline injected geometry lost-reply/restart; live preview-error reconciliation after restart",
+  "fullCatalogTimeoutAndMCPDeathQualification": false,
+  "note": "Archive tested before this report was added. Runtime payload hashes identify the candidate; no main catalog was opened. Scratch outputs referenced by evidence have been removed."
+}

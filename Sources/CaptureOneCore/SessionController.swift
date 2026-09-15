@@ -24,6 +24,7 @@ public struct DoctorReport: Codable, Equatable {
     public let docName: String?
     public let docPath: String?
     public let isSession: Bool
+    public var writesEnabled: Bool = false
     public let lockAcquired: Bool
     public let unresolvedOperationsCount: Int
     public let allChecksPassed: Bool
@@ -65,6 +66,7 @@ public struct DocumentInfo: Codable, Equatable {
     public let documentName: String
     public let documentPath: String
     public let isSession: Bool
+    public var writesEnabled: Bool = false
     public let openToken: String
     public let captureFolder: String
     public let outputFolder: String
@@ -249,20 +251,27 @@ public final class SessionController {
     private let executor: ScriptExecuting
     private let appInstance: () throws -> String
     private let databaseIdentity: (String) throws -> String
+    private let catalogWritePath: String?
+    private let imageDimensions: (String) -> [Double]?
     private let lock = CaptureOneLock.shared
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
 
     public init(executor: ScriptExecuting = AppleScriptExecutor.shared,
                 appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
-                databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity) {
+                databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
+                catalogWritePath: String? = ProcessInfo.processInfo.environment["C1_CATALOG_WRITE_PATH"],
+                imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read) {
         self.executor = executor
         self.appInstance = appInstance
         self.databaseIdentity = databaseIdentity
+        self.catalogWritePath = catalogWritePath
+        self.imageDimensions = imageDimensions
     }
 
-    private func databasePath(_ doc: DocumentInfo) -> String {
-        doc.isSession && !doc.documentId.hasSuffix(".cosessiondb")
+    private func databasePath(_ doc: DocumentInfo) throws -> String {
+        if !doc.isSession { return try CatalogLocation(nativeID: doc.documentId).database.path }
+        return doc.isSession && !doc.documentId.hasSuffix(".cosessiondb")
             ? URL(fileURLWithPath: doc.documentPath).appendingPathComponent(doc.documentName).path
             : doc.documentId
     }
@@ -275,7 +284,21 @@ public final class SessionController {
         if writes { try OperationJournal(sessionDirectory: URL(fileURLWithPath: actual.documentPath)).assertReady() }
     }
 
+    private func assertWritableImage(doc: DocumentInfo, source: GetResult?) throws {
+        if !doc.isSession {
+            guard let path = source?.parentImagePath, FileManager.default.isReadableFile(atPath: path) else {
+                throw C1Error.invalidRequest("Catalog writes require the original image to be online and readable.")
+            }
+            let package = try CatalogLocation(nativeID: doc.documentId).package
+            let image = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+            guard !image.path.hasPrefix(package.path + "/") else {
+                throw C1Error.invalidRequest("Experimental Catalog editing supports referenced originals only. Originals stored inside the Catalog are not yet qualified.")
+            }
+        }
+    }
+
     private func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
+        try assertWritableImage(doc: doc, source: source)
         var result = entry
         result.appInstance = try appInstance()
         result.documentIdentity = try databaseIdentity(databasePath(doc))
@@ -326,14 +349,22 @@ public final class SessionController {
         }
 
         var unresolvedCount = 0
-        if let p = docPath, let sessUrl = sessionUrl(forDocPath: p) {
-            let journal = OperationJournal(sessionDirectory: sessUrl)
-            unresolvedCount = (try? journal.validatedEntries().filter(OperationJournal.isUnresolved).count) ?? 1
+        var writesEnabled = false
+        var identityOK = false
+        if hasDoc {
+            do {
+                let doc = try getDocumentInfo()
+                identityOK = true
+                docPath = doc.documentPath
+                writesEnabled = doc.writesEnabled
+                let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+                unresolvedCount = try journal.validatedEntries().filter(OperationJournal.isUnresolved).count
+            } catch { unresolvedCount = 1 }
         }
 
-        let allPassed = appRunning && compat.isAllowed && hasDoc && documentCount == 1 && lockOk && (unresolvedCount == 0)
+        let allPassed = appRunning && compat.isAllowed && hasDoc && identityOK && documentCount == 1 && lockOk && (unresolvedCount == 0)
 
-        return DoctorReport(
+        var report = DoctorReport(
             appRunning: appRunning,
             appVersion: appVersion,
             exactBuildMatched: buildMatched,
@@ -348,6 +379,8 @@ public final class SessionController {
             allChecksPassed: allPassed,
             warning: compat.warning
         )
+        report.writesEnabled = writesEnabled && allPassed
+        return report
     }
 
     // MARK: - Document Info
@@ -378,17 +411,22 @@ public final class SessionController {
             captureDir = (docDir as NSString).appendingPathComponent("Capture")
             outputDir = (docDir as NSString).appendingPathComponent("Output")
         } else {
-            if path.hasSuffix(".cocatalog") {
-                docDir = (path as NSString).deletingLastPathComponent
-            }
+            let location = try CatalogLocation(nativeID: info.docId ?? path)
+            docDir = location.package.path
+            outputDir = location.package.deletingLastPathComponent()
+                .appendingPathComponent(location.package.lastPathComponent + ".c1-output").path
         }
 
         let nativeId = info.docId ?? path
-        let database = info.isSession && !nativeId.hasSuffix(".cosessiondb")
-            ? URL(fileURLWithPath: docDir).appendingPathComponent(name).path : nativeId
+        let database: String
+        if info.isSession {
+            database = nativeId.hasSuffix(".cosessiondb") ? nativeId : URL(fileURLWithPath: docDir).appendingPathComponent(name).path
+        } else {
+            database = try CatalogLocation(nativeID: nativeId).database.path
+        }
         let openToken = try "\(appInstance())|\(databaseIdentity(database))"
 
-        return DocumentInfo(
+        var document = DocumentInfo(
             documentId: nativeId,
             documentName: name,
             documentPath: docDir,
@@ -398,6 +436,8 @@ public final class SessionController {
             outputFolder: outputDir,
             appVersion: info.appVersion
         )
+        document.writesEnabled = (try? assertSessionWritable(docInfo: document, operation: "edit")) != nil
+        return document
     }
 
     // MARK: - Mutation Guard
@@ -408,8 +448,14 @@ public final class SessionController {
                 "Running Capture One build '\(docInfo.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(Self.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
             )
         }
-        guard docInfo.isSession else {
-            throw C1Error.invalidRequest("Catalogs are strictly read-only. Mutation operation '\(operation)' cannot be performed on Catalog '\(docInfo.documentName)'. Open a Session to mutate variants.")
+        if !docInfo.isSession {
+            guard let location = try? CatalogLocation(nativeID: docInfo.documentId),
+                  location.isAuthorized(by: catalogWritePath) else {
+                throw C1Error.invalidRequest("Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation '\(operation)' is blocked for '\(docInfo.documentName)'.")
+            }
+            guard docInfo.appVersion == Self.pinnedBuild else {
+                throw C1Error.unsupportedVersion("Catalog writes require Capture One \(Self.pinnedBuild); the untested-build override does not enable Catalog writes.")
+            }
         }
     }
 
@@ -420,13 +466,8 @@ public final class SessionController {
         if let minRating { filters["minRating"] = minRating }
         try ContractSchema.validate(tool: "variants_list", arguments: filters)
         let docInfo = try getDocumentInfo()
-        let provenance: ProvenanceStore?
-        if docInfo.isSession {
-            let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-            provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        } else {
-            provenance = nil
-        }
+        let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
+        let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
 
         let colDesc = collectionName != nil ? NSAppleEventDescriptor(string: collectionName!) : NSAppleEventDescriptor.missingValue()
         let selDesc = NSAppleEventDescriptor(boolean: selectedOnly)
@@ -440,7 +481,11 @@ public final class SessionController {
             (rating.map { rec.starRating == $0 } ?? true) &&
             (minRating.map { rec.starRating >= $0 } ?? true)
         }.map { rec in
-            let prov = provenance?.find(byCloneId: rec.variantId)
+            let matches = byClone[rec.variantId] ?? []
+            let candidate = matches.count == 1 ? matches.first : nil
+            let prov = candidate.flatMap { record in
+                (try? DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: rec.parentImagePath)) != nil ? record : nil
+            }
             return VariantSummary(
                 id: rec.variantId,
                 name: rec.variantName,
@@ -451,6 +496,29 @@ public final class SessionController {
                 isManagedWorkingClone: prov != nil,
                 workingRef: prov?.workingRef
             )
+        }
+    }
+
+    // MARK: - Edit an existing variant
+    public func editVariant(sourceRef: String, ifState expected: String, ifDocument: String, ifGeometryState: String? = nil) throws -> EditingRecord {
+        try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "variant_edit")
+            guard doc.openToken == ifDocument else { throw C1Error.documentChanged("Document changed since the editing targets were selected.") }
+            guard doc.appVersion == "16.8.5.30" else { throw C1Error.unsupportedVersion("Existing-variant editing requires Capture One 16.8.5.30.") }
+            try checkedDocument(doc)
+            let source = try get(ref: sourceRef)
+            guard let parent = source.parentImagePath, !parent.isEmpty else {
+                throw C1Error.identityAmbiguous("Existing-variant editing requires an identifiable parent image.")
+            }
+            guard source.stateHash == expected, ifGeometryState == nil || source.geometryStateHash == ifGeometryState else {
+                throw C1Error.stateChanged("Variant changed since inspection; read get again.")
+            }
+            try assertWritableImage(doc: doc, source: source)
+            let record = EditingRecord(source: source, document: doc)
+            try checkedDocument(doc)
+            try EditingStore(document: doc).register(record)
+            return record
         }
     }
 
@@ -522,7 +590,7 @@ public final class SessionController {
             do {
                 let result: DeleteVariantResult = try executor.executeAndDecode(handler: "deleteVariant", args: [
                     NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: record.cloneVariantId),
-                    NSAppleEventDescriptor(string: record.parentImagePath!)])
+                    NSAppleEventDescriptor(string: record.parentImagePath!), NSAppleEventDescriptor(string: record.sourceVariantId)])
                 guard result.deleted && !result.existsNow else { throw C1Error.readbackMismatch("Deleted variant still exists.") }
                 try store.remove(workingRef: workingRefString)
                 try journal.update(operationId: entry.operationId, status: "succeeded")
@@ -534,20 +602,38 @@ public final class SessionController {
         }
     }
 
+    private func normalizedGeometry(_ item: AdjustmentBatchItemRecord) -> Geometry? {
+        guard var geometry = item.geometryRecord?.geometry,
+              let path = item.parentImagePath, let dimensions = imageDimensions(path), dimensions.count == 2,
+              dimensions.allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+        geometry.imageWidth = dimensions[0]; geometry.imageHeight = dimensions[1]
+        return geometry
+    }
+
     // MARK: - Get
     public func get(ref: String) throws -> GetResult {
         let docInfo = try getDocumentInfo()
         var nativeId = ref
         var workingRefStr: String?
         var managedRecord: ProvenanceRecord?
+        var editingRecord: EditingRecord?
+        if EditingRecord.isEditingReference(ref) {
+            let record = try EditingStore(document: docInfo).resolve(ref, document: docInfo)
+            editingRecord = record
+            nativeId = record.variantId
+            workingRefStr = record.workingRef
+        }
 
-        if docInfo.isSession && WorkingRef.isWorkingRefString(ref) {
+        if WorkingRef.isWorkingRefString(ref) {
             let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
             let provenance = ProvenanceStore(sessionDirectory: sessUrl)
             let record = try provenance.resolveManagedWorkingReference(
                 ref,
                 currentDocumentPath: docInfo.documentPath
             )
+            // Reject expired references before a native ID lookup: IDs can be
+            // absent or reassigned after restart. Validate the live parent below.
+            try DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: record.parentImagePath ?? "")
             managedRecord = record
             nativeId = record.cloneVariantId
             workingRefStr = record.workingRef
@@ -568,6 +654,9 @@ public final class SessionController {
         if let record = managedRecord {
             try DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: first.parentImagePath ?? "")
         }
+        if let record = editingRecord {
+            try record.validate(document: docInfo, parent: first.parentImagePath ?? "")
+        }
         let adjustments = Adjustments(
             exposure: first.exposureVal,
             contrast: first.contrastVal,
@@ -587,12 +676,12 @@ public final class SessionController {
         )
         let hash = StateHash.compute(for: adjustments)
 
-        let geometry = first.geometryRecord?.geometry
+        let geometry = normalizedGeometry(first)
         return GetResult(
             geometry: geometry,
             geometryStateHash: geometry?.stateHash(tonalHash: hash.hex),
             geometryUsableBounds: geometry?.unsupportedReason == nil ? geometry?.safeBounds(rotation: geometry?.rotation ?? 0) : nil,
-            geometryUnavailableReason: geometry?.unsupportedReason ?? first.geometryUnavailableReason ?? (geometry == nil ? "Geometry unavailable from this build or source." : nil),
+            geometryUnavailableReason: geometry?.unsupportedReason ?? first.geometryUnavailableReason ?? (geometry == nil ? "Geometry unavailable: native geometry or intrinsic source-file dimensions could not be read." : nil),
             id: nativeId,
             workingRef: workingRefStr,
             adjustments: adjustments,
@@ -600,6 +689,16 @@ public final class SessionController {
             stateHash: hash.hex,
             parentImagePath: first.parentImagePath
         )
+    }
+
+    private func adjustmentTarget(_ ref: String, document: DocumentInfo) throws -> (workingRef: String, variantId: String, baselineAdjustments: Adjustments) {
+        if EditingRecord.isEditingReference(ref) {
+            let record = try EditingStore(document: document).resolve(ref, document: document)
+            return (record.workingRef, record.variantId, record.baselineAdjustments)
+        }
+        let record = try ProvenanceStore(sessionDirectory: URL(fileURLWithPath: document.documentPath))
+            .resolveManagedWorkingReference(ref, currentDocumentPath: document.documentPath)
+        return (record.workingRef, record.cloneVariantId, record.baselineAdjustments)
     }
 
     // MARK: - Set / Add / Reset Mutations
@@ -619,14 +718,9 @@ public final class SessionController {
         try assertSessionWritable(docInfo: docInfo, operation: resolvedOpType)
 
         let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
         let journal = OperationJournal(sessionDirectory: sessUrl)
 
-        // Core enforcement: must be a managed working reference
-        let record = try provenance.resolveManagedWorkingReference(
-            workingRefString,
-            currentDocumentPath: docInfo.documentPath
-        )
+        let record = try adjustmentTarget(workingRefString, document: docInfo)
 
         return try lock.withLock {
             try checkedDocument(docInfo, writes: !isDryRun)
@@ -636,6 +730,7 @@ public final class SessionController {
                 throw C1Error.stateChanged("Optimistic concurrency conflict for '\(workingRefString)'. Expected stateHash '\(expectedHash)', but actual is '\(current.stateHash)'.")
             }
 
+            try assertWritableImage(doc: docInfo, source: current)
             // 2. Compute target adjustments
             var target = current.adjustments
             if let s = setAdjustments {
@@ -682,7 +777,7 @@ public final class SessionController {
 
             // 4. Dispatch write
             let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
-            let varIdDesc = NSAppleEventDescriptor(string: record.cloneVariantId)
+            let varIdDesc = NSAppleEventDescriptor(string: record.variantId)
             var patch = Adjustments()
             for field in self.registry.supportedAdjustmentFields {
                 if setAdjustments?.value(for: field.name) != nil || addAdjustments?.value(for: field.name) != nil {
@@ -766,25 +861,53 @@ public final class SessionController {
     // MARK: - Crop and rotation
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
                             rotation: Double? = nil, aspectRatio: Double? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
+        try mutateGeometry(workingRef: workingRef, expected: expected, crop: crop, rotation: rotation, aspectRatio: aspectRatio, dryRun: dryRun, restore: false)
+    }
+
+    public func geometryRestore(workingRef: String, ifGeometryState expected: String, dryRun: Bool = false) throws -> GeometryMutationResult {
+        try mutateGeometry(workingRef: workingRef, expected: expected, crop: nil, rotation: nil, aspectRatio: nil, dryRun: dryRun, restore: true)
+    }
+
+    private func mutateGeometry(workingRef: String, expected: String, crop: CropRect?, rotation: Double?, aspectRatio: Double?, dryRun: Bool, restore: Bool) throws -> GeometryMutationResult {
         return try lock.withLock {
             let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "geometry_set")
+            let operation = restore ? "geometry_restore" : "geometry_set"
+            try assertSessionWritable(docInfo: doc, operation: operation)
             guard doc.appVersion == "16.8.5.30" else { throw C1Error.unsupportedVersion("Geometry requires Capture One 16.8.5.30.") }
             let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
-            _ = try store.resolveManagedWorkingReference(workingRef, currentDocumentPath: doc.documentPath)
+            let baseline: Geometry?
+            if EditingRecord.isEditingReference(workingRef) {
+                baseline = try EditingStore(document: doc).resolve(workingRef, document: doc).baselineGeometry
+            } else {
+                baseline = try store.resolveManagedWorkingReference(workingRef, currentDocumentPath: doc.documentPath).baselineGeometry
+            }
             try checkedDocument(doc, writes: !dryRun)
             let current = try get(ref: workingRef)
             guard let before = current.geometry, let state = current.geometryStateHash else {
                 throw C1Error.invalidRequest(current.geometryUnavailableReason ?? "Geometry unavailable.")
             }
             guard state == expected else { throw C1Error.stateChanged("Geometry precondition no longer matches; read get again.") }
-            let target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
+            let target: Geometry
+            if restore {
+                guard let baseline, baseline.unsupportedReason == nil, before.unsupportedReason == nil,
+                      before.sameContext(as: baseline) else {
+                    throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation.")
+                }
+                // This exact crop was observed on this image with the same lens/orientation
+                // context. It may legitimately exceed the conservative bounds for NEW crops.
+                var restored = before
+                restored.crop = baseline.crop; restored.rotation = baseline.rotation
+                target = restored
+            } else {
+                target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
+            }
+            try assertWritableImage(doc: doc, source: current)
             if dryRun {
                 return GeometryMutationResult(operationId: "dry-run", workingRef: workingRef, before: before, after: target,
                     diff: target.changes(from: before), geometryStateHash: state, isDryRun: true)
             }
             let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
-            let entry = try prepare(OperationRecord(operationType: "geometry_set", workingRef: workingRef,
+            let entry = try prepare(OperationRecord(operationType: operation, workingRef: workingRef,
                 documentPath: doc.documentPath, preconditionStateHash: expected, beforeAdjustments: current.adjustments,
                 beforeGeometry: before, intendedGeometry: target), doc: doc, source: current)
             try journal.append(entry: entry)
@@ -823,12 +946,7 @@ public final class SessionController {
         let docInfo = try getDocumentInfo()
         try assertSessionWritable(docInfo: docInfo, operation: "reset")
 
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let provenance = ProvenanceStore(sessionDirectory: sessUrl)
-        let record = try provenance.resolveManagedWorkingReference(
-            workingRefString,
-            currentDocumentPath: docInfo.documentPath
-        )
+        let record = try adjustmentTarget(workingRefString, document: docInfo)
 
         let targetResetAdjustments = try registry.computeResetValues(fields: fields, baseline: record.baselineAdjustments)
 
@@ -863,11 +981,14 @@ public final class SessionController {
                 diff: diffDict, geometryBefore: get1.geometry, geometryAfter: get2.geometry
             )
         } else {
-            guard docInfo.isSession else {
-                throw C1Error.invalidRequest("Single-reference diff compares a working variant against its baseline, which requires a Session. For Catalogs, provide two variant references: c1 diff <ref1> <ref2>")
+            if EditingRecord.isEditingReference(ref1) {
+                let record = try EditingStore(document: docInfo).resolve(ref1, document: docInfo)
+                return DiffResult(ref1: "baseline", ref2: ref1, stateHash1: record.baselineStateHash, stateHash2: get1.stateHash,
+                    diff: computeDiff(before: record.baselineAdjustments, after: get1.adjustments),
+                    geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry)
             }
             guard WorkingRef.isWorkingRefString(ref1) else {
-                throw C1Error.invalidRequest("Single-reference diff requires a managed working reference (c1_wrk_<uuid>). To compare native variants, provide two references: c1 diff <ref1> <ref2>")
+                throw C1Error.invalidRequest("Single-reference diff requires an editing reference (c1_edit_<uuid>) or managed clone (c1_wrk_<uuid>). To compare native variants, provide two references: c1 diff <ref1> <ref2>")
             }
             let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
             let provenance = ProvenanceStore(sessionDirectory: sessUrl)
@@ -957,6 +1078,7 @@ public final class SessionController {
                     colorTag: item.colorTagVal
                 )
                 let stateHash = StateHash.compute(for: adjustments).hex
+                let geometry = normalizedGeometry(item)
                 records.append(DumpRecord(
                     id: v.id,
                     name: v.name,
@@ -968,8 +1090,8 @@ public final class SessionController {
                     workingRef: v.workingRef,
                     adjustments: adjustments,
                     metadata: metadata,
-                    stateHash: stateHash, geometry: item.geometryRecord?.geometry,
-                    geometryUnavailableReason: item.geometryRecord?.geometry?.unsupportedReason ?? item.geometryUnavailableReason
+                    stateHash: stateHash, geometry: geometry,
+                    geometryUnavailableReason: geometry?.unsupportedReason ?? item.geometryUnavailableReason ?? (geometry == nil ? "Geometry or intrinsic source-file dimensions unavailable." : nil)
                 ))
             }
         }
@@ -1092,7 +1214,10 @@ public final class SessionController {
             "testedBuilds": Self.testedBuilds,
             "supportedVersionRange": "16.4+ through 16.x",
             "documentScope": "sessions-and-catalogs",
-            "catalogReadOnly": true,
+            "catalogReadOnly": catalogWritePath == nil,
+            "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
+                              "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
+                              "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
             "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "conservative centered rectangle", "keystoneWrites": false],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
@@ -1122,7 +1247,9 @@ public final class SessionController {
                 "scaling": "Long_Edge 1500px"
             ],
             "concurrency": "advisory-lock",
-            "workingVariantEnforced": true
+            "workingVariantEnforced": true,
+            "existingVariantEditing": ["beginTool": "variant_edit", "referencePrefix": "c1_edit_", "fields": ["crop", "rotation", "exposure", "contrast", "saturation", "temperature", "tint"],
+                                       "restoreTool": "geometry_restore", "createsVariant": false, "tonalWrites": true, "deletion": false]
         ]
     }
 

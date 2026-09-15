@@ -1,0 +1,56 @@
+[
+  {
+    "timestamp": "2026-09-14 19:52:05.00 -0400",
+    "appVersion": "16.8.5.30",
+    "incidentId": "596B1391-154A-4BB8-B9D2-C96D4E593AEB",
+    "exception": {
+      "codes": "0x0000000000000000, 0x0000000000000000",
+      "rawCodes": [
+        0,
+        0
+      ],
+      "type": "EXC_CRASH",
+      "signal": "SIGABRT"
+    },
+    "relevantFrames": [
+      "-[MOImage setImportDate:]",
+      "__37-[POImporter insertNewImageWithInfo:]_block_invoke"
+    ]
+  },
+  {
+    "timestamp": "2026-09-14 19:54:09.00 -0400",
+    "appVersion": "16.8.5.30",
+    "incidentId": "BD7E8E57-EE94-4D88-AF66-54D9520DBE61",
+    "exception": {
+      "codes": "0x0000000000000000, 0x0000000000000000",
+      "rawCodes": [
+        0,
+        0
+      ],
+      "type": "EXC_CRASH",
+      "signal": "SIGABRT"
+    },
+    "relevantFrames": [
+      "-[MOImage setImportDate:]",
+      "__37-[POImporter insertNewImageWithInfo:]_block_invoke"
+    ]
+  },
+  {
+    "timestamp": "2026-09-14 20:09:19.00 -0400",
+    "appVersion": "16.8.5.30",
+    "incidentId": "81755270-11FD-42DC-9D08-FE395F3ED009",
+    "exception": {
+      "codes": "0x0000000000000000, 0x0000000000000000",
+      "rawCodes": [
+        0,
+        0
+      ],
+      "type": "EXC_CRASH",
+      "signal": "SIGABRT"
+    },
+    "relevantFrames": [
+      "-[MOImage setImportDate:]",
+      "__37-[POImporter insertNewImageWithInfo:]_block_invoke"
+    ]
+  }
+]

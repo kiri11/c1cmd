@@ -15,6 +15,7 @@ def main():
     p.add_argument('proposals',type=Path)
     p.add_argument('--output-dir',type=Path,required=True)
     p.add_argument('--c1-bin',default='c1')
+    p.add_argument('--clone',action='store_true',help='Create separate proposal variants instead of cropping existing variants.')
     args=p.parse_args()
     proposals=json.loads(args.proposals.read_text())
     if not isinstance(proposals,list):raise ValueError('Proposals must be a JSON list')
@@ -23,7 +24,7 @@ def main():
         payload=json.loads(result.stderr if result.returncode else result.stdout)
         if result.returncode:raise RuntimeError(json.dumps(payload))
         return payload
-    # Validate input shape before cloning; native bounds are checked by c1.
+    # Validate input shape before preparing edits; native bounds are checked by c1.
     for proposal in proposals:
         if not isinstance(proposal,dict):raise ValueError('Each proposal must be an object')
         if not {'sourceRef','ifGeometryState','orientation','rationale'} <= proposal.keys():raise ValueError('Missing proposal identity or rationale')
@@ -38,7 +39,7 @@ def main():
             c=proposal['crop']
             if not isinstance(c,dict) or set(c)!={'centerX','centerY','width','height'} or not all(finite_number(v) for v in c.values()) or c['height']<=0 or c['width']<=0:raise ValueError('Invalid crop rectangle')
             if abs(c['width']-ratio*c['height'])>2 and not proposal.get('ratioException'):raise ValueError('Explain an exception to the usual ratio')
-    health=run('doctor');assert health['allChecksPassed'] and health['isSession'] and health['exactBuildMatched']
+    health=run('doctor');assert health['allChecksPassed'] and health['writesEnabled'] and health['exactBuildMatched']
     document=run('doc','info')
     args.output_dir.mkdir(parents=True,exist_ok=True)
     for proposal in proposals:
@@ -53,9 +54,16 @@ def main():
             source=run('get',proposal['sourceRef'])
             if source.get('geometryStateHash')!=proposal['ifGeometryState']:raise ValueError('Source geometry changed since proposal; re-inspect it')
             record['source']=source
-            record['clone']=run('variant','clone',proposal['sourceRef']);save()
-            ref=record['clone']['workingRef'];current=run('get',ref)
-            if current.get('geometryStateHash')!=source['geometryStateHash']:raise ValueError('Clone no longer matches proposal source')
+            record['mode']='clone' if args.clone else 'existing'
+            if args.clone:
+                record['clone']=run('variant','clone',proposal['sourceRef'])
+                ref=record['clone']['workingRef']
+            else:
+                record['editing']=run('variant','edit',proposal['sourceRef'],'--if-state',source['stateHash'],'--if-geometry-state',source['geometryStateHash'],'--if-document',document['openToken'])
+                ref=record['editing']['workingRef']
+            save()
+            current=run('get',ref)
+            if current.get('geometryStateHash')!=source['geometryStateHash']:raise ValueError('Variant no longer matches proposal source')
             record['beforePreview']=run('preview',ref);save()
             words=['geometry','set',ref,'--if-geometry-state',current['geometryStateHash']]
             if 'rotation' in proposal:words+=['--rotation',proposal['rotation']]

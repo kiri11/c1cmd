@@ -1,0 +1,403 @@
+[
+  {
+    "event": "environment",
+    "cliSHA256": "31b6b32665a9881737d0b72ca147aeb101f35c1d7060318d08e21751e1539f33",
+    "mcpSHA256": "b5355a861b6c0b3ab26036f0578d56d34c16b88d7f6ef58fccff1f07b9394810",
+    "sourceSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "contract": "1.4.0"
+  },
+  {
+    "event": "passed-session",
+    "variantId": "1",
+    "variantCount": 1,
+    "operations": 15,
+    "document": {
+      "appVersion": "16.8.5.30",
+      "captureFolder": "/tmp/c1-existing-live-mq67chbj/existing/Capture",
+      "documentId": "/private/tmp/c1-existing-live-mq67chbj/existing",
+      "documentName": "existing.cosessiondb",
+      "documentPath": "/tmp/c1-existing-live-mq67chbj/existing",
+      "isSession": true,
+      "openToken": "75773:1789438066.743894|/tmp/c1-existing-live-mq67chbj/existing/existing.cosessiondb|16777232|4178169|1789438341.6692157",
+      "outputFolder": "/tmp/c1-existing-live-mq67chbj/existing/Output",
+      "writesEnabled": true
+    },
+    "baseline": {
+      "baselineAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "baselineGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "baselineGeometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "createdAt": "2026-09-15T02:12:25Z",
+      "documentPath": "/tmp/c1-existing-live-mq67chbj/existing",
+      "documentToken": "75773:1789438066.743894|/tmp/c1-existing-live-mq67chbj/existing/existing.cosessiondb|16777232|4178169|1789438341.6692157",
+      "parentImagePath": "/tmp/c1-existing-live-mq67chbj/existing/Capture/fixture.CR3",
+      "variantId": "1",
+      "workingRef": "c1_edit_070f82de-51dc-47c7-9e62-5776bcb013be"
+    },
+    "final": {
+      "adjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 0,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 5,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-existing-live-mq67chbj/existing/Capture/fixture.CR3",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "workingRef": "c1_edit_070f82de-51dc-47c7-9e62-5776bcb013be"
+    },
+    "preview": {
+      "fileSizeBytes": 176131,
+      "geometry": {
+        "crop": {
+          "centerX": 3068,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 2852
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 5704
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "geometryStateHash": "geometry-v1:779f7a8b24ed6ddef1c52f865b67a759504f8bad614a06a2c1dbe51bd064ce6c",
+      "height": 1500,
+      "nativeVariantId": "1",
+      "operationId": "3451529c-eaae-4f61-afda-7c793b56aeee",
+      "outputPath": "/private/tmp/c1-existing-live-mq67chbj/existing/Output/c1-previews/3451529c-eaae-4f61-afda-7c793b56aeee/preview.jpg",
+      "pixelSha256": "7c909322f500d6186b45cc37ed99366f1b29dc21d82f5d2ffb2784f1ab584b70",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "width": 1125,
+      "workingRef": "c1_edit_070f82de-51dc-47c7-9e62-5776bcb013be"
+    },
+    "noCloneEvents": true,
+    "rawUnchanged": true
+  },
+  {
+    "event": "passed-catalog",
+    "variantId": "1",
+    "variantCount": 1,
+    "operations": 15,
+    "document": {
+      "appVersion": "16.8.5.30",
+      "captureFolder": "",
+      "documentId": "/private/tmp/c1-existing-live-dumsgf35/existing.cocatalog",
+      "documentName": "existing",
+      "documentPath": "/tmp/c1-existing-live-dumsgf35/existing.cocatalog",
+      "isSession": false,
+      "openToken": "75773:1789438066.743894|/tmp/c1-existing-live-dumsgf35/existing.cocatalog/existing.cocatalogdb|16777232|4178343|1789438390.452572",
+      "outputFolder": "/tmp/c1-existing-live-dumsgf35/existing.cocatalog.c1-output",
+      "writesEnabled": true
+    },
+    "baseline": {
+      "baselineAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "baselineGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "baselineGeometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "createdAt": "2026-09-15T02:13:15Z",
+      "documentPath": "/tmp/c1-existing-live-dumsgf35/existing.cocatalog",
+      "documentToken": "75773:1789438066.743894|/tmp/c1-existing-live-dumsgf35/existing.cocatalog/existing.cocatalogdb|16777232|4178343|1789438390.452572",
+      "parentImagePath": "/tmp/c1-existing-live-dumsgf35/fixture.CR3",
+      "variantId": "1",
+      "workingRef": "c1_edit_01244460-2786-4c4e-a3ba-38a2c11a682e"
+    },
+    "final": {
+      "adjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 0,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 5,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-existing-live-dumsgf35/fixture.CR3",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "workingRef": "c1_edit_01244460-2786-4c4e-a3ba-38a2c11a682e"
+    },
+    "preview": {
+      "fileSizeBytes": 176160,
+      "geometry": {
+        "crop": {
+          "centerX": 3068,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 2852
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 5704
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "geometryStateHash": "geometry-v1:779f7a8b24ed6ddef1c52f865b67a759504f8bad614a06a2c1dbe51bd064ce6c",
+      "height": 1500,
+      "nativeVariantId": "1",
+      "operationId": "2af146e7-1888-49a0-a664-58aeb2239422",
+      "outputPath": "/private/tmp/c1-existing-live-dumsgf35/existing.cocatalog.c1-output/c1-previews/2af146e7-1888-49a0-a664-58aeb2239422/preview.jpg",
+      "pixelSha256": "9b8cff7a57519983b527b54fe2114adf0ce6d9f8da7529501796091e36836172",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "width": 1125,
+      "workingRef": "c1_edit_01244460-2786-4c4e-a3ba-38a2c11a682e"
+    },
+    "noCloneEvents": true,
+    "rawUnchanged": true
+  },
+  {
+    "event": "passed",
+    "storage": "session-and-referenced-catalog",
+    "noDuplicateVariants": true,
+    "rawUnchanged": true
+  }
+]

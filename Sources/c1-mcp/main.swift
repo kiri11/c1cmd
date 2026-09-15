@@ -73,18 +73,20 @@ struct C1MCPServer {
         
         let definitions: [(String, String, Bool)] = [
             ("doctor", "Check environment, app status, exact build, document readiness, and unresolved operations.", true),
-            ("doc_info", "Show current open Session document info, folders, and open token.", true),
+            ("doc_info", "Show current open document info, folders, and open token.", true),
             ("capabilities", "Show capability matrix for the running Capture One build.", true),
             ("schema", "Output JSON Schema for c1 requests and responses.", true),
-            ("variants_list", "List variants in the current Session or specified collection, optionally filtered by exact or minimum star rating. Filters narrow results without changing UI selection.", true),
-            ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Originals cannot be mutated directly.", false),
+            ("variants_list", "List variants in the current document or specified collection, optionally filtered by exact or minimum star rating. Filters narrow results without changing UI selection.", true),
+            ("variant_edit", "Prepare editing on an existing variant without cloning. Requires ifDocument from doc_info and ifState from get; optionally check ifGeometryState too. Saves its baseline and returns a c1_edit_ reference for supported adjustments and geometry. Does not authorize deletion.", false),
+            ("geometry_restore", "Restore saved crop/rotation for an editing or clone reference. Requires fresh ifGeometryState; refuses changed lens/orientation context. Never delete an existing variant to reject a crop.", false),
+            ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Use variant_edit to edit existing variants.", false),
             ("variant_delete", "Delete a c1-managed working clone. (Originals cannot be deleted).", false),
             ("variant_baseline", "Create a managed default-settings baseline variant using native New Variant behavior.", false),
             ("get", "Get adjustments and metadata for a variant or working reference, including current stateHash.", true),
-            ("set", "Set absolute adjustments on a managed working clone. Requires matching ifState precondition.", false),
-            ("add", "Apply relative delta adjustments on a managed working clone. Requires matching ifState precondition.", false),
-            ("geometry_set", "Set crop and rotation on a managed clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Keystone is preserved.", false),
-            ("reset", "Reset verified adjustment fields on a managed working clone to defaults.", false),
+            ("set", "Set absolute adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
+            ("add", "Apply relative delta adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
+            ("geometry_set", "Set crop and rotation on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Keystone is preserved.", false),
+            ("reset", "Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             ("diff", "Compare adjustments between two variants or compare a working variant against its baseline.", true),
             ("dump", "Batched export of variants, adjustments, and metadata in JSON format.", true),
             ("preview", "Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data.", false),
@@ -150,6 +152,14 @@ struct C1MCPServer {
                         let json = OutputFormatter.formatJson(list)
                         return CallTool.Result(content: [textContent(json)], isError: false)
                         
+                    case "variant_edit":
+                        let result = try SessionController.shared.editVariant(sourceRef: args["sourceRef"] as! String,
+                            ifState: args["ifState"] as! String, ifDocument: args["ifDocument"] as! String, ifGeometryState: args["ifGeometryState"] as? String)
+                        return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
+                    case "geometry_restore":
+                        let result = try SessionController.shared.geometryRestore(workingRef: args["workingRef"] as! String,
+                            ifGeometryState: args["ifGeometryState"] as! String, dryRun: args["dryRun"] as? Bool ?? false)
+                        return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
                     case "variant_clone":
                         guard let sourceRef = extractString(from: params.arguments, key: "sourceRef") else {
                             throw C1Error.invalidRequest("Missing required argument: 'sourceRef'")

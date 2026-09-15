@@ -47,7 +47,7 @@ public struct OutputFormatter {
         }
         lines.append("Capture One Version : \(r.appVersion) \(versionDetail)")
         lines.append("Active Document     : \(r.hasDocument ? (r.docName ?? "Unknown") : "None (FAIL)")")
-        lines.append("Document Type       : \(r.isSession ? "Session (Full Read/Write)" : (r.hasDocument ? "Catalog (Read-Only Mode)" : "None (FAIL)"))")
+        lines.append("Document Type       : \(r.isSession ? "Session (Full Read/Write)" : (r.hasDocument ? "Catalog (\(r.writesEnabled ? "Editing Enabled" : "Read-Only Mode"))" : "None (FAIL)"))")
         if let p = r.docPath {
             lines.append("Document Path       : \(p)")
         }
@@ -77,9 +77,9 @@ public struct OutputFormatter {
         lines.append("\(info.isSession ? "Session" : "Catalog") Document Information")
         lines.append("----------------------------")
         lines.append("Name          : \(info.documentName)")
-        lines.append("Type          : \(info.isSession ? "Session (Read/Write)" : "Catalog (Read-Only)")")
+        lines.append("Type          : \(info.isSession ? "Session (Read/Write)" : "Catalog (\(info.writesEnabled ? "Editing Enabled" : "Read-Only"))")")
         lines.append("Path          : \(info.documentPath)")
-        if info.isSession {
+        if info.isSession || info.writesEnabled {
             lines.append("Capture Folder: \(info.captureFolder)")
             lines.append("Output Folder : \(info.outputFolder)")
         }

@@ -147,7 +147,7 @@ extension Geometry {
     var eventSnapshot: NSAppleEventDescriptor {
         func numbers(_ a: [Double]) -> NSAppleEventDescriptor { NSAppleEventDescriptor(list:a.map { NSAppleEventDescriptor(double:$0) }) }
         return NSAppleEventDescriptor(list: [numbers(crop.values), NSAppleEventDescriptor(double:rotation),
-            NSAppleEventDescriptor(int32:Int32(orientation)), numbers([imageWidth,imageHeight]),
+            NSAppleEventDescriptor(int32:Int32(orientation)),
             NSAppleEventDescriptor(string:flip), NSAppleEventDescriptor(string:aspectRatioName ?? ""),
             numbers(keystone), numbers(lensGeometry), NSAppleEventDescriptor(string:lensProfile),
             NSAppleEventDescriptor(boolean:hideDistortedAreas), NSAppleEventDescriptor(boolean:cropOutsideImage)])

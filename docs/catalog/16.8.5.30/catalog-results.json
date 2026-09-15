@@ -1,0 +1,93 @@
+[
+  {
+    "event": "environment",
+    "document": {
+      "appVersion": "16.8.5.30",
+      "captureFolder": "",
+      "documentId": "/private/tmp/c1-catalog-live-2f1hj7m9/qualification.cocatalog",
+      "documentName": "qualification",
+      "documentPath": "/tmp/c1-catalog-live-2f1hj7m9/qualification.cocatalog",
+      "isSession": false,
+      "openToken": "71155:1789430955.021519|/tmp/c1-catalog-live-2f1hj7m9/qualification.cocatalog/qualification.cocatalogdb|16777232|4155063|1789431301.868675",
+      "outputFolder": "/tmp/c1-catalog-live-2f1hj7m9/qualification.cocatalog.c1-output",
+      "writesEnabled": true
+    },
+    "sourceSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "cliSHA256": "2f9f3773724d34a6c11a5d7439e5eb9de9163734a6a2bed47cff620458e6d704",
+    "mcpSHA256": "f00ee2206ffb475ac5fa038a09a19bae70a81942c1c8cfdd20e4522852e8158b"
+  },
+  {
+    "event": "native-backup-created"
+  },
+  {
+    "event": "default-and-wrong-path-denied"
+  },
+  {
+    "event": "default-output-fixture",
+    "path": "/private/tmp/c1-catalog-live-2f1hj7m9/existing-output"
+  },
+  {
+    "event": "clone-edit-preview-diff-delete",
+    "sourceID": "1",
+    "imagePath": "/tmp/c1-catalog-live-2f1hj7m9/referenced.CR3",
+    "preview": {
+      "fileSizeBytes": 162090,
+      "geometry": {
+        "crop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3802,
+          "width": 5703
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 5999,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 5704
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "geometryStateHash": "geometry-v1:428e58af32efa6c2a0e506b771d865a6d48421d6a73b6f78820e4fd74ebb0af1",
+      "height": 1000,
+      "nativeVariantId": "2",
+      "operationId": "ee4d7071-10b0-44c6-bb67-3579ba0ad6b8",
+      "outputPath": "/private/tmp/c1-catalog-live-2f1hj7m9/qualification.cocatalog.c1-output/c1-previews/ee4d7071-10b0-44c6-bb67-3579ba0ad6b8/preview.jpg",
+      "pixelSha256": "a3d92c470e798f5107a4aa47cb07ce7dc5d57e5208fee5b1fb869464e6de3a4e",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "width": 1500,
+      "workingRef": "c1_wrk_e098db36-5b97-48c8-9bee-f722d95385a0"
+    }
+  },
+  {
+    "event": "passed",
+    "operations": 16,
+    "storageModes": [
+      "referenced"
+    ],
+    "originalsUnchanged": true
+  }
+]

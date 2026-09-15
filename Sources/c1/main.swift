@@ -159,7 +159,7 @@ struct DocCommand: ParsableCommand {
 }
 
 struct DocInfoCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "info", abstract: "Show current open Session document info and open token.")
+    static let configuration = CommandConfiguration(commandName: "info", abstract: "Show current open document info and open token.")
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
@@ -209,8 +209,8 @@ struct VariantsListCommand: ParsableCommand {
 struct VariantCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "variant",
-        abstract: "Manage individual variants (clone, delete, baseline).",
-        subcommands: [VariantCloneCommand.self, VariantDeleteCommand.self, VariantBaselineCommand.self]
+        abstract: "Edit existing variants or manage optional clones.",
+        subcommands: [VariantEditCommand.self, VariantCloneCommand.self, VariantDeleteCommand.self, VariantBaselineCommand.self]
     )
 }
 
@@ -320,7 +320,7 @@ func parseAdjustmentInputs(keyValues: [String], jsonStr: String?, filePath: Stri
 
 // MARK: - Set
 struct SetCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute adjustments on a managed working clone.")
+    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute adjustments on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
@@ -359,7 +359,7 @@ struct SetCommand: ParsableCommand {
 
 // MARK: - Add
 struct AddCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "add", abstract: "Apply relative delta adjustments on a managed working clone.")
+    static let configuration = CommandConfiguration(commandName: "add", abstract: "Apply relative delta adjustments on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
@@ -398,7 +398,7 @@ struct AddCommand: ParsableCommand {
 
 // MARK: - Reset
 struct ResetCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "reset", abstract: "Reset verified adjustment fields on a managed working clone.")
+    static let configuration = CommandConfiguration(commandName: "reset", abstract: "Reset verified adjustment fields on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
@@ -524,7 +524,7 @@ struct OperationCommand: ParsableCommand {
 }
 
 struct OperationStatusCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "status", abstract: "Inspect operation status in the Session journal.")
+    static let configuration = CommandConfiguration(commandName: "status", abstract: "Inspect operation status in the document journal.")
     @OptionGroup var globals: GlobalOptions
 
     @Argument(help: "Operation ID to check.")
@@ -552,7 +552,7 @@ struct OperationStatusCommand: ParsableCommand {
 }
 
 struct GeometryCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop and rotation on managed variants.", subcommands: [GeometrySetCommand.self])
+    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop and rotation on managed variants.", subcommands: [GeometrySetCommand.self, GeometryRestoreCommand.self])
 }
 struct GeometrySetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation; preserves other edits.")
@@ -579,6 +579,41 @@ struct GeometrySetCommand: ParsableCommand {
             try ContractSchema.validate(tool: "geometry_set", arguments: args)
             let result = try SessionController.shared.geometrySet(workingRef:workingRef, ifGeometryState:ifGeometryState,
                 crop:rect, rotation:rotation, aspectRatio:aspectRatio, dryRun:dryRun)
+            print(OutputFormatter.formatJson(result))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+struct VariantEditCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "edit", abstract: "Prepare adjustment and geometry editing of an existing variant without cloning.")
+    @OptionGroup var globals: GlobalOptions
+    @Argument var sourceRef: String
+    @Option(help: "stateHash from get.") var ifState: String
+    @Option(help: "Optional geometryStateHash check from get.") var ifGeometryState: String?
+    @Option(help: "openToken from doc info when selecting the targets.") var ifDocument: String
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            var args: [String: Any] = ["sourceRef": sourceRef, "ifState": ifState, "ifDocument": ifDocument]
+            if let ifGeometryState { args["ifGeometryState"] = ifGeometryState }
+            try ContractSchema.validate(tool: "variant_edit", arguments: args)
+            let result = try SessionController.shared.editVariant(sourceRef: sourceRef, ifState: ifState, ifDocument: ifDocument, ifGeometryState: ifGeometryState)
+            print(OutputFormatter.formatJson(result))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+struct GeometryRestoreCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved crop/rotation with fresh state and matching geometry context.")
+    @OptionGroup var globals: GlobalOptions
+    @Argument var workingRef: String
+    @Option var ifGeometryState: String
+    @Flag var dryRun: Bool = false
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            try ContractSchema.validate(tool: "geometry_restore", arguments: ["workingRef": workingRef, "ifGeometryState": ifGeometryState, "dryRun": dryRun])
+            let result = try SessionController.shared.geometryRestore(workingRef: workingRef, ifGeometryState: ifGeometryState, dryRun: dryRun)
             print(OutputFormatter.formatJson(result))
         }
         if code != .success { throw ExitCode(code.rawValue) }

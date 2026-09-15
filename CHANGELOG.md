@@ -1,3 +1,18 @@
+## Unreleased — edit existing variants by default
+
+- Add `variant edit` / `variant_edit`: snapshot an existing variant and bind an editing reference without creating another variant. All supported tonal fields and crop/rotation are editable with normal state checks; deletion remains clone-only.
+- Retain initial adjustments/geometry in `.c1/editing.json`, expose baseline diffs, and add explicit state-checked `geometry restore` / `geometry_restore` (contract 1.4.0, 19 MCP tools).
+- Reject expired clone references before native lookup, including when the old native ID no longer exists after restart.
+- Read intrinsic image dimensions through ImageIO so rotating the first variant does not invalidate geometry bounds/readback.
+- Make the crop and grading examples edit existing variants by default; `--clone` opts into separate proposals. Preserve document/app identity, journal recovery, and catalog opt-in/storage restrictions.
+
+## Unreleased — experimental catalog editing
+
+- Add exact-path `C1_CATALOG_WRITE_PATH` opt-in for Catalog edits on Capture One 16.8.5.30; default Catalog inspection remains read-only.
+- Bind Catalog references/recovery to the database inside the package, isolate journals/provenance per catalog, and expose `writesEnabled` in doctor/document responses (contract 1.3.0).
+- Preserve clone/state/journal protections, reject offline originals, guard deletion against missing sources and last variants, and support catalog crop/tonal previews with a dedicated output folder.
+- Initialize a missing catalog default output location for previews while preserving usable defaults. Add offline and disposable Catalog CLI/MCP coverage; see release validation for runtime limits.
+
 ## Unreleased — crop and rotation
 
 - Add shared CLI/MCP crop and rotation support, geometry reads/diffs/baselines, and independent `geometry-v1` preconditions; preserve the tonal contract.
