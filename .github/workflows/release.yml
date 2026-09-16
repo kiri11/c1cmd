@@ -2,8 +2,13 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [ "main" ]
+
+# Serialize number allocation and publication without replacing pending pushes.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: write
@@ -30,9 +35,38 @@ jobs:
       - name: Build Release Binaries
         run: swift build -c release -v
 
+      - name: Choose Daily Release Name
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          python3 <<'PY'
+          import datetime
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          day = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+          pattern = re.compile(rf"{day}-([0-9]+)")
+          pages = json.loads((Path(os.environ["RUNNER_TEMP"]) / "releases.json").read_text())
+          numbers = [
+              int(match.group(1))
+              for page in pages
+              for release in page
+              if (match := pattern.fullmatch(release["tag_name"]))
+          ]
+          # Keep increasing even if an earlier release was deleted.
+          tag = f"{day}-{max(numbers, default=0) + 1:02d}"
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"tag={tag}\n")
+          print(f"Release: {tag}")
+          PY
+
       - name: Package Release Archive
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: ./scripts/package-release.sh "$RELEASE_TAG" .build/release dist
 
       - name: Test Packaged Archive
@@ -41,9 +75,13 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             dist/*.tar.gz
             dist/*.sha256
-          draft: true
+          draft: false
           prerelease: false
           generate_release_notes: true
+          fail_on_unmatched_files: true

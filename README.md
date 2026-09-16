@@ -41,6 +41,8 @@ Both executables require **`c1_CaptureOneCore.bundle` beside them**. The Makefil
 
 Release binaries are ad-hoc signed, not Developer ID notarized. Source builds are available if macOS policy blocks a downloaded binary.
 
+Every push to `main` runs the release workflow. After unit tests, the release build, and packaged-archive checks pass, it publishes the archive and SHA-256 checksum in a GitHub release. Release names and tags use the UTC date plus a daily sequence: `YYYY-MM-DD-01`, `YYYY-MM-DD-02`, and so on, starting again at `01` each day. Runs are queued to keep numbering unique, and each tag points to the commit that triggered its build.
+
 ## MCP setup
 
 Configure your MCP client to launch the installed server over stdio:
