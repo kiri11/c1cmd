@@ -427,10 +427,24 @@ on checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, ex
     end tell
 end checkedGeometryVariant
 
-on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation)
+-- Values are resolved against the checked snapshot; untouched controls are never reset.
+-- Set amount last because native correction setters can affect its value.
+on applyKeystone(v, targetKeystone)
+    tell application "/Applications/Capture One.app"
+        set a to adjustments of v
+        if keystone vertical of a is not equal to item 2 of targetKeystone then set keystone vertical of a to item 2 of targetKeystone
+        if keystone horizontal of a is not equal to item 3 of targetKeystone then set keystone horizontal of a to item 3 of targetKeystone
+        if keystone skew of a is not equal to item 4 of targetKeystone then set keystone skew of a to item 4 of targetKeystone
+        if keystone aspect of a is not equal to item 5 of targetKeystone then set keystone aspect of a to item 5 of targetKeystone
+        if keystone amount of a is not equal to item 1 of targetKeystone then set keystone amount of a to (item 1 of targetKeystone as integer)
+    end tell
+end applyKeystone
+
+on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation, targetKeystone)
     set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
+        my applyKeystone(v, targetKeystone)
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         -- Rotation can recenter/shrink the native crop. Apply the final crop afterward.
         set crop of v to targetCrop
@@ -441,10 +455,11 @@ end applyGeometry
 -- Lens and perspective corrections change the canvas. Do not extrapolate from RAW dimensions or
 -- reuse bounds from another rotation. The caller journals the request before
 -- entering this handler; any error after dispatch keeps the write block.
-on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio)
+on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone)
     set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
+        my applyKeystone(v, targetKeystone)
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         set nativeBounds to maximum crop v apply false
         set {boundsX, boundsY, boundsW, boundsH} to nativeBounds
@@ -458,12 +473,12 @@ on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, ex
             set targetHeight to round (targetWidth / requestedRatio) rounding down
             set targetCrop to {round boundsX, round boundsY, targetWidth, targetHeight}
         else
-            -- Rotation-only preserves Capture One's own recentered/shrunk crop.
+            -- Transform-only requests preserve Capture One's own recentered/shrunk crop.
             set targetCrop to crop of v
         end if
         set {cx, cy, cw, ch} to targetCrop
         if cw < 1 or ch < 1 then error "Corrected geometry crop is empty."
-        -- Native rotation-only crops can exceed the reported maximum rectangle.
+        -- Native transform-only crops can exceed the reported maximum rectangle.
         -- Keep that observed crop; containment applies to caller-selected crops.
         if requestedCrop is not missing value or requestedRatio is not missing value then
             if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after rotation; inspect operation status before any further write."

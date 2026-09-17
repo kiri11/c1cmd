@@ -270,6 +270,14 @@ class Run:
             assert reconciled['requestedGeometry']['rotation'] == 3
             assert reconciled['afterGeometry']['lensGeometry'] == reconciled['beforeGeometry']['lensGeometry']
             assert reconciled['afterGeometry']['keystone'] == reconciled['beforeGeometry']['keystone']
+        if label == 'keystone-geometry-apple-event-timeout':
+            assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry')
+            assert reconciled['requestedGeometry']['keystone'] == {'vertical':12, 'horizontal':-7}
+            before_geometry, after_geometry = reconciled['beforeGeometry'], reconciled['afterGeometry']
+            assert after_geometry['lensGeometry'] == before_geometry['lensGeometry']
+            # Observations only: an external pause can land between setters.
+            for index, requested in enumerate([before_geometry['keystone'][0], 12, -7, before_geometry['keystone'][3], before_geometry['keystone'][4]]):
+                assert after_geometry['keystone'][index] in (before_geometry['keystone'][index], requested)
         stale = self.cli('get', clone['workingRef'], ok=False)
         assert stale['error']['code'] == 'document-changed', stale
         assert self.identities() == before, 'Recovery must not create/adopt/delete variants'
@@ -279,7 +287,7 @@ class Run:
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
-        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
+        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout', 'keystone-geometry-apple-event-timeout'):
             if label in ('corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
                 self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
@@ -321,7 +329,7 @@ set keystone horizontal of adjustments of v to -5
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False):
         clone, current = self.clone()
         if corrected or perspective:
             assert geometry
@@ -335,6 +343,9 @@ set keystone horizontal of adjustments of v to -5
             command = ([str(self.c1), 'geometry', 'set', clone['workingRef'], '--if-geometry-state',
                         current['geometryStateHash'], '--rotation', '3', '--aspect-ratio', '1.5'] if geometry else
                        [str(self.c1), 'set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.625'])
+            if keystone:
+                assert geometry
+                command += ['--keystone-vertical=12', '--keystone-horizontal=-7']
             self.child = subprocess.Popen(command + ['--format', 'json'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             pending = wait_for(lambda: next((r for r in self.records()
@@ -360,7 +371,7 @@ set keystone horizontal of adjustments of v to -5
                 self.child.kill()
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
-        label = 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        label = 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
         self.recovery(pending['operationId'], clone, label)
 
     def preview_timeout(self):
@@ -468,10 +479,11 @@ set keystone horizontal of adjustments of v to -5
         self.apple_event_timeout(geometry=True)
         self.apple_event_timeout(geometry=True, corrected=True)
         self.apple_event_timeout(geometry=True, perspective=True)
+        self.apple_event_timeout(geometry=True, keystone=True)
         self.preview_timeout()
         self.mcp_death()
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=6, rawSHA256=sha(self.raw),
+        self.log('all-cases-passed', cases=7, rawSHA256=sha(self.raw),
                  shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
 
     def finish(self):

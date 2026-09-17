@@ -22,7 +22,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 - **Other builds:** 16.4+ through 16.x are permitted by the compatibility check, but are **unverified**, not qualified support. Older/future major builds require `C1_ALLOW_UNTESTED_BUILD=1`. Check `doctor` for the tested-build match before editing.
 - **Platform:** the package targets macOS 13+, but this is a deployment target, not evidence that every macOS version is tested. Intel and older macOS runtime qualification are deferred.
 
-This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, keystone correction, style learning, and general recipe export are outside v0.1.
+This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, automatic keystone detection, style learning, and general recipe export are outside v0.1.
 
 ## Installation
 
@@ -83,7 +83,7 @@ For MCP, add this to the server's `env` and restart the server:
 }
 ```
 
-The default profile permits all supported tonal and geometry changes. Optionally add `C1_MCP_PROFILE=composition` to restrict an agent to crop/rotation. An absolute `.cocatalogdb` path inside the package is also accepted. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
+The default profile permits all supported tonal and geometry changes. Optionally add `C1_MCP_PROFILE=composition` to restrict an agent to crop/rotation/keystone. An absolute `.cocatalogdb` path inside the package is also accepted. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
 
 Before using a main catalog, make a fresh **File → Backup Catalog** backup and keep your RAW backups. Capture One's [catalog backup](https://support.captureone.com/hc/en-us/articles/27502751010333-How-Catalog-and-Session-Backups-Work-in-Capture-One) includes its database and adjustments, not original image files. `c1` does not create or verify this backup automatically.
 
@@ -112,14 +112,14 @@ c1 diff <editing-ref>
 
 MCP uses `variant_edit: {sourceRef, ifState, ifDocument}`. Optionally include `ifGeometryState` from the source inspection to check a crop proposal's geometry before preparing the edit. `variant_edit` saves the before-state in `.c1/editing.json` without changing Capture One or creating a variant. The returned `c1_edit_` reference permits all supported tonal and geometry mutations on that same native variant, subject to the normal checks. Baselines and every mutation's journal before-state are retained for review/recovery. RAW files are not modified by the API; fixture tests verify their byte preservation.
 
-Review the preview before handing back to the photographer. To restore the saved crop/rotation:
+Review the preview before handing back to the photographer. To restore the saved crop/rotation/keystone:
 
 ```sh
 c1 get <editing-ref>
 c1 geometry restore <editing-ref> --if-geometry-state <fresh-geometryStateHash>
 ```
 
-Restoration is explicit, state-checked, and journaled. It refuses a changed orientation/lens/keystone context, and never runs automatically after failure. To restore tonal edits, use `set` with the returned `baselineAdjustments` and a fresh state hash. `reset` restores exposure/contrast/saturation defaults and baseline white balance; **it is not a full undo of the previous edit**. References expire on app restart/database replacement; saved baselines remain available as evidence but are not automatically rebound.
+Restoration is explicit, state-checked, and journaled. It restores all five keystone controls along with crop and rotation, refuses a changed orientation/lens context, and never runs automatically after failure. To restore tonal edits, use `set` with the returned `baselineAdjustments` and a fresh state hash. `reset` restores exposure/contrast/saturation defaults and baseline white balance; **it is not a full undo of the previous edit**. References expire on app restart/database replacement; saved baselines remain available as evidence but are not automatically rebound.
 
 `variant clone <source-id>` is still available when separate comparison variants are wanted. Only those `c1_wrk_` clones can be deleted with `variant delete`; an existing `c1_edit_` variant cannot be deleted. `variant baseline` explicitly creates a new default-settings variant. `diff <ref1> <ref2>` compares two variants; single-reference `diff` uses its saved baseline. `dump` exports batched JSONL.
 
@@ -182,7 +182,7 @@ MCP accepts either a nested `adjustments` object or flat fields. Mixed forms, du
 
 ### Crop and rotation
 
-`c1 geometry set` / MCP `geometry_set` applies an absolute crop and rotation to an existing editing reference or optional managed clone. It requires **`geometryStateHash` from `get`**, passed as `--if-geometry-state` / `ifGeometryState`. This versioned token includes geometry and the tonal hash; the existing `stateHash` and tonal commands are unchanged. `get`, `dump`, and `diff` now include geometry; editing references and newly cloned variants retain a geometry baseline. Older provenance records remain readable but lack that baseline.
+`c1 geometry set` / MCP `geometry_set` applies absolute crop, rotation, and keystone corrections to an existing editing reference or optional managed clone. It requires **`geometryStateHash` from `get`**, passed as `--if-geometry-state` / `ifGeometryState`. This versioned token includes geometry and the tonal hash; the existing `stateHash` and tonal commands are unchanged. `get`, `dump`, and `diff` now include geometry; editing references and newly cloned variants retain a geometry baseline. Older provenance records remain readable but lack that baseline.
 
 ```sh
 c1 get <working-ref>
@@ -208,9 +208,34 @@ Geometry writes require **Capture One 16.8.5.30**. Lens distortion correction fr
 
 For rotation changes with lens or perspective corrections, the final bounds cannot be predicted without executing the native rotation. `dryRun` therefore rejects that combination; explicit crop dry runs at the current rotation remain available. Perspective/movement ratio fits also reject dry runs because native crop normalization can shrink them. The durable pending journal stores `requestedGeometry` before dispatch and records the concrete target once native bounds are known. A failure after rotation (including an explicit crop outside the new bounds) is an uncertain mutation: it can leave the rotation applied and blocks further writes until normal restart/reconciliation. Never automatically retry or undo it.
 
-Existing keystone and lens tilt/shift are supported and preserved. Their native maximum rectangle is an upper bound: Capture One may shrink a centered ratio fit to avoid transformed edges. The final crop must retain the requested ratio and lie inside the proposed rectangle. Explicit crops retain strict two-pixel readback tolerance; inspect a fresh preview and use a smaller rectangle if needed. Rotation-only preserves Capture One's observed automatic crop, which can extend beyond its reported maximum rectangle. Distortion outside 0...100, flips, crop-outside-image, and unqualified orientations remain blocked. Without lens or perspective transforms, bounds remain a conservative centered rectangle inside the rotated image. See [geometry qualification](docs/geometry/16.8.5.30/README.md) and [corrected-lens qualification](docs/geometry/16.8.5.30/lens/README.md) for evidence and fixture limits. The [perspective and movement report](docs/geometry/16.8.5.30/perspective/README.md) covers the extension; the tools do not set keystone or lens movement controls.
+Existing keystone and lens tilt/shift are supported and preserved. Their native maximum rectangle is an upper bound: Capture One may shrink a centered ratio fit to avoid transformed edges. The final crop must retain the requested ratio and lie inside the proposed rectangle. Explicit crops retain strict two-pixel readback tolerance; inspect a fresh preview and use a smaller rectangle if needed. Rotation-only preserves Capture One's observed automatic crop, which can extend beyond its reported maximum rectangle. Distortion outside 0...100, flips, crop-outside-image, and unqualified orientations remain blocked. Without lens or perspective transforms, bounds remain a conservative centered rectangle inside the rotated image. See [geometry qualification](docs/geometry/16.8.5.30/README.md) and [corrected-lens qualification](docs/geometry/16.8.5.30/lens/README.md) for evidence and fixture limits. The [perspective and movement report](docs/geometry/16.8.5.30/perspective/README.md) covers the extension; the tools preserve lens movement controls; keystone writes are described below.
 
-For a composition-only MCP agent, set `C1_MCP_PROFILE=composition` in the server environment. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; existing-variant preparation, crop/rotation/restore, inspection, optional cloning, clone deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It defaults to existing variants; pass `--clone` for separate proposals. `grade-folder.py` has the same default and option. Neither example infers aesthetic quality or acceptance.
+Keystone controls are optional absolute values; unspecified controls keep their current values. They use the same geometry token, existing-variant authorization, journal, and readback checks as crop/rotation. CLI flags map to the MCP `keystone` object:
+
+| CLI flag | MCP key | Range |
+|---|---|---|
+| `--keystone-amount` | `amount` | Integer 10–120 |
+| `--keystone-vertical` | `vertical` | −75–75 |
+| `--keystone-horizontal` | `horizontal` | −75–75 |
+| `--keystone-skew` | `skew` | −45–45 |
+| `--keystone-aspect` | `aspect` | −50–100 |
+
+The amount and aspect controls follow the [Capture One keystone documentation](https://support.captureone.com/hc/en-us/articles/360002588058-Keystone-correction). `keystone.aspect` changes image proportions; `aspectRatio` selects the crop's width/height ratio. Clearing a correction means explicitly setting vertical/horizontal/skew/aspect to zero; amount remains at its requested or existing value. This API sets controls, without automatic line detection or guide-point placement.
+
+```sh
+c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> \
+  --keystone-vertical 12 --keystone-horizontal=-7 --aspect-ratio 1.5
+```
+
+Equivalent MCP arguments:
+
+```json
+{"workingRef":"c1_edit_...","ifGeometryState":"geometry-v1:...","keystone":{"vertical":12,"horizontal":-7},"aspectRatio":1.5}
+```
+
+Keystone setters run before rotation and crop fitting. Bounds are queried after those transforms. Without a requested crop or ratio, Capture One's resulting crop is retained. Render a fresh preview before selecting precise crop coordinates. Keystone changes reject `dryRun` because their resulting bounds and crop cannot be predicted offline. `geometry_restore` restores the saved crop, rotation, and all keystone controls; its dry run reports that saved target. Native setters are sequential: a failure can leave a partial correction, so inspect the journal and use normal restart/reconciliation without retrying. `diff.geometryDiff` and mutation diffs use `keystone.amount`, `keystone.vertical`, `keystone.horizontal`, `keystone.skew`, and `keystone.aspect`. Response `geometry.keystone` retains its existing array order `[amount, vertical, horizontal, skew, aspect]`. See the [keystone qualification report](docs/geometry/16.8.5.30/keystone/README.md) for evidence and limits.
+
+For a composition-only MCP agent, set `C1_MCP_PROFILE=composition` in the server environment. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; existing-variant preparation, crop/rotation/keystone/restore, inspection, optional cloning, clone deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It defaults to existing variants; pass `--clone` for separate proposals. `grade-folder.py` has the same default and option. Neither example infers aesthetic quality or acceptance.
 
 ### Preview files
 
@@ -236,7 +261,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.7.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.8.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
@@ -245,24 +270,25 @@ export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
 # Normal candidate validation: offline, packaged contract/layout and live workflows.
 # No deliberate timeout/process-death tests. Zero open documents; exclusive use.
 make qualify EVIDENCE_DIR=/private/tmp/c1-new-qualification
-# Optional: recovery changes or a release checkpoint, against the existing archive:
+# Optional, only when explicitly requested by the user, against the existing archive:
 make qualify-recovery C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-new-recovery
-# Or run both groups explicitly:
+# Optional, only when the user explicitly requests both groups:
 make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-full-qualification
 
 # Individual live suites during development:
 python3 Tests/integration_test.py       # disposable Session; requires Capture One
 python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
 python3 Tests/geometry_integration_test.py # zero open documents; crop/rotation + review workflow
+python3 Tests/keystone_integration_test.py # zero open documents; control ranges, crop fitting, restore
 python3 Tests/catalog_integration_test.py # zero open documents; optional clone catalog workflow
 python3 Tests/existing_variant_integration_test.py # existing-variant tonal/crop edits; no duplicates
 C1_INVENTORY_EVIDENCE=/private/tmp/inventory.json python3 Tests/inventory_integration_test.py
 python3 Tests/native_inventory_probe.py # independent native-predicate qualification
 ```
 
-Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
+Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp` or `.build`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
 
-`make check` is the fast offline loop, including mocked timeout/failure safeguards. `make qualify` adds packaged live workflow checks but excludes deliberate timeouts and process-death injection. Real faults are opt-in through `make qualify-recovery`, or `make qualify-full` for both groups. Use them when changing dispatch, journaling, locking, timeout handling, reconciliation, or at a release checkpoint; ordinary feature validation does not automatically repeat the recovery campaign.
+`make check` is the fast offline loop, including mocked timeout/failure safeguards. `make qualify` adds packaged live workflow checks but excludes deliberate timeouts and process-death injection. Real faults are opt-in through `make qualify-recovery`, or `make qualify-full` for both groups. Run them only when the user explicitly requests deliberate fault testing. Recovery-sensitive changes and release checkpoints do not automatically require this optional campaign. Keep mocked failure guards in normal validation and report real recovery coverage separately.
 
 Recovery Sessions default to `.build/recovery-fixtures`; `C1_RECOVERY_FIXTURE_PARENT` accepts an absolute path outside `/tmp` without symlink aliases. `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default; explicit `sigterm` selects the qualified process-termination path, with no automatic fallback. Recovery verifies that Capture One is stopped before launching a fresh process. See [recovery qualification](docs/RELEASE_VALIDATION.md#reproduce-packaged-live-recovery-qualification) for scope and evidence. Real fault tests retain the actual 120-second Apple Event timeout because shortening or mocking it would prove something different. Live suites remain sequential. Rerun affected checks for harness/documentation changes and verify executable/resource hashes when reusing prior runtime results.
 

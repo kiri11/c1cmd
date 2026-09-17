@@ -1,0 +1,371 @@
+/Library/Developer/CommandLineTools/usr/bin/make check
+swift build
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/10] Write sources
+[3/10] Write swift-version--1AB21518FC5DEDBE.txt
+[5/12] Compiling CaptureOneCore Geometry.swift
+[6/12] Emitting module CaptureOneCore
+[6/15] Write Objects.LinkFileList
+[9/15] Linking CaptureOneCoreTests
+[10/15] Applying CaptureOneCoreTests
+[11/15] Linking c1
+[12/15] Applying c1
+[13/15] Linking c1-mcp
+[14/15] Applying c1-mcp
+Build complete! (5.63s)
+/usr/bin/time -p .build/debug/CaptureOneCoreTests
+=== Starting CaptureOneCore Unit Test Suite ===
+Running FieldSpecTests...
+Running StateHashTests...
+Running WorkingReferenceTests...
+Running ProvenanceStoreTests...
+Running OperationJournalTests...
+Running LockTests...
+Running ResetTests...
+Running DiffTests...
+Running DumpTests...
+Running CatalogGuardTests...
+Running CatalogEditingTests...
+Running ExistingVariantTests...
+Running VersionCompatibilityTests...
+Running ReleaseSafetyTests...
+Running RatingFilterTests...
+Running InventoryTests...
+Running RequestContextTests...
+Running GeometryTests...
+
+=== Test Results ===
+Total Assertions : 844
+Passed           : 844
+Failed           : 0
+SUCCESS: All unit tests passed!
+real 4.58
+user 1.10
+sys 0.21
+C1_TEST_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1" C1_TEST_MCP_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal mutation tools
+real 2.40
+user 0.76
+sys 0.35
+python3 -B Tests/recovery_harness_test.py
+........................
+----------------------------------------------------------------------
+Ran 24 tests in 0.039s
+
+OK
+/Library/Developer/CommandLineTools/usr/bin/make archive
+swift build -c release
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for production...
+[2/11] Write sources
+[3/11] Copying Handlers.applescript
+[3/11] Write sources
+[7/11] Write swift-version--1AB21518FC5DEDBE.txt
+[9/12] Compiling CaptureOneCore AppleScriptExecutor.swift
+[10/18] Compiling c1_mcp main.swift
+[10/18] Write Objects.LinkFileList
+[11/18] Linking c1-mcp
+[13/18] Compiling c1 main.swift
+[13/18] Write Objects.LinkFileList
+[14/18] Linking c1
+[16/18] Compiling CaptureOneCoreTests CatalogGuardTests.swift
+[16/18] Write Objects.LinkFileList
+[17/18] Linking CaptureOneCoreTests
+Build complete! (25.39s)
+./scripts/package-release.sh v0.1.0 .build/release dist
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.KRKRgHmuQI/c1-v0.1.0-macos-arm64/bin/c1: replacing existing signature
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.KRKRgHmuQI/c1-v0.1.0-macos-arm64/bin/c1-mcp: replacing existing signature
+mkdir -p ".build/keystone-evidence/package"
+C1_TEST_RAW_FIXTURE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-ga_zeuym/lens/Capture/2U6A7257.CR3" C1_GEOMETRY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/geometry" C1_LENS_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/lens" C1_PERSPECTIVE_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/perspective" C1_KEYSTONE_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/keystone" C1_CATALOG_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/catalog" C1_EXISTING_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/existing" C1_INVENTORY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "dist/c1-v0.1.0-macos-arm64.tar.gz"
+PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal mutation tools
+PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation
+TIMING archive and contract: 2.275s
+Running integration_test.py using extracted binaries with build resources hidden
+=== c1 M1 End-to-End Integration Verification ===
+Initial document path: None
+
+[Step 1] Creating disposable Session at /private/tmp/c1-m1-e2e...
+Copied RAW fixture: /private/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/Capture/fixture.CR3 (SHA-256: 2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868)
+
+[Step 2] Testing c1 doctor...
+PASS: doctor healthy on 16.8.5.30 for session c1-m1-e2e.cosessiondb
+
+[Step 3] Testing c1 doc info...
+PASS: doc info verified (token: 8108:1789686781.143338|/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4425485|1789686934.2971015)
+
+[Step 4] Testing c1 variants list...
+PASS: found variant ID 1 (fixture)
+
+[Step 5] Testing c1 get on original variant 1...
+PASS: initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a, adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 6] Testing c1 variant clone 1...
+PASS: created working clone c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5 (native ID: 2)
+
+[Step 7] Testing safety check: rejecting mutation to original variant 1...
+PASS: core rejected mutation on original: unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 8] Testing c1 set on working variant c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5...
+PASS: set applied accurately (new hash: 2c07831efb75a80d9cf62b83d49e12392386639fb58acc01e7a755bdcbc29baf)
+
+[Step 9] Testing c1 add on working variant c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5...
+PASS: add delta applied accurately (0.75 - 0.25 = 0.5, new hash: 667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56)
+
+[Step 10] Testing optimistic concurrency conflict detection...
+PASS: stale hash rejected: state-changed: Optimistic concurrency conflict for 'c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5'. Expected stateHash 'b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a', but actual is '667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56'.
+
+[Step 11] Testing c1 preview on working variant c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5...
+PASS: preview generated and decoded: /private/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/Output/c1-previews/46d224a7-b288-464b-8f0e-fda8a27c37f4/preview.jpg (1500x1000 px, size: 178711 B)
+PASS: custom output routing ignores stale JPEG and associates variant/state
+
+[Step 12] Verifying core invariants (Original variant & RAW file)...
+PASS: Original variant adjustments and RAW SHA-256 strictly preserved!
+
+[Step 13] Testing c1 variant delete c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5...
+PASS: working variant c1_wrk_3210c817-edcb-4e3b-b77a-b92a81b802d5 (clone 2) cleanly deleted.
+PASS: RAW file still 100% byte-for-byte identical after variant deletion.
+
+[Step 14] Testing examples/grade-folder.py workflow...
+=== c1 Automated Grading Workflow ===
+Preset : /Users/kiri11/projects/c1cmd/examples/presets/daylight.json
+Binary : /private/tmp/c1-release-live-z1mqfwr7/c1-v0.1.0-macos-arm64/bin/c1
+Dry run: False
+
+[1/4] Running c1 doctor check...
+Capture One 16.8.5.30 running. Document: c1-m1-e2e.cosessiondb
+
+[2/4] Inspecting active document info...
+Document path: /tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e
+Open token   : 8108:1789686781.143338|/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4425485|1789686934.2971015
+Preset adjustments: {'exposure': 0.25, 'contrast': 8.0, 'saturation': -5.0, 'temperature': 5600.0, 'tint': 2.5}
+
+[3/4] Found 1 total variants.
+Original variants to process: 1
+
+[4/4] Processing variants...
+
+--- [1/1] Variant 1 (fixture) ---
+  Editing reference: c1_wrk_f0a2ed56-2981-4a69-85e5-bdc8ba4b2ce3
+  Initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+  Applying preset adjustments...
+  Applied! New stateHash: d66d4eab0a40c286ef2c6d89c62edd14476080087e48a0e90059b5d1c922fe96
+  Rendering preview...
+  Preview ready: /private/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/Output/c1-previews/c7411b60-ae29-4253-bd1b-aaefe4aa8b19/preview.jpg (1500x1000 px)
+  Saved decision record: /tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/.c1/decisions/c1_wrk_f0a2ed56-2981-4a69-85e5-bdc8ba4b2ce3.json
+
+=======================================================
+Grading Complete — Summary for Photographer Review:
+=======================================================
+WORKING REF                           SOURCE    STATUS      PREVIEW
+--------------------------------------------------------------------------------
+c1_wrk_f0a2ed56-2981-4a69-85e5-bdc8ba4b2ce3  1         READY       /private/tmp/c1-m1-e2e-q16cp5ct/c1-m1-e2e/Output/c1-previews/c7411b60-ae29-4253-bd1b-aaefe4aa8b19/preview.jpg
+
+Review the clones. To discard one: c1 variant delete <workingRef>
+
+PASS: examples/grade-folder.py completed successfully!
+
+[Step 15] Testing c1 variant baseline on source variant...
+PASS: created managed baseline variant c1_wrk_22d711c0-4a19-488d-9c18-99db5d17cf39 (native ID: 4)
+PASS: retrieved baseline adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 16] Testing c1 diff on mutated working variant...
+PASS: single-ref diff accurately computed against baseline
+PASS: two-ref diff accurately computed between native variants 1 and 4
+PASS: human-formatted diff output verified
+
+[Step 17] Testing c1 reset on mutated working variant...
+PASS: selective reset of exposure verified (contrast remained untouched)
+PASS: full reset restored all fields and returned stateHash to baseline b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+
+[Step 18] Testing c1 dump in Session...
+PASS: c1 dump produced 2 valid JSONL records
+PASS: c1 dump human table verified
+
+[Step 19] Testing Catalog read-only detection & mutation guards...
+PASS: c1 doctor passes on Catalog (isSession=False, allChecksPassed=True)
+PASS: c1 doc info returns isSession=False on Catalog
+PASS: Catalog guard strictly blocked clone (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked set (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'set' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked reset (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'reset' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked baseline (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'baseline' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked delete (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'delete' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'add' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'add' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'geometry' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'geometry_set' is blocked for 'c1-cat-guard-test'.)
+
+=======================================================
+ALL M1 & M2 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!
+=======================================================
+
+[Cleanup] Cleaning up test session and temporary documents...
+Cleanup completed.
+TIMING integration_test.py: 48.281s
+Running mcp_test.py using extracted binaries with build resources hidden
+=== c1-mcp Stdio Server Comprehensive Test Suite ===
+Initial document path: None
+
+[Step 0] Creating disposable Session at /private/tmp/c1-mcp-e2e...
+Waiting for Capture One to index fixture variant...
+  ✓ RAW variant indexed by Capture One
+
+[Step 1] Testing MCP initialization handshake...
+  ✓ Handshake successful: c1-mcp v0.1.0 ready
+
+[Step 2] Testing tools/list and schema inspection...
+  ✓ All 20 tools discovered with complete schemas: ['add', 'capabilities', 'diff', 'doc_info', 'doctor', 'dump', 'geometry_restore', 'geometry_set', 'get', 'operation_status', 'preview', 'request_status', 'reset', 'schema', 'set', 'variant_baseline', 'variant_clone', 'variant_delete', 'variant_edit', 'variants_list']
+
+[Step 3] Testing read-only metadata tools...
+  ✓ Metadata tools verified. Active Session: 'c1-mcp-e2e.cosessiondb' (token: 8108:1789686781.143338|/tmp/c1-mcp-e2e-z59oy078/c1-mcp-e2e/c1-mcp-e2e.cosessiondb|16777232|4425818|1789686982.924522)
+
+[Step 4] Testing doctor tool...
+  ✓ Doctor diagnostic passed. Build: 16.8.5.30 (matched: True)
+
+[Step 5] Testing variants_list and dump tools...
+  ✓ Listed 1 variant(s). Source ID '1', Name 'fixture'
+  ✓ Dump returned 1 comprehensive record(s)
+
+[Step 6] Testing safety guard: rejecting mutation on unmanaged variant...
+  ✓ Unmanaged variant mutation blocked: [unmanaged-variant] unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 7] Testing variant_clone, variant_baseline, and get tools...
+  ✓ Created working clone: c1_wrk_d26343fa-d791-4533-9700-5300d55a8ff6 (baseline hash: b4d3341df126...)
+  ✓ Created managed baseline variant: c1_wrk_bdc946f8-26cc-4260-843f-f094e5c76734
+
+[Step 8] Testing set, add, diff, and reset tools on working clone...
+  ✓ 'set' applied successfully. New stateHash: 64b31405ca1f...
+  ✓ 'diff' against baseline confirmed changed adjustments
+  ✓ 'add' delta applied (-0.10 EV -> 0.25 EV)
+  ✓ 'reset' restored adjustments to baseline stateHash: b4d3341df126...
+
+[Step 9] Testing preview (with MCP image block) and variant_delete...
+  ✓ Preview metadata: 1500x1000 (160791 bytes), SHA-256: ba471977650e...
+  ✓ Image content block validated: 160791 bytes base64-decoded, valid JPEG header confirmed
+  ✓ Cleaned up working clone c1_wrk_d26343fa-d791-4533-9700-5300d55a8ff6
+  ✓ Cleaned up baseline variant c1_wrk_bdc946f8-26cc-4260-843f-f094e5c76734
+
+[Step 10] Testing Catalog fail-closed mutation guard over MCP...
+  ✓ Open document is Catalog: 'c1-cat-guard-test'
+  ✓ Catalog mutation guard verified over MCP: invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.
+
+=======================================================
+ALL c1-mcp INTEGRATION TESTS PASSED SUCCESSFULLY!
+Total Test Steps : 10
+Passed           : 10
+=======================================================
+TIMING mcp_test.py: 22.538s
+Running geometry_integration_test.py using extracted binaries with build resources hidden
+PASS: geometry CLI/MCP, ratios, rotations, off-center crop, full-frame context, orientation, original/RAW preservation
+/Users/kiri11/projects/c1cmd/.build/keystone-evidence/package/geometry
+TIMING geometry_integration_test.py: 96.015s
+Running lens_geometry_integration_test.py using extracted binaries with build resources hidden
+environment
+fixture-pending
+rotated-ratio 0
+preview-mapping 0
+rotation-only
+case-passed 0
+fixture-pending
+rotated-ratio 1
+preview-mapping 1
+case-passed 1
+fixture-pending
+rotated-ratio 2
+preview-mapping 2
+case-passed 2
+fixture-pending
+rotated-ratio 3
+preview-mapping 3
+case-passed 3
+fixture-pending
+rotated-ratio 4
+case-passed 4
+fixture-pending
+rotated-ratio 5
+case-passed 5
+fixture-pending
+fixture-pending
+passed
+TIMING lens_geometry_integration_test.py: 163.347s
+Running perspective_geometry_integration_test.py using extracted binaries with build resources hidden
+environment
+fixture-pending
+rotated-ratio 0
+preview-mapping 0
+rotation-only
+case-passed 0
+fixture-pending
+rotated-ratio 1
+preview-mapping 1
+case-passed 1
+fixture-pending
+rotated-ratio 2
+preview-mapping 2
+case-passed 2
+fixture-pending
+rotated-ratio 3
+preview-mapping 3
+case-passed 3
+fixture-pending
+rotated-ratio 4
+case-passed 4
+fixture-pending
+rotated-ratio 5
+case-passed 5
+fixture-pending
+rotated-ratio 6
+preview-mapping 6
+case-passed 6
+fixture-pending
+rotated-ratio 7
+preview-mapping 7
+case-passed 7
+fixture-pending
+fixture-pending
+passed
+TIMING perspective_geometry_integration_test.py: 242.525s
+Running keystone_integration_test.py using extracted binaries with build resources hidden
+environment
+control-passed amount=10
+control-passed amount=120
+control-passed vertical=-75
+control-passed vertical=75
+control-passed horizontal=-75
+control-passed horizontal=75
+control-passed skew=-45
+control-passed skew=45
+control-passed aspect=-50
+control-passed aspect=100
+control-passed vertical=12.5
+control-passed horizontal=-8.25
+control-passed skew=3.5
+failure-retained
+Traceback (most recent call last):
+  File "/Users/kiri11/projects/c1cmd/Tests/keystone_integration_test.py", line 133, in <module>
+    main()
+    ~~~~^^
+  File "/Users/kiri11/projects/c1cmd/Tests/keystone_integration_test.py", line 119, in main
+    assert restored_preview['pixelSha256'] == before_preview['pixelSha256']
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/kiri11/projects/c1cmd/Tests/release_integration_test.py", line 35, in <module>
+    subprocess.run([sys.executable, '-u', str(ROOT / 'Tests' / script)], env=environment,
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                   cwd=tmp, check=True, timeout=1200 if script in ('lens_geometry_integration_test.py', 'perspective_geometry_integration_test.py') else 600)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/opt/homebrew/opt/python@3.14/bin/python3.14', '-u', '/Users/kiri11/projects/c1cmd/Tests/keystone_integration_test.py']' returned non-zero exit status 1.
+real 748.33
+user 61.89
+sys 26.81
+make: *** [qualify] Error 1

@@ -582,16 +582,21 @@ struct OperationStatusCommand: ParsableCommand {
 }
 
 struct GeometryCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop and rotation on managed variants.", subcommands: [GeometrySetCommand.self, GeometryRestoreCommand.self])
+    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop, rotation, and keystone on managed variants.", subcommands: [GeometrySetCommand.self, GeometryRestoreCommand.self])
 }
 struct GeometrySetCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation; preserves other edits.")
+    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation/keystone; preserves other edits.")
     @OptionGroup var globals: GlobalOptions
     @Argument var workingRef: String
     @Option(help: "geometryStateHash from get, independent of the tonal stateHash.") var ifGeometryState: String
     @Option(help: "centerX,centerY,width,height in rotated-canvas pixels, bottom-left origin.") var crop: String?
     @Option(help: "Absolute rotation in degrees (-45 to 45).") var rotation: Double?
     @Option(help: "Width/height ratio for a centered crop fitted inside safe bounds (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
+    @Option(help: "Keystone amount (integer 10 to 120).") var keystoneAmount: Double?
+    @Option(help: "Absolute vertical keystone (-75 to 75).") var keystoneVertical: Double?
+    @Option(help: "Absolute horizontal keystone (-75 to 75).") var keystoneHorizontal: Double?
+    @Option(help: "Absolute keystone skew (-45 to 45).") var keystoneSkew: Double?
+    @Option(help: "Absolute keystone aspect (-50 to 100).") var keystoneAspect: Double?
     @Flag var dryRun: Bool = false
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
@@ -606,9 +611,12 @@ struct GeometrySetCommand: ParsableCommand {
             }
             if let v = rotation { args["rotation"] = v }
             if let v = aspectRatio { args["aspectRatio"] = v }
+            let controls = KeystoneAdjustments(amount:keystoneAmount, vertical:keystoneVertical, horizontal:keystoneHorizontal, skew:keystoneSkew, aspect:keystoneAspect)
+            let keystone = controls.values.contains(where: { $0 != nil }) ? controls : nil
+            if let keystone { try keystone.validate(); args["keystone"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(keystone)) }
             try ContractSchema.validate(tool: "geometry_set", arguments: args)
             let result = try SessionController.shared.geometrySet(workingRef:workingRef, ifGeometryState:ifGeometryState,
-                crop:rect, rotation:rotation, aspectRatio:aspectRatio, dryRun:dryRun)
+                crop:rect, rotation:rotation, aspectRatio:aspectRatio, keystone:keystone, dryRun:dryRun)
             print(OutputFormatter.formatJson(result))
         }
         if code != .success { throw ExitCode(code.rawValue) }
@@ -635,7 +643,7 @@ struct VariantEditCommand: ParsableCommand {
 }
 
 struct GeometryRestoreCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved crop/rotation with fresh state and matching geometry context.")
+    static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved crop/rotation/keystone with fresh state and matching geometry context.")
     @OptionGroup var globals: GlobalOptions
     @Argument var workingRef: String
     @Option var ifGeometryState: String

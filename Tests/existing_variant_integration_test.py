@@ -103,7 +103,7 @@ def main():
             reset = cli('reset', ref, '--if-state', added['stateHash'])
             assert reset['after']['exposure'] == 0 and reset['after']['contrast'] == 0
             state = cli('get', ref)
-            crop, _ = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash'], 'rotation': 2, 'aspectRatio': .75})
+            crop, _ = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash'], 'rotation': 2, 'aspectRatio': .75, 'keystone': {'vertical': 10, 'horizontal': -5}})
             tool('geometry_restore', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash']}, error='state-changed')
             preview, blocks = tool('preview', {'ref': ref})
             assert any(block['type'] == 'image' for block in blocks['content'])
@@ -117,6 +117,7 @@ def main():
             restored = cli('geometry', 'restore', ref, '--if-geometry-state', next_state['geometryStateHash'])
             assert restored['after']['crop'] == edit['baselineGeometry']['crop']
             assert restored['after']['rotation'] == edit['baselineGeometry']['rotation']
+            assert restored['after']['keystone'] == edit['baselineGeometry']['keystone']
             after_restore = cli('get', ref)
             assert after_restore['stateHash'] == next_edit['stateHash']
             tool('set', {'workingRef': ref, 'ifState': after_restore['stateHash'], 'adjustments': edit['baselineAdjustments']})

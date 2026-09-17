@@ -1,0 +1,1224 @@
+{
+  "build": "16.8.5.30",
+  "contract": "1.8.0",
+  "offlineAssertions": 844,
+  "offlineRecoveryHarnessTests": 25,
+  "testedArchiveSHA256": "4ffb3c0888c092f188f96bdf5eb88fee11221631e999a21d98532dbb87deaa84",
+  "payloadSHA256": {
+    "c1-v0.1.0-macos-arm64/bin/c1-mcp": "039758989b2d67d9d19fd8ea01b66375d3b7fbc8ff1dc9f8998a6a6a8fbac0bd",
+    "c1-v0.1.0-macos-arm64/bin/c1": "a1ba3164c727150d240be44f26c5f8722a0fb60a647655b1aeb8119804a947d8",
+    "c1-v0.1.0-macos-arm64/bin/c1_CaptureOneCore.bundle/Handlers.applescript": "14944518ac64912d3099535934ef940f432d7c9be1f8da7ea0bd12d6b71b940e"
+  },
+  "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "qualificationRuns": {
+    "initial": "Stopped on exact preview hash assertion; native geometry restoration and all 13 control cases passed.",
+    "resumed": "Affected and remaining suites passed against the same archive; measured export variance covered by strict pixel-error threshold."
+  },
+  "restoredPreviewError": {
+    "meanAbsoluteChannelError": 0.01165288888888889,
+    "maxChannelError": 11,
+    "meanThreshold": 0.1
+  },
+  "correctedGeometryKeystoneWrites": [
+    {
+      "event": "keystone-write",
+      "case": 2,
+      "corrected": {
+        "after": {
+          "crop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3514,
+            "width": 5271
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": false,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            75,
+            13,
+            -12,
+            5,
+            10
+          ],
+          "lensGeometry": [
+            50,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3520,
+            "width": 5280
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "before": {
+          "crop": {
+            "centerX": 3092,
+            "centerY": 1927,
+            "height": 3285,
+            "width": 4928
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": false,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            75,
+            10,
+            -10,
+            5,
+            10
+          ],
+          "lensGeometry": [
+            50,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3092,
+            "centerY": 1927,
+            "height": 3387,
+            "width": 5081
+          },
+          "orientation": 180,
+          "rotation": 0
+        },
+        "diff": {
+          "centerX": {
+            "after": 3174,
+            "before": 3092,
+            "delta": 82
+          },
+          "centerY": {
+            "after": 1898,
+            "before": 1927,
+            "delta": -29
+          },
+          "height": {
+            "after": 3514,
+            "before": 3285,
+            "delta": 229
+          },
+          "keystone.horizontal": {
+            "after": -12,
+            "before": -10,
+            "delta": -2
+          },
+          "keystone.vertical": {
+            "after": 13,
+            "before": 10,
+            "delta": 3
+          },
+          "rotation": {
+            "after": 2,
+            "before": 0,
+            "delta": 2
+          },
+          "width": {
+            "after": 5271,
+            "before": 4928,
+            "delta": 343
+          }
+        },
+        "geometryStateHash": "geometry-v1:1ec8d12fcf1be1caa036828c0fa1543f12008b306df7a4aa3eac4906945fcecf",
+        "isDryRun": false,
+        "operationId": "d96ed361-bfa8-4af2-96dc-c95e4c9feb0f",
+        "workingRef": "c1_edit_18876952-b9b5-4cb6-ac27-ca3bfe444113"
+      },
+      "restored": {
+        "after": {
+          "crop": {
+            "centerX": 3092,
+            "centerY": 1927,
+            "height": 3285,
+            "width": 4928
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": false,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            75,
+            10,
+            -10,
+            5,
+            10
+          ],
+          "lensGeometry": [
+            50,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3092,
+            "centerY": 1927,
+            "height": 3387,
+            "width": 5081
+          },
+          "orientation": 180,
+          "rotation": 0
+        },
+        "before": {
+          "crop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3514,
+            "width": 5271
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": false,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            75,
+            13,
+            -12,
+            5,
+            10
+          ],
+          "lensGeometry": [
+            50,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3520,
+            "width": 5280
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "diff": {
+          "centerX": {
+            "after": 3092,
+            "before": 3174,
+            "delta": -82
+          },
+          "centerY": {
+            "after": 1927,
+            "before": 1898,
+            "delta": 29
+          },
+          "height": {
+            "after": 3285,
+            "before": 3514,
+            "delta": -229
+          },
+          "keystone.horizontal": {
+            "after": -10,
+            "before": -12,
+            "delta": 2
+          },
+          "keystone.vertical": {
+            "after": 10,
+            "before": 13,
+            "delta": -3
+          },
+          "rotation": {
+            "after": 0,
+            "before": 2,
+            "delta": -2
+          },
+          "width": {
+            "after": 4928,
+            "before": 5271,
+            "delta": -343
+          }
+        },
+        "geometryStateHash": "geometry-v1:0e836e3ce6827f5011db480e6236c4ee23b1665394670f6d34299d0e1fb84962",
+        "isDryRun": false,
+        "operationId": "44c9b1b5-1b10-49fd-bfde-3cadfccc882f",
+        "workingRef": "c1_edit_18876952-b9b5-4cb6-ac27-ca3bfe444113"
+      },
+      "preview": {
+        "fileSizeBytes": 158020,
+        "geometry": {
+          "crop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3514,
+            "width": 5271
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": false,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            75,
+            13,
+            -12,
+            5,
+            10
+          ],
+          "lensGeometry": [
+            50,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3174,
+            "centerY": 1898,
+            "height": 3520,
+            "width": 5280
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "geometryStateHash": "geometry-v1:1ec8d12fcf1be1caa036828c0fa1543f12008b306df7a4aa3eac4906945fcecf",
+        "height": 1000,
+        "nativeVariantId": "2",
+        "operationId": "00742049-412b-4869-adc1-83c9d732fb62",
+        "outputPath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-cfe8ziek/lens/Output/c1-previews/00742049-412b-4869-adc1-83c9d732fb62/preview.jpg",
+        "pixelSha256": "4fb7036aa8e8c82b74d0d41f782a24cba77b616fd6cf52813093a2ffc3dcb3f0",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "width": 1500,
+        "workingRef": "c1_edit_18876952-b9b5-4cb6-ac27-ca3bfe444113"
+      }
+    },
+    {
+      "event": "keystone-write",
+      "case": 6,
+      "corrected": {
+        "after": {
+          "crop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3758,
+            "width": 5639
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            3,
+            -2,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            45,
+            2,
+            45,
+            3,
+            90,
+            2,
+            -2
+          ],
+          "lensProfile": "Phase One 45mm TS f/3.5",
+          "maximumCrop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3785,
+            "width": 5678
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "before": {
+          "crop": {
+            "centerX": 3047,
+            "centerY": 2016,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            45,
+            2,
+            45,
+            3,
+            90,
+            2,
+            -2
+          ],
+          "lensProfile": "Phase One 45mm TS f/3.5",
+          "maximumCrop": {
+            "centerX": 3047,
+            "centerY": 2016,
+            "height": 4000,
+            "width": 6000
+          },
+          "orientation": 180,
+          "rotation": 0
+        },
+        "diff": {
+          "centerX": {
+            "after": 3111,
+            "before": 3047,
+            "delta": 64
+          },
+          "centerY": {
+            "after": 2117,
+            "before": 2016,
+            "delta": 101
+          },
+          "height": {
+            "after": 3758,
+            "before": 4000,
+            "delta": -242
+          },
+          "keystone.horizontal": {
+            "after": -2,
+            "before": 0,
+            "delta": -2
+          },
+          "keystone.vertical": {
+            "after": 3,
+            "before": 0,
+            "delta": 3
+          },
+          "rotation": {
+            "after": 2,
+            "before": 0,
+            "delta": 2
+          },
+          "width": {
+            "after": 5639,
+            "before": 6000,
+            "delta": -361
+          }
+        },
+        "geometryStateHash": "geometry-v1:868c7a28ec67b67226b011504d379f728adcbd415891ab3cfeb79c7255a8571b",
+        "isDryRun": false,
+        "operationId": "80b8ccc2-91a8-49aa-9a5e-6b67c0383e3c",
+        "workingRef": "c1_edit_79c4aae6-e157-4b5c-837f-ee69f3d81611"
+      },
+      "restored": {
+        "after": {
+          "crop": {
+            "centerX": 3047,
+            "centerY": 2016,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            45,
+            2,
+            45,
+            3,
+            90,
+            2,
+            -2
+          ],
+          "lensProfile": "Phase One 45mm TS f/3.5",
+          "maximumCrop": {
+            "centerX": 3047,
+            "centerY": 2016,
+            "height": 4000,
+            "width": 6000
+          },
+          "orientation": 180,
+          "rotation": 0
+        },
+        "before": {
+          "crop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3758,
+            "width": 5639
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            3,
+            -2,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            45,
+            2,
+            45,
+            3,
+            90,
+            2,
+            -2
+          ],
+          "lensProfile": "Phase One 45mm TS f/3.5",
+          "maximumCrop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3785,
+            "width": 5678
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "diff": {
+          "centerX": {
+            "after": 3047,
+            "before": 3111,
+            "delta": -64
+          },
+          "centerY": {
+            "after": 2016,
+            "before": 2117,
+            "delta": -101
+          },
+          "height": {
+            "after": 4000,
+            "before": 3758,
+            "delta": 242
+          },
+          "keystone.horizontal": {
+            "after": 0,
+            "before": -2,
+            "delta": 2
+          },
+          "keystone.vertical": {
+            "after": 0,
+            "before": 3,
+            "delta": -3
+          },
+          "rotation": {
+            "after": 0,
+            "before": 2,
+            "delta": -2
+          },
+          "width": {
+            "after": 6000,
+            "before": 5639,
+            "delta": 361
+          }
+        },
+        "geometryStateHash": "geometry-v1:a4beae4425357327beabf82c44d28e37cd0e5fadb1a7f30b3a4b702be9812169",
+        "isDryRun": false,
+        "operationId": "0464f301-c59f-47b3-a5ec-6840a04e92c3",
+        "workingRef": "c1_edit_79c4aae6-e157-4b5c-837f-ee69f3d81611"
+      },
+      "preview": {
+        "fileSizeBytes": 162919,
+        "geometry": {
+          "crop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3758,
+            "width": 5639
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            3,
+            -2,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            45,
+            2,
+            45,
+            3,
+            90,
+            2,
+            -2
+          ],
+          "lensProfile": "Phase One 45mm TS f/3.5",
+          "maximumCrop": {
+            "centerX": 3111,
+            "centerY": 2117,
+            "height": 3785,
+            "width": 5678
+          },
+          "orientation": 180,
+          "rotation": 2
+        },
+        "geometryStateHash": "geometry-v1:868c7a28ec67b67226b011504d379f728adcbd415891ab3cfeb79c7255a8571b",
+        "height": 1000,
+        "nativeVariantId": "2",
+        "operationId": "53453ef7-ab7a-4153-aa80-882d8592a456",
+        "outputPath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-cfe8ziek/lens/Output/c1-previews/53453ef7-ab7a-4153-aa80-882d8592a456/preview.jpg",
+        "pixelSha256": "047f135c612c54fbe928a9dc229470248e0995772b4cd633acadb8508cd4d7a8",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "width": 1500,
+        "workingRef": "c1_edit_79c4aae6-e157-4b5c-837f-ee69f3d81611"
+      }
+    }
+  ],
+  "regularTimingsSeconds": {
+    "archive and contract": 2.297,
+    "integration_test.py": 48.281,
+    "mcp_test.py": 22.538,
+    "geometry_integration_test.py": 96.015,
+    "lens_geometry_integration_test.py": 163.347,
+    "perspective_geometry_integration_test.py": 242.525,
+    "keystone_integration_test.py": 174.101,
+    "catalog_integration_test.py": 73.304,
+    "existing_variant_integration_test.py": 130.091,
+    "inventory_integration_test.py": 160.179
+  },
+  "keystoneControlCases": 13,
+  "restoredPreviewPixelSHA256": "8c66ead11120b7eba3da945c243e250c603e0fbaf4f9f68b34069287f2767a30",
+  "baselinePreviewPixelSHA256": "c6d34a62d7e85567a257d4086b0783fceab1e529f60c29ccbcfd2aae4c9b8dc6",
+  "recoveryStatus": "Optional campaign stopped on user request after two completed cases. Corrected-lens case interrupted; perspective, keystone, preview, and MCP-death fault cases not run.",
+  "cancellationReconciliation": {
+    "reason": "User requested stopping optional timeout tests. No mutation retried.",
+    "operation": {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3003,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          100,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3002,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "appInstance": "10572:1789688854.33536",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "beforeGeometry": {
+        "crop": {
+          "centerX": 3003,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          100,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3002,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/recovery.cosessiondb|16777232|4434832|1789688538.415786",
+      "documentPath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "16",
+      "operationId": "15dfc3de-1608-401a-b065-14628333ec6c",
+      "operationType": "geometry_set",
+      "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/Capture/fixture.CR3",
+      "preconditionStateHash": "geometry-v1:85b6ec2d07276c73c87ec145a059f92198edaa336e1f1baef486b863f07a44fd",
+      "requestedGeometry": {
+        "aspectRatio": 1.5,
+        "rotation": 3
+      },
+      "status": "reconciled",
+      "timestamp": "2026-09-17T23:48:01Z",
+      "workingRef": "c1_wrk_aaa9e4f7-7326-4778-863d-9c9c3834d11d"
+    },
+    "originalPreserved": true,
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "unresolvedOperationsCount": 0,
+    "openDocuments": 0,
+    "oldPID": 10572,
+    "newPID": 10728
+  },
+  "recoveryCases": [
+    {
+      "time": "2026-09-17T23:45:26.632311+00:00",
+      "event": "case-passed",
+      "case": "real-apple-event-timeout",
+      "operationId": "57bf47ac-de7b-4877-8c39-ce76eae24095",
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+      "observations": {
+        "afterAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "afterGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "appInstance": "8108:1789686781.143338",
+        "beforeAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/recovery.cosessiondb|16777232|4434832|1789688538.415786",
+        "documentPath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery",
+        "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+        "intendedAdjustments": {
+          "contrast": 0,
+          "exposure": 0.625,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "nativeVariantId": "12",
+        "operationId": "57bf47ac-de7b-4877-8c39-ce76eae24095",
+        "operationType": "set",
+        "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/Capture/fixture.CR3",
+        "preconditionStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "status": "reconciled",
+        "timestamp": "2026-09-17T23:43:04Z",
+        "workingRef": "c1_wrk_cd4c5200-054d-4463-ac39-ac50a4a457a0"
+      },
+      "shutdownMode": "sigterm"
+    },
+    {
+      "time": "2026-09-17T23:47:55.594872+00:00",
+      "event": "case-passed",
+      "case": "geometry-apple-event-timeout",
+      "operationId": "6b5608aa-af20-4893-9ca1-3cd0d0292648",
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+      "observations": {
+        "afterAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "afterGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "appInstance": "10455:1789688708.9165568",
+        "beforeAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "beforeGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/recovery.cosessiondb|16777232|4434832|1789688538.415786",
+        "documentPath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery",
+        "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+        "intendedGeometry": {
+          "crop": {
+            "centerX": 3101,
+            "centerY": 2154,
+            "height": 3713,
+            "width": 5569
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 3
+        },
+        "nativeVariantId": "14",
+        "operationId": "6b5608aa-af20-4893-9ca1-3cd0d0292648",
+        "operationType": "geometry_set",
+        "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/Capture/fixture.CR3",
+        "preconditionStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "status": "reconciled",
+        "timestamp": "2026-09-17T23:45:30Z",
+        "workingRef": "c1_wrk_d85ba872-d4ba-44fd-9744-f3cd42fab2f2"
+      },
+      "shutdownMode": "sigterm"
+    }
+  ],
+  "recoveryCompletion": [
+    {
+      "time": "2026-09-17T23:49:34.083373+00:00",
+      "event": "cleanup",
+      "openDocuments": 0,
+      "retainedSession": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery"
+    }
+  ],
+  "developmentRangeReconciliations": [
+    {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "appInstance": "5803:1789685453.412899",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "beforeGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-ae_c_cs8/keystone/keystone.cosessiondb|16777232|4421297|1789686541.6412117",
+      "documentPath": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-ae_c_cs8/keystone",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "1",
+      "operationId": "251a3d18-1c89-4977-8601-94c280ee7a93",
+      "operationType": "geometry_set",
+      "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-ae_c_cs8/keystone/Capture/2U6A7257.CR3",
+      "preconditionStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "requestedGeometry": {
+        "keystone": {
+          "vertical": -100
+        },
+        "rotation": 0
+      },
+      "status": "reconciled",
+      "timestamp": "2026-09-17T23:09:20Z",
+      "workingRef": "c1_edit_d25462b6-cf85-426a-afa8-d39d1d6be4d7"
+    },
+    {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "appInstance": "7755:1789686612.862431",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "beforeGeometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-bi03flnm/keystone/keystone.cosessiondb|16777232|4422282|1789686696.535014",
+      "documentPath": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-bi03flnm/keystone",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "1",
+      "operationId": "4c7eb08a-324a-496a-b5f1-9b57f7f43aa3",
+      "operationType": "geometry_set",
+      "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-bi03flnm/keystone/Capture/2U6A7257.CR3",
+      "preconditionStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+      "requestedGeometry": {
+        "keystone": {
+          "skew": -100
+        },
+        "rotation": 0
+      },
+      "status": "reconciled",
+      "timestamp": "2026-09-17T23:12:16Z",
+      "workingRef": "c1_edit_466d4dc5-f25c-498b-b81b-50d7e612c603"
+    }
+  ]
+}

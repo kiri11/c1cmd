@@ -43,6 +43,9 @@ final class GeometryFake: ScriptExecuting {
             var r = record(id)
             if failure == "stale-dispatch" { throw C1Error.stateChanged("injected state change at handler") }
             if failure == "timeout" { throw C1Error.timeout("injected timeout") }
+            let keyIndex = handler == "applyCorrectedGeometry" ? 8 : 7
+            r["keystoneValues"] = (1...5).map { args[keyIndex].atIndex($0)!.doubleValue }
+            if failure == "keystone-partial" { records[id] = r; throw C1Error.scriptError("injected failure after keystone", code:-1700) }
             r["rotationDegrees"] = args[6].doubleValue; records[id] = r
             if failure == "partial" { throw C1Error.scriptError("injected failure after rotation", code:-1700) }
             var target: [Double]
@@ -64,6 +67,7 @@ final class GeometryFake: ScriptExecuting {
             if failure == "fit-outside" { fitted[0] += 10000 }
             r["cropValues"] = fitted
             if dimensionsFollowRotation { r["sourceDimensions"] = args[6].doubleValue == 0 ? [6000.0, 4000] : [6135.0, 4206] }
+            if failure == "keystone-mismatch" { r["keystoneValues"] = [100.0,99,0,0,0] }
             if failure == "mismatch" { r["rotationDegrees"] = 22.0 }
             if failure == "lens-change" { r["lensValues"] = [0.0,35,0,0,0,0,0,0] }
             records[id] = r
@@ -79,6 +83,7 @@ struct GeometryTests {
     static func run() {
         print("Running GeometryTests...")
         testCorrectedLens()
+        testKeystone()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
@@ -170,6 +175,66 @@ struct GeometryTests {
                 // Continue with a freshly bound reference after each simulated restart.
                 let next = try core.cloneVariant(sourceRef:"1")
                 faultRef = next.workingRef
+            }
+        }
+    }
+
+    private static func testKeystone() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "keystone-db"}, imageDimensions:{_ in [6000,4000]})
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
+            let edit = try core.editVariant(sourceRef:"1",ifState:source.stateHash,ifDocument:doc.openToken)
+            let ref = edit.workingRef, token = source.geometryStateHash!
+            for invalid in [KeystoneAdjustments(), KeystoneAdjustments(amount:9), KeystoneAdjustments(amount:121), KeystoneAdjustments(amount:50.5), KeystoneAdjustments(vertical:76), KeystoneAdjustments(horizontal:-76), KeystoneAdjustments(horizontal:Double.nan), KeystoneAdjustments(skew:Double.infinity), KeystoneAdjustments(aspect:-51)] {
+                XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,keystone:invalid))
+            }
+            XCTAssertThrowsError(try core.geometrySet(workingRef:"1",ifGeometryState:token,keystone:KeystoneAdjustments(vertical:10)))
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:"stale",keystone:KeystoneAdjustments(vertical:10)))
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,keystone:KeystoneAdjustments(vertical:10),dryRun:true))
+            XCTAssertEqual(fake.writeCount,0)
+            fake.normalizePerspective = true
+            let patch = KeystoneAdjustments(amount:80,vertical:12.5,horizontal:-8,skew:3,aspect:10)
+            let applied = try core.geometrySet(workingRef:ref,ifGeometryState:token,rotation:2,aspectRatio:1.5,keystone:patch)
+            XCTAssertEqual(applied.after.keystone,[80,12.5,-8,3,10])
+            XCTAssertEqual(applied.after.crop.width,4000)
+            XCTAssertEqual(applied.after.crop.aspectRatio,1.5,accuracy:0.001)
+            XCTAssertEqual(fake.requestedBeforeWrite?.keystone,patch)
+            XCTAssertTrue(fake.pendingBeforeWrite)
+            XCTAssertEqual(fake.base.values.count,1)
+            let after = try core.get(ref:ref)
+            XCTAssertEqual(after.stateHash,source.stateHash)
+            XCTAssertEqual(journal.find(operationId:applied.operationId)?.intendedGeometry?.keystone,applied.after.keystone)
+            let diff = try core.diff(ref1:ref)
+            XCTAssertNotNil(diff.geometryDiff?["keystone.vertical"])
+            fake.normalizePerspective = false
+            let partial = try core.geometrySet(workingRef:ref,ifGeometryState:applied.geometryStateHash,keystone:KeystoneAdjustments(vertical:0))
+            XCTAssertEqual(partial.after.keystone,[80,0,-8,3,10])
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:applied.geometryStateHash,keystone:patch))
+            let dry = try core.geometryRestore(workingRef:ref,ifGeometryState:partial.geometryStateHash,dryRun:true)
+            XCTAssertEqual(dry.after.keystone,source.geometry!.keystone)
+            let restored = try core.geometryRestore(workingRef:ref,ifGeometryState:partial.geometryStateHash)
+            XCTAssertEqual(restored.after.keystone,source.geometry!.keystone)
+            XCTAssertEqual(restored.after.crop,source.geometry!.crop)
+            XCTAssertEqual(restored.after.rotation,source.geometry!.rotation)
+            for failure in ["keystone-partial", "keystone-mismatch", "lost-reply"] {
+                let fresh = try core.get(ref:"1")
+                let prepared = try core.editVariant(sourceRef:"1",ifState:fresh.stateHash,ifDocument:try core.getDocumentInfo().openToken)
+                fake.failure = failure
+                var operation = ""
+                do { _ = try core.geometrySet(workingRef:prepared.workingRef,ifGeometryState:fresh.geometryStateHash!,keystone:patch); XCTFail("Expected keystone failure") }
+                catch let error as OperationFailure { operation = error.operationId }
+                XCTAssertFalse(operation.isEmpty)
+                XCTAssertEqual(journal.find(operationId:operation)?.requestedGeometry?.keystone,patch)
+                XCTAssertThrowsError(try core.geometryRestore(workingRef:prepared.workingRef,ifGeometryState:fresh.geometryStateHash!))
+                fake.failure = nil; fake.base.generation += "-restart"
+                let recovered = try core.operationStatus(operationId:operation)
+                XCTAssertEqual(recovered.status,"reconciled")
+                XCTAssertThrowsError(try core.get(ref:prepared.workingRef))
             }
         }
     }

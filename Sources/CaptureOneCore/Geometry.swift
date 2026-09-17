@@ -14,6 +14,36 @@ public struct CropRect: Codable, Equatable {
     public var aspectRatio: Double { width / height }
 }
 
+/// Absolute keystone controls. Omitted fields retain their current values.
+public struct KeystoneAdjustments: Codable, Equatable {
+    public var amount: Double?
+    public var vertical: Double?
+    public var horizontal: Double?
+    public var skew: Double?
+    public var aspect: Double?
+    public static let fields = ["amount", "vertical", "horizontal", "skew", "aspect"]
+    public static let ranges: [ClosedRange<Double>] = [10...120, -75...75, -75...75, -45...45, -50...100]
+    public init(amount: Double? = nil, vertical: Double? = nil, horizontal: Double? = nil, skew: Double? = nil, aspect: Double? = nil) {
+        self.amount = amount; self.vertical = vertical; self.horizontal = horizontal; self.skew = skew; self.aspect = aspect
+    }
+    public var values: [Double?] { [amount, vertical, horizontal, skew, aspect] }
+    public func validate() throws {
+        guard values.contains(where: { $0 != nil }) else { throw C1Error.invalidRequest("Provide at least one keystone control.") }
+        for (index, value) in values.enumerated() {
+            if let value {
+                guard value.isFinite, Self.ranges[index].contains(value), index != 0 || value.rounded() == value else {
+                    throw C1Error.invalidRequest("Keystone \(Self.fields[index]) must be within \(Self.ranges[index]); amount must be an integer.")
+                }
+            }
+        }
+    }
+    public func applying(to current: [Double]) throws -> [Double] {
+        try validate()
+        guard current.count == Self.fields.count else { throw C1Error.invalidRequest("Incomplete keystone state.") }
+        return zip(values, current).map { $0 ?? $1 }
+    }
+}
+
 public struct Geometry: Codable, Equatable {
     public var crop: CropRect
     public var rotation: Double
@@ -71,7 +101,7 @@ public struct Geometry: Codable, Equatable {
     }
 
     public func stateHash(tonalHash: String) -> String {
-        // Independent from the legacy tonal hash; includes read-only geometry context.
+        // Independent from the legacy tonal hash; includes mutable geometry and preserved lens/orientation context.
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(self) else { return "geometry-v1:unavailable" }
         let digest = SHA256.hash(data: Data(("geometry-v1|" + tonalHash + "|").utf8) + data)
@@ -113,26 +143,33 @@ public struct Geometry: Codable, Equatable {
                             ("width",before.crop.width,crop.width),("height",before.crop.height,crop.height),("rotation",before.rotation,rotation)] where a != b {
             result[key] = DoubleDiff(before: a, after: b)
         }
+        for (index, name) in KeystoneAdjustments.fields.enumerated() where keystone.count == 5 && before.keystone.count == 5 {
+            if keystone[index] != before.keystone[index] { result["keystone." + name] = DoubleDiff(before: before.keystone[index], after: keystone[index]) }
+        }
         return result
     }
     public func matchesTarget(_ target: Geometry) -> Bool {
-        zip(crop.values, target.crop.values).allSatisfy { abs($0 - $1) <= 2 } && abs(rotation-target.rotation) <= 0.001
+        zip(crop.values, target.crop.values).allSatisfy { abs($0 - $1) <= 2 } &&
+        abs(rotation-target.rotation) <= 0.001 && keystone.count == target.keystone.count &&
+        zip(keystone, target.keystone).allSatisfy { abs($0 - $1) <= 0.001 }
     }
-    public func sameContext(as other: Geometry) -> Bool {
+    public func sameContext(as other: Geometry, includingKeystone: Bool = true) -> Bool {
         orientation == other.orientation && imageWidth == other.imageWidth && imageHeight == other.imageHeight &&
-        flip == other.flip && aspectRatioName == other.aspectRatioName && keystone == other.keystone &&
+        flip == other.flip && aspectRatioName == other.aspectRatioName && (!includingKeystone || keystone == other.keystone) &&
         lensGeometry == other.lensGeometry && lensProfile == other.lensProfile && hideDistortedAreas == other.hideDistortedAreas && cropOutsideImage == other.cropOutsideImage
     }
 }
 
 /// Retained before native dispatch when the final crop depends on bounds that
-/// Capture One can only report after rotation. No fabricated target rectangle.
+/// Capture One can only report after rotation or keystone setters. No fabricated target rectangle.
 public struct GeometryRequest: Codable, Equatable {
     public let crop: CropRect?
     public let rotation: Double
     public let aspectRatio: Double?
+    public let keystone: KeystoneAdjustments?
 
-    public init(crop: CropRect?, rotation: Double, aspectRatio: Double?) throws {
+    public init(crop: CropRect?, rotation: Double, aspectRatio: Double?, keystone: KeystoneAdjustments? = nil) throws {
+        try keystone?.validate()
         guard crop == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
         guard rotation.isFinite, abs(rotation) <= 45 else { throw C1Error.invalidRequest("Rotation must be finite and between -45 and 45 degrees.") }
         if let crop {
@@ -141,7 +178,7 @@ public struct GeometryRequest: Codable, Equatable {
         if let aspectRatio {
             guard aspectRatio.isFinite, aspectRatio > 0 else { throw C1Error.invalidRequest("aspectRatio must be finite and positive.") }
         }
-        self.crop = crop; self.rotation = rotation; self.aspectRatio = aspectRatio
+        self.crop = crop; self.rotation = rotation; self.aspectRatio = aspectRatio; self.keystone = keystone
     }
 }
 

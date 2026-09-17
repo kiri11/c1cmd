@@ -238,6 +238,24 @@ set crop of v to (maximum crop v apply false)""")
             assert rotated['after']['lensGeometry'] == before['geometry']['lensGeometry']
             log('rotation-only', result=rotated, preview=tool('preview', {'ref': ref}))
             tool('geometry_restore', {'workingRef': ref, 'ifGeometryState': rotated['geometryStateHash']})
+        if index in (2, 6):
+            current = cli('get', ref)
+            patch = {'vertical': before['geometry']['keystone'][1] + 3,
+                     'horizontal': before['geometry']['keystone'][2] - 2}
+            corrected = tool('geometry_set', {'workingRef':ref, 'ifGeometryState':current['geometryStateHash'],
+                                             'keystone':patch, 'rotation':2, 'aspectRatio':ratio})
+            expected = list(before['geometry']['keystone'])
+            expected[1], expected[2] = patch['vertical'], patch['horizontal']
+            assert corrected['after']['keystone'] == expected
+            for key in ['lensGeometry', 'lensProfile', 'hideDistortedAreas', 'orientation']:
+                assert corrected['after'][key] == before['geometry'][key]
+            rendered = tool('preview', {'ref':ref})
+            assert abs(rendered['width']/rendered['height']-ratio) < .003
+            restored = tool('geometry_restore', {'workingRef':ref, 'ifGeometryState':corrected['geometryStateHash']})
+            assert restored['after']['keystone'] == before['geometry']['keystone']
+            assert restored['after']['crop'] == before['geometry']['crop']
+            assert cli('get', ref)['stateHash'] == before['stateHash']
+            log('keystone-write', case=index, corrected=corrected, restored=restored, preview=rendered)
         assert cli('get', original['id']) == original
         log('case-passed', case=index)
     # Changed correction values invalidate an earlier geometry token.

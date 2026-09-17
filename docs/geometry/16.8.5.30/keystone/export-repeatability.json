@@ -1,0 +1,26 @@
+[
+  {
+    "before": "before",
+    "after": "restored",
+    "meanAbsoluteChannelError": 0.011974666666666666,
+    "maxChannelError": 10,
+    "changedChannels": 44796,
+    "channels": 4500000
+  },
+  {
+    "before": "restored",
+    "after": "repeat-0",
+    "meanAbsoluteChannelError": 0.010994222222222223,
+    "maxChannelError": 9,
+    "changedChannels": 41740,
+    "channels": 4500000
+  },
+  {
+    "before": "repeat-0",
+    "after": "repeat-1",
+    "meanAbsoluteChannelError": 0.012924666666666666,
+    "maxChannelError": 11,
+    "changedChannels": 48444,
+    "channels": 4500000
+  }
+]

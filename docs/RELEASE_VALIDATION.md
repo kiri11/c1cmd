@@ -1,6 +1,34 @@
 # v0.1 release validation
 
+**Validation policy:** deliberate timeout/process-death tests are optional and run
+only on an explicit user request. Use `make check` and `make qualify` for normal
+validation, retaining mocked failure guards. Changes to dispatch, journaling,
+locking, timeout handling, or reconciliation, and release checkpoints, do not
+automatically authorize `make qualify-recovery` or `make qualify-full`. Report
+actual real-fault coverage separately; an omitted optional campaign is not a
+normal-validation failure.
+
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
+
+## Keystone corrections candidate (2026-09-17 UTC)
+
+Contract **1.8.0** adds manual keystone amount, vertical, horizontal, skew, and
+aspect writes through CLI/MCP, with native bounds, state checks, journaled
+intent, readback verification, diffs, and baseline restore. The
+[keystone report](geometry/16.8.5.30/keystone/README.md) records **844 offline
+assertions**, **25 offline recovery-harness tests**, all **nine regular packaged
+suites**, **13 control cases**, and **two additional lens-combination cases**.
+The initial run stopped on an exact preview-hash assertion; repeated unchanged
+exports established native pixel variance. A strict pixel-error check replaced
+hash equality, and the affected/remaining suites passed on the unchanged archive.
+
+The optional fault campaign was stopped at the user's request after tonal and
+standard-geometry recovery passed. The corrected-lens case was interrupted; its
+pending operation was reconciled after restart without retry, preserving the
+original and RAW and ending with zero unresolved operations and open documents.
+The remaining fault cases were not run, and full real-fault qualification is not
+claimed. This does not block the passing regular feature validation. Distribution
+and Catalog fault-recovery limits remain unchanged.
 
 ## Preserved perspective and lens movements candidate (2026-09-17 UTC)
 

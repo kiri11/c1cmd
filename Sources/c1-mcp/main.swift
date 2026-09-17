@@ -78,14 +78,14 @@ struct C1MCPServer {
             ("schema", "Output JSON Schema for c1 requests and responses.", true),
             ("variants_list", "List variants in the current document or specified collection, optionally filtered by exact or minimum star rating. Filters narrow results without changing UI selection.", true),
             ("variant_edit", "Prepare editing on an existing variant without cloning. Requires ifDocument from doc_info and ifState from get; optionally check ifGeometryState too. Saves its baseline and returns a c1_edit_ reference for supported adjustments and geometry. Does not authorize deletion.", false),
-            ("geometry_restore", "Restore saved crop/rotation for an editing or clone reference. Requires fresh ifGeometryState; refuses changed lens/orientation context. Never delete an existing variant to reject a crop.", false),
+            ("geometry_restore", "Restore saved crop/rotation/keystone for an editing or clone reference. Requires fresh ifGeometryState; refuses changed lens/orientation context. Never delete an existing variant to reject a crop.", false),
             ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Use variant_edit to edit existing variants.", false),
             ("variant_delete", "Delete a c1-managed working clone. (Originals cannot be deleted).", false),
             ("variant_baseline", "Create a managed default-settings baseline variant using native New Variant behavior.", false),
             ("get", "Get adjustments and metadata for a variant or working reference, including current stateHash.", true),
             ("set", "Set absolute adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             ("add", "Apply relative delta adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
-            ("geometry_set", "Set crop and rotation on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Preserves lens distortion, tilt/shift, and keystone using native bounds; rotation dry runs with these corrections are unavailable.", false),
+            ("geometry_set", "Set crop, rotation, and keystone on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Optional keystone object sets amount, vertical, horizontal, skew, or aspect; omitted controls are preserved. Preserves lens distortion and tilt/shift using native bounds. Dry runs cannot predict keystone changes or corrected rotation crops.", false),
             ("reset", "Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             ("diff", "Compare adjustments between two variants or compare a working variant against its baseline.", true),
             ("dump", "Batched export of variants, adjustments, and metadata in JSON format.", true),
@@ -242,9 +242,10 @@ struct C1MCPServer {
                             case "geometry_set":
                                 let crop: CropRect?
                                 if let value = args["crop"] { crop = try JSONDecoder().decode(CropRect.self, from: JSONSerialization.data(withJSONObject: value)) } else { crop = nil }
+                                let keystone = try args["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self, from: JSONSerialization.data(withJSONObject: $0)) }
                                 let result = try SessionController.shared.geometrySet(workingRef: args["workingRef"] as! String,
                                     ifGeometryState: args["ifGeometryState"] as! String, crop: crop,
-                                    rotation: (args["rotation"] as? NSNumber)?.doubleValue, aspectRatio: (args["aspectRatio"] as? NSNumber)?.doubleValue,
+                                    rotation: (args["rotation"] as? NSNumber)?.doubleValue, aspectRatio: (args["aspectRatio"] as? NSNumber)?.doubleValue, keystone: keystone,
                                     dryRun: args["dryRun"] as? Bool ?? false)
                                 return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
                             case "reset":

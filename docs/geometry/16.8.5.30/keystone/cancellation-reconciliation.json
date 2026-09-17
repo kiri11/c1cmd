@@ -1,0 +1,119 @@
+{
+  "reason": "User requested stopping optional timeout tests. No mutation retried.",
+  "operation": {
+    "afterAdjustments": {
+      "contrast": 0,
+      "exposure": 0,
+      "saturation": 0,
+      "temperature": 3200.113037109375,
+      "tint": 0.006856377236545086
+    },
+    "afterGeometry": {
+      "crop": {
+        "centerX": 3003,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "cropOutsideImage": false,
+      "flip": "none",
+      "hideDistortedAreas": true,
+      "imageHeight": 4000,
+      "imageWidth": 6000,
+      "keystone": [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry": [
+        100,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile": "Canon EF 35mm f/1.4L II USM",
+      "maximumCrop": {
+        "centerX": 3002,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "orientation": 0,
+      "rotation": 0
+    },
+    "appInstance": "10572:1789688854.33536",
+    "beforeAdjustments": {
+      "contrast": 0,
+      "exposure": 0,
+      "saturation": 0,
+      "temperature": 3200.113037109375,
+      "tint": 0.006856377236545086
+    },
+    "beforeGeometry": {
+      "crop": {
+        "centerX": 3003,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "cropOutsideImage": false,
+      "flip": "none",
+      "hideDistortedAreas": true,
+      "imageHeight": 4000,
+      "imageWidth": 6000,
+      "keystone": [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry": [
+        100,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile": "Canon EF 35mm f/1.4L II USM",
+      "maximumCrop": {
+        "centerX": 3002,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "orientation": 0,
+      "rotation": 0
+    },
+    "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/recovery.cosessiondb|16777232|4434832|1789688538.415786",
+    "documentPath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery",
+    "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+    "nativeVariantId": "16",
+    "operationId": "15dfc3de-1608-401a-b065-14628333ec6c",
+    "operationType": "geometry_set",
+    "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-fs7pcxtv/recovery/Capture/fixture.CR3",
+    "preconditionStateHash": "geometry-v1:85b6ec2d07276c73c87ec145a059f92198edaa336e1f1baef486b863f07a44fd",
+    "requestedGeometry": {
+      "aspectRatio": 1.5,
+      "rotation": 3
+    },
+    "status": "reconciled",
+    "timestamp": "2026-09-17T23:48:01Z",
+    "workingRef": "c1_wrk_aaa9e4f7-7326-4778-863d-9c9c3834d11d"
+  },
+  "originalPreserved": true,
+  "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "unresolvedOperationsCount": 0,
+  "openDocuments": 0,
+  "oldPID": 10572,
+  "newPID": 10728
+}

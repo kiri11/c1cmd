@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.7.0"
+    public static let version = "1.8.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -25,6 +25,14 @@ public enum ContractSchema {
     }
     public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
+    static var keystoneSchema: [String: Any] {
+        var properties: [String: Any] = [:]
+        for (index, name) in KeystoneAdjustments.fields.enumerated() {
+            properties[name] = ["type": index == 0 ? "integer" : "number", "minimum": KeystoneAdjustments.ranges[index].lowerBound, "maximum": KeystoneAdjustments.ranges[index].upperBound]
+        }
+        var result = object(properties); result["minProperties"] = 1
+        return result
+    }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
         switch name {
@@ -53,8 +61,8 @@ public enum ContractSchema {
             result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
             return result
         case "geometry_set":
-            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "rotation":["type":"number", "minimum":-45, "maximum":45], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
-            result["anyOf"] = ["crop", "rotation", "aspectRatio"].map { ["required": [$0]] }
+            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-45, "maximum":45], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
+            result["anyOf"] = ["crop", "rotation", "aspectRatio", "keystone"].map { ["required": [$0]] }
             result["not"] = ["required": ["crop", "aspectRatio"]]
             return result
         case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
@@ -97,8 +105,8 @@ public enum ContractSchema {
             }
         }
         if tool == "geometry_set" {
-            guard ["crop", "rotation", "aspectRatio"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
-                throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio; crop and aspectRatio are mutually exclusive.")
+            guard ["crop", "rotation", "aspectRatio", "keystone"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
+                throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, or keystone; crop and aspectRatio are mutually exclusive.")
             }
         }
         if tool == "reset", let fields = arguments["fields"] as? [String] {
@@ -167,7 +175,7 @@ public enum ContractSchema {
             "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs]),
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
-            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number], required:["rotation"]), "afterGeometry":geometrySchema])
+            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema])
         ]
         responses["geometry_restore"] = responses["geometry_set"]
         responses["variant_edit"] = object(["workingRef": string, "variantId": string, "documentPath": string, "documentToken": string,

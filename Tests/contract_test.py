@@ -119,7 +119,10 @@ def run(cli, mcp):
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h'}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':46}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':True}),
-            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'keystone':1}),
+            *[('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'keystone':value})
+              for value in [1, {}, {'unknown':1}, {'vertical':True}, {'horizontal':'1'}, {'skew':None},
+                            {'amount':9}, {'amount':121}, {'amount':50.5}, {'vertical':76},
+                            {'horizontal':-76}, {'skew':46}, {'aspect':-51}, {'aspect':101}]],
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'aspectRatio':0}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'width':3}}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'centerX':10,'centerY':10,'width':3,'height':2},'aspectRatio':1.5}),
@@ -139,6 +142,12 @@ def run(cli, mcp):
             assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
         for payload in ['{"exposure": 1, "unknown": 2}', '{"exposure": true}', '{"exposure": "bad", "contrast": 1}', '{}']:
             result = subprocess.run([str(cli), 'set', 'x', '--if-state', 'h', '--json', payload], capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0
+            assert_error_payload(json.loads(result.stderr), cli_schema)
+        for flag, value in [('amount', '9'), ('amount', '120.5'), ('vertical', '76'),
+                            ('horizontal', '-76'), ('skew', 'nan'), ('aspect', '-51')]:
+            result = subprocess.run([str(cli), 'geometry', 'set', 'x', '--if-geometry-state', 'h',
+                                     f'--keystone-{flag}={value}', '--format', 'json'], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
             assert_error_payload(json.loads(result.stderr), cli_schema)
         for crop in ['1,2,bad,3,4', '1,2,,3,4', '1,2,3', '1,2,nan,4']:

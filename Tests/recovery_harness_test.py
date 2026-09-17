@@ -260,6 +260,25 @@ class HarnessTests(unittest.TestCase):
         self.run.cli.assert_any_call('variant', 'delete', 'fresh')
         self.run.clone.assert_called_once()
 
+    def test_keystone_reconciliation_accepts_observed_partial_write_and_preserves_ids(self):
+        for observed in [[100,0,0,0,0], [100,12,0,0,0], [100,12,-7,0,0]]:
+            with self.subTest(observed=observed):
+                self.configure_recovery()
+                normal = self.run.cli.side_effect
+                def cli(*args, **kwargs):
+                    if args[:2] == ('operation', 'status') and self.restarted:
+                        return {'status':'reconciled',
+                                'requestedGeometry':{'keystone':{'vertical':12,'horizontal':-7}},
+                                'beforeGeometry':{'keystone':[100,0,0,0,0],'lensGeometry':[0]},
+                                'afterGeometry':{'keystone':observed,'lensGeometry':[0]}}
+                    if args == ('get', 'fresh'):
+                        return {'geometryStateHash':'fresh-geometry'}
+                    return normal(*args, **kwargs)
+                self.run.cli.side_effect = cli
+                self.run.recovery('operation', {'workingRef':'old-reference'}, 'keystone-geometry-apple-event-timeout')
+                self.run.clone.assert_called_once()
+                self.run.cli.assert_any_call('variant', 'delete', 'fresh')
+
     def test_changed_original_state_or_geometry_still_fails(self):
         for changed in [{'stateHash': 'changed', 'geometry': {'rotation': 0}},
                         {'stateHash': 'original', 'geometry': {'rotation': 3}}]:

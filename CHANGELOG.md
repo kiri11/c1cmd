@@ -1,3 +1,10 @@
+## Unreleased — keystone corrections
+
+- Add absolute keystone amount, vertical, horizontal, skew, and aspect controls to CLI `geometry set` and MCP `geometry_set` (contract 1.8.0), including the composition profile.
+- Preserve omitted controls, tonal edits, lens settings, and native variant identity. Validate native ranges before dispatch, obtain fresh crop bounds after transforms, and verify all five controls on readback.
+- Include keystone changes in diffs and durable geometry requests. Restore baseline keystone with crop/rotation through `geometry_restore`; reject predictive dry runs for keystone changes.
+- Add CLI/MCP control-range, preview, restoration, and referenced-Catalog coverage, plus an optional keystone timeout-recovery test case. Require an explicit user request before running timeout/process-death tests. See [qualification](docs/geometry/16.8.5.30/keystone/README.md).
+
 ## Unreleased — preserved keystone and lens movements
 
 - Enable crop, rotation, ratio fitting, context preview, and baseline restoration while preserving existing keystone and lens tilt/shift on Capture One 16.8.5.30 (contract 1.7.0).

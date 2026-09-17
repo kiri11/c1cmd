@@ -943,17 +943,17 @@ public final class SessionController {
         }
     }
 
-    // MARK: - Crop and rotation
+    // MARK: - Crop, rotation, and keystone
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
-                            rotation: Double? = nil, aspectRatio: Double? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
-        try mutateGeometry(workingRef: workingRef, expected: expected, crop: crop, rotation: rotation, aspectRatio: aspectRatio, dryRun: dryRun, restore: false)
+                            rotation: Double? = nil, aspectRatio: Double? = nil, keystone: KeystoneAdjustments? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
+        try mutateGeometry(workingRef: workingRef, expected: expected, crop: crop, rotation: rotation, aspectRatio: aspectRatio, keystone: keystone, dryRun: dryRun, restore: false)
     }
 
     public func geometryRestore(workingRef: String, ifGeometryState expected: String, dryRun: Bool = false) throws -> GeometryMutationResult {
-        try mutateGeometry(workingRef: workingRef, expected: expected, crop: nil, rotation: nil, aspectRatio: nil, dryRun: dryRun, restore: true)
+        try mutateGeometry(workingRef: workingRef, expected: expected, crop: nil, rotation: nil, aspectRatio: nil, keystone: nil, dryRun: dryRun, restore: true)
     }
 
-    private func mutateGeometry(workingRef: String, expected: String, crop: CropRect?, rotation: Double?, aspectRatio: Double?, dryRun: Bool, restore: Bool) throws -> GeometryMutationResult {
+    private func mutateGeometry(workingRef: String, expected: String, crop: CropRect?, rotation: Double?, aspectRatio: Double?, keystone: KeystoneAdjustments?, dryRun: Bool, restore: Bool) throws -> GeometryMutationResult {
         return try lock.withLock {
             let doc = try getDocumentInfo()
             let operation = restore ? "geometry_restore" : "geometry_set"
@@ -972,29 +972,35 @@ public final class SessionController {
                 throw C1Error.invalidRequest(current.geometryUnavailableReason ?? "Geometry unavailable.")
             }
             guard state == expected else { throw C1Error.stateChanged("Geometry precondition no longer matches; read get again.") }
+            var requestedContext = before
+            if let keystone { requestedContext.keystone = try keystone.applying(to: before.keystone) }
+            let keystoneChanged = requestedContext.keystone != before.keystone
             var target: Geometry?
             var nativeRequest: GeometryRequest?
             if restore {
                 guard let baseline, baseline.unsupportedReason == nil, before.unsupportedReason == nil,
-                      before.sameContext(as: baseline) else {
-                    throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation.")
+                      before.sameContext(as: baseline, includingKeystone: false) else {
+                    throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation/keystone.")
                 }
                 // This exact crop was observed on this image with the same lens/orientation
                 // context. It may legitimately exceed the conservative bounds for NEW crops.
                 var restored = before
-                restored.crop = baseline.crop; restored.rotation = baseline.rotation
+                restored.crop = baseline.crop; restored.rotation = baseline.rotation; restored.keystone = baseline.keystone
                 target = restored
-            } else if before.requiresNativeBounds {
+            } else if before.requiresNativeBounds || keystone != nil {
                 if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
-                guard crop != nil || rotation != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
+                guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
+                if dryRun && keystoneChanged {
+                    throw C1Error.invalidRequest("Keystone changes require native execution; dry runs cannot predict the final crop.")
+                }
                 if dryRun && before.hasPerspectiveOrMovements && aspectRatio != nil {
                     throw C1Error.invalidRequest("Perspective and movement ratio fits require native crop normalization; dry runs cannot predict the final crop.")
                 }
-                nativeRequest = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio)
+                nativeRequest = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio, keystone: keystone)
                 // Validate all knowable bounds before dispatch. At a new rotation,
                 // Capture One supplies bounds after its rotation setter executes.
-                if nativeRequest!.rotation == before.rotation || dryRun {
-                    target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
+                if !keystoneChanged && (nativeRequest!.rotation == before.rotation || dryRun) {
+                    target = try before.target(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio)
                 }
             } else {
                 target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
@@ -1017,25 +1023,26 @@ public final class SessionController {
                 if let request = nativeRequest {
                     let applied: CorrectedGeometryResult = try executor.executeAndDecode(handler: "applyCorrectedGeometry", args: arguments + [
                         request.crop.map { NSAppleEventDescriptor(list: $0.values.map { NSAppleEventDescriptor(double: $0) }) } ?? .missingValue(),
-                        NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue()])
+                        NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue(),
+                        NSAppleEventDescriptor(list: requestedContext.keystone.map { NSAppleEventDescriptor(double: $0) })])
                     guard applied.targetCropValues.count == 4, applied.boundsValues.count == 4,
                           applied.targetCropValues.allSatisfy({ $0.isFinite }), applied.boundsValues.allSatisfy({ $0.isFinite }) else {
                         throw C1Error.readbackMismatch("Corrected geometry native target or bounds are malformed.")
                     }
                     let c = applied.targetCropValues, b = applied.boundsValues
-                    let nativeRotationOnly = request.crop == nil && request.aspectRatio == nil
+                    let nativeCropUnchangedByCaller = request.crop == nil && request.aspectRatio == nil
                     guard c[2] >= 1, c[3] >= 1, b[2] > 0, b[3] > 0,
-                          nativeRotationOnly || (abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2 && abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2) else {
+                          nativeCropUnchangedByCaller || (abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2 && abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2) else {
                         throw C1Error.readbackMismatch("Corrected geometry target exceeds the native bounds.")
                     }
-                    var resolved = before
+                    var resolved = requestedContext
                     resolved.rotation = request.rotation
                     resolved.crop = CropRect(centerX: c[0], centerY: c[1], width: c[2], height: c[3])
                     if let crop = request.crop, resolved.crop != crop { throw C1Error.readbackMismatch("Native crop differs from the explicit request.") }
                     if let ratio = request.aspectRatio, abs(c[2] - c[3]*ratio) > max(2, ratio*2) {
                         throw C1Error.readbackMismatch("Native crop does not match the requested aspect ratio.")
                     }
-                    if before.hasPerspectiveOrMovements, let ratio = request.aspectRatio {
+                    if (before.hasPerspectiveOrMovements || requestedContext.hasPerspectiveOrMovements || keystoneChanged), let ratio = request.aspectRatio {
                         guard let fit = applied.fittedCropValues, fit.count == 4,
                               fit.allSatisfy({ $0.isFinite }), fit[2] >= 1, fit[3] >= 1,
                               abs(fit[0]-c[0])+fit[2]/2 <= c[2]/2+2,
@@ -1052,13 +1059,14 @@ public final class SessionController {
                     try journal.append(entry: entry)
                 } else {
                     let _: GeometryRecord = try executor.executeAndDecode(handler: "applyGeometry", args: arguments + [
-                        NSAppleEventDescriptor(list: target!.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target!.rotation)])
+                        NSAppleEventDescriptor(list: target!.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target!.rotation),
+                        NSAppleEventDescriptor(list: target!.keystone.map { NSAppleEventDescriptor(double: $0) })])
                 }
                 let readback = try get(ref: workingRef)
                 guard let after = readback.geometry else { throw C1Error.readbackMismatch("Geometry missing after write.") }
-                guard after.matchesTarget(target!), after.sameContext(as: before), readback.stateHash == current.stateHash else {
+                guard after.matchesTarget(target!), after.sameContext(as: before, includingKeystone: false), readback.stateHash == current.stateHash else {
                     try journal.update(operationId: entry.operationId, status: "partial-failure", afterAdjustments: readback.adjustments, afterGeometry: after)
-                    throw C1Error.readbackMismatch("Crop/rotation or preserved settings did not match; inspect operation status.")
+                    throw C1Error.readbackMismatch("Crop/rotation/keystone or preserved settings did not match; inspect operation status.")
                 }
                 let diff = after.changes(from: before)
                 try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: readback.adjustments, diff: diff, afterGeometry: after)
@@ -1359,7 +1367,7 @@ public final class SessionController {
             "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
                               "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
                               "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
-            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": false],
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation", "keystone"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": true, "keystoneChangeDryRun": false, "keystoneControls": ContractSchema.keystoneSchema],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,
