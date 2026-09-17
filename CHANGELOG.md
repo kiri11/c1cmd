@@ -1,3 +1,10 @@
+## Unreleased — corrected-lens crop and rotation
+
+- Support preserved distortion correction from 0 through 100 on Capture One 16.8.5.30, using native bounds for crops, ratio fits, rotation, and full-frame context previews.
+- Query bounds after corrected-lens rotation inside the journaled operation. Retain `requestedGeometry` before dispatch and the resolved target afterward (contract 1.6.0); reject dry runs that would require a new native rotation.
+- Keep lens tilt/shift, keystone, flips, and crop-outside-image blocked. Preserve baseline restoration, state checks, and uncertain-mutation recovery.
+- Add corrected-lens CLI/MCP, preview-coordinate, preservation, and timeout-recovery qualification. See [evidence and limits](docs/geometry/16.8.5.30/lens/README.md).
+
 ## Unreleased — filtered inventory and request progress
 
 - Filter ratings before fetching full summaries. Use qualified native predicates and bulk IDs for Capture One 16.8.5.30 Sessions, with a bounded rating-scan fallback for Catalogs and other allowed builds.

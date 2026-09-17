@@ -23,6 +23,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
@@ -256,6 +257,10 @@ class Run:
         assert reconciled['status'] == 'reconciled'
         if label == 'geometry-apple-event-timeout':
             assert reconciled.get('beforeGeometry') and reconciled.get('intendedGeometry') and reconciled.get('afterGeometry')
+        if label == 'corrected-geometry-apple-event-timeout':
+            assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry')
+            assert reconciled['requestedGeometry']['rotation'] == 3
+            assert reconciled['afterGeometry']['lensGeometry'] == reconciled['beforeGeometry']['lensGeometry']
         stale = self.cli('get', clone['workingRef'], ok=False)
         assert stale['error']['code'] == 'document-changed', stale
         assert self.identities() == before, 'Recovery must not create/adopt/delete variants'
@@ -265,7 +270,9 @@ class Run:
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
-        if label == 'geometry-apple-event-timeout':
+        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout'):
+            if label == 'corrected-geometry-apple-event-timeout':
+                self.enable_lens_correction(fresh)
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
         self.cli('variant', 'delete', fresh['workingRef'])
@@ -273,8 +280,27 @@ class Run:
         self.log('case-passed', case=label, operationId=operation,
                  rawSHA256=sha(self.raw), observations=reconciled, shutdownMode=self.shutdown_mode)
 
-    def apple_event_timeout(self, geometry=False):
+    def enable_lens_correction(self, clone):
+        current = self.cli('get', clone['workingRef'])
+        entry = dict(self.records()[-1], operationId=str(uuid.uuid4()), operationType='lens-fixture',
+                     status='pending', workingRef=clone['workingRef'], nativeVariantId=current['id'],
+                     beforeGeometry=current['geometry'])
+        def append():
+            with self.journal.open('a') as stream:
+                stream.write(json.dumps(entry)+'\n'); stream.flush(); os.fsync(stream.fileno())
+        append()
+        self.log('corrected-lens-fixture-pending', operationId=entry['operationId'], nativeVariantId=current['id'])
+        ae(f'set distortion of lens correction of variant id {json.dumps(current["id"])} of current document to 100')
+        observed = self.cli('get', clone['workingRef'])
+        assert observed['geometry']['lensGeometry'][0] == 100
+        entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
+        return observed
+
+    def apple_event_timeout(self, geometry=False, corrected=False):
         clone, current = self.clone()
+        if corrected:
+            assert geometry
+            current = self.enable_lens_correction(clone)
         known = {r['operationId'] for r in self.records()}
         pid = self.pid()
         # Watchdog is independent of this controller. Never leave the GUI suspended.
@@ -309,7 +335,8 @@ class Run:
                 self.child.kill()
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
-        self.recovery(pending['operationId'], clone, 'geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        label = 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        self.recovery(pending['operationId'], clone, label)
 
     def preview_timeout(self):
         clone, _ = self.clone()
@@ -414,10 +441,11 @@ class Run:
         self.log('clone-readback-regression-passed', cycles=10)
         self.apple_event_timeout()
         self.apple_event_timeout(geometry=True)
+        self.apple_event_timeout(geometry=True, corrected=True)
         self.preview_timeout()
         self.mcp_death()
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=4, rawSHA256=sha(self.raw),
+        self.log('all-cases-passed', cases=5, rawSHA256=sha(self.raw),
                  shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
 
     def finish(self):

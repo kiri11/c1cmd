@@ -2,6 +2,14 @@
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
+## Corrected-lens development candidate (2026-09-17 UTC)
+
+Contract **1.6.0** permits crop and rotation with preserved lens distortion correction in 0...100 on Capture One **16.8.5.30**. Corrected bounds come from native `maximum crop ... apply false`; new rotations obtain fresh bounds inside the journaled operation. `requestedGeometry` records intent before those bounds are known. A corrected-lens rotation dry run is rejected; uncertain failures retain the existing write block and restart/reconciliation rules.
+
+The [corrected-lens report](geometry/16.8.5.30/lens/README.md) covers six packaged cases, all four orientations, both hide-distorted-areas settings, signed rotations through ±45 degrees, off-center preview-coordinate checks, baseline restoration, and unchanged source/RAW bytes. **728/728 offline assertions** and **22 recovery-harness tests** passed, followed by extracted CLI, MCP, standard geometry, corrected-lens, Catalog, existing-variant, and inventory suites with build resource fallback hidden.
+
+**All five recovery cases passed** with explicit SIGTERM shutdown: real tonal timeout, standard geometry timeout, corrected-lens geometry timeout, preview timeout, and MCP process death. The full `make qualify` invocation exited zero and finished with zero open documents, preserving native IDs, source state, corrections, and RAW bytes. The corrected-lens fixture is a single Canon CR3 with the Canon EF 35mm f/1.4L II USM profile, not a 70–200 mm or multi-lens campaign. Tilt/shift, perspective, flips, crop-outside-image, other application builds, native graceful quit, Catalog fault recovery, and general binary-distribution gates remain outside this extension. This candidate supersedes the runtime payloads below; earlier failed attempts remain recorded in its report.
+
 ## Inventory and diagnostics development candidate (2026-09-16 UTC)
 
 Contract **1.5.0** adds `request_status` (20 MCP tools), native rating filtering on qualified Sessions, bounded inventory with a conservative Catalog fallback, background diagnostics, CLI/MCP progress, and read cancellation/deadlines between Apple Events. Mutation journaling and restart-based reconciliation remain mandatory.

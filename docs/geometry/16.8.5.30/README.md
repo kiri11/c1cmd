@@ -1,5 +1,7 @@
 # Crop and rotation qualification — Capture One 16.8.5.30
 
+This report records the original geometry milestone. The subsequent [corrected-lens extension](lens/README.md) qualifies nonzero distortion with native bounds and supersedes the distortion rejection below; other exclusions remain.
+
 Scope: managed clones in one Session, sequential calls, no UI edits or competing exports. Crop and absolute rotation only; existing color/layers/lens settings remain intact. Photographer acceptance and separate-shoot composition evaluation remain pending. Distribution gates in [release validation](../../RELEASE_VALIDATION.md) remain unchanged.
 
 ## Evidence

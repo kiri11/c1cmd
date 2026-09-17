@@ -46,7 +46,7 @@ qualify:
 	$(MAKE) check
 	$(MAKE) archive
 	mkdir -p "$(EVIDENCE_DIR)"
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)"
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)"
 	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))/recovery"
 
 install: build

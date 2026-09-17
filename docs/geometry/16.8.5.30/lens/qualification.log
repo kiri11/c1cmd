@@ -1,0 +1,971 @@
+/Library/Developer/CommandLineTools/usr/bin/make check
+swift build
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/9] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (4.26s)
+/usr/bin/time -p .build/debug/CaptureOneCoreTests
+=== Starting CaptureOneCore Unit Test Suite ===
+Running FieldSpecTests...
+Running StateHashTests...
+Running WorkingReferenceTests...
+Running ProvenanceStoreTests...
+Running OperationJournalTests...
+Running LockTests...
+Running ResetTests...
+Running DiffTests...
+Running DumpTests...
+Running CatalogGuardTests...
+Running CatalogEditingTests...
+Running ExistingVariantTests...
+Running VersionCompatibilityTests...
+Running ReleaseSafetyTests...
+Running RatingFilterTests...
+Running InventoryTests...
+Running RequestContextTests...
+Running GeometryTests...
+
+=== Test Results ===
+Total Assertions : 728
+Passed           : 728
+Failed           : 0
+SUCCESS: All unit tests passed!
+real 3.79
+user 0.59
+sys 0.16
+C1_TEST_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1" C1_TEST_MCP_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal mutation tools
+real 1.51
+user 0.58
+sys 0.26
+python3 -B Tests/recovery_harness_test.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.036s
+
+OK
+/Library/Developer/CommandLineTools/usr/bin/make archive
+swift build -c release
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for production...
+[2/6] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (0.65s)
+./scripts/package-release.sh v0.1.0 .build/release dist
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.uiD2yq3N85/c1-v0.1.0-macos-arm64/bin/c1: replacing existing signature
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.uiD2yq3N85/c1-v0.1.0-macos-arm64/bin/c1-mcp: replacing existing signature
+mkdir -p "/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2"
+C1_TEST_RAW_FIXTURE="/private/tmp/c1-geometry-live-j99twntf/geometry/Capture/2U6A7257.CR3" C1_GEOMETRY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/geometry" C1_LENS_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/lens" C1_CATALOG_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/catalog" C1_EXISTING_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/existing" C1_INVENTORY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "dist/c1-v0.1.0-macos-arm64.tar.gz"
+PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal mutation tools
+PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation
+TIMING archive and contract: 1.926s
+Running integration_test.py using extracted binaries with build resources hidden
+=== c1 M1 End-to-End Integration Verification ===
+Initial document path: None
+
+[Step 1] Creating disposable Session at /private/tmp/c1-m1-e2e...
+Copied RAW fixture: /private/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/Capture/fixture.CR3 (SHA-256: 2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868)
+
+[Step 2] Testing c1 doctor...
+PASS: doctor healthy on 16.8.5.30 for session c1-m1-e2e.cosessiondb
+
+[Step 3] Testing c1 doc info...
+PASS: doc info verified (token: 99049:1789680920.334167|/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4393403|1789680966.4008021)
+
+[Step 4] Testing c1 variants list...
+PASS: found variant ID 1 (fixture)
+
+[Step 5] Testing c1 get on original variant 1...
+PASS: initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a, adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 6] Testing c1 variant clone 1...
+PASS: created working clone c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272 (native ID: 2)
+
+[Step 7] Testing safety check: rejecting mutation to original variant 1...
+PASS: core rejected mutation on original: unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 8] Testing c1 set on working variant c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272...
+PASS: set applied accurately (new hash: 2c07831efb75a80d9cf62b83d49e12392386639fb58acc01e7a755bdcbc29baf)
+
+[Step 9] Testing c1 add on working variant c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272...
+PASS: add delta applied accurately (0.75 - 0.25 = 0.5, new hash: 667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56)
+
+[Step 10] Testing optimistic concurrency conflict detection...
+PASS: stale hash rejected: state-changed: Optimistic concurrency conflict for 'c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272'. Expected stateHash 'b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a', but actual is '667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56'.
+
+[Step 11] Testing c1 preview on working variant c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272...
+PASS: preview generated and decoded: /private/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/Output/c1-previews/2aeed620-58aa-4482-a524-7e4943589e45/preview.jpg (1500x1000 px, size: 178730 B)
+PASS: custom output routing ignores stale JPEG and associates variant/state
+
+[Step 12] Verifying core invariants (Original variant & RAW file)...
+PASS: Original variant adjustments and RAW SHA-256 strictly preserved!
+
+[Step 13] Testing c1 variant delete c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272...
+PASS: working variant c1_wrk_3a01a7b9-ac70-4626-b55a-8832738e5272 (clone 2) cleanly deleted.
+PASS: RAW file still 100% byte-for-byte identical after variant deletion.
+
+[Step 14] Testing examples/grade-folder.py workflow...
+=== c1 Automated Grading Workflow ===
+Preset : /Users/kiri11/projects/c1cmd/examples/presets/daylight.json
+Binary : /private/tmp/c1-release-live-sebxn7co/c1-v0.1.0-macos-arm64/bin/c1
+Dry run: False
+
+[1/4] Running c1 doctor check...
+Capture One 16.8.5.30 running. Document: c1-m1-e2e.cosessiondb
+
+[2/4] Inspecting active document info...
+Document path: /tmp/c1-m1-e2e-qccs51av/c1-m1-e2e
+Open token   : 99049:1789680920.334167|/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4393403|1789680966.4008021
+Preset adjustments: {'exposure': 0.25, 'contrast': 8.0, 'saturation': -5.0, 'temperature': 5600.0, 'tint': 2.5}
+
+[3/4] Found 1 total variants.
+Original variants to process: 1
+
+[4/4] Processing variants...
+
+--- [1/1] Variant 1 (fixture) ---
+  Editing reference: c1_wrk_8ae1ca40-e971-4981-ac4e-9f47ec477b99
+  Initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+  Applying preset adjustments...
+  Applied! New stateHash: d66d4eab0a40c286ef2c6d89c62edd14476080087e48a0e90059b5d1c922fe96
+  Rendering preview...
+  Preview ready: /private/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/Output/c1-previews/49853b99-6aec-4c3f-9721-43c2d059f92f/preview.jpg (1500x1000 px)
+  Saved decision record: /tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/.c1/decisions/c1_wrk_8ae1ca40-e971-4981-ac4e-9f47ec477b99.json
+
+=======================================================
+Grading Complete — Summary for Photographer Review:
+=======================================================
+WORKING REF                           SOURCE    STATUS      PREVIEW
+--------------------------------------------------------------------------------
+c1_wrk_8ae1ca40-e971-4981-ac4e-9f47ec477b99  1         READY       /private/tmp/c1-m1-e2e-qccs51av/c1-m1-e2e/Output/c1-previews/49853b99-6aec-4c3f-9721-43c2d059f92f/preview.jpg
+
+Review the clones. To discard one: c1 variant delete <workingRef>
+
+PASS: examples/grade-folder.py completed successfully!
+
+[Step 15] Testing c1 variant baseline on source variant...
+PASS: created managed baseline variant c1_wrk_2dc7a934-3ca1-497e-a3c4-7d4d18380df1 (native ID: 4)
+PASS: retrieved baseline adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 16] Testing c1 diff on mutated working variant...
+PASS: single-ref diff accurately computed against baseline
+PASS: two-ref diff accurately computed between native variants 1 and 4
+PASS: human-formatted diff output verified
+
+[Step 17] Testing c1 reset on mutated working variant...
+PASS: selective reset of exposure verified (contrast remained untouched)
+PASS: full reset restored all fields and returned stateHash to baseline b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+
+[Step 18] Testing c1 dump in Session...
+PASS: c1 dump produced 2 valid JSONL records
+PASS: c1 dump human table verified
+
+[Step 19] Testing Catalog read-only detection & mutation guards...
+PASS: c1 doctor passes on Catalog (isSession=False, allChecksPassed=True)
+PASS: c1 doc info returns isSession=False on Catalog
+PASS: Catalog guard strictly blocked clone (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked set (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'set' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked reset (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'reset' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked baseline (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'baseline' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked delete (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'delete' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'add' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'add' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'geometry' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'geometry_set' is blocked for 'c1-cat-guard-test'.)
+
+=======================================================
+ALL M1 & M2 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!
+=======================================================
+
+[Cleanup] Cleaning up test session and temporary documents...
+Cleanup completed.
+TIMING integration_test.py: 44.619s
+Running mcp_test.py using extracted binaries with build resources hidden
+=== c1-mcp Stdio Server Comprehensive Test Suite ===
+Initial document path: None
+
+[Step 0] Creating disposable Session at /private/tmp/c1-mcp-e2e...
+Waiting for Capture One to index fixture variant...
+  ✓ RAW variant indexed by Capture One
+
+[Step 1] Testing MCP initialization handshake...
+  ✓ Handshake successful: c1-mcp v0.1.0 ready
+
+[Step 2] Testing tools/list and schema inspection...
+  ✓ All 20 tools discovered with complete schemas: ['add', 'capabilities', 'diff', 'doc_info', 'doctor', 'dump', 'geometry_restore', 'geometry_set', 'get', 'operation_status', 'preview', 'request_status', 'reset', 'schema', 'set', 'variant_baseline', 'variant_clone', 'variant_delete', 'variant_edit', 'variants_list']
+
+[Step 3] Testing read-only metadata tools...
+  ✓ Metadata tools verified. Active Session: 'c1-mcp-e2e.cosessiondb' (token: 99049:1789680920.334167|/tmp/c1-mcp-e2e-lslh_7ua/c1-mcp-e2e/c1-mcp-e2e.cosessiondb|16777232|4393731|1789681011.5463986)
+
+[Step 4] Testing doctor tool...
+  ✓ Doctor diagnostic passed. Build: 16.8.5.30 (matched: True)
+
+[Step 5] Testing variants_list and dump tools...
+  ✓ Listed 1 variant(s). Source ID '1', Name 'fixture'
+  ✓ Dump returned 1 comprehensive record(s)
+
+[Step 6] Testing safety guard: rejecting mutation on unmanaged variant...
+  ✓ Unmanaged variant mutation blocked: [unmanaged-variant] unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 7] Testing variant_clone, variant_baseline, and get tools...
+  ✓ Created working clone: c1_wrk_15f129fa-7350-4a52-8e0b-a75db082d9e5 (baseline hash: b4d3341df126...)
+  ✓ Created managed baseline variant: c1_wrk_1dde9e37-f69c-4012-948d-9d7c61f62325
+
+[Step 8] Testing set, add, diff, and reset tools on working clone...
+  ✓ 'set' applied successfully. New stateHash: 64b31405ca1f...
+  ✓ 'diff' against baseline confirmed changed adjustments
+  ✓ 'add' delta applied (-0.10 EV -> 0.25 EV)
+  ✓ 'reset' restored adjustments to baseline stateHash: b4d3341df126...
+
+[Step 9] Testing preview (with MCP image block) and variant_delete...
+  ✓ Preview metadata: 1500x1000 (160776 bytes), SHA-256: 3be7e69bd1e5...
+  ✓ Image content block validated: 160776 bytes base64-decoded, valid JPEG header confirmed
+  ✓ Cleaned up working clone c1_wrk_15f129fa-7350-4a52-8e0b-a75db082d9e5
+  ✓ Cleaned up baseline variant c1_wrk_1dde9e37-f69c-4012-948d-9d7c61f62325
+
+[Step 10] Testing Catalog fail-closed mutation guard over MCP...
+  ✓ Open document is Catalog: 'c1-cat-guard-test'
+  ✓ Catalog mutation guard verified over MCP: invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.
+
+=======================================================
+ALL c1-mcp INTEGRATION TESTS PASSED SUCCESSFULLY!
+Total Test Steps : 10
+Passed           : 10
+=======================================================
+TIMING mcp_test.py: 21.390s
+Running geometry_integration_test.py using extracted binaries with build resources hidden
+PASS: geometry CLI/MCP, ratios, rotations, off-center crop, full-frame context, orientation, original/RAW preservation
+/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/geometry
+TIMING geometry_integration_test.py: 92.709s
+Running lens_geometry_integration_test.py using extracted binaries with build resources hidden
+environment 
+fixture-pending 
+rotated-ratio 0
+preview-mapping 0
+rotation-only 
+case-passed 0
+fixture-pending 
+rotated-ratio 1
+preview-mapping 1
+case-passed 1
+fixture-pending 
+rotated-ratio 2
+preview-mapping 2
+case-passed 2
+fixture-pending 
+rotated-ratio 3
+preview-mapping 3
+case-passed 3
+fixture-pending 
+rotated-ratio 4
+case-passed 4
+fixture-pending 
+rotated-ratio 5
+case-passed 5
+fixture-pending 
+fixture-pending 
+passed 
+TIMING lens_geometry_integration_test.py: 159.928s
+Running catalog_integration_test.py using extracted binaries with build resources hidden
+environment
+native-backup-created
+default-and-wrong-path-denied
+default-output-fixture
+clone-edit-preview-diff-delete
+passed
+TIMING catalog_integration_test.py: 45.931s
+Running existing_variant_integration_test.py using extracted binaries with build resources hidden
+environment
+passed-session
+passed-catalog
+passed
+TIMING existing_variant_integration_test.py: 106.141s
+Running inventory_integration_test.py using extracted binaries with build resources hidden
+PASS 12-document-sparse-exact5: 0.582s; legacy 0.932s; matches 1
+PASS 12-collection-sparse-rating0: 1.328s; legacy 0.977s; matches 11
+PASS 12-selected-sparse-min0: 0.928s; legacy 0.584s; matches 6
+PASS 12-document-dense-min5: 1.349s; legacy 0.969s; matches 12
+PASS 12-collection-dense-min0: 1.372s; legacy 0.980s; matches 12
+PASS 12-selected-dense-exact5: 0.908s; legacy 0.591s; matches 6
+PASS 12-collection-selected-min4: 0.983s; legacy 0.593s; matches 6
+PASS 12-empty-exact4: 0.443s; legacy 0.946s; matches 0
+PASS 120-document-sparse-exact5: 0.582s; legacy 7.789s; matches 1
+PASS 120-collection-sparse-rating0: 9.086s; legacy 7.673s; matches 119
+PASS 120-selected-sparse-min0: 4.849s; legacy 4.051s; matches 60
+PASS 120-document-dense-min5: 9.256s; legacy 7.824s; matches 120
+PASS 120-collection-dense-min0: 9.498s; legacy 7.805s; matches 120
+PASS 120-selected-dense-exact5: 4.717s; legacy 4.267s; matches 60
+PASS 120-collection-selected-min4: 4.751s; legacy 4.003s; matches 60
+PASS 120-empty-exact4: 0.430s; legacy 7.821s; matches 0
+{
+  "generatedAt": "2026-09-17T21:46:36.713515+00:00",
+  "referenceMode": "legacy-applescript",
+  "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "sourceRawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "candidateCounts": [
+    12,
+    120
+  ],
+  "cases": [
+    {
+      "label": "12-document-sparse-exact5",
+      "scope": "document",
+      "selected": false,
+      "rating": 5,
+      "minRating": null,
+      "resultCount": 1,
+      "referenceElapsedSeconds": 0.931859207994421,
+      "referenceOverheadDifferenceSeconds": 0.3499521250050748,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.5819070829893462,
+      "status": {
+        "requestId": "req-88956fc1-7523-4249-996d-d5d06d4ef032",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 568,
+        "candidatesScanned": 1,
+        "matchesFound": 1,
+        "summariesCompleted": 1,
+        "totalCandidates": 1,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-collection-sparse-rating0",
+      "scope": "collection",
+      "selected": false,
+      "rating": 0,
+      "minRating": null,
+      "resultCount": 11,
+      "referenceElapsedSeconds": 0.9766878749942407,
+      "referenceOverheadDifferenceSeconds": -0.3510642080073012,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 1.327752083001542,
+      "status": {
+        "requestId": "req-d35e5650-c0af-4bb8-9e28-8d068b972438",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 1313,
+        "candidatesScanned": 11,
+        "matchesFound": 11,
+        "summariesCompleted": 11,
+        "totalCandidates": 11,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-selected-sparse-min0",
+      "scope": "document",
+      "selected": true,
+      "rating": null,
+      "minRating": 0,
+      "resultCount": 6,
+      "referenceElapsedSeconds": 0.5843295839877101,
+      "referenceOverheadDifferenceSeconds": -0.3433295820141211,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.9276591660018312,
+      "status": {
+        "requestId": "req-d7cabcc6-110e-41aa-a361-495c5f4373c0",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 909,
+        "candidatesScanned": 6,
+        "matchesFound": 6,
+        "summariesCompleted": 6,
+        "totalCandidates": 6,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-document-dense-min5",
+      "scope": "document",
+      "selected": false,
+      "rating": null,
+      "minRating": 5,
+      "resultCount": 12,
+      "referenceElapsedSeconds": 0.968604708003113,
+      "referenceOverheadDifferenceSeconds": -0.38004387498949654,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 1.3486485829926096,
+      "status": {
+        "requestId": "req-06921abc-ec3b-45d2-9ee1-3735352bfb13",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 1328,
+        "candidatesScanned": 12,
+        "matchesFound": 12,
+        "summariesCompleted": 12,
+        "totalCandidates": 12,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-collection-dense-min0",
+      "scope": "collection",
+      "selected": false,
+      "rating": null,
+      "minRating": 0,
+      "resultCount": 12,
+      "referenceElapsedSeconds": 0.9795960420015035,
+      "referenceOverheadDifferenceSeconds": -0.3928850410011364,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 1.37248108300264,
+      "status": {
+        "requestId": "req-a9861bf5-15cc-4883-b30b-b4b81e759f10",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 1351,
+        "candidatesScanned": 12,
+        "matchesFound": 12,
+        "summariesCompleted": 12,
+        "totalCandidates": 12,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-selected-dense-exact5",
+      "scope": "document",
+      "selected": true,
+      "rating": 5,
+      "minRating": null,
+      "resultCount": 6,
+      "referenceElapsedSeconds": 0.5905660830030683,
+      "referenceOverheadDifferenceSeconds": -0.3171149999980116,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.90768108300108,
+      "status": {
+        "requestId": "req-a6d2d02f-6756-4825-848e-aca3642a4d58",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 889,
+        "candidatesScanned": 6,
+        "matchesFound": 6,
+        "summariesCompleted": 6,
+        "totalCandidates": 6,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-collection-selected-min4",
+      "scope": "collection",
+      "selected": true,
+      "rating": null,
+      "minRating": 4,
+      "resultCount": 6,
+      "referenceElapsedSeconds": 0.5925942920002853,
+      "referenceOverheadDifferenceSeconds": -0.3906607490062015,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.9832550410064869,
+      "status": {
+        "requestId": "req-de30bc25-52d5-4fd4-a2a3-6eb6d2c0141a",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 962,
+        "candidatesScanned": 6,
+        "matchesFound": 6,
+        "summariesCompleted": 6,
+        "totalCandidates": 6,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "12-empty-exact4",
+      "scope": "document",
+      "selected": false,
+      "rating": 4,
+      "minRating": null,
+      "resultCount": 0,
+      "referenceElapsedSeconds": 0.9462771249964135,
+      "referenceOverheadDifferenceSeconds": 0.5032398749899585,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.443037250006455,
+      "status": {
+        "requestId": "req-6f857896-c85d-48b8-af94-5e5388b87433",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 426,
+        "candidatesScanned": 0,
+        "matchesFound": 0,
+        "summariesCompleted": 0,
+        "totalCandidates": 0,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 5
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "120-document-sparse-exact5",
+      "scope": "document",
+      "selected": false,
+      "rating": 5,
+      "minRating": null,
+      "resultCount": 1,
+      "referenceElapsedSeconds": 7.78888508300588,
+      "referenceOverheadDifferenceSeconds": 7.207195708004292,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.5816893750015879,
+      "status": {
+        "requestId": "req-379629f4-72fb-4571-9279-4463651a70fd",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 563,
+        "candidatesScanned": 1,
+        "matchesFound": 1,
+        "summariesCompleted": 1,
+        "totalCandidates": 1,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 7
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "120-collection-sparse-rating0",
+      "scope": "collection",
+      "selected": false,
+      "rating": 0,
+      "minRating": null,
+      "resultCount": 119,
+      "referenceElapsedSeconds": 7.672507667011814,
+      "referenceOverheadDifferenceSeconds": -1.4137481660000049,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 9.086255833011819,
+      "status": {
+        "requestId": "req-ff408de0-2b65-4dfc-a62b-b3e493e66c83",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 9072,
+        "candidatesScanned": 119,
+        "matchesFound": 119,
+        "summariesCompleted": 119,
+        "totalCandidates": 119,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 13
+      },
+      "progressEvents": 13
+    },
+    {
+      "label": "120-selected-sparse-min0",
+      "scope": "document",
+      "selected": true,
+      "rating": null,
+      "minRating": 0,
+      "resultCount": 60,
+      "referenceElapsedSeconds": 4.051415292007732,
+      "referenceOverheadDifferenceSeconds": -0.7971293749869801,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 4.848544666994712,
+      "status": {
+        "requestId": "req-e28fefc6-e623-4bc0-a809-7ff0f59e6905",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 4833,
+        "candidatesScanned": 60,
+        "matchesFound": 60,
+        "summariesCompleted": 60,
+        "totalCandidates": 60,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 9
+      },
+      "progressEvents": 10
+    },
+    {
+      "label": "120-document-dense-min5",
+      "scope": "document",
+      "selected": false,
+      "rating": null,
+      "minRating": 5,
+      "resultCount": 120,
+      "referenceElapsedSeconds": 7.824004542009789,
+      "referenceOverheadDifferenceSeconds": -1.4317124579974916,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 9.25571700000728,
+      "status": {
+        "requestId": "req-7a6cba3c-58d4-4a6c-9934-cbb9557e0236",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 9240,
+        "candidatesScanned": 120,
+        "matchesFound": 120,
+        "summariesCompleted": 120,
+        "totalCandidates": 120,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 13
+      },
+      "progressEvents": 13
+    },
+    {
+      "label": "120-collection-dense-min0",
+      "scope": "collection",
+      "selected": false,
+      "rating": null,
+      "minRating": 0,
+      "resultCount": 120,
+      "referenceElapsedSeconds": 7.8046246249869,
+      "referenceOverheadDifferenceSeconds": -1.6931320420262637,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 9.497756667013164,
+      "status": {
+        "requestId": "req-f913d383-a7b4-40fc-8ed8-5431c7bb7c64",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 9483,
+        "candidatesScanned": 120,
+        "matchesFound": 120,
+        "summariesCompleted": 120,
+        "totalCandidates": 120,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 13
+      },
+      "progressEvents": 13
+    },
+    {
+      "label": "120-selected-dense-exact5",
+      "scope": "document",
+      "selected": true,
+      "rating": 5,
+      "minRating": null,
+      "resultCount": 60,
+      "referenceElapsedSeconds": 4.267364582992741,
+      "referenceOverheadDifferenceSeconds": -0.4493147500033956,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 4.7166793329961365,
+      "status": {
+        "requestId": "req-ce75d7ee-5fc7-42a7-b5e9-e382a29563f4",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 4701,
+        "candidatesScanned": 60,
+        "matchesFound": 60,
+        "summariesCompleted": 60,
+        "totalCandidates": 60,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 9
+      },
+      "progressEvents": 10
+    },
+    {
+      "label": "120-collection-selected-min4",
+      "scope": "collection",
+      "selected": true,
+      "rating": null,
+      "minRating": 4,
+      "resultCount": 60,
+      "referenceElapsedSeconds": 4.0027966250054305,
+      "referenceOverheadDifferenceSeconds": -0.7485758329858072,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 4.751372457991238,
+      "status": {
+        "requestId": "req-7d11ea52-9da7-4bef-84ac-e048473a32d6",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 4735,
+        "candidatesScanned": 60,
+        "matchesFound": 60,
+        "summariesCompleted": 60,
+        "totalCandidates": 60,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 9
+      },
+      "progressEvents": 10
+    },
+    {
+      "label": "120-empty-exact4",
+      "scope": "document",
+      "selected": false,
+      "rating": 4,
+      "minRating": null,
+      "resultCount": 0,
+      "referenceElapsedSeconds": 7.8213762499945005,
+      "referenceOverheadDifferenceSeconds": 7.391527583997231,
+      "firstProgressElapsedMs": 0,
+      "elapsedSeconds": 0.42984866599726956,
+      "status": {
+        "requestId": "req-2b9cfbd9-cf51-4e09-8ed3-bca455903641",
+        "phase": "validating-inventory",
+        "status": "completed",
+        "elapsedMs": 412,
+        "candidatesScanned": 0,
+        "matchesFound": 0,
+        "summariesCompleted": 0,
+        "totalCandidates": 0,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 5
+      },
+      "progressEvents": 8
+    },
+    {
+      "label": "mcp-progress-status-cancellation",
+      "firstProgressSeconds": 0.01355958401109092,
+      "statusDuringRead": "running",
+      "cancelledStatus": "cancelled",
+      "completedCount": 120,
+      "progressValues": [
+        0,
+        16,
+        48,
+        80,
+        112,
+        144,
+        176,
+        208,
+        240
+      ]
+    },
+    {
+      "label": "cli-sigint-cancellation",
+      "status": "cancelled",
+      "summariesCompleted": 7
+    },
+    {
+      "label": "deadline-safety",
+      "elapsedSeconds": 0.2503729169984581,
+      "errorCode": "deadline-exceeded",
+      "status": {
+        "summariesCompleted": 0,
+        "candidatesScanned": 0,
+        "matchesFound": 0,
+        "inventoryStrategy": "native-filter",
+        "handlerCalls": 1,
+        "startedAt": 1789681596.453795,
+        "slow": false,
+        "requestId": "req-dc4f6ddb-dc55-42b3-84f1-5c51621d13d6",
+        "elapsedMs": 234,
+        "status": "failed",
+        "processId": 195,
+        "documentIdentity": "0cd4bd2d430354621c0d56f7f4d6c75cf02b9cb308d747a22f44e10241a492fe",
+        "tool": "variants_list",
+        "waitingForAppleEvent": false,
+        "phase": "discovering",
+        "updatedAt": 1789681596.688705,
+        "scope": "document:all",
+        "applicationProgress": "unknown"
+      }
+    }
+  ],
+  "limitations": [
+    "Legacy timing uses standalone osascript; candidate timing includes CLI and document/batch validation overhead.",
+    "Fixtures contain multiple variants of one copied RAW; timing is indicative, not a throughput guarantee for a whole shoot.",
+    "handlerCalls counts script invocations; individual Apple Event counts and peak memory are not measured."
+  ]
+}
+Evidence: /Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/inventory.json
+TIMING inventory_integration_test.py: 161.010s
+PASS: extracted release CLI and MCP live suites; build resource fallback unavailable
+real 633.79
+user 53.14
+sys 23.47
+C1_TEST_RAW_FIXTURE="/private/tmp/c1-geometry-live-j99twntf/geometry/Capture/2U6A7257.CR3" C1_RECOVERY_FIXTURE_PARENT="/Users/kiri11/projects/c1cmd/.build/recovery-fixtures" C1_RECOVERY_SHUTDOWN_MODE="sigterm" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "dist/c1-v0.1.0-macos-arm64.tar.gz" "/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2/recovery"
+build-resource-fallback-hidden
+swift-driver version: 1.148.6 environment
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+clone-readback-regression-passed
+cli
+cli
+target-paused-after-pending
+apple-event-timeout-reply
+cli
+target-resumed
+cli
+recovery-inventory
+cli
+cli
+cli
+restart-started
+fixture-snapshot
+process-exited
+fixture-snapshot
+restart
+cli
+recovery-inventory
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+case-passed
+cli
+cli
+target-paused-after-pending
+apple-event-timeout-reply
+cli
+target-resumed
+cli
+recovery-inventory
+cli
+cli
+cli
+restart-started
+fixture-snapshot
+process-exited
+fixture-snapshot
+restart
+cli
+recovery-inventory
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+case-passed
+cli
+cli
+cli
+corrected-lens-fixture-pending
+cli
+target-paused-after-pending
+apple-event-timeout-reply
+cli
+target-resumed
+cli
+recovery-inventory
+cli
+cli
+cli
+restart-started
+fixture-snapshot
+process-exited
+fixture-snapshot
+restart
+cli
+recovery-inventory
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+corrected-lens-fixture-pending
+cli
+cli
+cli
+cli
+cli
+case-passed
+cli
+cli
+cli
+cli
+output-observed-after-timeout
+cli
+recovery-inventory
+cli
+cli
+cli
+restart-started
+fixture-snapshot
+process-exited
+fixture-snapshot
+restart
+cli
+recovery-inventory
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+case-passed
+cli
+cli
+mcp-initialize
+mcp-killed-after-export-dispatch
+cli
+recovery-inventory
+cli
+cli
+cli
+restart-started
+fixture-snapshot
+process-exited
+fixture-snapshot
+restart
+cli
+recovery-inventory
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+case-passed
+all-cases-passed
+cleanup
+real 546.49
+user 22.47
+sys 9.76

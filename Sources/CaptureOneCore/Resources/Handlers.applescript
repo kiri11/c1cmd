@@ -410,7 +410,7 @@ on geometrySnapshot(v)
     return {cropValues of g, rotationDegrees of g, orientationDegrees of g, flipName of g, ratioName of g, keystoneValues of g, lensValues of g, profileName of g, hiddenAreas of g, outsideAllowed of g}
 end geometrySnapshot
 
-on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation)
+on checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
         set v to variant id (variantId as text) of d
@@ -423,9 +423,48 @@ on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTon
             set deltaValue to (item n of actualTone) - (item n of expectedTone)
             if deltaValue > (item n of tolerances) or deltaValue < (0 - (item n of tolerances)) then error "Adjustments changed before geometry dispatch." number -27002
         end repeat
+        return v
+    end tell
+end checkedGeometryVariant
+
+on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation)
+    set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
+    tell application "/Applications/Capture One.app"
+        set a to adjustments of v
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         -- Rotation can recenter/shrink the native crop. Apply the final crop afterward.
         set crop of v to targetCrop
         return my geometryRecordOf(v)
     end tell
 end applyGeometry
+
+-- Distortion changes the canvas. Do not extrapolate from RAW dimensions or
+-- reuse bounds from another rotation. The caller journals the request before
+-- entering this handler; any error after dispatch keeps the write block.
+on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio)
+    set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
+    tell application "/Applications/Capture One.app"
+        set a to adjustments of v
+        if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
+        set nativeBounds to maximum crop v apply false
+        set {boundsX, boundsY, boundsW, boundsH} to nativeBounds
+        if boundsW <= 0 or boundsH <= 0 then error "Corrected-lens bounds are unavailable."
+        if requestedCrop is not missing value then
+            set targetCrop to requestedCrop
+        else if requestedRatio is not missing value then
+            set targetWidth to boundsW
+            if boundsH * requestedRatio < targetWidth then set targetWidth to boundsH * requestedRatio
+            set targetWidth to round targetWidth rounding down
+            set targetHeight to round (targetWidth / requestedRatio) rounding down
+            set targetCrop to {round boundsX, round boundsY, targetWidth, targetHeight}
+        else
+            -- Rotation-only preserves Capture One's own recentered/shrunk crop.
+            set targetCrop to crop of v
+        end if
+        set {cx, cy, cw, ch} to targetCrop
+        if cw < 1 or ch < 1 then error "Corrected-lens crop is empty."
+        if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after rotation; inspect operation status before any further write."
+        set crop of v to targetCrop
+        return {targetCropValues:targetCrop, boundsValues:nativeBounds}
+    end tell
+end applyCorrectedGeometry

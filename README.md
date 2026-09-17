@@ -204,7 +204,11 @@ Geometry bounds use the original file’s intrinsic pixel dimensions read throug
 
 `--full-frame` / `fullFrame: true` renders the largest conservative context rectangle at the current rotation through a temporary managed clone, then deletes that clone. The response's `contextSourceRef` identifies the source; `workingRef` and `nativeVariantId` identify the rendered temporary clone. On failure, retain the clone and journal for inspection and use normal recovery. The source crop is never temporarily reset.
 
-Geometry writes require **Capture One 16.8.5.30**. Existing keystone, lens distortion/shift, flips, crop-outside-image, and unqualified orientation combinations are rejected for editing/context mapping; their settings remain intact. Valid crops are limited to a conservative centered rectangle inside the rotated image, with two-pixel native rounding tolerance. See [geometry qualification](docs/geometry/16.8.5.30/README.md) for fixture coverage and limitations.
+Geometry writes require **Capture One 16.8.5.30**. Lens distortion correction from 0 through 100 is supported while preserving the correction amount, profile, and “hide distorted areas” setting. With nonzero distortion, usable bounds come from Capture One's read-only `maximum crop` query in the current canvas. A rotation change queries fresh native bounds after rotation, then fits `aspectRatio` or validates the explicit crop. Rotation-only requests retain Capture One's automatically recentered/shrunk crop. Inspect a fresh preview after rotation before selecting precise crop coordinates. Full-frame context previews use the same native bounds.
+
+For corrected-lens rotation changes, the final bounds cannot be predicted without executing the native rotation. `dryRun` therefore rejects that combination; crop-only dry runs remain available. The durable pending journal stores `requestedGeometry` before dispatch and records the concrete target once native bounds are known. A failure after rotation (including an explicit crop outside the new bounds) is an uncertain mutation: it can leave the rotation applied and blocks further writes until normal restart/reconciliation. Never automatically retry or undo it.
+
+Existing keystone, lens tilt/shift, distortion outside 0...100, flips, crop-outside-image, and unqualified orientations remain blocked. Without distortion, bounds remain a conservative centered rectangle inside the rotated image. Both paths allow two-pixel native rounding tolerance. See [geometry qualification](docs/geometry/16.8.5.30/README.md) and [corrected-lens qualification](docs/geometry/16.8.5.30/lens/README.md) for evidence and fixture limits.
 
 For a composition-only MCP agent, set `C1_MCP_PROFILE=composition` in the server environment. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; existing-variant preparation, crop/rotation/restore, inspection, optional cloning, clone deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It defaults to existing variants; pass `--clone` for separate proposals. `grade-folder.py` has the same default and option. Neither example infers aesthetic quality or acceptance.
 
@@ -232,7 +236,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.5.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.6.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards

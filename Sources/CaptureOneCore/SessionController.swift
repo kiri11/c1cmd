@@ -765,7 +765,7 @@ public final class SessionController {
         return GetResult(
             geometry: geometry,
             geometryStateHash: geometry?.stateHash(tonalHash: hash.hex),
-            geometryUsableBounds: geometry?.unsupportedReason == nil ? geometry?.safeBounds(rotation: geometry?.rotation ?? 0) : nil,
+            geometryUsableBounds: geometry?.unsupportedReason == nil ? try geometry?.safeBounds(rotation: geometry?.rotation ?? 0) : nil,
             geometryUnavailableReason: geometry?.unsupportedReason ?? first.geometryUnavailableReason ?? (geometry == nil ? "Geometry unavailable: native geometry or intrinsic source-file dimensions could not be read." : nil),
             id: nativeId,
             workingRef: workingRefStr,
@@ -972,7 +972,8 @@ public final class SessionController {
                 throw C1Error.invalidRequest(current.geometryUnavailableReason ?? "Geometry unavailable.")
             }
             guard state == expected else { throw C1Error.stateChanged("Geometry precondition no longer matches; read get again.") }
-            let target: Geometry
+            var target: Geometry?
+            var nativeRequest: GeometryRequest?
             if restore {
                 guard let baseline, baseline.unsupportedReason == nil, before.unsupportedReason == nil,
                       before.sameContext(as: baseline) else {
@@ -983,28 +984,65 @@ public final class SessionController {
                 var restored = before
                 restored.crop = baseline.crop; restored.rotation = baseline.rotation
                 target = restored
+            } else if before.hasLensDistortion {
+                if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
+                guard crop != nil || rotation != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
+                nativeRequest = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio)
+                // Validate all knowable bounds before dispatch. At a new rotation,
+                // Capture One supplies bounds after its rotation setter executes.
+                if nativeRequest!.rotation == before.rotation || dryRun {
+                    target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
+                }
             } else {
                 target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
             }
             try assertWritableImage(doc: doc, source: current)
             if dryRun {
-                return GeometryMutationResult(operationId: "dry-run", workingRef: workingRef, before: before, after: target,
-                    diff: target.changes(from: before), geometryStateHash: state, isDryRun: true)
+                return GeometryMutationResult(operationId: "dry-run", workingRef: workingRef, before: before, after: target!,
+                    diff: target!.changes(from: before), geometryStateHash: state, isDryRun: true)
             }
             let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
-            let entry = try prepare(OperationRecord(operationType: operation, workingRef: workingRef,
+            var entry = try prepare(OperationRecord(operationType: operation, workingRef: workingRef,
                 documentPath: doc.documentPath, preconditionStateHash: expected, beforeAdjustments: current.adjustments,
-                beforeGeometry: before, intendedGeometry: target), doc: doc, source: current)
+                beforeGeometry: before, intendedGeometry: target, requestedGeometry: nativeRequest), doc: doc, source: current)
             try journal.append(entry: entry)
             do {
-                let _: GeometryRecord = try executor.executeAndDecode(handler: "applyGeometry", args: [
+                let arguments = [
                     NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: current.id),
                     NSAppleEventDescriptor(string: current.parentImagePath ?? ""), before.eventSnapshot,
-                    NSAppleEventDescriptor(list: registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) }),
-                    NSAppleEventDescriptor(list: target.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target.rotation)])
+                    NSAppleEventDescriptor(list: registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) })]
+                if let request = nativeRequest {
+                    let applied: CorrectedGeometryResult = try executor.executeAndDecode(handler: "applyCorrectedGeometry", args: arguments + [
+                        request.crop.map { NSAppleEventDescriptor(list: $0.values.map { NSAppleEventDescriptor(double: $0) }) } ?? .missingValue(),
+                        NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue()])
+                    guard applied.targetCropValues.count == 4, applied.boundsValues.count == 4,
+                          applied.targetCropValues.allSatisfy({ $0.isFinite }), applied.boundsValues.allSatisfy({ $0.isFinite }) else {
+                        throw C1Error.readbackMismatch("Corrected-lens native target or bounds are malformed.")
+                    }
+                    let c = applied.targetCropValues, b = applied.boundsValues
+                    guard c[2] >= 1, c[3] >= 1, b[2] > 0, b[3] > 0,
+                          abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2, abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2 else {
+                        throw C1Error.readbackMismatch("Corrected-lens target exceeds the native bounds.")
+                    }
+                    var resolved = before
+                    resolved.rotation = request.rotation
+                    resolved.crop = CropRect(centerX: c[0], centerY: c[1], width: c[2], height: c[3])
+                    if let crop = request.crop, resolved.crop != crop { throw C1Error.readbackMismatch("Native crop differs from the explicit request.") }
+                    if let ratio = request.aspectRatio, abs(c[2] - c[3]*ratio) > max(2, ratio*2) {
+                        throw C1Error.readbackMismatch("Native crop does not match the requested aspect ratio.")
+                    }
+                    target = resolved
+                    // Preserve the concrete target once native bounds are known;
+                    // the original pending record already contains the user's request.
+                    entry.intendedGeometry = resolved
+                    try journal.append(entry: entry)
+                } else {
+                    let _: GeometryRecord = try executor.executeAndDecode(handler: "applyGeometry", args: arguments + [
+                        NSAppleEventDescriptor(list: target!.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target!.rotation)])
+                }
                 let readback = try get(ref: workingRef)
                 guard let after = readback.geometry else { throw C1Error.readbackMismatch("Geometry missing after write.") }
-                guard after.matchesTarget(target), after.sameContext(as: before), readback.stateHash == current.stateHash else {
+                guard after.matchesTarget(target!), after.sameContext(as: before), readback.stateHash == current.stateHash else {
                     try journal.update(operationId: entry.operationId, status: "partial-failure", afterAdjustments: readback.adjustments, afterGeometry: after)
                     throw C1Error.readbackMismatch("Crop/rotation or preserved settings did not match; inspect operation status.")
                 }
@@ -1198,7 +1236,7 @@ public final class SessionController {
             let current = try get(ref: clone.workingRef)
             guard let cloneState = current.geometryStateHash, cloneState == source.geometryStateHash else { throw C1Error.stateChanged("Context clone differs from source; inspect managed clone \(clone.workingRef).") }
             _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState,
-                                crop: geometry.safeBounds(rotation: geometry.rotation))
+                                crop: try geometry.safeBounds(rotation: geometry.rotation))
             var result = try preview(ref: clone.workingRef, outputDirOverride: outputDirOverride, timeout: timeout)
             guard try get(ref: ref).geometryStateHash == source.geometryStateHash else { throw C1Error.stateChanged("Source changed during context preview; discard preview.") }
             _ = try deleteVariant(workingRefString: clone.workingRef)
@@ -1303,7 +1341,7 @@ public final class SessionController {
             "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
                               "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
                               "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
-            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "conservative centered rectangle", "keystoneWrites": false],
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for corrected lenses; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "keystoneWrites": false],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,

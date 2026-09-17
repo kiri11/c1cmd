@@ -89,7 +89,7 @@ Run `Tests/release_integration_test.py` against the candidate archive, then clos
 
 ### Step 5: Qualify geometry and add the build
 
-Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Both geometry harnesses and the production geometry gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
+Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Also run the [corrected-lens suite](geometry/16.8.5.30/lens/README.md): native bounds after rotation, both hide-distorted-areas settings, off-center preview mapping, correction preservation, baseline restore, and corrected-lens timeout recovery. The geometry harnesses and production gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
 
 Once the packaged workflow and recovery qualification pass and their scope has been reviewed, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
 

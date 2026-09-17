@@ -9,6 +9,7 @@ final class GeometryFake: ScriptExecuting {
     var writeCount = 0
     var dimensionsFollowRotation = false
     var pendingBeforeWrite = false
+    var requestedBeforeWrite: GeometryRequest?
     init(directory: URL) { base = FakeScript(directory: directory) }
     func record(_ id: String) -> [String: Any] {
         records[id] ?? ["cropValues":[3000.0,2000,6000,4000], "rotationDegrees":0.0, "orientationDegrees":0,
@@ -33,21 +34,34 @@ final class GeometryFake: ScriptExecuting {
             try FakeScript.jpeg(width:120, height:Int((120*crop[3]/crop[2]).rounded())).write(to:url)
             if changeDuringPreview { var changed = r; changed["rotationDegrees"] = 1.0; records[id] = changed }
             result = ["jobId":"geometry-job"]
-        case "applyGeometry":
+        case "applyGeometry", "applyCorrectedGeometry":
             writeCount += 1
             pendingBeforeWrite = OperationJournal(sessionDirectory: base.directory).unresolvedEntries().contains { $0.operationType == "geometry_set" }
+            requestedBeforeWrite = OperationJournal(sessionDirectory: base.directory).unresolvedEntries().last?.requestedGeometry
             let id = args[1].stringValue!
             var r = record(id)
             if failure == "stale-dispatch" { throw C1Error.stateChanged("injected state change at handler") }
             if failure == "timeout" { throw C1Error.timeout("injected timeout") }
             r["rotationDegrees"] = args[6].doubleValue; records[id] = r
             if failure == "partial" { throw C1Error.scriptError("injected failure after rotation", code:-1700) }
-            r["cropValues"] = (1...4).map { args[5].atIndex($0)!.doubleValue }
+            var target: [Double]
+            let bounds = [3150.0,2300,5000,3400] // Native corrected canvas deliberately differs from RAW math.
+            if handler == "applyCorrectedGeometry" {
+                if args[5].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType {
+                    target = (1...4).map { args[5].atIndex($0)!.doubleValue }
+                } else if args[7].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType {
+                    let ratio = args[7].doubleValue, w = floor(min(bounds[2], bounds[3]*args[7].doubleValue))
+                    target = [bounds[0], bounds[1], w, floor(w/ratio)]
+                } else { target = [3150,2300,2400,1600] }
+                r["maximumValues"] = bounds
+            } else { target = (1...4).map { args[5].atIndex($0)!.doubleValue } }
+            r["cropValues"] = target
             if dimensionsFollowRotation { r["sourceDimensions"] = args[6].doubleValue == 0 ? [6000.0, 4000] : [6135.0, 4206] }
             if failure == "mismatch" { r["rotationDegrees"] = 22.0 }
+            if failure == "lens-change" { r["lensValues"] = [0.0,35,0,0,0,0,0,0] }
             records[id] = r
             if failure == "lost-reply" { throw C1Error.timeout("applied, reply lost") }
-            result = r
+            result = handler == "applyCorrectedGeometry" ? ["targetCropValues":target, "boundsValues": failure == "bad-bounds" ? [0.0,0,1,1] : bounds] : r
         default: return try base.executeAndDecode(handler:handler, args:args)
         }
         return try JSONDecoder().decode(T.self, from:JSONSerialization.data(withJSONObject:result))
@@ -57,6 +71,7 @@ final class GeometryFake: ScriptExecuting {
 struct GeometryTests {
     static func run() {
         print("Running GeometryTests...")
+        testCorrectedLens()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
@@ -148,6 +163,71 @@ struct GeometryTests {
                 // Continue with a freshly bound reference after each simulated restart.
                 let next = try core.cloneVariant(sourceRef:"1")
                 faultRef = next.workingRef
+            }
+        }
+    }
+
+    private static func testCorrectedLens() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        var source = fake.record("1")
+        source["lensValues"] = [100.0,35,0,0,0,0,0,0]
+        source["maximumValues"] = [3002.0,2000,6000,4000]
+        fake.records["1"] = source
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "corrected-db"}, imageDimensions:{_ in [6000,4000]})
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), original = try core.get(ref:"1")
+            XCTAssertNil(original.geometryUnavailableReason)
+            XCTAssertEqual(original.geometryUsableBounds,original.geometry!.maximumCrop)
+            let edit = try core.editVariant(sourceRef:"1",ifState:original.stateHash,ifDocument:doc.openToken,ifGeometryState:original.geometryStateHash)
+            let ref = edit.workingRef
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:original.geometryStateHash!,rotation:5,aspectRatio:0.75,dryRun:true))
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:original.geometryStateHash!,crop:CropRect(centerX:0,centerY:0,width:1000,height:1000)))
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:original.geometryStateHash!,rotation:5,aspectRatio:Double.nan))
+            XCTAssertEqual(fake.writeCount,0,"Invalid requests and unknown dry-run bounds cannot dispatch")
+            let result = try core.geometrySet(workingRef:ref,ifGeometryState:original.geometryStateHash!,rotation:5,aspectRatio:0.75)
+            XCTAssertEqual(result.after.crop,CropRect(centerX:3150,centerY:2300,width:2550,height:3400),"Fit the native corrected canvas, not intrinsic RAW bounds")
+            XCTAssertEqual(fake.requestedBeforeWrite?.rotation,5)
+            XCTAssertEqual(fake.requestedBeforeWrite?.aspectRatio,0.75)
+            XCTAssertTrue(fake.pendingBeforeWrite)
+            XCTAssertEqual(result.before.lensGeometry,result.after.lensGeometry)
+            XCTAssertEqual(fake.base.values.count,1,"Existing corrected-lens edit creates no duplicate")
+            let record = journal.find(operationId:result.operationId)!
+            XCTAssertNotNil(record.requestedGeometry)
+            XCTAssertEqual(record.intendedGeometry?.crop,result.after.crop)
+            XCTAssertEqual(record.status,"succeeded")
+            let restored = try core.geometryRestore(workingRef:ref,ifGeometryState:result.geometryStateHash)
+            XCTAssertEqual(restored.after.crop,original.geometry!.crop)
+            XCTAssertEqual(restored.after.rotation,original.geometry!.rotation)
+            XCTAssertEqual(restored.after.lensGeometry,original.geometry!.lensGeometry)
+            for index in 2...7 {
+                var blocked = original.geometry!; blocked.lensGeometry[index] = 1
+                XCTAssertNotNil(blocked.unsupportedReason)
+            }
+            for amount in [-1.0,101,Double.nan] {
+                var blocked = original.geometry!; blocked.lensGeometry[0] = amount
+                XCTAssertNotNil(blocked.unsupportedReason)
+            }
+            var invalid = original.geometry!; invalid.maximumCrop.width = 0
+            XCTAssertNotNil(invalid.unsupportedReason)
+            for failure in ["partial","lost-reply","lens-change","bad-bounds"] {
+                let fresh = try core.get(ref:"1")
+                let freshEdit = try core.editVariant(sourceRef:"1",ifState:fresh.stateHash,ifDocument:try core.getDocumentInfo().openToken,ifGeometryState:fresh.geometryStateHash)
+                fake.failure = failure
+                var operation = ""
+                do { _ = try core.geometrySet(workingRef:freshEdit.workingRef,ifGeometryState:fresh.geometryStateHash!,rotation:-5,aspectRatio:1.5); XCTFail("Expected corrected-lens failure") }
+                catch let error as OperationFailure { operation = error.operationId }
+                XCTAssertFalse(operation.isEmpty)
+                XCTAssertNotNil(journal.find(operationId:operation)?.requestedGeometry)
+                XCTAssertThrowsError(try core.geometrySet(workingRef:freshEdit.workingRef,ifGeometryState:fresh.geometryStateHash!,rotation:0))
+                fake.failure = nil; fake.base.generation += "-restart"
+                let recovered = try core.operationStatus(operationId:operation)
+                XCTAssertEqual(recovered.status,"reconciled")
+                XCTAssertThrowsError(try core.get(ref:freshEdit.workingRef))
+                fake.records["1"] = source
             }
         }
     }

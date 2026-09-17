@@ -1,0 +1,131 @@
+{
+  "dateUTC": "2026-09-17T21:57:03.239551+00:00",
+  "decision": "PASS for corrected-lens Session crop/rotation on Capture One 16.8.5.30 in the documented fixture scope",
+  "environment": {
+    "time": "2026-09-17T21:46:38.386636+00:00",
+    "event": "environment",
+    "archive": "c1-v0.1.0-macos-arm64.tar.gz",
+    "archiveSHA256": "6031295a44d4089006b92505117b972ff5677ad1f31f63fb9cb509db828c05bb",
+    "cliSHA256": "01cb62f67a997c3747aad04b9eb2210f980cf25f33c4577b035b4b275b9741f8",
+    "mcpSHA256": "7ef2c86c666368d97542dfa7245b7a0d2765017a04dc464d357a36e0bb1daa35",
+    "handlersSHA256": "68cf74282bb6c7157d3717526034efce65a88fc058b0b4a886236b7d89024776",
+    "commit": "0b5cf06f8e734452ec62342f826fe07255f55c71",
+    "sourcePatchSHA256": "727f7c6aa8efc24d178ad77bddf4dc4ff7ec74146ed3308f0af8f3df99d2daf4",
+    "harnessSHA256": "fe6b08757ba3bade4a61057c5de5110da405a4267598e407021b50521fa10ce9",
+    "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+    "architecture": "arm64",
+    "swift": "Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)\nTarget: arm64-apple-macosx26.0\n",
+    "appVersion": "16.8.5.30",
+    "session": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-pd7axeb8/recovery",
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "fixtureParent": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures",
+    "shutdownMode": "sigterm",
+    "shutdownKind": "process-termination"
+  },
+  "qualifiedArchiveSHA256": "6031295a44d4089006b92505117b972ff5677ad1f31f63fb9cb509db828c05bb",
+  "runtimePayloadSHA256": {
+    "cliSHA256": "01cb62f67a997c3747aad04b9eb2210f980cf25f33c4577b035b4b275b9741f8",
+    "mcpSHA256": "7ef2c86c666368d97542dfa7245b7a0d2765017a04dc464d357a36e0bb1daa35",
+    "handlersSHA256": "68cf74282bb6c7157d3717526034efce65a88fc058b0b4a886236b7d89024776"
+  },
+  "fixture": {
+    "camera": "Canon EOS R6m2",
+    "lensProfile": "Canon EF 35mm f/1.4L II USM",
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "coverage": "One copied CR3, correction amounts 50/100, hide distorted areas on/off, all orientations, signed rotations including +/-45; not a 70-200mm or multi-lens sample"
+  },
+  "results": {
+    "offlineAssertions": 728,
+    "offlineRecoveryHarnessTests": 22,
+    "packagedCLI": 19,
+    "packagedMCP": 10,
+    "correctedLensCases": 6,
+    "previewMapping": [
+      {
+        "case": 0,
+        "meanAbsoluteChannelError": 2.8181647588665792,
+        "threshold": 8,
+        "sampledPixels": 5329
+      },
+      {
+        "case": 1,
+        "meanAbsoluteChannelError": 2.5871020203915682,
+        "threshold": 8,
+        "sampledPixels": 5329
+      },
+      {
+        "case": 2,
+        "meanAbsoluteChannelError": 2.3180083818102206,
+        "threshold": 8,
+        "sampledPixels": 5329
+      },
+      {
+        "case": 3,
+        "meanAbsoluteChannelError": 2.230624882717208,
+        "threshold": 8,
+        "sampledPixels": 5329
+      }
+    ],
+    "packagedSuites": [
+      "archive and contract: 1.926s",
+      "integration_test.py: 44.619s",
+      "mcp_test.py: 21.390s",
+      "geometry_integration_test.py: 92.709s",
+      "lens_geometry_integration_test.py: 159.928s",
+      "catalog_integration_test.py: 45.931s",
+      "existing_variant_integration_test.py: 106.141s",
+      "inventory_integration_test.py: 161.010s"
+    ],
+    "recoveryCases": [
+      {
+        "case": "real-apple-event-timeout",
+        "operationId": "9143ca1b-de31-4a9a-b34d-6260cfc2a325",
+        "status": "reconciled"
+      },
+      {
+        "case": "geometry-apple-event-timeout",
+        "operationId": "d5bc7a32-6841-4f2e-922e-56f576ccc3e5",
+        "status": "reconciled"
+      },
+      {
+        "case": "corrected-geometry-apple-event-timeout",
+        "operationId": "642cb46e-3daa-4f61-be26-cd9202756b80",
+        "status": "reconciled"
+      },
+      {
+        "case": "preview-timeout-with-eventual-output",
+        "operationId": "e7327a68-96ef-489e-801b-5a13fb52da4e",
+        "status": "reconciled"
+      },
+      {
+        "case": "mcp-death-after-export-dispatch",
+        "operationId": "a5c27775-869c-49fe-a3e7-4955eca54bde",
+        "status": "reconciled"
+      }
+    ]
+  },
+  "sourceSHA256": {
+    "Sources/CaptureOneCore/ContractSchema.swift": "5e436680721dbeea4e22641ac1bb6e62f93f3f357afbb8b6c07ed1365101f8d4",
+    "Sources/CaptureOneCore/Geometry.swift": "bd8f74794454c5b216e40c7f4828563fbbdcde739c9486d01fd80027f5a28987",
+    "Sources/CaptureOneCore/OperationJournal.swift": "803a537d66a01a4056148ff507e5521b79910b00d37ed5afe262f2da431f791b",
+    "Sources/CaptureOneCore/Resources/Handlers.applescript": "68cf74282bb6c7157d3717526034efce65a88fc058b0b4a886236b7d89024776",
+    "Sources/CaptureOneCore/SessionController.swift": "41c199c51958dbd9e19164f98742ed5fa202207fe4494c00f730c32582e7df55",
+    "Sources/c1-mcp/main.swift": "1b8dc94495a04ee0868248856a2da7f19dfec4dbb8f72a861df9a497ba597bee",
+    "Tests/CaptureOneCoreTests/GeometryTests.swift": "6db6573589bb3408e9a5ef37a8cdfddc282c0ab9601a987fbbe3f28e2e2e33dd",
+    "Tests/geometry_integration_test.py": "ee85846e0c0235aad0ffd0cbb7ef912e4b0faf8c1d569d8ac231ff5d87c9eb81",
+    "Tests/lens_geometry_integration_test.py": "47fbf03237123fa68d5986610a0cfbc14a3758deb25e730e41f60345e0697961",
+    "Tests/recovery_harness_test.py": "1534f67131c727291324d8696f8d38ca2e3c5a86ed36d6a85a1f12bd7dae1f00",
+    "Tests/recovery_integration_test.py": "fe6b08757ba3bade4a61057c5de5110da405a4267598e407021b50521fa10ce9",
+    "Tests/release_integration_test.py": "3ff99dadf8c175fa712bdcdccd99f43ec1e8fce70df627df172a81124dbd2145",
+    "probes/geometry/lens_probe.py": "f0da10c9138ae0b5ba73e526f2fc779ed051e08378969e74b6cda0a4e92d589f"
+  },
+  "fullEvidenceDirectory": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/packaged-2",
+  "limitations": [
+    "Native graceful quit remains unqualified; five recovery cases used explicit SIGTERM",
+    "Corrected-lens live coverage is Session-only; Catalog editing remains experimental and Catalog fault recovery unqualified",
+    "Lens tilt/shift, perspective, flips, crop-outside-image and distortion outside 0...100 remain blocked",
+    "Corrected-lens rotation dry runs are rejected because native bounds require execution"
+  ],
+  "priorAttempts": "prior-attempts.json",
+  "documentationRepack": "Final documentation-only repack includes this report. The CLI, MCP, and handler hashes must match runtimePayloadSHA256; the adjacent archive .sha256 identifies the wrapper."
+}

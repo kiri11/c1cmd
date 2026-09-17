@@ -29,14 +29,18 @@ public struct Geometry: Codable, Equatable {
     public var hideDistortedAreas: Bool
     public var cropOutsideImage: Bool
 
+    public var hasLensDistortion: Bool { lensGeometry.first.map { $0 != 0 } ?? false }
+
     public var unsupportedReason: String? {
         guard [0, 90, 180, 270].contains(orientation), flip == "none" else { return "Orientation or flip is not qualified for geometry writes." }
         guard keystone.count == 5, keystone.dropFirst().allSatisfy({ $0 == 0 }), lensGeometry.count == 8,
-              lensGeometry[0] == 0, lensGeometry.dropFirst(2).allSatisfy({ $0 == 0 }), !cropOutsideImage else {
-            return "Existing perspective, lens distortion/shift, or crop-outside-image settings require manual review."
+              lensGeometry.dropFirst(2).allSatisfy({ $0 == 0 }), !cropOutsideImage else {
+            return "Existing perspective, lens tilt/shift, or crop-outside-image settings require manual review."
         }
+        guard (0...100).contains(lensGeometry[0]) else { return "Lens distortion amounts outside 0...100 are not qualified." }
         guard maximumCrop.values.allSatisfy({ $0.isFinite }), keystone.allSatisfy({ $0.isFinite }), lensGeometry.allSatisfy({ $0.isFinite }),
               imageWidth.isFinite, imageHeight.isFinite, imageWidth > 0, imageHeight > 0,
+              maximumCrop.width > 0, maximumCrop.height > 0,
               rotation.isFinite, abs(rotation) <= 45, crop.values.allSatisfy({ $0.isFinite }), crop.width > 0, crop.height > 0 else {
             return "Image geometry is unavailable or outside the qualified range."
         }
@@ -45,7 +49,13 @@ public struct Geometry: Codable, Equatable {
 
     /// A conservative centered rectangle inside the rotated image, preserving its
     /// native aspect ratio. It intentionally excludes the triangular corner areas.
-    public func safeBounds(rotation angle: Double) -> CropRect {
+    public func safeBounds(rotation angle: Double) throws -> CropRect {
+        // Native bounds are valid only in the currently observed canvas. A new
+        // corrected-lens rotation must obtain fresh bounds inside the journaled handler.
+        if hasLensDistortion {
+            guard angle == rotation else { throw C1Error.invalidRequest("Native corrected-lens bounds belong to the current rotation only.") }
+            return maximumCrop
+        }
         let portrait = orientation == 90 || orientation == 270
         let w = portrait ? imageHeight : imageWidth
         let h = portrait ? imageWidth : imageHeight
@@ -73,7 +83,10 @@ public struct Geometry: Codable, Equatable {
         guard requested == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
         let angle = angle ?? rotation
         guard angle.isFinite, abs(angle) <= 45 else { throw C1Error.invalidRequest("Rotation must be finite and between -45 and 45 degrees.") }
-        let bounds = safeBounds(rotation: angle)
+        guard !hasLensDistortion || angle == rotation else {
+            throw C1Error.invalidRequest("Corrected-lens bounds at a new rotation require native execution; a dry run cannot predict them.")
+        }
+        let bounds = try safeBounds(rotation: angle)
         var rect = requested ?? crop
         if let ratio = aspectRatio {
             guard ratio.isFinite, ratio > 0 else { throw C1Error.invalidRequest("aspectRatio must be finite and positive.") }
@@ -105,6 +118,31 @@ public struct Geometry: Codable, Equatable {
         flip == other.flip && aspectRatioName == other.aspectRatioName && keystone == other.keystone &&
         lensGeometry == other.lensGeometry && lensProfile == other.lensProfile && hideDistortedAreas == other.hideDistortedAreas && cropOutsideImage == other.cropOutsideImage
     }
+}
+
+/// Retained before native dispatch when the final crop depends on bounds that
+/// Capture One can only report after rotation. No fabricated target rectangle.
+public struct GeometryRequest: Codable, Equatable {
+    public let crop: CropRect?
+    public let rotation: Double
+    public let aspectRatio: Double?
+
+    public init(crop: CropRect?, rotation: Double, aspectRatio: Double?) throws {
+        guard crop == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
+        guard rotation.isFinite, abs(rotation) <= 45 else { throw C1Error.invalidRequest("Rotation must be finite and between -45 and 45 degrees.") }
+        if let crop {
+            guard crop.values.allSatisfy({ $0.isFinite }), crop.width >= 1, crop.height >= 1 else { throw C1Error.invalidRequest("Crop dimensions must be positive finite pixels.") }
+        }
+        if let aspectRatio {
+            guard aspectRatio.isFinite, aspectRatio > 0 else { throw C1Error.invalidRequest("aspectRatio must be finite and positive.") }
+        }
+        self.crop = crop; self.rotation = rotation; self.aspectRatio = aspectRatio
+    }
+}
+
+struct CorrectedGeometryResult: Decodable {
+    let targetCropValues: [Double]
+    let boundsValues: [Double]
 }
 
 public struct GeometryMutationResult: Codable {

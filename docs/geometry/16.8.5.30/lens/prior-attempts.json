@@ -1,0 +1,165 @@
+{
+  "debugRun1": {
+    "result": "harness argument error before negative-rotation dry run dispatch",
+    "passedCases": 1
+  },
+  "debugRun2": {
+    "result": "assertion required exact crop equality instead of existing two-pixel tolerance at +45 degrees",
+    "passedCases": 4,
+    "intendedCrop": {
+      "centerX": 3537,
+      "centerY": 3537,
+      "width": 3394,
+      "height": 2262
+    },
+    "observedCrop": {
+      "centerX": 3537,
+      "centerY": 3537,
+      "width": 3393,
+      "height": 2261
+    }
+  },
+  "packagedRun1": {
+    "failure": "Native profile rejects shift (-54); no retry",
+    "beforeRestart": {
+      "adjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "aspectRatioName": "2x3",
+        "crop": {
+          "centerX": 3068,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 2852
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 5704
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "geometryStateHash": "geometry-v1:ddb8972fecefad2671afdb19854282ed35f0602564f351d434b2b1dce3dc3ec8",
+      "geometryUsableBounds": {
+        "centerX": 3067.9714744622893,
+        "centerY": 2103.4801441456943,
+        "height": 3803,
+        "width": 5704
+      },
+      "id": "2",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 0,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 0,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-geometry-live-10wa41u4/geometry/Capture/2U6A7257.CR3",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a"
+    },
+    "reconciled": {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "aspectRatioName": "2x3",
+        "crop": {
+          "centerX": 3068,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 2852
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3067,
+          "centerY": 2103,
+          "height": 3803,
+          "width": 5704
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "appInstance": "96637:1789679457.0801601",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "documentIdentity": "/tmp/c1-geometry-live-10wa41u4/geometry/geometry.cosessiondb|16777232|4391218|1789680682.518041",
+      "documentPath": "/tmp/c1-geometry-live-10wa41u4/geometry",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "2",
+      "operationId": "65919b8b-bd0f-4900-8581-6c7a001fd66f",
+      "operationType": "geometry-fixture-shift",
+      "parentImagePath": "/tmp/c1-geometry-live-10wa41u4/geometry/Capture/2U6A7257.CR3",
+      "status": "reconciled",
+      "timestamp": "2026-09-17T21:31:26Z",
+      "variantIdsBefore": [
+        "1"
+      ],
+      "workingRef": "c1_wrk_a7a63e9f-801f-4632-8798-56db053201ff"
+    },
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  },
+  "offlineAttempts": "Test compilation autoclosure and mock journal-directory setup were corrected before the final run; neither dispatched a native write."
+}

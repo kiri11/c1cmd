@@ -278,6 +278,31 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(len(data['images']), 2)
         self.assertEqual(data['quickCheck'], 'ok')
 
+    def test_corrected_lens_fixture_is_journaled_before_dispatch(self):
+        self.run.journal.parent.mkdir()
+        self.run.records = Mock(return_value=[{'operationId': 'old', 'status': 'succeeded'}])
+        self.run.cli = Mock(side_effect=[{'id':'12', 'geometry':{'lensGeometry':[0]}},
+                                        {'id':'12', 'geometry':{'lensGeometry':[100]}}])
+        def dispatched(script):
+            pending = json.loads(self.run.journal.read_text().splitlines()[-1])
+            self.assertEqual(pending['status'], 'pending')
+            self.assertEqual(pending['nativeVariantId'], '12')
+            self.assertIn('variant id "12"', script)
+        with patch.object(harness, 'ae', side_effect=dispatched):
+            observed = self.run.enable_lens_correction({'workingRef':'owned'})
+        self.assertEqual(observed['geometry']['lensGeometry'], [100])
+        self.assertEqual(json.loads(self.run.journal.read_text().splitlines()[-1])['status'], 'succeeded')
+
+    def test_failed_corrected_lens_fixture_retains_pending_block(self):
+        self.run.journal.parent.mkdir()
+        self.run.records = Mock(return_value=[{'operationId': 'old', 'status': 'succeeded'}])
+        self.run.cli = Mock(return_value={'id':'12', 'geometry':{'lensGeometry':[0]}})
+        with patch.object(harness, 'ae', side_effect=TimeoutError('unknown')):
+            with self.assertRaises(TimeoutError):
+                self.run.enable_lens_correction({'workingRef':'owned'})
+        self.assertEqual(len(self.run.journal.read_text().splitlines()), 1)
+        self.assertEqual(json.loads(self.run.journal.read_text())['status'], 'pending')
+
 
 if __name__ == '__main__':
     unittest.main()

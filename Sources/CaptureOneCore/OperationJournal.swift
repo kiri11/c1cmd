@@ -34,6 +34,7 @@ public struct OperationRecord: Codable, Equatable {
     public var afterAdjustments: Adjustments?
     public var beforeGeometry: Geometry?
     public var intendedGeometry: Geometry?
+    public var requestedGeometry: GeometryRequest?
     public var afterGeometry: Geometry?
     public var diff: [String: DoubleDiff]?
     public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown"
@@ -55,10 +56,12 @@ public struct OperationRecord: Codable, Equatable {
         error: String? = nil,
         previewOutputPath: String? = nil,
         beforeGeometry: Geometry? = nil,
-        intendedGeometry: Geometry? = nil
+        intendedGeometry: Geometry? = nil,
+        requestedGeometry: GeometryRequest? = nil
     ) {
         self.beforeGeometry = beforeGeometry
         self.intendedGeometry = intendedGeometry
+        self.requestedGeometry = requestedGeometry
         self.operationId = operationId
         self.timestamp = timestamp
         self.operationType = operationType

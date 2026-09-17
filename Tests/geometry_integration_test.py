@@ -114,7 +114,9 @@ try:
     assert result['after']['aspectRatioName']==current['geometry']['aspectRatioName']
     pr,_=tool('preview',{'ref':ref});assert abs(pr['width']/pr['height']-.75)<.003
     log('aspect-ratio-preset',result=result,preview=pr)
-    for label, setter in [('perspective','keystone vertical of adjustments'),('distortion','distortion of lens correction')]:
+    # This non-shift lens profile cannot accept a native shift fixture value.
+    # Tilt/shift rejection is covered offline; distortion is qualified separately.
+    for label, setter in [('perspective','keystone vertical of adjustments')]:
         native_fixture(label,f'set {setter} of v to 1')
         current=cli('get',ref)
         assert current.get('geometryUnavailableReason'),current
