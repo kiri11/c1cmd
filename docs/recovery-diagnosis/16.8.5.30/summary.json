@@ -1128,5 +1128,7 @@
   "testedFinalProbeSHA256": "3f5f688b8869c3bfa0a31cc400fe0339b05f73359b15657c5b391991741a9b98",
   "currentProbeSHA256": "158ec574a277cc18b1434d07a8709bd743df9e20bb7f434d46a1adc7234306fe",
   "probeRevisionNote": "Current probe adds guarded cleanup for incomplete restart and best-effort sampling after the final live run; validated offline separately.",
-  "restartsObserved": 17
+  "restartsObserved": 17,
+  "cleanup": "cleanup-2026-09-17.json",
+  "retentionNote": "Snapshot/event evidence in this directory is retained. Disposable control fixtures and scratch copies/full samples were removed after qualification; the original failed recovery fixture and preserved source RAW remain."
 }

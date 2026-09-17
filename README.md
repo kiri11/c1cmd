@@ -216,6 +216,8 @@ The reserved `c1-preview` recipe is configured by c1 and may remain in the Sessi
 
 ## Errors and recovery
 
+Normal CLI/MCP commands do not quit Capture One. Application shutdown remains under user control; native quit and SIGTERM options are confined to the explicitly invoked recovery qualification harness.
+
 Every dispatched write, including clone, baseline, delete, recipe setup, and preview export, has a durable pre-dispatch journal entry in the document's `.c1/journal.jsonl`. The journal appends state snapshots instead of rewriting history. Failed journal writes prevent dispatch; corrupted journals and provenance fail closed on writes.
 
 Failures after dispatch include an **`operationId`** in CLI/MCP error JSON. Do not repeat a timed-out command:

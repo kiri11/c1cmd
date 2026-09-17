@@ -25,7 +25,7 @@ The [earlier diagnosis](../../recovery-diagnosis/16.8.5.30/README.md) still appl
 
 ## Payload and evidence
 
-The [machine-readable summary](summary.json), [events](run-1/events.jsonl), [journal](run-1/journal.jsonl), and [provenance](run-1/provenance.json) retain the result. Snapshot paths are indexed in the summary. The full scratch run is `/private/tmp/c1-recovery-qualification-20260917-sigterm-run1`; its harness copy matches `Tests/recovery_integration_test.py` at SHA-256 `44d544dc644d1372c38835e3f8f5527d5fdc6f82cd3f94c16fb38d4af4c31903`. Production sources were unchanged and the recorded source patch is empty. The build-tree resource bundle was hidden during the run and restored afterward.
+The [machine-readable summary](summary.json), [events](run-1/events.jsonl), [journal](run-1/journal.jsonl), and [provenance](run-1/provenance.json) retain the result. Snapshot paths are indexed in the summary. The scratch run was `/private/tmp/c1-recovery-qualification-20260917-sigterm-run1`; its harness copy was verified against `Tests/recovery_integration_test.py` at SHA-256 `44d544dc644d1372c38835e3f8f5527d5fdc6f82cd3f94c16fb38d4af4c31903` before redundant scratch files were removed. Production sources were unchanged and the recorded source patch was empty. The build-tree resource bundle was hidden during the run and restored afterward.
 
 Archive SHA-256 is `258c3be50b488e9cde4265b97f6e8a5c8a4d0f303a6d329f260598389f984484`. Its wrapper differs from the earlier archive, but its CLI, MCP, and handler bytes exactly match the [inventory candidate](../../inventory/16.8.5.30/summary.json):
 
@@ -35,9 +35,9 @@ Archive SHA-256 is `258c3be50b488e9cde4265b97f6e8a5c8a4d0f303a6d329f260598389f98
 | MCP | `0fa7dc5b5df2bc192e7c14e38800027fc1e2ec22d7f5ed90bd78146c076791a5` |
 | Handler | `c0cbe307d17b601cecd224ab0e77b1fe11cf61856f47e5346dd8e7214c81a567` |
 
-`make check` passed before the campaign: **679/679 Swift assertions**, CLI/MCP contract/profile checks, and **20 offline recovery-harness tests**. The live campaign took about **468 seconds** from its environment record through cleanup. Previously passing packaged CLI/MCP/geometry/Catalog/existing-variant/inventory suites were not repeated because their runtime payload was unchanged. This is a separate recovery run, not a new full `make qualify` invocation.
+`make check` passed before the campaign: **679/679 Swift assertions**, CLI/MCP contract/profile checks, and **20 offline recovery-harness tests**; a [focused log excerpt](offline-checks.log) is retained. The live campaign took about **468 seconds** from its environment record through cleanup. Previously passing packaged CLI/MCP/geometry/Catalog/existing-variant/inventory suites were not repeated because their runtime payload was unchanged. This is a separate recovery run, not a new full `make qualify` invocation.
 
-The disposable fixture is retained at `/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-9ow5hb0r/recovery`. Both its copied RAW and the preserved source RAW have SHA-256 `2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868`. Retain the fixture before build cleanup if further forensic inspection is wanted. RAWs, JPEGs, binary databases, and redundant harness/console copies are not committed.
+The disposable fixture was `/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-9ow5hb0r/recovery`. Both its copied RAW and the preserved source RAW matched SHA-256 `2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868` before [authorized cleanup](../../recovery-diagnosis/16.8.5.30/cleanup-2026-09-17.json). The passing fixture and redundant scratch output have been removed; the preserved source RAW and original failed recovery fixture remain. RAWs, JPEGs, and binary databases are not committed.
 
 ## Reproduce
 

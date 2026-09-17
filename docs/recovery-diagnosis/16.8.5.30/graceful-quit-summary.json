@@ -1,0 +1,88 @@
+{
+  "dateUTC": "2026-09-17",
+  "status": "investigation-closed; optional graceful quit not required for normal CLI/MCP use",
+  "appVersion": "16.8.5.30",
+  "sourceDirectory": "/private/tmp/c1-graceful-quit-20260917",
+  "executedProbeSHA256": "b3cc9c4c5abe6c2a69ec477b538cc9acfbc4345589fd5214c6090d71a4a9e7ae",
+  "controls": [
+    {
+      "time": "2026-09-17T18:29:50.426154+00:00",
+      "label": "fresh-native-1",
+      "event": "quit-result",
+      "pid": 94274,
+      "stillAlive": false,
+      "elapsedSeconds": 0.6459027500022785,
+      "sendExitCode": 0,
+      "stderr": "",
+      "sendElapsedSeconds": 0.6457872500031954
+    },
+    {
+      "time": "2026-09-17T18:31:06.152731+00:00",
+      "label": "fresh-native-settled-1",
+      "event": "quit-result",
+      "pid": 94309,
+      "stillAlive": true,
+      "elapsedSeconds": 30.01238108400139,
+      "replyTimeoutSeconds": 30
+    },
+    {
+      "time": "2026-09-17T18:32:17.018246+00:00",
+      "label": "fresh-native-settled-2",
+      "event": "quit-result",
+      "pid": 94368,
+      "stillAlive": true,
+      "elapsedSeconds": 30.015058292003232,
+      "replyTimeoutSeconds": 30
+    },
+    {
+      "time": "2026-09-17T18:32:54.829078+00:00",
+      "label": "fresh-native-immediate-2",
+      "event": "quit-result",
+      "pid": 94420,
+      "stillAlive": false,
+      "elapsedSeconds": 0.6537712499994086,
+      "sendExitCode": 0,
+      "stderr": "",
+      "sendElapsedSeconds": 0.6535845840044203
+    }
+  ],
+  "menuComparison": {
+    "status": "manual-quit-reported-and-process-exit-verified",
+    "automatedMenuAccess": "blocked: System Events assistive access denied (-1719)",
+    "result": {
+      "time": "2026-09-17T19:13:55.458448+00:00",
+      "label": "pending-menu-comparison",
+      "event": "manual-quit-verified",
+      "preparedPID": 94435,
+      "userReportedQuitSuccess": true,
+      "captureOnePIDs": [],
+      "pgrepExitCode": 1,
+      "terminationLogStartLocal": "2026-09-17 15:13:24.861",
+      "terminationLogEndLocal": "2026-09-17 15:13:24.917",
+      "limitations": [
+        "Manual action reported by user; exact UI action and request time were not instrumented",
+        "Application uptime was about 40 minutes, versus 15 seconds before the stalled native controls",
+        "No post-editing manual quit or repeated manual cycle has been tested"
+      ]
+    }
+  },
+  "samples": [
+    {
+      "source": "/private/tmp/c1-graceful-quit-20260917/fresh-native-settled-1-sample.txt",
+      "sourceSHA256": "61db5c6e01aec67e536dd1864b0d6701f76efac90b1bccdb1cfb9b97d7a7b317",
+      "excerpt": "fresh-native-settled-1-main-thread.txt"
+    },
+    {
+      "source": "/private/tmp/c1-graceful-quit-20260917/fresh-native-settled-2-sample.txt",
+      "sourceSHA256": "a04f10890a396b213e444c403c3dedded25e66a9da51e60dac38dd9be65b1713",
+      "excerpt": "fresh-native-settled-2-main-thread.txt"
+    }
+  ],
+  "scope": "Fresh launches with zero documents; no Session or Catalog opened; no c1 commands or RAW mutations",
+  "retention": {
+    "kept": "This compact summary; earlier main-thread samples and qualified recovery evidence remain in the repository.",
+    "removed": "Supplemental full samples, standalone scratch driver, duplicate event/log extracts, and separate narrative.",
+    "scopeDecision": "No additional quit automation. Capture One shutdown stays under user control; shutdown modes belong to the explicit recovery test harness."
+  },
+  "samplesRetained": false
+}

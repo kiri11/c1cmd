@@ -1,0 +1,126 @@
+{
+  "dateUTC": "2026-09-17T19:22:52.569969+00:00",
+  "reason": "User requested focused commit and removal of unnecessary investigation artifacts",
+  "preservedSourceRAW": {
+    "path": "/private/tmp/c1-geometry-live-j99twntf/geometry/Capture/2U6A7257.CR3",
+    "sha256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  },
+  "preservedFailedFixture": {
+    "path": "/private/tmp/c1-recovery-1ujzomvx/recovery",
+    "databaseSHA256": "5344869cf7718ce7cc938ddaa2fa23638815de991e3fc1699927b61ee63296b6"
+  },
+  "removed": [
+    {
+      "path": "/Users/kiri11/projects/c1cmd/.build/recovery-probes/c1-restart-probe-2bcp16za",
+      "reason": "disposable diagnostic Session",
+      "files": 11,
+      "bytes": 14088755
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/.build/recovery-probes/c1-restart-probe-q2pom5jx",
+      "reason": "disposable diagnostic Session",
+      "files": 9,
+      "bytes": 13868834
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/.build/recovery-probes/c1-restart-probe-bpv050fp",
+      "reason": "disposable diagnostic Session",
+      "files": 9,
+      "bytes": 13867772
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/.build/recovery-probes/c1-restart-probe-74x99ox5",
+      "reason": "disposable diagnostic Session",
+      "files": 9,
+      "bytes": 13865861
+    },
+    {
+      "path": "/private/tmp/c1-restart-probe-qkc6vuzk",
+      "reason": "disposable diagnostic Session",
+      "files": 11,
+      "bytes": 14222260
+    },
+    {
+      "path": "/private/tmp/c1-restart-probe-k8b6ufmk",
+      "reason": "disposable diagnostic Session",
+      "files": 11,
+      "bytes": 14173173
+    },
+    {
+      "path": "/private/tmp/c1-restart-probe-v08hs_18",
+      "reason": "disposable diagnostic Session",
+      "files": 11,
+      "bytes": 14221663
+    },
+    {
+      "path": "/private/tmp/c1-restart-probe-26tckv8g",
+      "reason": "disposable diagnostic Session",
+      "files": 9,
+      "bytes": 13962504
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-9ow5hb0r",
+      "reason": "passing recovery Session and extracted test archive",
+      "files": 122,
+      "bytes": 26586701
+    },
+    {
+      "path": "/private/tmp/c1-recovery-diagnosis-20260916",
+      "reason": "redundant diagnosis scratch evidence",
+      "files": 54,
+      "bytes": 1611872
+    },
+    {
+      "path": "/private/tmp/c1-graceful-quit-20260917",
+      "reason": "optional graceful-quit scratch probe and samples",
+      "files": 4,
+      "bytes": 474466
+    },
+    {
+      "path": "/private/tmp/c1-recovery-qualification-20260917-sigterm-run1",
+      "reason": "redundant successful recovery scratch evidence",
+      "files": 13,
+      "bytes": 253911
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/docs/recovery-diagnosis/16.8.5.30/graceful-quit",
+      "reason": "supplemental evidence condensed into graceful-quit-summary.json",
+      "files": 6,
+      "bytes": 23756
+    },
+    {
+      "path": "/Users/kiri11/projects/c1cmd/suggestions.md",
+      "reason": "completed proposal; results and deferred items retained in inventory report",
+      "files": 1,
+      "bytes": 9234
+    },
+    {
+      "path": "/private/tmp/c1-recovery-qualification-20260917-sigterm-run1.log",
+      "reason": "temporary log or curation helper",
+      "files": 1,
+      "bytes": 1275
+    },
+    {
+      "path": "/private/tmp/c1-recovery-harness-check.log",
+      "reason": "temporary log or curation helper",
+      "files": 1,
+      "bytes": 1547
+    },
+    {
+      "path": "/private/tmp/check_recovery_probe.py",
+      "reason": "temporary log or curation helper",
+      "files": 1,
+      "bytes": 4075
+    },
+    {
+      "path": "/private/tmp/curate_recovery_20260917.py",
+      "reason": "temporary log or curation helper",
+      "files": 1,
+      "bytes": 3810
+    }
+  ],
+  "sourceRAWUnchangedAfterCleanup": true,
+  "failedFixtureUnchangedAfterCleanup": true,
+  "totalBytesRemoved": 141241469,
+  "totalFilesRemoved": 284
+}

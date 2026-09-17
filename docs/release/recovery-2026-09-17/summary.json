@@ -751,13 +751,15 @@
     "contractsAndProfiles": "passed",
     "recoveryHarnessTestsPassed": 20,
     "command": "make check",
-    "log": "/private/tmp/c1-recovery-harness-check.log"
+    "log": "offline-checks.log (retained excerpt; full scratch log removed during cleanup)",
+    "fullLogSHA256": "230122feb7fd83d9047f89bdd5987be5a828acd3b7e3b1e9dc0ae5dfde2c479b"
   },
   "evidenceCuration": {
     "fullRunDirectory": "/private/tmp/c1-recovery-qualification-20260917-sigterm-run1",
     "harness": "Tests/recovery_integration_test.py at environment.harnessSHA256",
     "sourcePatch": "empty; production sources unchanged",
-    "excluded": "RAWs, JPEGs, binary databases, duplicate harness copy and repetitive event-name console log remain in retained scratch/fixture paths"
+    "excluded": "Disposable successful/control fixtures, scratch run directories, RAW copies, exports and redundant logs removed during authorized cleanup; source RAW and original failed recovery fixture preserved.",
+    "cleanup": "../../recovery-diagnosis/16.8.5.30/cleanup-2026-09-17.json"
   },
   "limits": [
     "Only Capture One 16.8.5.30 on this machine and disposable Session qualified",
