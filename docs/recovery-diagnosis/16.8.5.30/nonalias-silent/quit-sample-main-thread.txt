@@ -1,0 +1,60 @@
+Analysis of sampling Capture One (pid 89556) every 1 millisecond
+Process:         Capture One [89556]
+Path:            /Applications/Capture One.app/Contents/MacOS/Capture One
+Load Address:    0x104344000
+Identifier:      com.captureone.captureone16
+Version:         16.8.5.30 (16.8.5.30)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  launchd [1]
+Target Type:     live task
+
+Date/Time:       2026-09-16 22:09:30.618 -0400
+Launch Time:     2026-09-16 22:09:04.724 -0400
+OS Version:      macOS 26.6.2 (25G83)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         328.8M
+Physical footprint (peak):  944.5M
+Idle exit:                  untracked
+----
+
+Call graph:
+    2044 Thread_1421035   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 2044 start  (in dyld) + 6992  [0x18b2544e4]
+    +   2044 ???  (in Capture One)  load address 0x104344000 + 0xfe7528  [0x10532b528]
+    +     2044 NSApplicationMain  (in AppKit) + 880  [0x18fadd7b0]
+    +       2044 -[NSApplication run]  (in AppKit) + 368  [0x18fb0513c]
+    +         2044 -[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:]  (in AppKit) + 72  [0x1906a7678]
+    +           2044 -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]  (in AppKit) + 688  [0x1906a796c]
+    +             2044 _DPSNextEvent  (in AppKit) + 1284  [0x18fb12348]
+    +               2044 AEProcessAppleEvent  (in HIToolbox) + 68  [0x198420344]
+    +                 2044 aeProcessAppleEvent  (in AE) + 484  [0x19390bfb8]
+    +                   2044 ???  (in AE)  load address 0x193908000 + 0xa88c  [0x19391288c]
+    +                     2044 ???  (in AE)  load address 0x193908000 + 0xaf34  [0x193912f34]
+    +                       2044 _NSAppleEventManagerGenericHandler  (in Foundation) + 80  [0x18ceffdc4]
+    +                         2044 -[NSAppleEventManager dispatchRawAppleEvent:withRawReply:handlerRefCon:]  (in Foundation) + 316  [0x18cefffcc]
+    +                           2044 -[NSScriptingAppleEventHandler handleCommandEvent:withReplyEvent:]  (in Foundation) + 152  [0x18d9cf2ac]
+    +                             2044 -[NSScriptCommand executeCommand]  (in Foundation) + 320  [0x18d9bf1d4]
+    +                               2044 -[NSScriptCommand _sendToRemainingReceivers]  (in Foundation) + 304  [0x18d9bef84]
+    +                                 2044 -[NSInvocation invokeWithTarget:]  (in CoreFoundation) + 64  [0x18b6f1a00]
+    +                                   2044 -[NSInvocation invoke]  (in CoreFoundation) + 424  [0x18b6bd4f0]
+    +                                     2044 __invoking___  (in CoreFoundation) + 148  [0x18b6bd664]
+    +                                       2044 ???  (in Capture One)  load address 0x104344000 + 0x1044624  [0x105388624]
+    +                                         2044 -[NSApplication terminate:]  (in AppKit) + 780  [0x18fd13578]
+    +                                           2044 -[NSApplication _shouldTerminate]  (in AppKit) + 1188  [0x18fd2182c]
+    +                                             2044 -[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:]  (in AppKit) + 72  [0x1906a7678]
+    +                                               2044 -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]  (in AppKit) + 688  [0x1906a796c]
+    +                                                 2044 _DPSNextEvent  (in AppKit) + 576  [0x18fb12084]
+    +                                                   2044 _DPSBlockUntilNextEventMatchingListInMode  (in AppKit) + 228  [0x1901be3d0]
+    +                                                     2044 _BlockUntilNextEventMatchingListInMode  (in HIToolbox) + 48  [0x19865414c]
+    +                                                       2044 ReceiveNextEventCommon  (in HIToolbox) + 488  [0x1984ca8bc]
+    +                                                         2044 RunCurrentEventLoopInMode  (in HIToolbox) + 320  [0x1984c7560]
+    +                                                           2044 _CFRunLoopRunSpecificWithOptions  (in CoreFoundation) + 532  [0x18b7ae264]
+    +                                                             2044 __CFRunLoopRun  (in CoreFoundation) + 1188  [0x18b6db9f4]
+    +                                                               2044 __CFRunLoopServiceMachPort  (in CoreFoundation) + 160  [0x18b6dd108]
+    +                                                                 2044 mach_msg  (in libsystem_kernel.dylib) + 24  [0x18b5dbfc0]
+    +                                                                   2044 mach_msg_overwrite  (in libsystem_kernel.dylib) + 480  [0x18b5e49c0]
+    +                                                                     2044 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x18b5ee5a4]
+    +                                                                       2044 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x18b5dbc34]

@@ -1,0 +1,206 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 7,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 28,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 37,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 5,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 7,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 8,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 9,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 10,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 11,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 12,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 13,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 23,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 24,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 25,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 29,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 30,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 31,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 32,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 33,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 34,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 35,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 36,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 37,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "42EED708-D288-4586-A267-634F7CE1A733"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "4046735C-D7A9-4FA2-90A0-B7365400006E"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGE": 2,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "51243EE5-D5C9-476E-ADF2-D6E592DA7BDE"
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGE": 2,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "4AB146D4-5C01-4783-BCC6-0D793D13590F"
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGE": 3,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "04A3E483-39FE-4B4D-9047-AFBE1376C734"
+    },
+    {
+      "Z_PK": 6,
+      "ZIMAGE": 3,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "B5AFFB8C-E75B-41B0-A552-1EB16B0887C4"
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "bd1d094a99810b0625be2fce063543a97e7497065abd4ac4ac1d946424fd5495",
+  "sidecarUUIDs": [
+    "42EED708-D288-4586-A267-634F7CE1A733",
+    "4046735C-D7A9-4FA2-90A0-B7365400006E"
+  ]
+}

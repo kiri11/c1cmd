@@ -1,0 +1,22 @@
+environment
+closed
+quit-stalled
+failed
+PASS quit-reply-timeout
+environment
+closed
+quit-stalled
+failed
+PASS process-exit-timeout
+environment
+closed
+quit-stalled
+sample-failed
+failed
+PASS sample-failure
+environment
+closed
+quit-completed
+failed
+PASS reopen-failure
+PASS syntax; 4 failure paths retain evidence without retry, fallback, or cleanup Apple Events

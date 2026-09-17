@@ -1,0 +1,56 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "ADD4BFA7-10CB-4C02-9F63-FEFDB90B5281",
+      "ZIMAGELOCATION": 1,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 1,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "B3EFA447-EB95-42A3-9629-D2D630FD0EA6"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "D7F4A3B5-1BF1-425A-9D40-3B7E6F84FF7A"
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "98400c00880e5aa2f55975d5edbfdb6d678326e12a78a02cf453c2bb174d312e",
+  "sidecarUUIDs": [
+    "B3EFA447-EB95-42A3-9629-D2D630FD0EA6",
+    "D7F4A3B5-1BF1-425A-9D40-3B7E6F84FF7A"
+  ]
+}

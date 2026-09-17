@@ -4,7 +4,10 @@
 Requires C1_TEST_RAW_FIXTURE, Capture One 16.8.5.30 running with ZERO documents,
 and exclusive use of the application. Creates and retains a disposable Session.
 Pauses Capture One with an independent resume watchdog; kills only its own MCP
-client; normally restarts Capture One between fault cases. Never retries a write.
+client; restarts Capture One between fault cases. Never retries a write.
+Fixtures default to .build/recovery-fixtures; C1_RECOVERY_FIXTURE_PARENT overrides
+the parent with an absolute, non-aliased path outside /tmp and /private/tmp.
+C1_RECOVERY_SHUTDOWN_MODE is quit (default) or explicit sigterm; no fallback.
 Usage: python3 Tests/recovery_integration_test.py ARCHIVE EVIDENCE_DIRECTORY
 """
 import datetime
@@ -14,6 +17,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -21,6 +25,25 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
+
+
+def fixture_parent():
+    parent = Path(os.environ.get('C1_RECOVERY_FIXTURE_PARENT', ROOT / '.build/recovery-fixtures'))
+    if not parent.is_absolute() or parent != parent.resolve():
+        raise ValueError('C1_RECOVERY_FIXTURE_PARENT must be an absolute path without symlink aliases')
+    if any(parent == base or base in parent.parents for base in [Path('/tmp'), Path('/private/tmp')]):
+        raise ValueError('Recovery fixtures must be outside /tmp and /private/tmp')
+    return parent
+
+
+def process_exited(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    # Permission errors are not evidence of process exit.
+    return False
 
 
 def sha(path):
@@ -52,6 +75,11 @@ def wait_for(fn, seconds=30):
 
 class Run:
     def __init__(self, archive, evidence):
+        self.shutdown_mode = os.environ.get('C1_RECOVERY_SHUTDOWN_MODE', 'quit')
+        if self.shutdown_mode not in SHUTDOWN_MODES:
+            raise ValueError('C1_RECOVERY_SHUTDOWN_MODE must be quit or sigterm')
+        self.fixture_parent = fixture_parent()
+        self.fixture_parent.mkdir(parents=True, exist_ok=True)
         self.archive = archive.resolve()
         self.evidence = evidence.resolve()
         self.evidence.mkdir(parents=True, exist_ok=False)
@@ -69,7 +97,7 @@ class Run:
                 assert added.returncode in [0, 1], added.stderr
                 patch += added.stdout
         (self.evidence / 'source.patch').write_bytes(patch)
-        self.work = Path(tempfile.mkdtemp(prefix='c1-recovery-', dir='/private/tmp'))
+        self.work = Path(tempfile.mkdtemp(prefix='c1-recovery-', dir=self.fixture_parent))
         self.session = self.work / 'recovery'
         self.db = self.session / 'recovery.cosessiondb'
         self.journal = self.session / '.c1/journal.jsonl'
@@ -77,6 +105,8 @@ class Run:
         self.paused = None
         self.owns_session = False
         self.hidden_bundle = None
+        self.restart_in_progress = False
+        self.restart_number = 0
 
     def log(self, event, **data):
         with self.events.open('a') as stream:
@@ -112,26 +142,82 @@ class Run:
         assert command == '/Applications/Capture One.app/Contents/MacOS/Capture One', command
         return pid
 
+    def fixture_snapshot(self, phase):
+        # Exact-build diagnostics only. Private database rows never authorize writes.
+        destination = self.evidence / f'restart-{self.restart_number}-{phase}.json'
+        try:
+            with sqlite3.connect(self.db.as_uri() + '?mode=ro', uri=True) as connection:
+                connection.row_factory = sqlite3.Row
+                data = {name: [dict(row) for row in connection.execute(query)] for name, query in {
+                    'images': 'SELECT Z_PK,ZIMAGEUUID,ZIMAGELOCATION,ZIMAGEFILENAME FROM ZIMAGE',
+                    'paths': 'SELECT Z_PK,ZMACROOT,ZRELATIVEPATH,ZISRELATIVE FROM ZPATHLOCATION',
+                    'variants': 'SELECT Z_PK,ZIMAGE,ZINDEX,ZVARIANTUUID FROM ZVARIANT',
+                }.items()}
+                data['quickCheck'] = connection.execute('PRAGMA quick_check').fetchone()[0]
+            destination.write_text(json.dumps(data, indent=2) + '\n')
+            self.log('fixture-snapshot', phase=phase, path=str(destination))
+        except (sqlite3.Error, OSError) as error:
+            self.log('fixture-snapshot-failed', phase=phase, error=repr(error))
+
     def restart(self):
+        assert self.owns_session, 'Only the owned recovery fixture may be restarted'
+        assert self.shutdown_mode in SHUTDOWN_MODES
+        self.restart_in_progress = True
+        self.restart_number += 1
+        try:
+            self._restart()
+        except BaseException as error:
+            # Leave cleanup suppressed: another Apple Event could reenter a stalled
+            # quit or launch the application after a failed reopen.
+            self.log('restart-failed', shutdownMode=self.shutdown_mode, error=repr(error))
+            raise
+        self.restart_in_progress = False
+
+    def _restart(self):
+        assert ae('return count of documents') == 1
         assert Path(ae('return id of first document')).resolve() == self.session.resolve()
         old = self.pid()
-        # Closing the owned fixture first avoids Capture One hanging in quit
-        # with a document open after a timed-out Apple Event. Never reopen it
-        # until the old app process has ended; old references remain invalid.
+        self.log('restart-started', oldPid=old, shutdownMode=self.shutdown_mode,
+                 shutdownKind=SHUTDOWN_MODES[self.shutdown_mode], restartNumber=self.restart_number)
+        # A native quit can stall even with zero documents. Close only our fixture,
+        # verify the process again, and never silently switch shutdown modes.
         ae('close first document', timeout=60)
         assert ae('return count of documents') == 0
-        ae('quit', timeout=60)
-        wait_for(lambda: subprocess.run(['kill', '-0', str(old)], capture_output=True).returncode != 0)
+        self.fixture_snapshot('closed')
+        assert self.pid() == old, 'Application changed before shutdown'
+        assert ae('return count of documents') == 0
+        try:
+            if self.shutdown_mode == 'quit':
+                ae('quit', timeout=60)
+            else:
+                os.kill(old, signal.SIGTERM)
+            wait_for(lambda: process_exited(old))
+        except (subprocess.TimeoutExpired, TimeoutError):
+            self.log('shutdown-stalled', oldPid=old, shutdownMode=self.shutdown_mode)
+            try:
+                # Sample only the still-running verified application, never a reused PID.
+                if self.pid() == old:
+                    result = subprocess.run(['sample', str(old), '3', '-file',
+                        str(self.evidence / f'restart-{self.restart_number}-sample.txt')],
+                        capture_output=True, text=True, timeout=10)
+                    self.log('shutdown-sample', code=result.returncode, stderr=result.stderr)
+            except Exception as error:
+                self.log('shutdown-sample-failed', error=repr(error))
+            raise
+        self.log('process-exited', oldPid=old, shutdownMode=self.shutdown_mode)
+        self.fixture_snapshot('terminated')
         subprocess.run(['open', '-a', '/Applications/Capture One.app', str(self.db)], check=True)
         def ready():
             try:
-                return Path(ae('return id of first document', timeout=5)).resolve() == self.session.resolve()
+                return (ae('return count of documents', timeout=5) == 1 and
+                        Path(ae('return id of first document', timeout=5)).resolve() == self.session.resolve())
             except (RuntimeError, subprocess.TimeoutExpired):
                 return False
         wait_for(ready, 60)
         new = self.pid()
         assert new != old
-        self.log('restart', oldPid=old, newPid=new)
+        self.log('restart', oldPid=old, newPid=new, shutdownMode=self.shutdown_mode,
+                 shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
 
     def clone(self):
         clone = self.cli('variant', 'clone', self.source)
@@ -139,10 +225,18 @@ class Run:
         return clone, current
 
     def identities(self):
-        return sorted((v['id'], v['parentImagePath']) for v in self.cli('variants', 'list'))
+        variants = self.cli('variants', 'list')
+        self.verify_image_paths(variants)
+        return sorted((v['id'], v['parentImagePath']) for v in variants)
+
+    def verify_image_paths(self, variants):
+        for variant in variants:
+            assert variant['parentImagePath'] == str(self.raw), (
+                'Native image path differs from the fixture path; stop before further mutations', variant)
 
     def recovery(self, operation, clone, label):
         before = self.identities()
+        self.log('recovery-inventory', case=label, phase='before-restart', identities=before)
         count = len(self.records())
         state = self.cli('operation', 'status', operation)
         assert state['status'] in ('pending', 'outcome-unknown')
@@ -152,6 +246,9 @@ class Run:
         assert len(self.records()) == count, 'Blocked operation must not dispatch or append'
         assert self.identities() == before
         self.restart()
+        after = self.identities()
+        self.log('recovery-inventory', case=label, phase='after-restart', identities=after)
+        assert after == before, 'Restart must preserve native IDs, count, and parent-image paths'
         # Restart alone is insufficient: the explicit status operation must reconcile.
         blocked = self.cli('variant', 'clone', self.source, ok=False)
         assert blocked['error']['code'] == 'outcome-unknown'
@@ -174,7 +271,7 @@ class Run:
         self.cli('variant', 'delete', fresh['workingRef'])
         assert self.identities() == before
         self.log('case-passed', case=label, operationId=operation,
-                 rawSHA256=sha(self.raw), observations=reconciled)
+                 rawSHA256=sha(self.raw), observations=reconciled, shutdownMode=self.shutdown_mode)
 
     def apple_event_timeout(self, geometry=False):
         clone, current = self.clone()
@@ -291,8 +388,10 @@ class Run:
                  sourcePatchSHA256=sha(self.evidence / 'source.patch'),
                  harnessSHA256=sha(__file__), macOS=subprocess.check_output(['sw_vers'], text=True),
                  architecture=os.uname().machine, swift=subprocess.check_output(['swift', '--version'], text=True),
-                 appVersion=ae('return version'), session=str(self.session), sourceRAW_SHA256=sha(fixture))
-        ae(f'make new document with properties {{name:"recovery", kind:session, path:"{self.work}"}}')
+                 appVersion=ae('return version'), session=str(self.session), sourceRAW_SHA256=sha(fixture),
+                 fixtureParent=str(self.fixture_parent), shutdownMode=self.shutdown_mode,
+                 shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
+        ae(f'make new document with properties {{name:"recovery", kind:session, path:{json.dumps(str(self.work))}}}')
         self.owns_session = True
         self.raw = self.session / 'Capture' / ('fixture' + fixture.suffix)
         self.raw.parent.mkdir(parents=True, exist_ok=True)
@@ -300,10 +399,11 @@ class Run:
         self.raw_hash = sha(self.raw)
         ae('set current collection of first document to collection "Capture" of first document')
         doctor = self.cli('doctor')
-        assert doctor['allChecksPassed'] and doctor['isSession'] and doctor['exactBuildMatched']
+        assert doctor['allChecksPassed'] and doctor['isSession'] and doctor['exactBuildMatched'] and doctor['writesEnabled']
         self.cli('doc', 'info')
         variants = wait_for(lambda: self.cli('variants', 'list'))
         assert len(variants) == 1
+        self.verify_image_paths(variants)
         self.source = variants[0]['id']
         self.original = self.cli('get', self.source)
         # Regression for transient collection-scoped clone ID readback (-1700).
@@ -317,7 +417,8 @@ class Run:
         self.preview_timeout()
         self.mcp_death()
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=4, rawSHA256=sha(self.raw))
+        self.log('all-cases-passed', cases=4, rawSHA256=sha(self.raw),
+                 shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
 
     def finish(self):
         if self.hidden_bundle:
@@ -331,13 +432,17 @@ class Run:
             shutil.copy2(self.journal, self.evidence / 'journal.jsonl')
             shutil.copy2(self.journal.with_name('provenance.json'), self.evidence / 'provenance.json')
         # Keep the Session and ambiguous clones as evidence. Never delete/adopt them.
-        if self.owns_session:
+        if self.owns_session and not self.restart_in_progress:
             try:
-                if Path(ae('return id of first document')).resolve() == self.session.resolve():
+                if (ae('return count of documents') == 1 and
+                        Path(ae('return id of first document')).resolve() == self.session.resolve()):
                     ae('close first document')
                     self.log('cleanup', openDocuments=ae('return count of documents'), retainedSession=str(self.session))
             except Exception as error:
                 self.log('cleanup-failed', error=str(error))
+        elif self.restart_in_progress:
+            self.log('cleanup-skipped', reason='incomplete restart; no further Apple Events',
+                     retainedSession=str(self.session))
 
 
 if __name__ == '__main__':

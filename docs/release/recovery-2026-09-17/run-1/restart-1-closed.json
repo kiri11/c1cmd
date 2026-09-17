@@ -1,0 +1,51 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "31602772-FC21-4333-858B-6A431EAB7D90",
+      "ZIMAGELOCATION": 1,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 1,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "317D0D93-5517-460E-A86E-78F1DC3EB257"
+    },
+    {
+      "Z_PK": 12,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "081A389B-1510-496B-BC61-3A6D492D09D6"
+    }
+  ],
+  "quickCheck": "ok"
+}

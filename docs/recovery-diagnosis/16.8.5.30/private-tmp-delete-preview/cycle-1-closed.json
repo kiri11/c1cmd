@@ -1,0 +1,213 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "1E1CB3E4-398A-4400-9C9B-114D5E52E291",
+      "ZIMAGELOCATION": 7,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGEUUID": "1E1CB3E4-398A-4400-9C9B-114D5E52E291",
+      "ZIMAGELOCATION": 31,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGEUUID": "1E1CB3E4-398A-4400-9C9B-114D5E52E291",
+      "ZIMAGELOCATION": 37,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 5,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 7,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 8,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 9,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 10,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 11,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 12,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 13,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 23,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 24,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 25,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 29,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 30,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 31,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 32,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 33,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 34,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 35,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 36,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 37,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "8F183053-1578-4598-A7D2-D8AFA7C9BBF7"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "73E25A53-766D-4853-945E-37AE8C1C3FCE"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGE": 2,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "4E02C4AB-222E-4005-9742-8EAC90EEFD3F"
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGE": 2,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "35EE4CAA-39F1-432D-8311-1587C024BF8E"
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGE": 3,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "D2B47761-85CB-426E-ADE0-5532C1BC5FCA"
+    },
+    {
+      "Z_PK": 6,
+      "ZIMAGE": 3,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "522BF409-202D-45E2-A276-DDFCD8A00BBC"
+    },
+    {
+      "Z_PK": 8,
+      "ZIMAGE": 1,
+      "ZINDEX": 383,
+      "ZVARIANTUUID": "851DAEB0-6F26-4CF7-AD8C-0E61BDCE16B5"
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "fc969be7b4da0df7042ed2f56590f055cb00f598c8ee8c6e48f1619eac41020c",
+  "sidecarUUIDs": [
+    "8F183053-1578-4598-A7D2-D8AFA7C9BBF7",
+    "73E25A53-766D-4853-945E-37AE8C1C3FCE",
+    "851DAEB0-6F26-4CF7-AD8C-0E61BDCE16B5"
+  ]
+}

@@ -1,0 +1,296 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 7,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 37,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 54,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGEUUID": "FC3F46DD-AB38-4769-B623-1577BD207618",
+      "ZIMAGELOCATION": 61,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 5,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 7,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 8,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 9,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 10,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 11,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 12,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 13,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 23,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 24,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 25,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 29,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 30,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 31,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 32,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 33,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 34,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 35,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 36,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 37,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 47,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 48,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 49,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 53,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 54,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 55,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 56,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 57,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 58,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 59,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 60,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 61,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "42EED708-D288-4586-A267-634F7CE1A733"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "4046735C-D7A9-4FA2-90A0-B7365400006E"
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGE": 3,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "42EED708-D288-4586-A267-634F7CE1A733"
+    },
+    {
+      "Z_PK": 6,
+      "ZIMAGE": 3,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "4046735C-D7A9-4FA2-90A0-B7365400006E"
+    },
+    {
+      "Z_PK": 7,
+      "ZIMAGE": 4,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "7BFF35F7-5BF3-4904-8F31-28B4B1218522"
+    },
+    {
+      "Z_PK": 8,
+      "ZIMAGE": 4,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "7393DB4F-D81F-4800-8FEC-D23B84505141"
+    },
+    {
+      "Z_PK": 9,
+      "ZIMAGE": 5,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "8F042E6D-F1AA-4456-9AFE-A98E45132FB9"
+    },
+    {
+      "Z_PK": 10,
+      "ZIMAGE": 5,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "AE048956-52E3-48AA-8EBC-04BD8710F5FC"
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "d4f54c3e75485047dcccb6c5bf908b2f34f36bd021d8c495f3a18a5b6166f6c8",
+  "sidecarUUIDs": [
+    "42EED708-D288-4586-A267-634F7CE1A733",
+    "4046735C-D7A9-4FA2-90A0-B7365400006E"
+  ]
+}

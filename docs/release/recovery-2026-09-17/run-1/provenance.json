@@ -1,0 +1,234 @@
+{
+  "c1_wrk_0efbf9d0-2bfe-41c2-be7c-de65e0d6bd8b" : {
+    "baselineAdjustments" : {
+      "contrast" : 0,
+      "exposure" : 0,
+      "saturation" : 0,
+      "temperature" : 3200.113037109375,
+      "tint" : 0.006856377236545086
+    },
+    "baselineGeometry" : {
+      "crop" : {
+        "centerX" : 3000,
+        "centerY" : 2000,
+        "height" : 4000,
+        "width" : 6000
+      },
+      "cropOutsideImage" : false,
+      "flip" : "none",
+      "hideDistortedAreas" : true,
+      "imageHeight" : 4000,
+      "imageWidth" : 6000,
+      "keystone" : [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry" : [
+        0,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile" : "Canon EF 35mm f\/1.4L II USM",
+      "maximumCrop" : {
+        "centerX" : 2999,
+        "centerY" : 2000,
+        "height" : 3999,
+        "width" : 5999
+      },
+      "orientation" : 0,
+      "rotation" : 0
+    },
+    "baselineStateHash" : "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+    "cloneVariantId" : "12",
+    "createdAt" : "2026-09-17T15:56:05Z",
+    "creationOperationId" : "dd9b072e-b939-49fe-b1de-094961cc55b1",
+    "documentName" : "recovery.cosessiondb",
+    "documentPath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery",
+    "documentToken" : "91400:1789611780.7286339|\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/recovery.cosessiondb|16777232|4347645|1789660494.3013556",
+    "parentImagePath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/Capture\/fixture.CR3",
+    "sourceVariantId" : "1",
+    "workingRef" : "c1_wrk_0efbf9d0-2bfe-41c2-be7c-de65e0d6bd8b"
+  },
+  "c1_wrk_2de28211-493f-45d0-98e6-8f90e1e08578" : {
+    "baselineAdjustments" : {
+      "contrast" : 0,
+      "exposure" : 0,
+      "saturation" : 0,
+      "temperature" : 3200.113037109375,
+      "tint" : 0.006856377236545086
+    },
+    "baselineGeometry" : {
+      "crop" : {
+        "centerX" : 3000,
+        "centerY" : 2000,
+        "height" : 4000,
+        "width" : 6000
+      },
+      "cropOutsideImage" : false,
+      "flip" : "none",
+      "hideDistortedAreas" : true,
+      "imageHeight" : 4000,
+      "imageWidth" : 6000,
+      "keystone" : [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry" : [
+        0,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile" : "Canon EF 35mm f\/1.4L II USM",
+      "maximumCrop" : {
+        "centerX" : 2999,
+        "centerY" : 2000,
+        "height" : 3999,
+        "width" : 5999
+      },
+      "orientation" : 0,
+      "rotation" : 0
+    },
+    "baselineStateHash" : "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+    "cloneVariantId" : "19",
+    "createdAt" : "2026-09-17T16:02:03Z",
+    "creationOperationId" : "f0972062-1977-41d5-97df-3fa19b305957",
+    "documentName" : "recovery.cosessiondb",
+    "documentPath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery",
+    "documentToken" : "93274:1789660895.555602|\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/recovery.cosessiondb|16777232|4347645|1789660494.3013556",
+    "parentImagePath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/Capture\/fixture.CR3",
+    "sourceVariantId" : "1",
+    "workingRef" : "c1_wrk_2de28211-493f-45d0-98e6-8f90e1e08578"
+  },
+  "c1_wrk_3d829240-b749-4cda-96b6-4295a2996c6e" : {
+    "baselineAdjustments" : {
+      "contrast" : 0,
+      "exposure" : 0,
+      "saturation" : 0,
+      "temperature" : 3200.113037109375,
+      "tint" : 0.006856377236545086
+    },
+    "baselineGeometry" : {
+      "crop" : {
+        "centerX" : 3000,
+        "centerY" : 2000,
+        "height" : 4000,
+        "width" : 6000
+      },
+      "cropOutsideImage" : false,
+      "flip" : "none",
+      "hideDistortedAreas" : true,
+      "imageHeight" : 4000,
+      "imageWidth" : 6000,
+      "keystone" : [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry" : [
+        0,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile" : "Canon EF 35mm f\/1.4L II USM",
+      "maximumCrop" : {
+        "centerX" : 2999,
+        "centerY" : 2000,
+        "height" : 3999,
+        "width" : 5999
+      },
+      "orientation" : 0,
+      "rotation" : 0
+    },
+    "baselineStateHash" : "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+    "cloneVariantId" : "16",
+    "createdAt" : "2026-09-17T16:01:23Z",
+    "creationOperationId" : "6a670f58-0b99-4110-8748-abd4a51d7db0",
+    "documentName" : "recovery.cosessiondb",
+    "documentPath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery",
+    "documentToken" : "93200:1789660852.131978|\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/recovery.cosessiondb|16777232|4347645|1789660494.3013556",
+    "parentImagePath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/Capture\/fixture.CR3",
+    "sourceVariantId" : "1",
+    "workingRef" : "c1_wrk_3d829240-b749-4cda-96b6-4295a2996c6e"
+  },
+  "c1_wrk_fb3b05ab-ee46-4b2f-a095-370ef67c25d5" : {
+    "baselineAdjustments" : {
+      "contrast" : 0,
+      "exposure" : 0,
+      "saturation" : 0,
+      "temperature" : 3200.113037109375,
+      "tint" : 0.006856377236545086
+    },
+    "baselineGeometry" : {
+      "crop" : {
+        "centerX" : 3000,
+        "centerY" : 2000,
+        "height" : 4000,
+        "width" : 6000
+      },
+      "cropOutsideImage" : false,
+      "flip" : "none",
+      "hideDistortedAreas" : true,
+      "imageHeight" : 4000,
+      "imageWidth" : 6000,
+      "keystone" : [
+        100,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensGeometry" : [
+        0,
+        35,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lensProfile" : "Canon EF 35mm f\/1.4L II USM",
+      "maximumCrop" : {
+        "centerX" : 2999,
+        "centerY" : 2000,
+        "height" : 3999,
+        "width" : 5999
+      },
+      "orientation" : 0,
+      "rotation" : 0
+    },
+    "baselineStateHash" : "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+    "cloneVariantId" : "14",
+    "createdAt" : "2026-09-17T15:58:40Z",
+    "creationOperationId" : "d6494a7a-57cc-4bee-8559-cba28dce83e6",
+    "documentName" : "recovery.cosessiondb",
+    "documentPath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery",
+    "documentToken" : "93087:1789660693.571871|\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/recovery.cosessiondb|16777232|4347645|1789660494.3013556",
+    "parentImagePath" : "\/Users\/kiri11\/projects\/c1cmd\/.build\/recovery-fixtures\/c1-recovery-9ow5hb0r\/recovery\/Capture\/fixture.CR3",
+    "sourceVariantId" : "1",
+    "workingRef" : "c1_wrk_fb3b05ab-ee46-4b2f-a095-370ef67c25d5"
+  }
+}

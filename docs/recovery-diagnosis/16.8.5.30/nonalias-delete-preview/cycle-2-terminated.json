@@ -1,0 +1,95 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "7AC12AE0-3155-4078-81D5-17FF49F619A2",
+      "ZIMAGELOCATION": 1,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGEUUID": "7E780F4D-90A1-465E-8DFB-5FEA283A5F38",
+      "ZIMAGELOCATION": 6,
+      "ZIMAGEFILENAME": "preview.jpg"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 1,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 5,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output/c1-previews",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 6,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output/c1-previews/4de928f2-79ff-4934-8736-ea5e69147fa9",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "F30ED579-415E-4E38-83F9-798529EA63D5",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "26805DBC-1DE0-45E5-8BD2-1DC29A7BEC0D",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGE": 1,
+      "ZINDEX": 383,
+      "ZVARIANTUUID": "3C1EC05E-DA64-4E80-8B87-F6CDE075B639",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGE": 2,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "63EB4B89-0BF5-46C4-BEE9-13FBB86FC913",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "eda42d48edcb77040d2b145fc3545878743bf67893f620a3ee453d4a6db9e60c",
+  "sidecarUUIDs": [
+    "F30ED579-415E-4E38-83F9-798529EA63D5",
+    "26805DBC-1DE0-45E5-8BD2-1DC29A7BEC0D",
+    "3C1EC05E-DA64-4E80-8B87-F6CDE075B639"
+  ]
+}

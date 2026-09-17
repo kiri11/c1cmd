@@ -16,6 +16,8 @@ endif
 BINDIR ?= $(PREFIX)/bin
 BUILD_DIR ?= .build/release
 ARCHIVE := dist/c1-v0.1.0-macos-$(shell uname -m).tar.gz
+C1_RECOVERY_FIXTURE_PARENT ?= $(CURDIR)/.build/recovery-fixtures
+C1_RECOVERY_SHUTDOWN_MODE ?= quit
 
 .PHONY: all build build-debug test install uninstall clean
 
@@ -35,6 +37,7 @@ test:
 check: build-debug
 	/usr/bin/time -p .build/debug/CaptureOneCoreTests
 	C1_TEST_BIN="$(CURDIR)/.build/debug/c1" C1_TEST_MCP_BIN="$(CURDIR)/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+	python3 -B Tests/recovery_harness_test.py
 
 # Every qualification check, once per candidate. Keep Capture One calls sequential.
 qualify:
@@ -44,7 +47,7 @@ qualify:
 	$(MAKE) archive
 	mkdir -p "$(EVIDENCE_DIR)"
 	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)"
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))/recovery"
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))/recovery"
 
 install: build
 	mkdir -p $(DESTDIR)$(BINDIR)

@@ -1,0 +1,74 @@
+2026-09-15 22:51:34.705 Waiting for background saving to complete (saveSessionToURL)…
+2026-09-15 22:51:34.735 saveSessionToURL: Background saving done (saveSessionToURL).
+2026-09-15 22:51:39.178 Initiating CamerasManager shutdown procedure
+2026-09-15 22:51:39.178 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminating service
+2026-09-15 22:51:39.178 Activity threads finished shutdown
+2026-09-15 22:51:39.179 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: calling terminate
+2026-09-15 22:51:39.181 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminated
+2026-09-15 22:51:39.185 *** Initiating Capture One Termination Procedure ***
+2026-09-15 22:51:39.271 Threads done
+2026-09-15 22:51:39.405 *** ENDED ***
+2026-09-15 22:51:40.203 Previous run termination was Normal
+2026-09-15 22:51:48.529 *** Prefetch: Instantiation of 1 images took 0.000452 seconds.
+2026-09-15 22:51:48.530 *** Prefetch: Instantiation of 4 ImageInCollection took 0.000128 seconds.
+2026-09-15 22:51:48.530 *** Prefetch: Instantiation of 2 variants took 0.000102 seconds.
+2026-09-15 22:54:10.328 Waiting for background saving to complete (saveSessionToURL)…
+2026-09-15 22:54:10.367 saveSessionToURL: Background saving done (saveSessionToURL).
+2026-09-15 22:54:15.089 Initiating CamerasManager shutdown procedure
+2026-09-15 22:54:15.090 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminating service
+2026-09-15 22:54:15.090 Activity threads finished shutdown
+2026-09-15 22:54:15.091 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: calling terminate
+2026-09-15 22:54:15.095 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminated
+2026-09-15 22:57:25.384 *** Initiating Capture One Termination Procedure ***
+2026-09-15 22:57:25.538 Threads done
+2026-09-15 22:57:25.565 *** ENDED ***
+2026-09-15 22:57:26.022 Previous run termination was Normal
+2026-09-15 22:57:32.500 *** Prefetch: Instantiation of 4 images took 0.000629 seconds.
+2026-09-15 22:57:32.501 *** Prefetch: Instantiation of 19 ImageInCollection took 0.000266 seconds.
+2026-09-15 22:57:32.501 *** Prefetch: Instantiation of 10 variants took 0.000214 seconds.
+2026-09-15 22:58:03.355 Waiting for background saving to complete (saveSessionToURL)…
+2026-09-15 22:58:03.396 saveSessionToURL: Background saving done (saveSessionToURL).
+2026-09-15 22:58:04.122 Initiating CamerasManager shutdown procedure
+2026-09-15 22:58:04.122 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminating service
+2026-09-15 22:58:04.123 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: calling terminate
+2026-09-15 22:58:04.125 -[CaptureCoreService stopAndTerminateService:]_block_invoke_2: terminated
+2026-09-15 22:58:04.362 Activity threads finished shutdown
+2026-09-15 23:00:09.213 *** Initiating Capture One Termination Procedure ***
+2026-09-15 23:00:09.363 Threads done
+2026-09-15 23:00:09.391 *** ENDED ***
+2026-09-15 23:00:09.866 Previous run termination was Normal
+2026-09-15 23:00:16.354 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.354 *** Prefetch: Instantiation of 5 images took 0.000751 seconds.
+2026-09-15 23:00:16.355 *** Prefetch: Instantiation of 31 ImageInCollection took 0.000378 seconds.
+2026-09-15 23:00:16.356 *** Prefetch: Instantiation of 16 variants took 0.000263 seconds.
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.388 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:16.389 Corrupted image at rowID 5 with no path. Returning dummy path: /Users/kiri11/Pictures/fixture.CR3
+2026-09-15 23:00:20.880 Waiting for background saving to complete (saveSessionToURL)…
+2026-09-15 23:00:20.905 saveSessionToURL: Background saving done (saveSessionToURL).

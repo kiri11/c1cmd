@@ -1,0 +1,139 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "6F155937-2132-406D-9924-39619039751F",
+      "ZIMAGELOCATION": 1,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGEUUID": "6F155937-2132-406D-9924-39619039751F",
+      "ZIMAGELOCATION": 13,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 1,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 9,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 10,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 11,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 12,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 13,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 14,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 15,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 16,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "B1193032-EC76-4B25-ADE8-E8E5046F0442",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "FAEE4623-97B0-4270-BAAB-1D0F0BB4C257",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGE": 2,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "DCFE4085-0111-4E2C-98F9-D4B80048473A",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGE": 2,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "BF03D6A8-4C94-428A-9037-49BC939B4515",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    },
+    {
+      "Z_PK": 6,
+      "ZIMAGE": 1,
+      "ZINDEX": 383,
+      "ZVARIANTUUID": "5F428407-5D04-4973-A35B-82FA8C53A1EC",
+      "ZEXPOSURE": 0.0,
+      "ZROTATION": 0.0
+    }
+  ],
+  "quickCheck": "ok",
+  "sidecarSHA256": "24e3617394204e84d5f083d4e73b61fd685c178ace9fa4de6e9df05f9bcd45db",
+  "sidecarUUIDs": [
+    "B1193032-EC76-4B25-ADE8-E8E5046F0442",
+    "FAEE4623-97B0-4270-BAAB-1D0F0BB4C257",
+    "5F428407-5D04-4973-A35B-82FA8C53A1EC"
+  ]
+}
