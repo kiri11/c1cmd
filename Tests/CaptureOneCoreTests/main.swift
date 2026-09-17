@@ -17,6 +17,8 @@ ExistingVariantTests.run()
 VersionCompatibilityTests.run()
 ReleaseSafetyTests.run()
 RatingFilterTests.run()
+InventoryTests.run()
+RequestContextTests.run()
 GeometryTests.run()
 
 print("\n=== Test Results ===")

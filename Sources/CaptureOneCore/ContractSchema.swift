@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.4.0"
+    public static let version = "1.5.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status"]
+    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
@@ -31,6 +31,8 @@ public enum ContractSchema {
         case "variants_list":
             var result = object([
                 "collection": string, "selected": boolean,
+                "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
+                "deadlineSeconds": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
                 "rating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."],
                 "minRating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Inclusive minimum star rating. Mutually exclusive with rating."]
             ])
@@ -59,6 +61,7 @@ public enum ContractSchema {
         case "diff": return object(["ref1": string, "ref2": string], required: ["ref1"])
         case "dump": return object(["collection": string, "selected": boolean, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
         case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean], required: ["ref"])
+        case "request_status": return object(["requestId": string], required: ["requestId"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
         default: return object([:])
         }
@@ -143,9 +146,19 @@ public enum ContractSchema {
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
         let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
         var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string; dumpProps["geometry"] = geometrySchema; dumpProps["geometryStateHash"] = string; dumpProps["geometryUnavailableReason"] = string
+        var requestStatusProperties: [String: Any] = [
+            "requestId": string, "tool": string, "phase": string, "status": string,
+            "documentIdentity": string, "scope": string, "operationId": string, "handler": string,
+            "applicationProgress": string, "inventoryStrategy": string, "waitingForAppleEvent": boolean, "processAlive": boolean, "stale": boolean, "slow": boolean,
+            "startedAt": number, "updatedAt": number
+        ]
+        for name in ["processId", "elapsedMs", "lastProgressAgoMs", "candidatesScanned", "matchesFound", "summariesCompleted", "totalCandidates", "rating", "minRating", "handlerCalls"] {
+            requestStatusProperties[name] = ["type": "integer"]
+        }
         var responses: [String: Any] = [
             "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
             "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
+            "request_status": object(requestStatusProperties, required: ["requestId", "tool", "phase", "status", "elapsedMs", "processAlive", "stale"]),
             "capabilities": ["type": "object"], "schema": ["type": "object"],
             "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,
             "variant_delete": object(["deleted": boolean, "workingRef": string, "cloneVariantId": string]),
@@ -162,6 +175,6 @@ public enum ContractSchema {
             "baselineGeometryStateHash": string, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses,
-                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string], required: ["code", "message"])], required: ["error"])]]
+                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string], required: ["code", "message"])], required: ["error"])]]
     }
 }

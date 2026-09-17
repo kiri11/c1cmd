@@ -248,6 +248,7 @@ public final class SessionController {
         return VersionCompatibility(isTestedMatch: false, isAllowed: false, warning: nil)
     }
 
+    private let nativeInventoryEnabled: Bool
     private let executor: ScriptExecuting
     private let appInstance: () throws -> String
     private let databaseIdentity: (String) throws -> String
@@ -261,7 +262,9 @@ public final class SessionController {
                 appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
                 databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
                 catalogWritePath: String? = ProcessInfo.processInfo.environment["C1_CATALOG_WRITE_PATH"],
-                imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read) {
+                imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read,
+                nativeInventoryEnabled: Bool = ProcessInfo.processInfo.environment["C1_INVENTORY_STRATEGY"] != "scan") {
+        self.nativeInventoryEnabled = nativeInventoryEnabled
         self.executor = executor
         self.appInstance = appInstance
         self.databaseIdentity = databaseIdentity
@@ -437,6 +440,7 @@ public final class SessionController {
             appVersion: info.appVersion
         )
         document.writesEnabled = (try? assertSessionWritable(docInfo: document, operation: "edit")) != nil
+        RequestContext.current?.document(document.openToken)
         return document
     }
 
@@ -460,42 +464,123 @@ public final class SessionController {
     }
 
     // MARK: - Variants List
-    public func listVariants(collectionName: String? = nil, selectedOnly: Bool = false, rating: Int? = nil, minRating: Int? = nil) throws -> [VariantSummary] {
-        var filters: [String: Any] = [:]
+    public func listVariants(collectionName: String? = nil, selectedOnly: Bool = false, rating: Int? = nil, minRating: Int? = nil,
+                             batchSize: Int = 32, deadlineSeconds: Double? = nil) throws -> [VariantSummary] {
+        var filters: [String: Any] = ["batchSize": batchSize]
         if let rating { filters["rating"] = rating }
         if let minRating { filters["minRating"] = minRating }
+        if let deadlineSeconds { filters["deadlineSeconds"] = deadlineSeconds }
         try ContractSchema.validate(tool: "variants_list", arguments: filters)
-        let docInfo = try getDocumentInfo()
-        let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
-        let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
-
-        let colDesc = collectionName != nil ? NSAppleEventDescriptor(string: collectionName!) : NSAppleEventDescriptor.missingValue()
-        let selDesc = NSAppleEventDescriptor(boolean: selectedOnly)
-
-        let records: [VariantSummaryRecord] = try executor.executeAndDecode(
-            handler: "listVariants",
-            args: [NSAppleEventDescriptor(string: docInfo.documentId), colDesc, selDesc]
-        )
-
-        return records.filter { rec in
-            (rating.map { rec.starRating == $0 } ?? true) &&
-            (minRating.map { rec.starRating >= $0 } ?? true)
-        }.map { rec in
-            let matches = byClone[rec.variantId] ?? []
-            let candidate = matches.count == 1 ? matches.first : nil
-            let prov = candidate.flatMap { record in
-                (try? DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: rec.parentImagePath)) != nil ? record : nil
+        let started = ProcessInfo.processInfo.systemUptime
+        let context = RequestContext.current
+        context?.inventoryScope(collection: collectionName, selected: selectedOnly, rating: rating, minRating: minRating)
+        func checkpoint() throws {
+            try context?.checkReadCancellation()
+            if let deadlineSeconds, ProcessInfo.processInfo.systemUptime - started >= deadlineSeconds {
+                throw C1Error.deadlineExceeded("Inventory deadline reached between Apple Events; no partial inventory was returned. An outstanding event cannot be interrupted.")
             }
-            return VariantSummary(
-                id: rec.variantId,
-                name: rec.variantName,
-                parentImagePath: rec.parentImagePath,
-                isSelected: rec.isSelected,
-                rating: rec.starRating,
-                colorTag: rec.colorTagVal,
-                isManagedWorkingClone: prov != nil,
-                workingRef: prov?.workingRef
-            )
+        }
+        try checkpoint()
+        return try lock.withLock(checkpoint: checkpoint) {
+            try checkpoint()
+            context?.update(phase: "validating-document")
+            let docInfo = try getDocumentInfo()
+            context?.document(docInfo.openToken)
+            // Native predicates/bulk IDs are qualified only for Sessions on this exact build.
+            let native = nativeInventoryEnabled && docInfo.isSession && docInfo.appVersion == Self.pinnedBuild
+            context?.inventoryStrategy(native ? "native-filter" : "rating-scan")
+            func validateDocument() throws {
+                try checkpoint()
+                let current = try getDocumentInfo()
+                guard current.openToken == docInfo.openToken, current.documentId == docInfo.documentId else {
+                    throw C1Error.documentChanged("Document identity changed during inventory; discard this inventory.")
+                }
+                try checkpoint()
+            }
+            let doc = NSAppleEventDescriptor(string: docInfo.documentId)
+            let col = collectionName.map(NSAppleEventDescriptor.init(string:)) ?? NSAppleEventDescriptor.missingValue()
+            func discover() throws -> [String] {
+                try checkpoint()
+                var args = [doc, col, NSAppleEventDescriptor(boolean: selectedOnly)]
+                if native {
+                    args += [rating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
+                             minRating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue()]
+                }
+                let ids: [String] = try executor.executeAndDecode(handler: native ? "discoverFilteredVariantIDs" : "discoverVariantIDs", args: args)
+                guard Set(ids).count == ids.count, ids.allSatisfy({ !$0.isEmpty }) else {
+                    throw C1Error.identityAmbiguous("Inventory returned empty or duplicate native IDs.")
+                }
+                try checkpoint()
+                return ids
+            }
+            context?.update(phase: "discovering")
+            let ids = try discover()
+            context?.update(phase: native ? "metadata" : "ratings", matches: native ? ids.count : 0, total: ids.count)
+            var records: [VariantSummaryRecord] = []
+            var scanned = 0
+            var matched = 0
+            struct RatingRecord: Decodable { let variantId: String; let starRating: Int }
+            for offset in stride(from: 0, to: ids.count, by: batchSize) {
+                try validateDocument()
+                let batch = Array(ids[offset..<min(offset + batchSize, ids.count)])
+                if native {
+                    context?.update(phase: "metadata")
+                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
+                    guard summaries.map(\.variantId) == batch, summaries.allSatisfy({ item in
+                        (0...5).contains(item.starRating) &&
+                        (rating.map { item.starRating == $0 } ?? true) &&
+                        (minRating.map { item.starRating >= $0 } ?? true) && (!selectedOnly || item.isSelected)
+                    }) else {
+                        throw C1Error.stateChanged("Native inventory membership or metadata changed; no partial inventory was returned.")
+                    }
+                    records.append(contentsOf: summaries)
+                    scanned += batch.count
+                    context?.update(phase: "metadata", scanned: scanned, completed: records.count)
+                    try checkpoint()
+                    continue
+                }
+                context?.update(phase: "ratings")
+                let ratings: [RatingRecord] = try executor.executeAndDecode(handler: "readVariantRatings", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
+                guard ratings.map(\.variantId) == batch, ratings.allSatisfy({ (0...5).contains($0.starRating) }) else {
+                    throw C1Error.stateChanged("Inventory rating IDs or values changed; no partial inventory was returned.")
+                }
+                let matches = ratings.filter { item in
+                    (rating.map { item.starRating == $0 } ?? true) && (minRating.map { item.starRating >= $0 } ?? true)
+                }
+                scanned += batch.count; matched += matches.count
+                context?.update(phase: "ratings", scanned: scanned, matches: matched)
+                try checkpoint()
+                if !matches.isEmpty {
+                    context?.update(phase: "metadata")
+                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: matches.map { NSAppleEventDescriptor(string: $0.variantId) })])
+                    guard summaries.map(\.variantId) == matches.map(\.variantId),
+                          summaries.map(\.starRating) == matches.map(\.starRating),
+                          !selectedOnly || summaries.allSatisfy(\.isSelected) else {
+                        throw C1Error.stateChanged("Inventory changed while reading metadata; no partial inventory was returned.")
+                    }
+                    records.append(contentsOf: summaries)
+                    context?.update(phase: "metadata", completed: records.count)
+                }
+                try checkpoint()
+            }
+            context?.update(phase: "validating-inventory")
+            try validateDocument()
+            guard Set(try discover()) == Set(ids) else {
+                throw C1Error.stateChanged("Inventory scope membership changed; no partial inventory was returned.")
+            }
+            try validateDocument()
+            let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
+            let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
+            return records.map { rec in
+                let matches = byClone[rec.variantId] ?? []
+                let candidate = matches.count == 1 ? matches.first : nil
+                let prov = candidate.flatMap { record in
+                    (try? DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: rec.parentImagePath)) != nil ? record : nil
+                }
+                return VariantSummary(id: rec.variantId, name: rec.variantName, parentImagePath: rec.parentImagePath,
+                    isSelected: rec.isSelected, rating: rec.starRating, colorTag: rec.colorTagVal,
+                    isManagedWorkingClone: prov != nil, workingRef: prov?.workingRef)
+            }
         }
     }
 

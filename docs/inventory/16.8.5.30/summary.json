@@ -1,0 +1,105 @@
+{
+  "dateUTC": "2026-09-16",
+  "status": "feature-and-packaged-workflows-passed; recovery-partial",
+  "contractVersion": "1.5.0",
+  "mcpToolCount": 20,
+  "environment": {
+    "time": "2026-09-16T02:48:22.925557+00:00",
+    "event": "environment",
+    "archive": "c1-v0.1.0-macos-arm64.tar.gz",
+    "archiveSHA256": "640f91c995ab01336927fd921e34a1256ae56abda2006e7de3db91f97e611382",
+    "cliSHA256": "8eac889a502381e0adf95e678807aee9adbeb5c59d9026d871c0f553b0664df1",
+    "mcpSHA256": "0fa7dc5b5df2bc192e7c14e38800027fc1e2ec22d7f5ed90bd78146c076791a5",
+    "handlersSHA256": "c0cbe307d17b601cecd224ab0e77b1fe11cf61856f47e5346dd8e7214c81a567",
+    "commit": "166b09316155f3b4682737202b94a50a33ba4399",
+    "sourcePatchSHA256": "dec7d574be6602aa04d7ea81ac52edb75eedb017b696c9d4a9e83723ecffd97f",
+    "harnessSHA256": "a73d9984a46ca17bc00dccc91d0c564ae36871aa79c5f5bef11e860248b14eb8",
+    "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+    "architecture": "arm64",
+    "swift": "Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)\nTarget: arm64-apple-macosx26.0\n",
+    "appVersion": "16.8.5.30",
+    "session": "/private/tmp/c1-recovery-1ujzomvx/recovery",
+    "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  },
+  "offline": {
+    "assertions": 679,
+    "passed": 679,
+    "contractAndProfiles": "passed"
+  },
+  "packaged": {
+    "resourceFallbackHidden": true,
+    "archiveAndContract": "passed",
+    "cliSteps": 19,
+    "mcpSteps": 10,
+    "geometry": "passed",
+    "catalogReferencedOriginals": "passed",
+    "existingVariantSessionAndCatalog": "passed",
+    "inventoryComparisonCases": 16,
+    "mcpReadProgressStatusCancellation": "passed",
+    "cliSIGINT": "passed",
+    "inventoryDeadline": "passed",
+    "timingsSeconds": {
+      "archive and contract": 2.122,
+      "integration_test.py": 70.264,
+      "mcp_test.py": 30.634,
+      "geometry_integration_test.py": 158.873,
+      "catalog_integration_test.py": 72.764,
+      "existing_variant_integration_test.py": 160.724,
+      "inventory_integration_test.py": 349.133
+    }
+  },
+  "recovery": {
+    "makeQualifyExitCode": 2,
+    "unattendedFullRun": "failed-native-quit-timeout",
+    "tonalAppleEventTimeout": "passed-normal-restart-and-reconciliation",
+    "geometryAppleEventTimeout": "passed-in-continuation-after-verified-SIGTERM",
+    "previewTimeout": "partial-eventual-output-and-write-block; failed-native-ID-preservation-after-restart",
+    "mcpProcessDeath": "not-reached",
+    "previewExpiredReference": "rejected-document-changed",
+    "previewReconciliation": "target-absent-observation; no retry/adoption/deletion",
+    "beforePreviewRestartNativeIDs": [
+      "1",
+      "12",
+      "18",
+      "32"
+    ],
+    "afterPreviewRestartNativeIDs": [
+      "33",
+      "34",
+      "35"
+    ],
+    "retainedSession": "/private/tmp/c1-recovery-1ujzomvx/recovery",
+    "cleanupOpenDocuments": 0
+  },
+  "sourceAndRecoveryCopyRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "earlierPackagedAttempt": {
+    "result": "failed-test-client-preview-receive-timeout",
+    "fixture": "/private/tmp/c1-catalog-live-yyclamyp/qualification.cocatalog",
+    "journalFinalStatuses": "9 succeeded; no unresolved operations; cleanup deletion not dispatched"
+  },
+  "measurementLimits": [
+    "12 and 120 variants of one RAW; not heterogeneous large shoots",
+    "Legacy AppleScript vs new CLI wall time includes different fixed overhead",
+    "handlerCalls are not individual Apple Event counts; peak memory not measured",
+    "MCP initial progress timing measures request start, not completed image processing"
+  ],
+  "deferred": [
+    "projections",
+    "pagination",
+    "inventory cache",
+    "bulk metadata beyond IDs",
+    "lock-owner identification"
+  ],
+  "payloadPolicy": "The tested archive hash identifies the live candidate. Documentation-only repacks must preserve CLI/MCP/handler hashes; the archive checksum sidecar identifies each repack.",
+  "nativePredicateProbe": {
+    "appVersion": "16.8.5.30",
+    "orderedIDEquivalenceCases": 20,
+    "probeSHA256": "604f40536852f68898b3c72c99afd278c3adaed523b219e977e4e40c6e09dcca"
+  },
+  "evidenceCuration": {
+    "retained": "Benchmarks, packaged regressions, recovery event streams, continuation scripts and final append-only recovery journal.",
+    "duplicateHarness": "Identical to Tests/recovery_integration_test.py at the recorded harnessSHA256.",
+    "fullRunDirectory": "/private/tmp/c1-inventory-qualification-20260916-final",
+    "productionSource": "Verified byte-for-byte against the tested source patch before staging; source is retained in this feature commit. The original patch remains in the full run directory."
+  }
+}

@@ -42,7 +42,7 @@ assert original.get('geometry'),original
 contract=json.loads(subprocess.check_output([str(CLI),'schema'],text=True))
 cloned=cli('variant','clone',original['id']); ref=cloned['workingRef']
 log('environment',doc=doc,source=original,clone=cloned,rawSHA256=original_sha,cliSHA256=sha(CLI),mcpSHA256=sha(MCP))
-client=Client(MCP)
+client=Client(MCP, timeout=150)
 def tool(name,args):
     result=client.tool(name,args)
     assert not result.get('isError'),result

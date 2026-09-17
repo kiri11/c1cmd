@@ -3,13 +3,17 @@ import Foundation
 public final class CaptureOneLock {
     public static let shared = CaptureOneLock()
 
+    private let ownershipKey = "c1.lock." + UUID().uuidString
     public let lockPath: String
 
     public init(lockPath: String = "/private/tmp/c1-application.lock") {
         self.lockPath = lockPath
     }
 
-    public func withLock<T>(timeout: TimeInterval = 5.0, _ body: () throws -> T) throws -> T {
+    public func withLock<T>(timeout: TimeInterval = 5.0, checkpoint: (() throws -> Void)? = nil, _ body: () throws -> T) throws -> T {
+        // Inventory is also used inside clone/recovery while this lock is already held.
+        if Thread.current.threadDictionary[ownershipKey] as? Bool == true { return try body() }
+        RequestContext.current?.update(phase: "waiting-for-lock")
         let fd = open(lockPath, O_CREAT | O_RDWR, 0o666)
         guard fd >= 0 else {
             throw C1Error.captureOneBusy("Unable to open advisory lock file at '\(lockPath)'.")
@@ -22,6 +26,7 @@ public final class CaptureOneLock {
         var acquired = false
 
         while Date() < deadline {
+            try checkpoint?()
             if flock(fd, LOCK_EX | LOCK_NB) == 0 {
                 acquired = true
                 break
@@ -37,6 +42,9 @@ public final class CaptureOneLock {
             flock(fd, LOCK_UN)
         }
 
+        RequestContext.current?.update(phase: "lock-acquired")
+        Thread.current.threadDictionary[ownershipKey] = true
+        defer { Thread.current.threadDictionary.removeObject(forKey: ownershipKey) }
         return try body()
     }
 }

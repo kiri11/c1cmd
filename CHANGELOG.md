@@ -1,3 +1,11 @@
+## Unreleased — filtered inventory and request progress
+
+- Filter ratings before fetching full summaries. Use qualified native predicates and bulk IDs for Capture One 16.8.5.30 Sessions, with a bounded rating-scan fallback for Catalogs and other allowed builds.
+- Preserve inventory fields, ordering, selection/collection scope, and duplicate variants; serialize scans with writes and validate identity and membership between work units.
+- Add background request diagnostics, CLI stderr progress/quiet modes, MCP progress notifications, and file-backed `request status` / `request_status` (contract 1.5.0, 20 MCP tools).
+- Support inventory batch limits, deadlines, and cancellation between Apple Events without returning partial inventories or weakening mutation recovery.
+- Add offline, native-predicate, packaged inventory, and concurrent status/progress qualification. See [inventory validation](docs/inventory/16.8.5.30/README.md) for measurements and limits.
+
 ## Unreleased — edit existing variants by default
 
 - Add `variant edit` / `variant_edit`: snapshot an existing variant and bind an editing reference without creating another variant. All supported tonal fields and crop/rotation are editable with normal state checks; deletion remains clone-only.

@@ -2,6 +2,16 @@
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
+## Inventory and diagnostics development candidate (2026-09-16 UTC)
+
+Contract **1.5.0** adds `request_status` (20 MCP tools), native rating filtering on qualified Sessions, bounded inventory with a conservative Catalog fallback, background diagnostics, CLI/MCP progress, and read cancellation/deadlines between Apple Events. Mutation journaling and restart-based reconciliation remain mandatory.
+
+The [inventory qualification report](inventory/16.8.5.30/README.md) records **679/679 offline assertions**, relocated archive checks, and passing packaged CLI, MCP, geometry, Catalog, existing-variant, and inventory suites on Capture One **16.8.5.30**. It also records native-predicate equivalence, status access while inventory occupies the MCP executor, and cancellation without partial results. Sparse-filter timings improved substantially in the disposable fixture; dense scans retained validation overhead. The measurements use variants of one RAW and do not establish performance for an entire shoot.
+
+**Full recovery qualification remains incomplete.** Tonal timeout recovery passed; geometry timeout recovery passed only after manually ending an empty application process when native quit stalled. Preview recovery later failed the native-ID preservation check after another restart, and MCP process-death coverage was not reached. The interrupted runs, explicit continuations, and retained fixture are documented; this is not a passing full `make qualify` run. No uncertain write was repeated.
+
+This candidate supersedes the runtime payload of the historical development entries below. Catalog-stored originals, Catalog fault qualification, simultaneous UI operators, and the original binary-distribution gates remain outside its scope. Exact hashes, failed attempts, and retained evidence are in the linked report.
+
 ## Existing-variant development candidate (2026-09-14)
 
 Contract **1.4.0** adds `variant_edit` and `geometry_restore` (19 MCP tools). Existing variants can receive all five supported tonal adjustments and crop/rotation through a saved editing reference; cloning is optional. The photographer continues on the same variant after the agent finishes. Existing references cannot authorize deletion. Catalog edits retain the exact-path opt-in and referenced-original storage limit.

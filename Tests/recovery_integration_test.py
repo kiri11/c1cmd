@@ -57,8 +57,18 @@ class Run:
         self.evidence.mkdir(parents=True, exist_ok=False)
         self.events = self.evidence / 'events.jsonl'
         shutil.copy2(__file__, self.evidence / 'harness.py')
-        (self.evidence / 'source.patch').write_bytes(subprocess.check_output(
-            ['git', 'diff', '--', 'Sources'], cwd=ROOT))
+        patch = subprocess.check_output(['git', 'diff', 'HEAD', '--', 'Sources'], cwd=ROOT)
+        # A development candidate may add source files before they are committed.
+        # Include them so the recorded source patch reproduces the actual binary inputs.
+        untracked = subprocess.check_output(
+            ['git', 'ls-files', '--others', '--exclude-standard', '-z', '--', 'Sources'], cwd=ROOT)
+        for name in untracked.split(b'\0'):
+            if name:
+                added = subprocess.run(['git', 'diff', '--no-index', '--', '/dev/null', os.fsdecode(name)],
+                                       cwd=ROOT, capture_output=True)
+                assert added.returncode in [0, 1], added.stderr
+                patch += added.stdout
+        (self.evidence / 'source.patch').write_bytes(patch)
         self.work = Path(tempfile.mkdtemp(prefix='c1-recovery-', dir='/private/tmp'))
         self.session = self.work / 'recovery'
         self.db = self.session / 'recovery.cosessiondb'

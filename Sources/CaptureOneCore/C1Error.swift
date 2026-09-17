@@ -17,6 +17,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
     case partialFailure(String)
     case outcomeUnknown(String)
     case timeout(String)
+    case requestCancelled(String)
+    case deadlineExceeded(String)
     case scriptError(String, code: Int?)
 
     public var errorCode: String {
@@ -37,6 +39,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .partialFailure: return "partial-failure"
         case .outcomeUnknown: return "outcome-unknown"
         case .timeout: return "timeout"
+        case .requestCancelled: return "request-cancelled"
+        case .deadlineExceeded: return "deadline-exceeded"
         case .scriptError: return "script-error"
         }
     }
@@ -45,7 +49,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         switch self {
         case .invalidRequest, .unmanagedVariant, .variantNotFound, .unsupportedField, .scriptError, .identityAmbiguous:
             return 1
-        case .captureOneBusy:
+        case .captureOneBusy, .requestCancelled, .deadlineExceeded:
             return 2
         case .documentChanged, .stateChanged:
             return 3
@@ -74,6 +78,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .partialFailure(let msg): return "partial-failure: \(msg)"
         case .outcomeUnknown(let msg): return "outcome-unknown: \(msg)"
         case .timeout(let msg): return "timeout: \(msg)"
+        case .requestCancelled(let msg): return "request-cancelled: \(msg)"
+        case .deadlineExceeded(let msg): return "deadline-exceeded: \(msg)"
         case .scriptError(let msg, let code):
             if let c = code {
                 return "script-error (\(c)): \(msg)"
@@ -98,7 +104,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
              .unsupportedVersion(let msg), .unsupportedField(let msg), .invalidRequest(let msg),
              .captureOneBusy(let msg), .documentChanged(let msg), .stateChanged(let msg),
              .readbackMismatch(let msg), .partialFailure(let msg), .outcomeUnknown(let msg),
-             .timeout(let msg):
+             .timeout(let msg), .requestCancelled(let msg), .deadlineExceeded(let msg):
             try container.encode(msg, forKey: .message)
         case .scriptError(let msg, let code):
             try container.encode(msg, forKey: .message)
@@ -128,6 +134,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case "partial-failure": self = .partialFailure(msg)
         case "outcome-unknown": self = .outcomeUnknown(msg)
         case "timeout": self = .timeout(msg)
+        case "request-cancelled": self = .requestCancelled(msg)
+        case "deadline-exceeded": self = .deadlineExceeded(msg)
         case "script-error": self = .scriptError(msg, code: sCode)
         default: self = .invalidRequest(msg)
         }

@@ -145,6 +145,8 @@ public final class AppleScriptExecutor: ScriptExecuting {
         event.setParam(parameters, forKeyword: AEKeyword(keyDirectObject))
 
         var errorDict: NSDictionary?
+        RequestContext.current?.appleEvent(name, waiting: true)
+        defer { RequestContext.current?.appleEvent(nil, waiting: false) }
         let result = script.executeAppleEvent(event, error: &errorDict)
 
         if let err = errorDict {

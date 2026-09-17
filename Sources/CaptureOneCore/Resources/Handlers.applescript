@@ -64,54 +64,102 @@ on getAppAndDocInfo()
     end tell
 end getAppAndDocInfo
 
-on listVariants(docName, collectionName, selectedOnly)
+-- Qualified by the independent legacy enumeration for Session document, collection,
+-- and selected scopes on 16.8.5.30. Every ID stays paired with its own summary.
+on discoverFilteredVariantIDs(docName, collectionName, selectedOnly, exactRating, minimumRating)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
-        set varList to {}
-        set sourceVariants to {}
-        if d is missing value then
-            return {}
+        if collectionName is missing value or collectionName is "" then
+            set scope to d
+        else
+            set scope to collection collectionName of d
         end if
-        
-        if collectionName is not missing value and collectionName is not "" then
-            set col to collection collectionName of d
+        if exactRating is not missing value then
             if selectedOnly then
-                set sourceVariants to (every variant of col whose selected is true)
+                set foundIDs to id of (every variant of scope whose selected is true and rating is exactRating)
             else
-                set sourceVariants to every variant of col
+                set foundIDs to id of (every variant of scope whose rating is exactRating)
+            end if
+        else if minimumRating is not missing value then
+            if selectedOnly then
+                set foundIDs to id of (every variant of scope whose selected is true and rating is greater than or equal to minimumRating)
+            else
+                set foundIDs to id of (every variant of scope whose rating is greater than or equal to minimumRating)
             end if
         else
             if selectedOnly then
-                set sourceVariants to (every variant of d whose selected is true)
+                set foundIDs to id of (every variant of scope whose selected is true)
             else
-                set sourceVariants to every variant of d
+                set foundIDs to id of every variant of scope
             end if
         end if
-        
+        set textIDs to {}
+        repeat with foundID in foundIDs
+            set end of textIDs to foundID as text
+        end repeat
+        return textIDs
+    end tell
+end discoverFilteredVariantIDs
+
+-- Discovery remains a single application enumeration; its internal progress is unknown.
+-- Keep IDs paired with ratings in bounded reads, avoiding unqualified bulk/whose-rating behavior.
+on discoverVariantIDs(docName, collectionName, selectedOnly)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        if collectionName is not missing value and collectionName is not "" then
+            set scope to collection collectionName of d
+        else
+            set scope to d
+        end if
+        if selectedOnly then
+            set sourceVariants to (every variant of scope whose selected is true)
+        else
+            set sourceVariants to every variant of scope
+        end if
+        set resultIDs to {}
         repeat with v in sourceVariants
+            set end of resultIDs to (id of v as text)
+        end repeat
+        return resultIDs
+    end tell
+end discoverVariantIDs
+
+on readVariantRatings(docName, variantIDs)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        set results to {}
+        repeat with requestedID in variantIDs
+            set v to variant id (requestedID as text) of d
+            -- A read failure is not an unrated image. Fail rather than silently omit a match.
+            set end of results to {variantId:(id of v as text), starRating:(rating of v as integer)}
+        end repeat
+        return results
+    end tell
+end readVariantRatings
+
+on readVariantSummaries(docName, variantIDs)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        set results to {}
+        repeat with requestedID in variantIDs
+            set v to variant id (requestedID as text) of d
             set vId to (id of v as text)
             set vName to (name of v as text)
             set vSel to (selected of v as boolean)
-            set vRating to 0
-            try
-                set vRating to (rating of v as integer)
-            end try
+            set vRating to (rating of v as integer)
             set vTag to 0
             try
                 set vTag to (color tag of v as integer)
             end try
             set rawP to ""
             try
-                set img to parent image of v
-                set rawP to (POSIX path of (path of img as text))
+                set rawP to POSIX path of (path of parent image of v as text)
             end try
-            
-            set end of varList to {variantId:vId, variantName:vName, parentImagePath:rawP, isSelected:vSel, starRating:vRating, colorTagVal:vTag}
+            set end of results to {variantId:vId, variantName:vName, parentImagePath:rawP, isSelected:vSel, starRating:vRating, colorTagVal:vTag}
         end repeat
-        
-        return varList
+        return results
     end tell
-end listVariants
+end readVariantSummaries
 
 on cloneVariant(docName, sourceId)
     tell application "/Applications/Capture One.app"

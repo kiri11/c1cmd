@@ -127,7 +127,7 @@ def main():
             cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=env)
             cli('preview', variants[0]['id'], error='invalid-request', env=env)
         log('default-and-wrong-path-denied')
-        client = Client(MCP, env=environment)
+        client = Client(MCP, env=environment, timeout=150)
         for source in originals.values():
             clone, _ = tool('variant_clone', {'sourceRef': source['id']})
             ref = clone['workingRef']
@@ -169,7 +169,7 @@ def main():
             log('clone-edit-preview-diff-delete', sourceID=source['id'], imagePath=source['parentImagePath'], preview=preview)
         # Composition MCP profile also supports the exact-path opt-in.
         client.close()
-        client = Client(MCP, env=dict(environment, C1_MCP_PROFILE='composition'))
+        client = Client(MCP, env=dict(environment, C1_MCP_PROFILE='composition'), timeout=150)
         names = [entry['name'] for entry in client.request('tools/list', {})['tools']]
         assert 'geometry_set' in names and 'set' not in names and 'variant_baseline' not in names
         clone, _ = tool('variant_clone', {'sourceRef': variants[0]['id']})

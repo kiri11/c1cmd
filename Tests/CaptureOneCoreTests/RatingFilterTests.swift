@@ -24,9 +24,13 @@ struct RatingFilterTests {
                 XCTAssertEqual(exact.map(\.id), [String(rating + 1)])
                 XCTAssertEqual(minimum.map(\.rating), Array(rating...5))
             }
+            fake.calls = []
             let selected = try core.listVariants(collectionName: "Capture", selectedOnly: true, minRating: 4)
             XCTAssertEqual(selected.map(\.id), ["5", "6"])
             XCTAssertTrue(selected.allSatisfy(\.isSelected))
+            XCTAssertTrue(fake.calls.contains("discoverFilteredVariantIDs"), "Scope and filters are sent to native discovery")
+            XCTAssertTrue(fake.ratingBatches.isEmpty, "Native discovery avoids the fallback rating scan")
+            XCTAssertFalse(fake.calls.contains("listVariants"), "Inventory does not hydrate the entire variant list")
             XCTAssertEqual(fake.listArguments[1].stringValue, "Capture", "Collection scope still reaches the native handler")
             XCTAssertTrue(fake.listArguments[2].booleanValue)
             let empty = try core.listVariants(selectedOnly: true, rating: 3)

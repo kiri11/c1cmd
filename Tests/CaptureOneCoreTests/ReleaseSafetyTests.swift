@@ -19,6 +19,22 @@ final class FakeScript: ScriptExecuting {
     var parentOverride: String?
     var generation = "app-1"
     var beforeApply: (() -> Void)?
+    // Inventory test controls. These hooks let the offline suite model a
+    // document changing between the discovery, rating, and summary phases.
+    var beforeHandler: ((String) -> Void)?
+    var beforeDiscover: (() -> Void)?
+    var beforeReadRatings: (() -> Void)?
+    var beforeReadSummaries: (() -> Void)?
+    var documentDrift: (() -> Void)?
+    var ratingDrift: (() -> Void)?
+    var membershipDrift: (() -> Void)?
+    var discoveredVariantIDs: [String]?
+    var ratingResponseIDs: (([String]) -> [String])?
+    var summaryResponseIDs: (([String]) -> [String])?
+    var ratingBatches: [[String]] = []
+    var hydrationBatches: [[String]] = []
+    var hydrationCounterIDs: [String] { hydrationBatches.flatMap { $0 } }
+    private var discoverCount = 0
     var preparedBeforeDispatch = true
     var previewRoot: String?
     static func jpeg(width: Int = 2, height: Int = 2) -> Data {
@@ -36,8 +52,24 @@ final class FakeScript: ScriptExecuting {
         return ["variantId": id, "parentImagePath": parentOverride ?? parent,
                 "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4], "starRating": 0, "colorTagVal": 0]
     }
+    private func ids(from descriptor: NSAppleEventDescriptor?) -> [String] {
+        guard let descriptor else { return [] }
+        guard descriptor.numberOfItems > 0 else { return [] }
+        return (1...descriptor.numberOfItems).compactMap { descriptor.atIndex($0)?.stringValue }
+    }
+    private func optionalInt(from descriptor: NSAppleEventDescriptor?) -> Int? {
+        guard let descriptor, descriptor.descriptorType != NSAppleEventDescriptor.missingValue().descriptorType else { return nil }
+        return Int(descriptor.int32Value)
+    }
+    private func summary(_ id: String) -> [String: Any] {
+        let a = values[id] ?? [0, 0, 0, 5000, 0]
+        return ["variantId": id, "variantName": "fixture", "parentImagePath": parentOverride ?? parent,
+                "isSelected": selectedIDs.contains(id), "starRating": ratings[id] ?? 0, "colorTagVal": 0,
+                "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4]]
+    }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
         calls.append(handler)
+        beforeHandler?(handler)
         if ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyAdjustments", "ensurePreviewRecipe", "processPreview"].contains(handler) {
             preparedBeforeDispatch = preparedBeforeDispatch && OperationJournal(sessionDirectory: directory).unresolvedEntries().contains { $0.status == "pending" }
         }
@@ -53,6 +85,39 @@ final class FakeScript: ScriptExecuting {
             result = values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }.map {
                 ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": 0] as [String: Any]
             }
+        case "discoverVariantIDs":
+            beforeDiscover?()
+            discoverCount += 1
+            if discoverCount > 1 { membershipDrift?() }
+            listArguments = args
+            result = discoveredVariantIDs ?? values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }
+        case "discoverFilteredVariantIDs":
+            beforeDiscover?()
+            discoverCount += 1
+            if discoverCount > 1 { membershipDrift?() }
+            listArguments = args
+            let base = discoveredVariantIDs ?? values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }
+            let exact = optionalInt(from: args[3])
+            let minimum = optionalInt(from: args[4])
+            result = base.filter { id in
+                let value = ratings[id] ?? 0
+                return (exact.map { value == $0 } ?? true) && (minimum.map { value >= $0 } ?? true)
+            }
+        case "readVariantRatings":
+            beforeReadRatings?()
+            documentDrift?()
+            let requested = ids(from: args[1])
+            ratingBatches.append(requested)
+            let responseIDs = ratingResponseIDs?(requested) ?? requested
+            result = responseIDs.map { ["variantId": $0, "starRating": ratings[$0] ?? 0] as [String: Any] }
+        case "readVariantSummaries":
+            beforeReadSummaries?()
+            documentDrift?()
+            ratingDrift?()
+            let requested = ids(from: args[1])
+            hydrationBatches.append(requested)
+            let responseIDs = summaryResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
+            result = responseIDs.map(summary)
         case "getAdjustmentsBatch":
             guard let id = args[1].atIndex(1)?.stringValue, values[id] != nil else { throw C1Error.variantNotFound("missing") }
             result = [item(id)]

@@ -81,12 +81,18 @@ When using `c1-mcp`:
 
 ---
 
+Inventory listing filters before full metadata reads and uses sequential bounded batches (`batchSize` / `--batch-size`, default 32). The exact qualified Session build uses native predicates and bulk IDs; Catalogs and other allowed builds use a rating-scan fallback. Do not narrow the scope to UI selection unless requested. Native-filter counters describe returned candidates, not Capture One's internal scan progress.
+
+`request_status` / `c1 request status <requestId>` reads local diagnostic snapshots without contacting Capture One, so it can be used while an inventory request is running. Request IDs are separate from mutation operation IDs and never authorize writes. CLI Ctrl-C, MCP cancellation, and `deadlineSeconds` / `--deadline-seconds` stop inventory at boundaries between Apple Events; they do not interrupt an outstanding event. A heartbeat shows service activity, not completed photo processing. Keep using `operation_status` for uncertain mutations.
+
 ## 5. Error Code Reference
 
 - `app-not-running`: Launch Capture One and ensure GUI is active.
 - `no-document`: Open a Session or Catalog in Capture One.
 - `unsupported-version`: Capture One version is outside supported range (16.4+ through 16.x) or unverified (<16.4 or 17+). Override with `C1_ALLOW_UNTESTED_BUILD=1`.
 - `unmanaged-variant`: Attempted write without editing permission, or attempted deletion of an existing variant. Use `variant_edit` before adjustment/geometry writes; deletion remains clone-only.
+- `request-cancelled`: Inventory stopped at a safe boundary, or a queued MCP request was cancelled before dispatch; no partial inventory is returned.
+- `deadline-exceeded`: Inventory exceeded its read deadline at a boundary; an outstanding Apple Event cannot be interrupted.
 - `capture-one-busy`: Cross-process advisory lock timed out; wait or check for hung processes.
 - `document-changed`: Document count, exact identity, or application lifetime no longer matches. Same-file reopening in one app launch is not reliably detected.
 - `state-changed`: Optimistic concurrency check failed (`--if-state` mismatch).

@@ -89,7 +89,7 @@ def main():
             doc = cli('doc', 'info')
             health = cli('doctor')
             assert health['allChecksPassed'] and health['writesEnabled']
-            client = Client(MCP, env=environment)
+            client = Client(MCP, env=environment, timeout=150)
             edit, _ = tool('variant_edit', {'sourceRef': source_id, 'ifState': source['stateHash'],
                                           'ifGeometryState': source['geometryStateHash'], 'ifDocument': doc['openToken']})
             ref = edit['workingRef']
@@ -151,7 +151,7 @@ def main():
             if kind == 'catalog':
                 client.close()
                 denied = dict(environment); denied.pop('C1_CATALOG_WRITE_PATH')
-                client = Client(MCP, env=denied)
+                client = Client(MCP, env=denied, timeout=150)
                 tool('set', {'workingRef': ref, 'ifState': next_edit['stateHash'], 'exposure': 1}, error='invalid-request')
             journal = Path(doc['documentPath']) / '.c1/journal.jsonl'
             records = [json.loads(line) for line in journal.read_text().splitlines()]

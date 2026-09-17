@@ -5,13 +5,15 @@ import os
 from pathlib import Path
 import selectors
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
 class Client:
-    def __init__(self, binary, env=None):
+    def __init__(self, binary, env=None, timeout=15):
         self.process = subprocess.Popen([str(binary)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.id = 0
+        self.timeout = timeout
         self.selector = selectors.DefaultSelector()
         self.selector.register(self.process.stdout, selectors.EVENT_READ)
         self.request('initialize', {'protocolVersion': '2024-11-05', 'capabilities': {}, 'clientInfo': {'name': 'contract-test', 'version': '1'}})
@@ -21,7 +23,7 @@ class Client:
         self.id += 1
         self.process.stdin.write(json.dumps({'jsonrpc': '2.0', 'id': self.id, 'method': method, 'params': params}) + '\n')
         self.process.stdin.flush()
-        assert self.selector.select(15), f'Timed out: {method}'
+        assert self.selector.select(self.timeout), f'Timed out: {method}'
         response = json.loads(self.process.stdout.readline())
         assert response.get('id') == self.id, response
         assert 'error' not in response, response
@@ -60,6 +62,12 @@ def validate_response(value, schema, path='response'):
     if isinstance(value, str): assert len(value) >= schema.get('minLength', 0), path
 
 
+def assert_error_payload(value, schema, expected_code='invalid-request'):
+    """Ensure additive error context remains represented by the shared schema."""
+    validate_response(value, schema['definitions']['Error'])
+    assert value['error']['code'] == expected_code, value
+
+
 def run(cli, mcp):
     cli_schema = json.loads(subprocess.check_output([str(cli), 'schema'], text=True, timeout=15))
     client = Client(mcp)
@@ -67,21 +75,43 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 19
+        assert len(tools) == 20
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
         rating_schema = cli_schema['requests']['variants_list']
+        assert cli_schema['requests']['request_status'] == {
+            'type': 'object', 'properties': {'requestId': {'type': 'string', 'minLength': 1}},
+            'required': ['requestId'], 'additionalProperties': False,
+        }
+        request_status_tool = next(t for t in tools if t['name'] == 'request_status')
+        assert request_status_tool['annotations']['readOnlyHint'] is True
+        assert request_status_tool['annotations']['destructiveHint'] is False
+        error_properties = cli_schema['definitions']['Error']['properties']['error']['properties']
+        assert {'requestId', 'phase', 'elapsedMs', 'recoveryAction'} <= set(error_properties)
+        assert error_properties['elapsedMs']['type'] == 'integer'
         for key in ['rating', 'minRating']:
             assert rating_schema['properties'][key]['type'] == 'integer'
             assert rating_schema['properties'][key]['minimum'] == 0
             assert rating_schema['properties'][key]['maximum'] == 5
         assert rating_schema['not'] == {'required': ['rating', 'minRating']}
+        assert rating_schema['properties']['batchSize']['type'] == 'integer'
+        assert rating_schema['properties']['batchSize']['minimum'] == 1
+        assert rating_schema['properties']['batchSize']['maximum'] == 256
+        assert rating_schema['properties']['deadlineSeconds']['type'] == 'number'
+        assert rating_schema['properties']['deadlineSeconds']['exclusiveMinimum'] == 0
+        assert rating_schema['properties']['deadlineSeconds']['maximum'] == 86400
         for name in ['preview', 'operation_status', 'variant_edit', 'geometry_restore']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
         for name, args in [
             *[('variants_list', {key: value}) for key in ['rating', 'minRating']
               for value in [-1, 6, 4.5, True, '5', None]],
             ('variants_list', {'rating': 5, 'minRating': 4}),
+            *[('variants_list', {'batchSize': value}) for value in [0, 257, -1, 1.5, True, '2', None]],
+            *[('variants_list', {'deadlineSeconds': value}) for value in [0, -1, 86401, True, '2', None]],
+            ('request_status', {}),
+            ('request_status', {'requestId': ''}),
+            ('request_status', {'requestId': 1}),
+            ('request_status', {'requestId': 'req-00000000-0000-0000-0000-000000000000', 'extra': 1}),
             ('variant_edit', {'sourceRef':'1', 'ifGeometryState':'h'}),
             ('variant_edit', {'sourceRef':'1', 'ifGeometryState':'h', 'ifDocument':True}),
             ('geometry_restore', {'workingRef':'x'}),
@@ -106,35 +136,60 @@ def run(cli, mcp):
         ]:
             result = client.tool(name, args)
             assert result.get('isError'), (name, args, result)
-            assert json.loads(result['content'][0]['text'])['error']['code'] == 'invalid-request', result
+            assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
         for payload in ['{"exposure": 1, "unknown": 2}', '{"exposure": true}', '{"exposure": "bad", "contrast": 1}', '{}']:
             result = subprocess.run([str(cli), 'set', 'x', '--if-state', 'h', '--json', payload], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
-            assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+            assert_error_payload(json.loads(result.stderr), cli_schema)
         for crop in ['1,2,bad,3,4', '1,2,,3,4', '1,2,3', '1,2,nan,4']:
             result = subprocess.run([str(cli), 'geometry', 'set', 'x', '--if-geometry-state', 'h', '--crop', crop, '--format', 'json'], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
-            assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+            assert_error_payload(json.loads(result.stderr), cli_schema)
         for flags in [['--rating=-1'], ['--rating', '6'], ['--min-rating=-1'],
-                      ['--min-rating', '6'], ['--rating', '5', '--min-rating', '4']]:
+                      ['--min-rating', '6'], ['--rating', '5', '--min-rating', '4'],
+                      ['--batch-size', '0'], ['--batch-size', '257'], ['--batch-size=-1'],
+                      ['--deadline-seconds', '0'], ['--deadline-seconds=-1'], ['--deadline-seconds', '86401']]:
             result = subprocess.run([str(cli), 'variants', 'list', '--format', 'json', *flags], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
-            assert json.loads(result.stderr)['error']['code'] == 'invalid-request', result.stderr
+            assert_error_payload(json.loads(result.stderr), cli_schema)
         for key in ['--rating', '--min-rating']:
             for value in ['4.5', 'true', 'five']:
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 19 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival')
     finally:
         client.close()
+    with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
+        env = dict(os.environ, C1_REQUEST_DIR=directory, C1_PROGRESS='quiet')
+        local = Client(mcp, env=env)
+        try:
+            failure = json.loads(local.tool('variants_list', {'rating': 6})['content'][0]['text'])
+            request_id = failure['error']['requestId']
+            status = json.loads(local.tool('request_status', {'requestId': request_id})['content'][0]['text'])
+            validate_response(status, cli_schema['responses']['request_status'])
+            assert status['status'] == 'failed' and status['processAlive'] and not status['stale'], status
+            command = subprocess.run([str(cli), 'request', 'status', request_id, '--format', 'json', '--quiet'],
+                                     capture_output=True, text=True, env=env, timeout=15)
+            assert command.returncode == 0 and not command.stderr, command.stderr
+            assert json.loads(command.stdout)['requestId'] == request_id
+            visible = subprocess.run([str(cli), 'version', '--format', 'json', '--progress', 'json'],
+                                     capture_output=True, text=True, env=env, timeout=15)
+            assert visible.returncode == 0 and json.loads(visible.stdout)['schemaVersion'] == cli_schema['version']
+            events = [json.loads(line) for line in visible.stderr.splitlines()]
+            assert events[0]['status'] == 'running' and events[-1]['status'] == 'completed', events
+            assert all('requestId' in event for event in events)
+            assert len(events) <= 4, 'Fast requests should not flood stderr'
+            print('PASS: local request status, CLI quiet/JSON progress, stable stdout')
+        finally:
+            local.close()
     composition = Client(mcp, env=dict(os.environ, C1_MCP_PROFILE='composition'))
     try:
         names = {t['name'] for t in composition.request('tools/list', {})['tools']}
         assert {'geometry_set','variant_edit','geometry_restore'} <= names
         assert 'variants_list' in names
         result = composition.tool('variants_list', {'rating': 6})
-        assert result['isError'] and json.loads(result['content'][0]['text'])['error']['code'] == 'invalid-request'
+        assert result['isError']; assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
         assert not names.intersection({'set','add','reset','variant_baseline'})
         result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
         assert result['isError'] and 'not enabled' in result['content'][0]['text']

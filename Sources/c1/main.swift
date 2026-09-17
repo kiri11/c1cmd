@@ -6,6 +6,12 @@ struct GlobalOptions: ParsableArguments {
     @Option(name: .shortAndLong, help: "Output format: auto, json, or human.")
     var format: String = "auto"
 
+    @Flag(help: "Suppress request progress on stderr (errors are still reported).")
+    var quiet = false
+
+    @Option(help: "Request progress on stderr: human, json, or quiet. Defaults to human on a terminal, quiet in pipelines.")
+    var progress: String?
+
     var outputFormat: OutputFormat {
         switch format.lowercased() {
         case "json": return .json
@@ -15,16 +21,33 @@ struct GlobalOptions: ParsableArguments {
     }
 }
 
-func handleExecution<T>(format: OutputFormat, _ block: () throws -> T) -> ExitCode {
+func handleExecution<T>(format: OutputFormat, progressMode: String? = nil, _ block: () throws -> T) -> ExitCode {
+    let args = Array(CommandLine.arguments.dropFirst())
+    let subcommands: Set<String> = ["variants", "variant", "doc", "geometry", "operation", "request"]
+    let command = args.first ?? "cli"
+    let tool = subcommands.contains(command) && args.count > 1 ? command + "_" + args[1] : command
+    let context = RequestContext(tool: tool, progressMode: progressMode)
+    var signalSource: DispatchSourceSignal?
+    let oldSignal = tool == "variants_list" ? signal(SIGINT, SIG_IGN) : nil
+    if tool == "variants_list" {
+        let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+        source.setEventHandler { context.cancel() }
+        source.resume(); signalSource = source
+    }
+    defer { signalSource?.cancel(); if tool == "variants_list" { signal(SIGINT, oldSignal) } }
     do {
-        _ = try block()
+        if let progressMode, !["quiet", "json", "human"].contains(progressMode) { throw C1Error.invalidRequest("progress must be human, json, or quiet.") }
+        context.update(phase: "executing")
+        _ = try context.withCurrent(block)
+        context.finish()
         return ExitCode.success
     } catch {
+        context.finish(error: error)
         if OutputFormatter.resolveFormat(format) == .json,
-           let data = try? JSONSerialization.data(withJSONObject: ErrorResponse.payload(error), options: [.prettyPrinted, .sortedKeys]) {
+           let data = try? JSONSerialization.data(withJSONObject: context.annotate(ErrorResponse.payload(error)), options: [.prettyPrinted, .sortedKeys]) {
             FileHandle.standardError.write(data + Data("\n".utf8))
         } else {
-            FileHandle.standardError.write(Data("\(error)\n".utf8))
+            FileHandle.standardError.write(Data("[\(context.snapshot.requestId)] \(error)\n".utf8))
         }
         return ExitCode(error is OperationFailure ? 4 : (error as? C1Error)?.exitCode ?? 1)
     }
@@ -51,7 +74,8 @@ struct C1: ParsableCommand {
             DiffCommand.self,
             DumpCommand.self,
             PreviewCommand.self,
-            OperationCommand.self
+            OperationCommand.self,
+            RequestCommand.self
         ]
     )
 }
@@ -62,7 +86,7 @@ struct DoctorCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let report = try SessionController.shared.doctor()
             let output = OutputFormatter.renderDoctorReport(report, format: globals.outputFormat)
             print(output)
@@ -94,7 +118,7 @@ struct VersionCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let info: [String: Any] = [
                 "c1Version": "0.1.0",
                 "testedCaptureOneBuilds": SessionController.testedBuilds,
@@ -124,7 +148,7 @@ struct CapabilitiesCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let caps = SessionController.shared.capabilities()
             if let data = try? JSONSerialization.data(withJSONObject: caps, options: [.prettyPrinted, .sortedKeys]),
                let str = String(data: data, encoding: .utf8) {
@@ -141,11 +165,11 @@ struct SchemaCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let schema = ContractSchema.document()
-        if let data = try? JSONSerialization.data(withJSONObject: schema, options: [.prettyPrinted, .sortedKeys]),
-           let str = String(data: data, encoding: .utf8) {
-            print(str)
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            let data = try JSONSerialization.data(withJSONObject: ContractSchema.document(), options: [.prettyPrinted, .sortedKeys])
+            print(String(decoding: data, as: UTF8.self))
         }
+        if code != .success { throw ExitCode(code.rawValue) }
     }
 }
 
@@ -163,7 +187,7 @@ struct DocInfoCommand: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let info = try SessionController.shared.getDocumentInfo()
             print(OutputFormatter.renderDocumentInfo(info, format: globals.outputFormat))
         }
@@ -196,9 +220,15 @@ struct VariantsListCommand: ParsableCommand {
     @Option(help: "Inclusive minimum star rating (0–5). Cannot combine with --rating.")
     var minRating: Int?
 
+    @Option(help: "Maximum variants per inventory batch (1–256).")
+    var batchSize: Int = 32
+
+    @Option(help: "Read deadline checked between Apple Events; does not interrupt an outstanding event.")
+    var deadlineSeconds: Double?
+
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
-            let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating)
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating, batchSize: batchSize, deadlineSeconds: deadlineSeconds)
             print(OutputFormatter.renderVariants(list, format: globals.outputFormat))
         }
         if code != .success { throw ExitCode(code.rawValue) }
@@ -222,7 +252,7 @@ struct VariantCloneCommand: ParsableCommand {
     var sourceRef: String
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.cloneVariant(sourceRef: sourceRef)
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
                 print(OutputFormatter.formatJson(res))
@@ -246,7 +276,7 @@ struct VariantDeleteCommand: ParsableCommand {
     var workingRef: String
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.deleteVariant(workingRefString: workingRef)
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
                 print(OutputFormatter.formatJson(res))
@@ -269,7 +299,7 @@ struct VariantBaselineCommand: ParsableCommand {
     var sourceRef: String
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.createBaselineVariant(sourceRef: sourceRef)
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
                 print(OutputFormatter.formatJson(res))
@@ -294,7 +324,7 @@ struct GetCommand: ParsableCommand {
     var ref: String
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.get(ref: ref)
             print(OutputFormatter.renderGetResult(res, format: globals.outputFormat))
         }
@@ -342,7 +372,7 @@ struct SetCommand: ParsableCommand {
     var keyValues: [String] = []
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let adjustments = try parseAdjustmentInputs(keyValues: keyValues, jsonStr: json, filePath: file)
             let res = try SessionController.shared.mutate(
                 workingRefString: workingRef,
@@ -381,7 +411,7 @@ struct AddCommand: ParsableCommand {
     var keyValues: [String] = []
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let adjustments = try parseAdjustmentInputs(keyValues: keyValues, jsonStr: json, filePath: file, delta: true)
             let res = try SessionController.shared.mutate(
                 workingRefString: workingRef,
@@ -414,7 +444,7 @@ struct ResetCommand: ParsableCommand {
     var fields: [String] = []
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.reset(
                 workingRefString: workingRef,
                 ifState: ifState,
@@ -439,7 +469,7 @@ struct DiffCommand: ParsableCommand {
     var ref2: String?
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.diff(ref1: ref1, ref2: ref2)
             print(OutputFormatter.renderDiffResult(res, format: globals.outputFormat))
         }
@@ -465,7 +495,7 @@ struct DumpCommand: ParsableCommand {
     var dumpFormat: String = "jsonl"
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let records = try SessionController.shared.dump(
                 collectionName: collection,
                 selectedOnly: selected,
@@ -502,7 +532,7 @@ struct PreviewCommand: ParsableCommand {
     var fullFrame: Bool = false
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let res = try SessionController.shared.preview(
                 ref: ref,
                 outputDirOverride: outputDir,
@@ -531,7 +561,7 @@ struct OperationStatusCommand: ParsableCommand {
     var operationId: String
 
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             let entry = try SessionController.shared.operationStatus(operationId: operationId)
             if OutputFormatter.resolveFormat(globals.outputFormat) == .json {
                 print(OutputFormatter.formatJson(entry))
@@ -564,7 +594,7 @@ struct GeometrySetCommand: ParsableCommand {
     @Option(help: "Width/height ratio for a centered crop fitted inside safe bounds (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
     @Flag var dryRun: Bool = false
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             var args: [String: Any] = ["workingRef":workingRef, "ifGeometryState":ifGeometryState, "dryRun":dryRun]
             var rect: CropRect?
             if let crop = crop {
@@ -593,7 +623,7 @@ struct VariantEditCommand: ParsableCommand {
     @Option(help: "Optional geometryStateHash check from get.") var ifGeometryState: String?
     @Option(help: "openToken from doc info when selecting the targets.") var ifDocument: String
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             var args: [String: Any] = ["sourceRef": sourceRef, "ifState": ifState, "ifDocument": ifDocument]
             if let ifGeometryState { args["ifGeometryState"] = ifGeometryState }
             try ContractSchema.validate(tool: "variant_edit", arguments: args)
@@ -611,10 +641,26 @@ struct GeometryRestoreCommand: ParsableCommand {
     @Option var ifGeometryState: String
     @Flag var dryRun: Bool = false
     mutating func run() throws {
-        let code = handleExecution(format: globals.outputFormat) {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             try ContractSchema.validate(tool: "geometry_restore", arguments: ["workingRef": workingRef, "ifGeometryState": ifGeometryState, "dryRun": dryRun])
             let result = try SessionController.shared.geometryRestore(workingRef: workingRef, ifGeometryState: ifGeometryState, dryRun: dryRun)
             print(OutputFormatter.formatJson(result))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+// This inspection path never contacts Capture One and remains usable during another request.
+struct RequestCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "request", abstract: "Inspect local request diagnostics.", subcommands: [RequestStatusCommand.self])
+}
+struct RequestStatusCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "status", abstract: "Read stored request progress without contacting Capture One.")
+    @OptionGroup var globals: GlobalOptions
+    @Argument var requestId: String
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            print(OutputFormatter.formatJson(try RequestContext.status(requestId: requestId)))
         }
         if code != .success { throw ExitCode(code.rawValue) }
     }

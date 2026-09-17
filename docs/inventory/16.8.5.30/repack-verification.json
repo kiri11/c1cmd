@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "archiveSHA256": "258c3be50b488e9cde4265b97f6e8a5c8a4d0f303a6d329f260598389f984484",
+  "payloadSHA256": {
+    "c1-mcp": "0fa7dc5b5df2bc192e7c14e38800027fc1e2ec22d7f5ed90bd78146c076791a5",
+    "c1": "8eac889a502381e0adf95e678807aee9adbeb5c59d9026d871c0f553b0664df1",
+    "Handlers.applescript": "c0cbe307d17b601cecd224ab0e77b1fe11cf61856f47e5346dd8e7214c81a567"
+  },
+  "matchesLiveQualifiedPayload": true,
+  "resourceFallbackHidden": true,
+  "relocatedArchiveAndContract": "passed",
+  "openDocuments": 0,
+  "sourceRAW_SHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+}

@@ -17,7 +17,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 
 - **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. The retained M0 evidence is from an M1 Pro running macOS 26.4.1. See [release validation](docs/RELEASE_VALIDATION.md) for the current decision and remaining distribution gates; the [M0 report](docs/m0_requalification_16.8.5.30.md) is historical evidence.
 - **One open document:** the implementation rejects operations when more than one document is open. Sessions (`.cosessiondb`) support editing and preview export. Catalogs default to read-only inspection; [experimental catalog editing](#catalog-editing-experimental) requires an exact-path opt-in.
-- **One operator, sequential calls:** keep the document open throughout a workflow. Do not switch/reopen/replace databases, edit in the UI, or launch competing exports during a command. The advisory lock serializes cooperating c1 writers; it does not lock the photographer UI, other automation, or delayed Apple Events. Multi-process workflows remain unqualified.
+- **One operator, sequential calls:** keep the document open throughout a workflow. Do not switch/reopen/replace databases, edit in the UI, or launch competing exports during a command. The advisory lock serializes inventory scans and cooperating c1 writers; it does not lock the photographer UI, other automation, or delayed Apple Events. Multi-process workflows remain unqualified.
 - **Reference lifetime:** a working reference is bound to the canonical database file identity, Capture One process/launch, and parent-image path. Restarting Capture One or replacing the database invalidates it; inspect current state and create a fresh editing reference. Capture One does not expose a reliable same-file close/reopen token within one application launch. Such workflows remain unsupported, rather than being presented as automatically detected.
 - **Other builds:** 16.4+ through 16.x are permitted by the compatibility check, but are **unverified**, not qualified support. Older/future major builds require `C1_ALLOW_UNTESTED_BUILD=1`. Check `doctor` for the tested-build match before editing.
 - **Platform:** the package targets macOS 13+, but this is a deployment target, not evidence that every macOS version is tested. Intel and older macOS runtime qualification are deferred.
@@ -61,7 +61,7 @@ macOS Automation permission must allow the launching application to control Capt
 
 No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `allChecksPassed`, `writesEnabled`, and `exactBuildMatched` before editing. `isSession` identifies the document type; it is not an editing permission.
 
-The default server exposes 19 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, and `operation_status`.
+The default server exposes 20 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -125,7 +125,7 @@ Restoration is explicit, state-checked, and journaled. It refuses a changed orie
 
 ### Select culled photos by star rating
 
-Filter the listing before cloning photos for crop or color work:
+Filter the listing before preparing photos for crop or color work:
 
 ```sh
 c1 variants list --rating 5                 # Exactly 5 stars (also: more than 4)
@@ -144,7 +144,29 @@ Use `{"minRating": 4}` for four stars and above. Both arguments require integers
 
 For “crop my five-star picks,” call `variants_list` with `rating: 5`, then prepare each intended existing variant with `variant_edit` and follow the crop workflow below. Results are variants: multiple edits of the same photo can appear, including existing managed clones. Review the IDs and `isManagedWorkingClone` before creating proposals. Filtering is also available in the composition MCP profile and for read-only Catalog inspection.
 
-### Supported adjustments
+### Inventory progress and cancellation
+
+Rating filters run before full metadata reads. On Capture One 16.8.5.30 Sessions, native rating predicates select matching variants and bulk ID reads capture the ordered candidates. Full summaries are then read in sequential batches. Catalogs and other allowed builds retain a two-stage rating scan that hydrates only matches; `C1_INVENTORY_STRATEGY=scan` explicitly selects this fallback. `batchSize` (CLI `--batch-size`) defaults to 32 and accepts 1–256. Distinct variants of the same image remain separate; response fields and ordering are preserved. A failed rating read now fails the request rather than treating the image as unrated. Native rating predicates and bulk IDs were checked against the legacy enumeration across document, collection, and selected scopes. Bulk reads of other properties remain deferred.
+
+The [inventory qualification report](docs/inventory/16.8.5.30/README.md) records sparse-filter gains, dense-scan overhead, and the fixture limitations.
+
+```sh
+c1 variants list --rating 5 --batch-size 32 --progress human
+c1 variants list --rating 5 --deadline-seconds 120 --progress json
+c1 request status req-<UUID> --format json
+```
+
+The entire inventory holds the application advisory lock, rechecks the document token between batches, validates returned IDs/ratings, and compares scope membership before returning. Partial inventories are never returned as complete. This is not an atomic application snapshot: edits to already-read ratings or transient membership changes can escape detection. The one-operator/no-UI-edits requirement still applies. Candidate discovery itself remains one potentially slow script; batch size is a work limit, not an execution-time guarantee.
+
+Every executed CLI command and MCP tool receives a diagnostic request ID, separate from mutation operation IDs. Status snapshots record elapsed time, phase, inventory strategy, actual completed counters, and an outstanding handler when known. For `native-filter`, candidate totals describe the IDs returned by the native predicate; they do not claim to count all variants examined internally by Capture One. For `rating-scan`, totals cover the unfiltered scope. A background heartbeat runs every five seconds even while the main thread is blocked. Requests are marked slow after 10 seconds (`C1_SLOW_REQUEST_SECONDS` overrides the threshold). `handlerCalls` counts script invocations, not the Apple Events executed inside them. It reports no invented percentage or ETA; progress inside an outstanding Apple Event is unknown. MCP callers supplying `_meta.progressToken` receive increasing progress notifications for observed work; heartbeats with unchanged counters are recorded locally, not sent as fictitious progress.
+
+Progress goes to stderr, leaving stdout results/MCP messages intact. CLI `--progress human|json|quiet` or `C1_PROGRESS` selects the format; `--quiet` suppresses progress. Default progress is human on a terminal and quiet in pipelines. Status files are still written in quiet mode. Request IDs appear in progress events, error responses, and the status-cache filenames. Error envelopes add `requestId`, `phase`, and `elapsedMs`, plus recovery guidance where applicable.
+
+Snapshots are stored in `~/Library/Caches/c1/requests`; use the same `C1_REQUEST_DIR` in CLI and MCP to override it, or `C1_REQUEST_DIR=off` to disable persistence. `request_status({"requestId":"req-..."})` and `c1 request status` read these files without the application lock or an Apple Event. They distinguish process liveness from stale observations; a live process is not proof that Capture One advanced. Set `C1_DIAGNOSTICS=1` to retain per-request JSONL events, rotated at 1 MiB with one previous file. Paths, collection names, and image names are omitted from these diagnostics; document identity is hashed. These cache files may be deleted when no request needs inspection. Diagnostic failures cannot override a command outcome or replace the mutation journal.
+
+For inventory, Ctrl-C in the CLI or MCP cancellation requests stop work at the next boundary between Apple Events. `deadlineSeconds` / `--deadline-seconds` is an optional positive duration up to 86400 seconds, checked at those same boundaries. Neither mechanism interrupts a dispatched event or proves Capture One stopped processing it. Mutation cancellation does not release journal safeguards or authorize retries; existing outcome-unknown/restart/reconciliation rules remain in effect.
+
+## Supported adjustments
 
 | Field | Aliases | Absolute range |
 |---|---|---|
@@ -208,7 +230,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.4.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.5.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # build once; all offline Swift + CLI/MCP contract checks
@@ -224,6 +246,8 @@ python3 Tests/mcp_test.py               # run sequentially, never alongside CLI 
 python3 Tests/geometry_integration_test.py # zero open documents; crop/rotation + review workflow
 python3 Tests/catalog_integration_test.py # zero open documents; optional clone catalog workflow
 python3 Tests/existing_variant_integration_test.py # existing-variant tonal/crop edits; no duplicates
+C1_INVENTORY_EVIDENCE=/private/tmp/inventory.json python3 Tests/inventory_integration_test.py
+python3 Tests/native_inventory_probe.py # independent native-predicate qualification
 ```
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.

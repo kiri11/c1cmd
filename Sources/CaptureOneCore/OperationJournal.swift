@@ -126,6 +126,7 @@ public final class OperationJournal {
         try handle.seekToEnd()
         try handle.write(contentsOf: data)
         try handle.synchronize()
+        if entry.status == "pending" { RequestContext.current?.linkOperation(entry.operationId) }
     }
 
     public func update(operationId: String, status: String, afterAdjustments: Adjustments? = nil,
