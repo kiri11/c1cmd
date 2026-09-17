@@ -114,16 +114,6 @@ try:
     assert result['after']['aspectRatioName']==current['geometry']['aspectRatioName']
     pr,_=tool('preview',{'ref':ref});assert abs(pr['width']/pr['height']-.75)<.003
     log('aspect-ratio-preset',result=result,preview=pr)
-    # This non-shift lens profile cannot accept a native shift fixture value.
-    # Tilt/shift rejection is covered offline; distortion is qualified separately.
-    for label, setter in [('perspective','keystone vertical of adjustments')]:
-        native_fixture(label,f'set {setter} of v to 1')
-        current=cli('get',ref)
-        assert current.get('geometryUnavailableReason'),current
-        rejection=cli('geometry','set',ref,'--if-geometry-state',current['geometryStateHash'],'--aspect-ratio',1.5,error='invalid-request')
-        assert cli('get',ref)==current,'Rejected request changed existing corrections'
-        log('unsupported-'+label,rejection=rejection,observed=current)
-        native_fixture(label+'-restore',f'set {setter} of v to 0')
     for orientation in [90,180,270]:
         entry=dict(binding,operationId=str(uuid.uuid4()),operationType='geometry-fixture-orientation',workingRef=ref,nativeVariantId=cloned['cloneVariantId'],status='pending')
         def append():

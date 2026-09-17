@@ -10,6 +10,7 @@ final class GeometryFake: ScriptExecuting {
     var dimensionsFollowRotation = false
     var pendingBeforeWrite = false
     var requestedBeforeWrite: GeometryRequest?
+    var normalizePerspective = false
     init(directory: URL) { base = FakeScript(directory: directory) }
     func record(_ id: String) -> [String: Any] {
         records[id] ?? ["cropValues":[3000.0,2000,6000,4000], "rotationDegrees":0.0, "orientationDegrees":0,
@@ -55,13 +56,19 @@ final class GeometryFake: ScriptExecuting {
                 } else { target = [3150,2300,2400,1600] }
                 r["maximumValues"] = bounds
             } else { target = (1...4).map { args[5].atIndex($0)!.doubleValue } }
-            r["cropValues"] = target
+            var fitted = target
+            if normalizePerspective && handler == "applyCorrectedGeometry" {
+                fitted[2] *= 0.8; fitted[3] *= 0.8
+            }
+            if failure == "fit-ratio" { fitted[2] *= 0.7 }
+            if failure == "fit-outside" { fitted[0] += 10000 }
+            r["cropValues"] = fitted
             if dimensionsFollowRotation { r["sourceDimensions"] = args[6].doubleValue == 0 ? [6000.0, 4000] : [6135.0, 4206] }
             if failure == "mismatch" { r["rotationDegrees"] = 22.0 }
             if failure == "lens-change" { r["lensValues"] = [0.0,35,0,0,0,0,0,0] }
             records[id] = r
             if failure == "lost-reply" { throw C1Error.timeout("applied, reply lost") }
-            result = handler == "applyCorrectedGeometry" ? ["targetCropValues":target, "boundsValues": failure == "bad-bounds" ? [0.0,0,1,1] : bounds] : r
+            result = handler == "applyCorrectedGeometry" ? ["targetCropValues":target, "fittedCropValues":fitted, "boundsValues": failure == "bad-bounds" ? [0.0,0,1,1] : bounds] : r
         default: return try base.executeAndDecode(handler:handler, args:args)
         }
         return try JSONDecoder().decode(T.self, from:JSONSerialization.data(withJSONObject:result))
@@ -205,7 +212,16 @@ struct GeometryTests {
             XCTAssertEqual(restored.after.lensGeometry,original.geometry!.lensGeometry)
             for index in 2...7 {
                 var blocked = original.geometry!; blocked.lensGeometry[index] = 1
-                XCTAssertNotNil(blocked.unsupportedReason)
+                XCTAssertNil(blocked.unsupportedReason)
+                XCTAssertTrue(blocked.requiresNativeBounds)
+            }
+            for index in 1...4 {
+                var corrected = original.geometry!; corrected.lensGeometry[0] = 0; corrected.keystone[index] = 10
+                XCTAssertNil(corrected.unsupportedReason)
+                XCTAssertTrue(corrected.requiresNativeBounds)
+                let nativeBounds = try corrected.safeBounds(rotation:corrected.rotation)
+                XCTAssertEqual(nativeBounds,corrected.maximumCrop)
+                XCTAssertThrowsError(try corrected.safeBounds(rotation:5))
             }
             for amount in [-1.0,101,Double.nan] {
                 var blocked = original.geometry!; blocked.lensGeometry[0] = amount
@@ -213,7 +229,29 @@ struct GeometryTests {
             }
             var invalid = original.geometry!; invalid.maximumCrop.width = 0
             XCTAssertNotNil(invalid.unsupportedReason)
-            for failure in ["partial","lost-reply","lens-change","bad-bounds"] {
+            for field in ["keystoneValues", "lensValues"] {
+                let indices = field == "keystoneValues" ? Array(1...4) : Array(2...7)
+                for index in indices {
+                    var context = fake.record("1")
+                    context["lensValues"] = [0.0,35,0,0,0,0,0,0]
+                    var values = context[field] as! [Double]; values[index] = 1; context[field] = values
+                    fake.records["1"] = context
+                    let fresh = try core.get(ref:"1")
+                    let prepared = try core.editVariant(sourceRef:"1",ifState:fresh.stateHash,ifDocument:doc.openToken)
+                    fake.normalizePerspective = true
+                    let changed = try core.geometrySet(workingRef:prepared.workingRef,ifGeometryState:fresh.geometryStateHash!,rotation:3,aspectRatio:1.5)
+                    XCTAssertNotNil(journal.find(operationId:changed.operationId)?.requestedGeometry)
+                    XCTAssertTrue(changed.before.sameContext(as:changed.after))
+                    XCTAssertEqual(changed.after.crop.width,4000)
+                    XCTAssertThrowsError(try core.geometrySet(workingRef:prepared.workingRef,ifGeometryState:changed.geometryStateHash,aspectRatio:1.5,dryRun:true))
+                }
+            }
+            fake.normalizePerspective = false
+            fake.records["1"] = source
+            for failure in ["partial","lost-reply","lens-change","bad-bounds","fit-ratio","fit-outside"] {
+                if failure.hasPrefix("fit-") {
+                    var record = source; record["keystoneValues"] = [100.0,15,0,0,0]; fake.records["1"] = record
+                }
                 let fresh = try core.get(ref:"1")
                 let freshEdit = try core.editVariant(sourceRef:"1",ifState:fresh.stateHash,ifDocument:try core.getDocumentInfo().openToken,ifGeometryState:fresh.geometryStateHash)
                 fake.failure = failure

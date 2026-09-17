@@ -438,7 +438,7 @@ on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTon
     end tell
 end applyGeometry
 
--- Distortion changes the canvas. Do not extrapolate from RAW dimensions or
+-- Lens and perspective corrections change the canvas. Do not extrapolate from RAW dimensions or
 -- reuse bounds from another rotation. The caller journals the request before
 -- entering this handler; any error after dispatch keeps the write block.
 on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio)
@@ -448,7 +448,7 @@ on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, ex
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         set nativeBounds to maximum crop v apply false
         set {boundsX, boundsY, boundsW, boundsH} to nativeBounds
-        if boundsW <= 0 or boundsH <= 0 then error "Corrected-lens bounds are unavailable."
+        if boundsW <= 0 or boundsH <= 0 then error "Corrected geometry bounds are unavailable."
         if requestedCrop is not missing value then
             set targetCrop to requestedCrop
         else if requestedRatio is not missing value then
@@ -462,9 +462,13 @@ on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, ex
             set targetCrop to crop of v
         end if
         set {cx, cy, cw, ch} to targetCrop
-        if cw < 1 or ch < 1 then error "Corrected-lens crop is empty."
-        if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after rotation; inspect operation status before any further write."
-        set crop of v to targetCrop
-        return {targetCropValues:targetCrop, boundsValues:nativeBounds}
+        if cw < 1 or ch < 1 then error "Corrected geometry crop is empty."
+        -- Native rotation-only crops can exceed the reported maximum rectangle.
+        -- Keep that observed crop; containment applies to caller-selected crops.
+        if requestedCrop is not missing value or requestedRatio is not missing value then
+            if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after rotation; inspect operation status before any further write."
+            set crop of v to targetCrop
+        end if
+        return {targetCropValues:targetCrop, boundsValues:nativeBounds, fittedCropValues:crop of v}
     end tell
 end applyCorrectedGeometry

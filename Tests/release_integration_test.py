@@ -29,11 +29,11 @@ with tempfile.TemporaryDirectory(prefix='c1-release-live-', dir='/private/tmp') 
         started = time.perf_counter()
         check_package(root)
         print(f'TIMING archive and contract: {time.perf_counter() - started:.3f}s', flush=True)
-        for script in ['integration_test.py', 'mcp_test.py', 'geometry_integration_test.py', 'lens_geometry_integration_test.py', 'catalog_integration_test.py', 'existing_variant_integration_test.py', 'inventory_integration_test.py']:
+        for script in ['integration_test.py', 'mcp_test.py', 'geometry_integration_test.py', 'lens_geometry_integration_test.py', 'perspective_geometry_integration_test.py', 'catalog_integration_test.py', 'existing_variant_integration_test.py', 'inventory_integration_test.py']:
             print(f'Running {script} using extracted binaries with build resources hidden', flush=True)
             started = time.perf_counter()
             subprocess.run([sys.executable, '-u', str(ROOT / 'Tests' / script)], env=environment,
-                           cwd=tmp, check=True, timeout=1200 if script == 'lens_geometry_integration_test.py' else 600)
+                           cwd=tmp, check=True, timeout=1200 if script in ('lens_geometry_integration_test.py', 'perspective_geometry_integration_test.py') else 600)
             print(f'TIMING {script}: {time.perf_counter() - started:.3f}s', flush=True)
         print('PASS: extracted release CLI and MCP live suites; build resource fallback unavailable', flush=True)
     finally:

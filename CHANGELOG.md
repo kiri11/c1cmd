@@ -1,3 +1,11 @@
+## Unreleased — preserved keystone and lens movements
+
+- Enable crop, rotation, ratio fitting, context preview, and baseline restoration while preserving existing keystone and lens tilt/shift on Capture One 16.8.5.30 (contract 1.7.0).
+- Validate native ratio-fit shrinkage inside the proposed rectangle. Keep explicit crops strict and retain native automatic crops for rotation-only requests.
+- Reject dry runs that would need native rotation or perspective/movement ratio normalization. Keep journal, state, context, and recovery checks.
+- Make real timeout/process-death validation opt-in via `qualify-recovery` or `qualify-full`; normal `qualify` retains offline and packaged live workflow checks.
+- Add representative movement-profile and keystone workflows, coordinate checks, and a combined-correction timeout case. See [qualification](docs/geometry/16.8.5.30/perspective/README.md).
+
 ## Unreleased — corrected-lens crop and rotation
 
 - Support preserved distortion correction from 0 through 100 on Capture One 16.8.5.30, using native bounds for crops, ratio fits, rotation, and full-frame context previews.

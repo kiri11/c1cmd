@@ -1,0 +1,366 @@
+[
+  {
+    "attempt": "perspective-probe-1",
+    "events": [
+      {
+        "event": "failure",
+        "label": "profile",
+        "error": "93:173: execution error: Capture One got an error: Could not find a lens profile with this name. (-50)\n"
+      }
+    ],
+    "reconciliation": {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3678,
+          "centerY": 3112,
+          "height": 2134,
+          "width": 3200
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          75,
+          10,
+          -10,
+          5,
+          10
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3678,
+          "centerY": 3112,
+          "height": 2189,
+          "width": 3283
+        },
+        "orientation": 0,
+        "rotation": 44.99998474121094
+      },
+      "appInstance": "1091:1789682123.835506",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/probe-9qjr3j3u/geometry/geometry.cosessiondb|16777232|4400602|1789682687.0962796",
+      "documentPath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/probe-9qjr3j3u/geometry",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "2",
+      "operationId": "b440c5f2-9e81-4eb1-9070-c3de0a01a656",
+      "operationType": "geometry-probe",
+      "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/probe-9qjr3j3u/geometry/Capture/2U6A7257.CR3",
+      "status": "reconciled",
+      "timestamp": "2026-09-17T22:05:59.440003+00:00",
+      "variantIdsBefore": [
+        "1"
+      ],
+      "workingRef": "c1_wrk_9cebaf7e-b50e-4e58-875b-2be037be8aab"
+    }
+  },
+  {
+    "attempt": "perspective-live-1",
+    "events": [
+      {
+        "event": "failed",
+        "error": "{'content': [{'text': '{\\n  \"error\" : {\\n    \"code\" : \"script-error\",\\n    \"elapsedMs\" : 995,\\n    \"message\" : \"Operation 75dd43d7-fd36-44a6-bbdf-c233b611aa2a: script-error (-2700): Requested crop exceeds native bounds after rotation; inspect operation status before any further write.. Inspect operation status; do not retry the write.\",\\n    \"operationId\" : \"75dd43d7-fd36-44a6-bbdf-c233b611aa2a\",\\n    \"outcome\" : \"inspect-operation\",\\n    \"phase\" : \"mutation-prepared\",\\n    \"recoveryAction\" : \"Inspect operation status; do not retry the mutation.\",\\n    \"requestId\" : \"req-e9e52941-082f-4713-b69d-e555be66de41\"\\n  }\\n}', 'type': 'text'}], 'isError': True}"
+      }
+    ],
+    "reconciliation": {
+      "afterAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "afterGeometry": {
+        "crop": {
+          "centerX": 3058,
+          "centerY": 2117,
+          "height": 3774,
+          "width": 5661
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          15,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3128,
+          "centerY": 2121,
+          "height": 3773,
+          "width": 5660
+        },
+        "orientation": 0,
+        "rotation": 2
+      },
+      "appInstance": "2345:1789682826.9857438",
+      "beforeAdjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "beforeGeometry": {
+        "crop": {
+          "centerX": 3130,
+          "centerY": 2018,
+          "height": 3848,
+          "width": 5772
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          15,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 3130,
+          "centerY": 2018,
+          "height": 3848,
+          "width": 5772
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-69g8iq3f/lens/lens.cosessiondb|16777232|4403812|1789683076.726789",
+      "documentPath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-69g8iq3f/lens",
+      "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+      "nativeVariantId": "2",
+      "operationId": "75dd43d7-fd36-44a6-bbdf-c233b611aa2a",
+      "operationType": "geometry_set",
+      "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/lens-qualification/live-69g8iq3f/lens/Capture/2U6A7257.CR3",
+      "preconditionStateHash": "geometry-v1:fa3dededb0e6afe21bcbf1d2ee54571a4859b68102a7a26335cc7cd1fdd01d7c",
+      "requestedGeometry": {
+        "rotation": 2
+      },
+      "status": "reconciled",
+      "timestamp": "2026-09-17T22:11:50Z",
+      "workingRef": "c1_edit_47703962-f864-4389-9c49-505c87d8b46d"
+    }
+  },
+  {
+    "attempt": "initial-packaged-recovery",
+    "result": "First two recovery cases passed; Launch Services returned -600 after the third old process exited. Full make qualify stopped. A guarded fresh-launch harness was checked against the same archive; the later campaign was stopped at user request as detailed below.",
+    "launchReconciliation": {
+      "blockedBeforeReconciliation": {
+        "error": {
+          "code": "outcome-unknown",
+          "elapsedMs": 267,
+          "message": "Operation 96006fe1-d82d-4c09-b9d6-5f33922b8e41: outcome-unknown: An unresolved operation blocks further writes. Restart Capture One to end in-flight work, then inspect operation status.. Inspect operation status; do not retry the write.",
+          "operationId": "96006fe1-d82d-4c09-b9d6-5f33922b8e41",
+          "outcome": "inspect-operation",
+          "phase": "lock-acquired",
+          "recoveryAction": "Inspect operation status; do not retry the mutation.",
+          "requestId": "req-d6a77eb9-573c-4073-bc74-888d7eae1429"
+        }
+      },
+      "observations": {
+        "afterAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "afterGeometry": {
+          "crop": {
+            "centerX": 3003,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3002,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "appInstance": "5155:1789684675.997806",
+        "beforeAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "beforeGeometry": {
+          "crop": {
+            "centerX": 3003,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            100,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3002,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "documentIdentity": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/recovery.cosessiondb|16777232|4413701|1789684354.9309196",
+        "documentPath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery",
+        "error": "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone.",
+        "nativeVariantId": "16",
+        "operationId": "96006fe1-d82d-4c09-b9d6-5f33922b8e41",
+        "operationType": "geometry_set",
+        "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/Capture/fixture.CR3",
+        "preconditionStateHash": "geometry-v1:85b6ec2d07276c73c87ec145a059f92198edaa336e1f1baef486b863f07a44fd",
+        "requestedGeometry": {
+          "aspectRatio": 1.5,
+          "rotation": 3
+        },
+        "status": "reconciled",
+        "timestamp": "2026-09-17T22:38:21Z",
+        "workingRef": "c1_wrk_c5890874-ffbf-4f1a-a441-a065789aed13"
+      },
+      "sourceUnchanged": true,
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+      "identities": [
+        [
+          "1",
+          "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/Capture/fixture.CR3"
+        ],
+        [
+          "12",
+          "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/Capture/fixture.CR3"
+        ],
+        [
+          "14",
+          "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/Capture/fixture.CR3"
+        ],
+        [
+          "16",
+          "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-nukoldqb/recovery/Capture/fixture.CR3"
+        ]
+      ]
+    }
+  },
+  {
+    "attempt": "second-recovery-campaign",
+    "result": "Stopped at user request to exclude slow timeout validation. Three timeout recoveries passed; the combined-correction pause was cancelled, its operation succeeded normally, and no unresolved writes remain. This is not a completed six-case recovery qualification.",
+    "userStop": {
+      "reason": "User requested excluding timeout validation; cancel the active pause and inspect the dispatched operation without retry.",
+      "pid": 5803,
+      "operationId": "80df5a00-0aee-43cc-8ffc-23ef7f8c83f1",
+      "result": "Already-dispatched operation completed successfully after artificial pause was cancelled; no retry.",
+      "status": "succeeded",
+      "unresolvedOperations": 0,
+      "openDocuments": 0,
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+      "passedRecoveryCases": [
+        "real-apple-event-timeout",
+        "geometry-apple-event-timeout",
+        "corrected-geometry-apple-event-timeout"
+      ]
+    }
+  }
+]

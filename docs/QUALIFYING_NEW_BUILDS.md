@@ -89,7 +89,7 @@ Run `Tests/release_integration_test.py` against the candidate archive, then clos
 
 ### Step 5: Qualify geometry and add the build
 
-Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Also run the [corrected-lens suite](geometry/16.8.5.30/lens/README.md): native bounds after rotation, both hide-distorted-areas settings, off-center preview mapping, correction preservation, baseline restore, and corrected-lens timeout recovery. The geometry harnesses and production gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
+Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Also run the [corrected-lens suite](geometry/16.8.5.30/lens/README.md): native bounds after rotation, both hide-distorted-areas settings, off-center preview mapping, correction preservation, baseline restore, and corrected-lens timeout recovery. Run the perspective/movement suite too: vertical/horizontal/skew/aspect keystone, a native movement-capable lens profile, ratio normalization, strict explicit crops, rotation-only, preview mapping, baseline restore, and combined-correction timeout recovery. The geometry harnesses and production gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
 
 Once the packaged workflow and recovery qualification pass and their scope has been reviewed, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
 
@@ -116,3 +116,7 @@ Commit your changes:
 3. Any relevant test logs or release notes
 
 Submit a PR with the title: `feat: qualify Capture One <version>`.
+
+## Validation tiers
+
+`make check` runs offline tests, including injected failure/recovery guards. `make qualify` adds packaged live workflows and excludes deliberate timeout/process-death tests. Use `make qualify-recovery` against an existing archive when changing recovery-sensitive behavior or at a release checkpoint; `make qualify-full` explicitly runs both tiers. Real timeout evidence is reported separately and is never inferred from mocked tests. Use a new `EVIDENCE_DIR` for each command.

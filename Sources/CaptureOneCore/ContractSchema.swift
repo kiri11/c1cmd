@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.6.0"
+    public static let version = "1.7.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]

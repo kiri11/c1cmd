@@ -2,6 +2,12 @@
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
+## Preserved perspective and lens movements candidate (2026-09-17 UTC)
+
+Contract **1.7.0** enables crop/rotation with existing keystone and lens tilt/shift on Capture One **16.8.5.30**, retaining those corrections. Native ratio-fit normalization is validated; explicit crops remain strict. The [perspective/movement report](geometry/16.8.5.30/perspective/README.md) records **800 offline assertions**, **24 recovery-harness tests**, **eight packaged perspective/movement cases**, and all regular packaged suites passing. Movement metadata was applied to an owned Canon RAW clone using the native Phase One 45mm TS profile; optical-profile accuracy and real tilt/shift capture coverage are not claimed.
+
+Real timeout validation is now **opt-in**, following the user's workflow decision: `make qualify` runs regular checks, `make qualify-recovery` runs faults against an existing archive, and `make qualify-full` explicitly combines both. Three timeout recoveries passed on this payload. The combined-correction pause was cancelled at the user's request; its dispatched operation completed normally, with zero unresolved writes and zero open documents. A full six-case fault campaign is **not claimed**. The earlier launch failure, guarded fresh-launch harness fix, and safe stop are retained in the report. Existing distribution and Catalog fault-recovery limits remain unchanged.
+
 ## Corrected-lens development candidate (2026-09-17 UTC)
 
 Contract **1.6.0** permits crop and rotation with preserved lens distortion correction in 0...100 on Capture One **16.8.5.30**. Corrected bounds come from native `maximum crop ... apply false`; new rotations obtain fresh bounds inside the journaled operation. `requestedGeometry` records intent before those bounds are known. A corrected-lens rotation dry run is rejected; uncertain failures retain the existing write block and restart/reconciliation rules.
@@ -94,7 +100,7 @@ caffeinate -i python3 Tests/recovery_integration_test.py \
 
 `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default: request native quit and verify the old process exits. `C1_RECOVERY_SHUTDOWN_MODE=sigterm` explicitly selects process termination after closing the owned Session, confirming zero documents, and rechecking the verified PID. There is **no automatic fallback**. Environment, restart, case, and completion events record the mode; a SIGTERM pass is process-termination recovery evidence, not graceful-quit qualification. Capture One labeled direct SIGTERM abnormal in the diagnostic controls. Both modes require observed old-process exit before reopening and a different PID afterward.
 
-Both settings can be passed to `make qualify`, for example `make qualify C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/new-qualification` with `C1_TEST_RAW_FIXTURE` set. The evidence directory may be under `/tmp`; the Session fixture must not be.
+Both settings can be passed to the opt-in `make qualify-full`, for example `make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/new-qualification` with `C1_TEST_RAW_FIXTURE` set. The evidence directory may be under `/tmp`; the Session fixture must not be.
 
 The `caffeinate` wrapper inhibits idle sleep for the test duration; a suspended machine can invalidate timeout timing. Use a new evidence directory for each run. Failures are retained, not overwritten or automatically retried. Shutdown timeouts collect a best-effort process sample and stop. After an incomplete restart, cleanup sends no further Apple Events; it still restores the build resource bundle and retains the journal. Otherwise cleanup closes only its own Session. If a run fails with unresolved work, inspect its journal and end the old app process before manual reconciliation. No uncertain clones are deleted or adopted by cleanup.
 

@@ -984,9 +984,12 @@ public final class SessionController {
                 var restored = before
                 restored.crop = baseline.crop; restored.rotation = baseline.rotation
                 target = restored
-            } else if before.hasLensDistortion {
+            } else if before.requiresNativeBounds {
                 if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
                 guard crop != nil || rotation != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
+                if dryRun && before.hasPerspectiveOrMovements && aspectRatio != nil {
+                    throw C1Error.invalidRequest("Perspective and movement ratio fits require native crop normalization; dry runs cannot predict the final crop.")
+                }
                 nativeRequest = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio)
                 // Validate all knowable bounds before dispatch. At a new rotation,
                 // Capture One supplies bounds after its rotation setter executes.
@@ -1017,12 +1020,13 @@ public final class SessionController {
                         NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue()])
                     guard applied.targetCropValues.count == 4, applied.boundsValues.count == 4,
                           applied.targetCropValues.allSatisfy({ $0.isFinite }), applied.boundsValues.allSatisfy({ $0.isFinite }) else {
-                        throw C1Error.readbackMismatch("Corrected-lens native target or bounds are malformed.")
+                        throw C1Error.readbackMismatch("Corrected geometry native target or bounds are malformed.")
                     }
                     let c = applied.targetCropValues, b = applied.boundsValues
+                    let nativeRotationOnly = request.crop == nil && request.aspectRatio == nil
                     guard c[2] >= 1, c[3] >= 1, b[2] > 0, b[3] > 0,
-                          abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2, abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2 else {
-                        throw C1Error.readbackMismatch("Corrected-lens target exceeds the native bounds.")
+                          nativeRotationOnly || (abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2 && abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2) else {
+                        throw C1Error.readbackMismatch("Corrected geometry target exceeds the native bounds.")
                     }
                     var resolved = before
                     resolved.rotation = request.rotation
@@ -1030,6 +1034,16 @@ public final class SessionController {
                     if let crop = request.crop, resolved.crop != crop { throw C1Error.readbackMismatch("Native crop differs from the explicit request.") }
                     if let ratio = request.aspectRatio, abs(c[2] - c[3]*ratio) > max(2, ratio*2) {
                         throw C1Error.readbackMismatch("Native crop does not match the requested aspect ratio.")
+                    }
+                    if before.hasPerspectiveOrMovements, let ratio = request.aspectRatio {
+                        guard let fit = applied.fittedCropValues, fit.count == 4,
+                              fit.allSatisfy({ $0.isFinite }), fit[2] >= 1, fit[3] >= 1,
+                              abs(fit[0]-c[0])+fit[2]/2 <= c[2]/2+2,
+                              abs(fit[1]-c[1])+fit[3]/2 <= c[3]/2+2,
+                              abs(fit[2]-fit[3]*ratio) <= max(2,ratio*2) else {
+                            throw C1Error.readbackMismatch("Native perspective fit must preserve the requested ratio inside the target rectangle.")
+                        }
+                        resolved.crop = CropRect(centerX:fit[0],centerY:fit[1],width:fit[2],height:fit[3])
                     }
                     target = resolved
                     // Preserve the concrete target once native bounds are known;
@@ -1235,8 +1249,12 @@ public final class SessionController {
             let clone = try cloneVariant(sourceRef: ref)
             let current = try get(ref: clone.workingRef)
             guard let cloneState = current.geometryStateHash, cloneState == source.geometryStateHash else { throw C1Error.stateChanged("Context clone differs from source; inspect managed clone \(clone.workingRef).") }
-            _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState,
-                                crop: try geometry.safeBounds(rotation: geometry.rotation))
+            let bounds = try geometry.safeBounds(rotation: geometry.rotation)
+            if geometry.hasPerspectiveOrMovements {
+                _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState, aspectRatio: bounds.aspectRatio)
+            } else {
+                _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState, crop: bounds)
+            }
             var result = try preview(ref: clone.workingRef, outputDirOverride: outputDirOverride, timeout: timeout)
             guard try get(ref: ref).geometryStateHash == source.geometryStateHash else { throw C1Error.stateChanged("Source changed during context preview; discard preview.") }
             _ = try deleteVariant(workingRefString: clone.workingRef)
@@ -1341,7 +1359,7 @@ public final class SessionController {
             "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
                               "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
                               "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
-            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for corrected lenses; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "keystoneWrites": false],
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": false],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,

@@ -85,7 +85,7 @@ struct C1MCPServer {
             ("get", "Get adjustments and metadata for a variant or working reference, including current stateHash.", true),
             ("set", "Set absolute adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             ("add", "Apply relative delta adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
-            ("geometry_set", "Set crop and rotation on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Preserves lens correction using native bounds; corrected-lens rotation dry runs are unavailable. Keystone is preserved.", false),
+            ("geometry_set", "Set crop and rotation on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Preserves lens distortion, tilt/shift, and keystone using native bounds; rotation dry runs with these corrections are unavailable.", false),
             ("reset", "Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             ("diff", "Compare adjustments between two variants or compare a working variant against its baseline.", true),
             ("dump", "Batched export of variants, adjustments, and metadata in JSON format.", true),

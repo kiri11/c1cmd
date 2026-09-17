@@ -47,6 +47,14 @@ def process_exited(pid):
     return False
 
 
+def launch_session(db):
+    # An exited PID can still have a stale Launch Services registration (-600).
+    # Request a fresh launch only after proving there is no running C1 process.
+    running = subprocess.run(['pgrep', '-x', 'Capture One'], capture_output=True, text=True)
+    assert running.returncode == 1 and not running.stdout.strip(), 'Cannot prove Capture One is stopped; do not launch another instance'
+    subprocess.run(['open', '-n', '-a', '/Applications/Capture One.app', str(db)], check=True)
+
+
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -207,7 +215,7 @@ class Run:
             raise
         self.log('process-exited', oldPid=old, shutdownMode=self.shutdown_mode)
         self.fixture_snapshot('terminated')
-        subprocess.run(['open', '-a', '/Applications/Capture One.app', str(self.db)], check=True)
+        launch_session(self.db)
         def ready():
             try:
                 return (ae('return count of documents', timeout=5) == 1 and
@@ -257,10 +265,11 @@ class Run:
         assert reconciled['status'] == 'reconciled'
         if label == 'geometry-apple-event-timeout':
             assert reconciled.get('beforeGeometry') and reconciled.get('intendedGeometry') and reconciled.get('afterGeometry')
-        if label == 'corrected-geometry-apple-event-timeout':
+        if label in ('corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
             assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry')
             assert reconciled['requestedGeometry']['rotation'] == 3
             assert reconciled['afterGeometry']['lensGeometry'] == reconciled['beforeGeometry']['lensGeometry']
+            assert reconciled['afterGeometry']['keystone'] == reconciled['beforeGeometry']['keystone']
         stale = self.cli('get', clone['workingRef'], ok=False)
         assert stale['error']['code'] == 'document-changed', stale
         assert self.identities() == before, 'Recovery must not create/adopt/delete variants'
@@ -270,9 +279,9 @@ class Run:
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
-        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout'):
-            if label == 'corrected-geometry-apple-event-timeout':
-                self.enable_lens_correction(fresh)
+        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
+            if label in ('corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
+                self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
         self.cli('variant', 'delete', fresh['workingRef'])
@@ -280,7 +289,7 @@ class Run:
         self.log('case-passed', case=label, operationId=operation,
                  rawSHA256=sha(self.raw), observations=reconciled, shutdownMode=self.shutdown_mode)
 
-    def enable_lens_correction(self, clone):
+    def enable_lens_correction(self, clone, perspective=False):
         current = self.cli('get', clone['workingRef'])
         entry = dict(self.records()[-1], operationId=str(uuid.uuid4()), operationType='lens-fixture',
                      status='pending', workingRef=clone['workingRef'], nativeVariantId=current['id'],
@@ -290,17 +299,33 @@ class Run:
                 stream.write(json.dumps(entry)+'\n'); stream.flush(); os.fsync(stream.fileno())
         append()
         self.log('corrected-lens-fixture-pending', operationId=entry['operationId'], nativeVariantId=current['id'])
-        ae(f'set distortion of lens correction of variant id {json.dumps(current["id"])} of current document to 100')
+        script = f'set v to variant id {json.dumps(current["id"])} of current document\n'
+        if perspective:
+            script += '''set lens profile of lens correction of v to "Phase One 45mm TS f/3.5"
+set tilt of lens correction of v to 2
+set tilt direction of lens correction of v to 45
+set shift of lens correction of v to 3
+set shift direction of lens correction of v to 90
+set shift x of lens correction of v to 2
+set shift y of lens correction of v to -2
+set keystone vertical of adjustments of v to 10
+set keystone horizontal of adjustments of v to -5
+'''
+        script += 'set distortion of lens correction of v to 100'
+        ae(script)
         observed = self.cli('get', clone['workingRef'])
         assert observed['geometry']['lensGeometry'][0] == 100
+        if perspective:
+            assert observed['geometry']['lensGeometry'][2:] == [2,45,3,90,2,-2]
+            assert observed['geometry']['keystone'][1:3] == [10,-5]
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False):
         clone, current = self.clone()
-        if corrected:
+        if corrected or perspective:
             assert geometry
-            current = self.enable_lens_correction(clone)
+            current = self.enable_lens_correction(clone, perspective=perspective)
         known = {r['operationId'] for r in self.records()}
         pid = self.pid()
         # Watchdog is independent of this controller. Never leave the GUI suspended.
@@ -335,7 +360,7 @@ class Run:
                 self.child.kill()
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
-        label = 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        label = 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
         self.recovery(pending['operationId'], clone, label)
 
     def preview_timeout(self):
@@ -442,10 +467,11 @@ class Run:
         self.apple_event_timeout()
         self.apple_event_timeout(geometry=True)
         self.apple_event_timeout(geometry=True, corrected=True)
+        self.apple_event_timeout(geometry=True, perspective=True)
         self.preview_timeout()
         self.mcp_death()
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=5, rawSHA256=sha(self.raw),
+        self.log('all-cases-passed', cases=6, rawSHA256=sha(self.raw),
                  shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
 
     def finish(self):

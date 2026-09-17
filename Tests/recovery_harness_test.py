@@ -46,7 +46,10 @@ class HarnessTests(unittest.TestCase):
             return str(self.run.session)
 
     def command(self, args, **kwargs):
+        if args[0] == 'pgrep':
+            return subprocess.CompletedProcess(args, 1, '', '')
         if args[0] == 'open':
+            self.assertIn('-n', args)
             self.calls.append('open')
         return subprocess.CompletedProcess(args, 0, '', '')
 
@@ -108,6 +111,13 @@ class HarnessTests(unittest.TestCase):
         harness.os.kill.assert_called_once_with(100, signal.SIGTERM)
         self.assertNotIn('quit', self.calls)
         self.assertEqual(self.run.log.call_args.kwargs['shutdownKind'], 'process-termination')
+
+    def test_launch_refuses_running_or_unknown_process_state(self):
+        for code,output in [(0,'123\n'), (2,''), (1,'123\n')]:
+            with self.subTest(code=code,output=output), patch.object(harness.subprocess, 'run', return_value=subprocess.CompletedProcess([],code,output,'')) as command:
+                with self.assertRaisesRegex(AssertionError, 'Cannot prove'):
+                    harness.launch_session(self.run.db)
+                command.assert_called_once()
 
     def test_ownership_guards_prevent_shutdown(self):
         self.restart_patches()
@@ -292,6 +302,20 @@ class HarnessTests(unittest.TestCase):
             observed = self.run.enable_lens_correction({'workingRef':'owned'})
         self.assertEqual(observed['geometry']['lensGeometry'], [100])
         self.assertEqual(json.loads(self.run.journal.read_text().splitlines()[-1])['status'], 'succeeded')
+
+    def test_perspective_fixture_checks_movements_and_keystone(self):
+        self.run.journal.parent.mkdir()
+        self.run.records = Mock(return_value=[{'operationId': 'old', 'status': 'succeeded'}])
+        expected = {'lensGeometry':[100,45,2,45,3,90,2,-2], 'keystone':[100,10,-5,0,0]}
+        self.run.cli = Mock(side_effect=[{'id':'12', 'geometry':{}}, {'id':'12', 'geometry':expected}])
+        def dispatched(script):
+            self.assertEqual(json.loads(self.run.journal.read_text().splitlines()[-1])['status'], 'pending')
+            self.assertIn('Phase One 45mm TS f/3.5', script)
+            self.assertIn('keystone vertical', script)
+            self.assertIn('shift y', script)
+        with patch.object(harness, 'ae', side_effect=dispatched):
+            self.run.enable_lens_correction({'workingRef':'owned'}, perspective=True)
+        self.assertEqual(json.loads(self.run.journal.read_text().splitlines()[-1])['afterGeometry'], expected)
 
     def test_failed_corrected_lens_fixture_retains_pending_block(self):
         self.run.journal.parent.mkdir()

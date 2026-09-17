@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Corrected-lens CLI/MCP qualification using a copied RAW and owned Session.
+"""Existing perspective and movement CLI/MCP qualification using a copied RAW and owned Session.
 
-Requires zero open documents, C1_TEST_RAW_FIXTURE and optional C1_LENS_EVIDENCE.
+Requires zero open documents, C1_TEST_RAW_FIXTURE and optional C1_PERSPECTIVE_EVIDENCE.
 Native fixture writes are journaled; any failure stops without automatic retry.
 """
 import hashlib
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN', ROOT / '.build/debug/c1-mcp'))
 RAW = Path(os.environ['C1_TEST_RAW_FIXTURE'])
-EVIDENCE = Path(os.environ.get('C1_LENS_EVIDENCE', tempfile.mkdtemp(prefix='c1-lens-evidence-')))
+EVIDENCE = Path(os.environ.get('C1_PERSPECTIVE_EVIDENCE', tempfile.mkdtemp(prefix='c1-perspective-evidence-')))
 EVIDENCE.mkdir(parents=True, exist_ok=True)
 
 
@@ -142,7 +142,7 @@ def tool(name, args):
 
 def fixture_write(body):
     assert cli('doctor')['allChecksPassed']
-    record = dict(binding, operationId=str(uuid.uuid4()), operationType='lens-fixture',
+    record = dict(binding, operationId=str(uuid.uuid4()), operationType='perspective-fixture',
                   nativeVariantId=vid, workingRef=clone['workingRef'], status='pending')
     def append():
         with journal.open('a') as stream:
@@ -158,15 +158,36 @@ def fixture_write(body):
 
 
 try:
-    cases = [(50, True, 0, 5, 1.5), (100, True, 90, -5, .75),
-             (100, False, 180, 5, 1.5), (50, False, 270, -5, .75),
-             (100, True, 0, 45, 1.5), (100, True, 90, -45, .75)]
-    for index, (amount, hidden, orientation, angle, ratio) in enumerate(cases):
-        fixture_write(f'''set distortion of lens correction of v to {amount}
+    # amount, hidden, orientation, rotation, ratio, keystone, movement fixture
+    cases = [
+        (0, True, 0, 5, 1.5, [100,15,0,0,0], False),
+        (0, True, 90, -5, .75, [100,0,-15,0,0], False),
+        (50, False, 180, 5, 1.5, [75,10,-10,5,10], False),
+        (100, True, 270, -5, .75, [100,-10,10,-5,-10], False),
+        (100, True, 0, 45, 1.5, [100,10,5,0,0], True),
+        (50, False, 90, -45, .75, [100,0,0,0,0], True),
+        (100, True, 180, 5, 1.5, [100,0,0,0,0], True),
+        (0, True, 270, -5, .75, [100,0,0,0,0], True),
+    ]
+    for index, (amount, hidden, orientation, angle, ratio, keystone, movements) in enumerate(cases):
+        profile = 'Phase One 45mm TS f/3.5' if movements else original['geometry']['lensProfile']
+        body = f'set lens profile of lens correction of v to "{profile}"\n'
+        if movements:
+            sign = 1 if index % 2 == 0 else -1
+            body += f"""set tilt of lens correction of v to 2
+set tilt direction of lens correction of v to {45 if sign == 1 else 225}
+set shift of lens correction of v to 3
+set shift direction of lens correction of v to {90 if sign == 1 else 270}
+set shift x of lens correction of v to {2*sign}
+set shift y of lens correction of v to {-2*sign}
+"""
+        for key,value in zip(['amount','vertical','horizontal','skew','aspect'],keystone):
+            body += f'set keystone {key} of adjustments of v to {value}\n'
+        fixture_write(body + f"""set distortion of lens correction of v to {amount}
 set hide distorted areas of lens correction of v to {str(hidden).lower()}
 set orientation of adjustments of v to {orientation}
 set rotation of adjustments of v to 0
-set crop of v to (maximum crop v apply false)''')
+set crop of v to (maximum crop v apply false)""")
         before = cli('get', vid)
         assert not before.get('geometryUnavailableReason'), before
         assert before['geometryUsableBounds'] == before['geometry']['maximumCrop']
@@ -190,7 +211,7 @@ set crop of v to (maximum crop v apply false)''')
         assert all(abs(operation['intendedGeometry']['crop'][key]-result['after']['crop'][key]) <= 2
                    for key in ['centerX','centerY','width','height']), operation
         log('rotated-ratio', case=index, before=before, result=result, preview=preview)
-        if index < 4:
+        if index < 4 or index >= 6:
             context = tool('preview', {'ref': ref, 'fullFrame': True})
             assert len(cli('variants', 'list')) == 2, 'Context clone leaked'
             assert cli('get', ref)['geometryStateHash'] == after['geometryStateHash']
@@ -221,7 +242,7 @@ set crop of v to (maximum crop v apply false)''')
         log('case-passed', case=index)
     # Changed correction values invalidate an earlier geometry token.
     stale = cli('get', ref)
-    fixture_write('set distortion of lens correction of v to 50')
+    fixture_write('set keystone vertical of adjustments of v to 2')
     cli('geometry','set',ref,'--if-geometry-state',stale['geometryStateHash'],'--aspect-ratio',1.5,error='state-changed')
     # Crop outside the image stays blocked; rejection dispatches no setters.
     fixture_write('set crop outside image of v to true')

@@ -1,5 +1,7 @@
 # Corrected-lens crop and rotation — Capture One 16.8.5.30
 
+This report describes the committed distortion-only milestone. The [perspective and movement extension](../perspective/README.md) supersedes its tilt/shift and keystone exclusions.
+
 **PASS for the documented Session scope on Capture One 16.8.5.30.** The final `make qualify` campaign exited zero, including all packaged functional suites and five real recovery cases with explicit SIGTERM shutdown. It finished with zero open documents. Original variant state and both source/copied RAW hashes remained unchanged.
 
 ## Evidence
@@ -46,7 +48,7 @@ C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3 \
 C1_LENS_EVIDENCE=/absolute/path/to/new-evidence \
 python3 -B Tests/lens_geometry_integration_test.py
 
-make qualify C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3 \
+make qualify-full C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3 \
   C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/absolute/path/to/new-campaign
 ```
 
