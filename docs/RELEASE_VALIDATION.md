@@ -1,12 +1,11 @@
 # v0.1 release validation
 
-**Validation policy:** deliberate timeout/process-death tests are optional and run
-only on an explicit user request. Use `make check` and `make qualify` for normal
-validation, retaining mocked failure guards. Changes to dispatch, journaling,
-locking, timeout handling, or reconciliation, and release checkpoints, do not
-automatically authorize `make qualify-recovery` or `make qualify-full`. Report
-actual real-fault coverage separately; an omitted optional campaign is not a
-normal-validation failure.
+**Validation policy:** choose tests based on the changed behavior. Use `make check`
+for offline feedback and `make qualify` for the core packaged workflows; select
+affected live suites with `QUALIFY_SUITES`, or all nine with `make qualify-extended`.
+Run relevant live recovery cases when recovery behavior or fault-harness behavior
+changes, without requiring a separate user request. Skip unrelated matrices and
+fault campaigns. Report actual coverage and any required validation not run.
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
@@ -52,7 +51,7 @@ and Catalog fault-recovery limits remain unchanged.
 
 Contract **1.7.0** enables crop/rotation with existing keystone and lens tilt/shift on Capture One **16.8.5.30**, retaining those corrections. Native ratio-fit normalization is validated; explicit crops remain strict. The [perspective/movement report](geometry/16.8.5.30/perspective/README.md) records **800 offline assertions**, **24 recovery-harness tests**, **eight packaged perspective/movement cases**, and all regular packaged suites passing. Movement metadata was applied to an owned Canon RAW clone using the native Phase One 45mm TS profile; optical-profile accuracy and real tilt/shift capture coverage are not claimed.
 
-Real timeout validation is now **opt-in**, following the user's workflow decision: `make qualify` runs regular checks, `make qualify-recovery` runs faults against an existing archive, and `make qualify-full` explicitly combines both. Three timeout recoveries passed on this payload. The combined-correction pause was cancelled at the user's request; its dispatched operation completed normally, with zero unresolved writes and zero open documents. A full six-case fault campaign is **not claimed**. The earlier launch failure, guarded fresh-launch harness fix, and safe stop are retained in the report. Existing distribution and Catalog fault-recovery limits remain unchanged.
+At the time of this qualification, real timeout validation required an explicit request; the current change-based policy above supersedes that guidance. Three timeout recoveries passed on this payload. The combined-correction pause was cancelled at the user's request; its dispatched operation completed normally, with zero unresolved writes and zero open documents. A full six-case fault campaign is **not claimed**. The earlier launch failure, guarded fresh-launch harness fix, and safe stop are retained in the report. Existing distribution and Catalog fault-recovery limits remain unchanged.
 
 ## Corrected-lens development candidate (2026-09-17 UTC)
 
@@ -132,6 +131,33 @@ Failed attempts are summarized in the run history; the motivating clone failure 
 
 The same patched archive also passed the [recorded regression run](release/recovery-2026-09-09/validation.json): **331/331 offline assertions**, archive checksum/relocation and shared CLI/MCP contract checks, then **19/19 CLI** and **10/10 MCP** live integration steps through extracted binaries with build-tree resources hidden. Logs: [unit](release/recovery-2026-09-09/unit.log), [archive](release/recovery-2026-09-09/archive.log), [extracted live workflows](release/recovery-2026-09-09/release-live.log). These are the retained regression results for this runtime payload.
 
+## Recovery test selection
+
+Keep all fast offline safeguards in routine checks. Run live faults when the changed
+path can alter dispatch, partial application, write blocking, or recovery. Build a
+current archive with `make archive` (or reuse the same candidate from `make qualify`).
+
+| Changed behavior | Relevant `RECOVERY_CASES` |
+|---|---|
+| Tonal mutation dispatch or timeout | `tonal` |
+| Crop/rotation dispatch or partial writes | `geometry`; add `lens`, `perspective`, and `keystone` for affected corrected-image paths |
+| Lens, perspective/movements, or keystone mutation/recovery | Corresponding `lens`, `perspective`, or `keystone` |
+| Preview export, timeout, or completion detection | `preview mcp-death` |
+| MCP process lifetime/cancellation around dispatch | `mcp-death` |
+| Clone native-ID readback | `clone-readback` |
+| Shared journal, unresolved-write guards, lock ownership, app lifetime, restart/reconciliation, or stale-reference behavior | All affected fault paths; use `all` when impact cannot be narrowed |
+| Fault harness pause/resume, dispatch detection, shutdown, identity checks, or recovery assertions | Cases using the changed behavior |
+| Unrelated features, docs, build/CI, or selection/reporting only | Offline checks; no live fault campaign |
+
+For example, `make qualify-recovery RECOVERY_CASES="preview mcp-death" C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-preview-recovery` skips unrelated Apple Event timeout cases and clone stress. Cases run sequentially and stop on the first failure. Selected/skipped cases are recorded in evidence; a partial selection is never reported as an all-case pass. `all` retains the original seven faults plus the ten-cycle clone-readback regression. New recovery paths (such as metadata partial writes) need a matching regression; existing cases do not establish coverage for a path they never exercise.
+
+A release checkpoint alone does not require a repeated fault campaign. Selection
+and reporting changes can be checked with mocked orchestration; changes to actual
+fault behavior need the relevant live case. Keep real timeout durations and all
+RAW, ownership, identity, and reconciliation guards. If the required application,
+fixture, or exclusive access is unavailable, complete offline checks and state the
+remaining live-validation gap.
+
 ## Reproduce packaged live recovery qualification
 
 Close all documents and allow exclusive use of Capture One. The harness refuses to start with an open document or a different app build. It copies a local RAW into a fresh Session under `.build/recovery-fixtures` in the checkout. Set `C1_RECOVERY_FIXTURE_PARENT` to override that parent with an absolute path outside `/tmp` and `/private/tmp`, without symlink aliases. Native image-path spelling must match the copied fixture before mutations. Sessions and uncertain clones are retained; build cleanup may remove the default fixture directory, so preserve evidence elsewhere before cleaning. Keep the source RAW outside the build tree. Only managed clones are adjusted. The harness pauses/resumes the verified app PID with an independent 150-second watchdog, kills its own MCP child after export output appears, and restarts the app between cases. Do not run another test suite or build concurrently.
@@ -146,7 +172,7 @@ caffeinate -i python3 Tests/recovery_integration_test.py \
 
 `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default: request native quit and verify the old process exits. `C1_RECOVERY_SHUTDOWN_MODE=sigterm` explicitly selects process termination after closing the owned Session, confirming zero documents, and rechecking the verified PID. There is **no automatic fallback**. Environment, restart, case, and completion events record the mode; a SIGTERM pass is process-termination recovery evidence, not graceful-quit qualification. Capture One labeled direct SIGTERM abnormal in the diagnostic controls. Both modes require observed old-process exit before reopening and a different PID afterward.
 
-Both settings can be passed to the opt-in `make qualify-full`, for example `make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/new-qualification` with `C1_TEST_RAW_FIXTURE` set. The evidence directory may be under `/tmp`; the Session fixture must not be.
+Both settings can be passed to `make qualify-full` when all regular and recovery paths need validation, for example `make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/new-qualification` with `C1_TEST_RAW_FIXTURE` set. For a focused recovery run, use `make qualify-recovery RECOVERY_CASES="tonal" ...` or add `--cases tonal` to the Python command above. The evidence directory may be under `/tmp`; the Session fixture must not be.
 
 The `caffeinate` wrapper inhibits idle sleep for the test duration; a suspended machine can invalidate timeout timing. Use a new evidence directory for each run. Failures are retained, not overwritten or automatically retried. Shutdown timeouts collect a best-effort process sample and stop. After an incomplete restart, cleanup sends no further Apple Events; it still restores the build resource bundle and retains the journal. Otherwise cleanup closes only its own Session. If a run fails with unresolved work, inspect its journal and end the old app process before manual reconciliation. No uncertain clones are deleted or adopted by cleanup.
 

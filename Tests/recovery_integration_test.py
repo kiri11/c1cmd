@@ -8,8 +8,9 @@ client; restarts Capture One between fault cases. Never retries a write.
 Fixtures default to .build/recovery-fixtures; C1_RECOVERY_FIXTURE_PARENT overrides
 the parent with an absolute, non-aliased path outside /tmp and /private/tmp.
 C1_RECOVERY_SHUTDOWN_MODE is quit (default) or explicit sigterm; no fallback.
-Usage: python3 Tests/recovery_integration_test.py ARCHIVE EVIDENCE_DIRECTORY
+Usage: python3 Tests/recovery_integration_test.py ARCHIVE EVIDENCE_DIRECTORY [--cases tonal preview]
 """
+import argparse
 import datetime
 import hashlib
 import json
@@ -27,6 +28,29 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
+RECOVERY_CASES = ('clone-readback', 'tonal', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
+
+
+def selected_cases(cases):
+    if list(cases) == ['all']:
+        return list(RECOVERY_CASES)
+    if not cases or len(set(cases)) != len(cases) or any(case not in RECOVERY_CASES for case in cases):
+        raise ValueError('Select unique recovery cases, or all alone')
+    # Clone stress assumes the initial one-variant fixture, before faults retain clones.
+    return [case for case in RECOVERY_CASES if case in cases]
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('archive', type=Path)
+    parser.add_argument('evidence', type=Path)
+    parser.add_argument('--cases', nargs='+', choices=[*RECOVERY_CASES, 'all'], default=['all'])
+    args = parser.parse_args(argv)
+    try:
+        args.cases = selected_cases(args.cases)
+    except ValueError as error:
+        parser.error(str(error))
+    return args
 
 
 def fixture_parent():
@@ -422,7 +446,9 @@ set keystone horizontal of adjustments of v to -5
                  limitation='File creation proves dispatch, not that rendering was still outstanding at SIGKILL.')
         self.recovery(pending['operationId'], clone, 'mcp-death-after-export-dispatch')
 
-    def run(self):
+    def run(self, cases=RECOVERY_CASES):
+        cases = selected_cases(cases)
+        self.log('selected-cases', selected=cases, skipped=[case for case in RECOVERY_CASES if case not in cases])
         fixture = Path(os.environ['C1_TEST_RAW_FIXTURE']).resolve()
         assert fixture.is_file()
         digest = sha(self.archive)
@@ -469,22 +495,33 @@ set keystone horizontal of adjustments of v to -5
         self.verify_image_paths(variants)
         self.source = variants[0]['id']
         self.original = self.cli('get', self.source)
-        # Regression for transient collection-scoped clone ID readback (-1700).
-        for _ in range(10):
-            clone, _ = self.clone()
-            self.cli('variant', 'delete', clone['workingRef'])
-        assert len(self.cli('variants', 'list')) == 1
-        self.log('clone-readback-regression-passed', cycles=10)
-        self.apple_event_timeout()
-        self.apple_event_timeout(geometry=True)
-        self.apple_event_timeout(geometry=True, corrected=True)
-        self.apple_event_timeout(geometry=True, perspective=True)
-        self.apple_event_timeout(geometry=True, keystone=True)
-        self.preview_timeout()
-        self.mcp_death()
+        self.run_cases(cases)
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed', cases=7, rawSHA256=sha(self.raw),
+        self.log('all-cases-passed' if cases == list(RECOVERY_CASES) else 'selected-cases-passed',
+                 cases=len([case for case in cases if case != 'clone-readback']), selected=cases,
+                 rawSHA256=sha(self.raw),
                  shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
+
+    def run_cases(self, cases):
+        for case in selected_cases(cases):
+            if case == 'clone-readback':
+                # Repeated clone stress is useful only when its readback path changes.
+                for _ in range(10):
+                    clone, _ = self.clone()
+                    self.cli('variant', 'delete', clone['workingRef'])
+                assert len(self.cli('variants', 'list')) == 1
+                self.log('clone-readback-regression-passed', cycles=10)
+            elif case == 'tonal':
+                self.apple_event_timeout()
+            elif case in ('geometry', 'lens', 'perspective', 'keystone'):
+                options = {'geometry': True}
+                if case != 'geometry':
+                    options['corrected' if case == 'lens' else case] = True
+                self.apple_event_timeout(**options)
+            elif case == 'preview':
+                self.preview_timeout()
+            elif case == 'mcp-death':
+                self.mcp_death()
 
     def finish(self):
         if self.hidden_bundle:
@@ -511,12 +548,17 @@ set keystone horizontal of adjustments of v to -5
                      retainedSession=str(self.session))
 
 
-if __name__ == '__main__':
-    run = Run(Path(sys.argv[1]), Path(sys.argv[2]))
+def main(argv=None):
+    args = parse_args(argv)
+    run = Run(args.archive, args.evidence)
     try:
-        run.run()
+        run.run(args.cases)
     except BaseException as error:
         run.log('failed', error=repr(error))
         raise
     finally:
         run.finish()
+
+
+if __name__ == '__main__':
+    main()

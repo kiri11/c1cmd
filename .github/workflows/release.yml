@@ -29,11 +29,11 @@ jobs:
           xcode-select -p
           xcodebuild -version
 
-      - name: Run Unit Tests
-        run: swift run CaptureOneCoreTests
-
       - name: Build Release Binaries
         run: swift build -c release -v
+
+      - name: Run Offline Checks (Release)
+        run: make check-built-core TEST_BUILD_DIR=.build/release
 
       - name: Choose Daily Release Name
         id: release

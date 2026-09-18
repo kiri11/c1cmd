@@ -288,12 +288,18 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
 make test                              # Swift assertions only (also available separately)
 export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
-# Normal candidate validation: offline, packaged contract/layout and live workflows.
+# Normal candidate validation: release build, offline, package, CLI/MCP and existing edits.
 # No deliberate timeout/process-death tests. Zero open documents; exclusive use.
 make qualify EVIDENCE_DIR=/private/tmp/c1-new-qualification
-# Optional, only when explicitly requested by the user, against the existing archive:
+# Affected live suites, or every regular matrix (no deliberate faults):
+make qualify QUALIFY_SUITES="geometry lens" EVIDENCE_DIR=/private/tmp/c1-geometry-check
+make qualify-extended EVIDENCE_DIR=/private/tmp/c1-extended-qualification
+# Relevant recovery changes: rebuild the archive, then select affected fault cases:
+make archive
+make qualify-recovery RECOVERY_CASES="preview mcp-death" C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-preview-recovery
+# All recovery paths when impact is broad:
 make qualify-recovery C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-new-recovery
-# Optional, only when the user explicitly requests both groups:
+# All regular suites plus recovery, when both need broad validation:
 make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-full-qualification
 
 # Individual live suites during development:
@@ -309,7 +315,13 @@ python3 Tests/native_inventory_probe.py # independent native-predicate qualifica
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp` or `.build`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
 
-`make check` is the fast offline loop, including mocked timeout/failure safeguards. `make qualify` adds packaged live workflow checks but excludes deliberate timeouts and process-death injection. Real faults are opt-in through `make qualify-recovery`, or `make qualify-full` for both groups. Run them only when the user explicitly requests deliberate fault testing. Recovery-sensitive changes and release checkpoints do not automatically require this optional campaign. Keep mocked failure guards in normal validation and report real recovery coverage separately.
+`make check` is the default development loop: all offline Swift assertions, CLI/MCP contracts, and mocked failure safeguards. Documentation-only changes need relevant syntax/link checks. Run live tests when native behavior or the live harness changes; avoid rerunning unrelated matrices.
+
+`make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory`. `make qualify-extended` runs all nine regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
+
+The retained [metadata qualification log](docs/metadata/16.8.5.30/qualification.log) recorded about 28.5 minutes across all nine live suites; the three default suites accounted for about 6 minutes (79% less live-suite time on that run). This is a historical comparison, not a new runtime measurement. Local qualification also avoids a separate debug build. CI runs debug offline checks; the publication workflow builds release once and checks its unit tests, harnesses, and packaged CLI/MCP before publishing. Release packaging is therefore checked on main rather than on every pull request.
+
+Run relevant live recovery cases when changes affect dispatch, journaling, locking, timeouts, restart/reconciliation, stale references, or the fault harness's behavior. No separate user request is needed. `make qualify-recovery RECOVERY_CASES="..."` reuses a current candidate archive and runs only selected cases: `tonal geometry lens perspective keystone preview mcp-death clone-readback`; the default `all` retains the full campaign. Shared recovery changes need every affected path; use `all` when impact cannot be narrowed. Skip live faults for unrelated features, documentation, build/CI, or test-selection/reporting changes; use offline checks for those. Release checkpoints alone do not require rerunning faults. See the [recovery test selection guide](docs/RELEASE_VALIDATION.md#recovery-test-selection). Report actual coverage separately from omitted suites.
 
 Recovery Sessions default to `.build/recovery-fixtures`; `C1_RECOVERY_FIXTURE_PARENT` accepts an absolute path outside `/tmp` without symlink aliases. `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default; explicit `sigterm` selects the qualified process-termination path, with no automatic fallback. Recovery verifies that Capture One is stopped before launching a fresh process. See [recovery qualification](docs/RELEASE_VALIDATION.md#reproduce-packaged-live-recovery-qualification) for scope and evidence. Real fault tests retain the actual 120-second Apple Event timeout because shortening or mocking it would prove something different. Live suites remain sequential. Rerun affected checks for harness/documentation changes and verify executable/resource hashes when reusing prior runtime results.
 

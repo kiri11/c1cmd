@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline recovery-harness safeguards; never contacts Capture One."""
 import json
+import contextlib
+import io
 import os
 from pathlib import Path
 import signal
@@ -14,6 +16,50 @@ import recovery_integration_test as harness
 
 
 class HarnessTests(unittest.TestCase):
+    def test_case_selection_rejects_invalid_before_setup(self):
+        self.assertEqual(harness.parse_args(['archive', 'evidence']).cases, list(harness.RECOVERY_CASES))
+        self.assertEqual(harness.selected_cases(['preview', 'clone-readback']), ['clone-readback', 'preview'])
+        for cases in [[], ['unknown'], ['preview', 'preview'], ['all', 'preview']]:
+            with self.subTest(cases=cases), patch.object(harness, 'Run') as run, contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    harness.main(['archive', 'evidence', '--cases', *cases])
+                self.assertEqual(error.exception.code, 2)
+                run.assert_not_called()
+
+    def test_selected_faults_skip_unrelated_stress_and_timeouts(self):
+        self.run.apple_event_timeout = Mock()
+        self.run.preview_timeout = Mock()
+        self.run.mcp_death = Mock()
+        self.run.clone = Mock()
+        self.run.run_cases(['preview', 'mcp-death'])
+        self.run.preview_timeout.assert_called_once_with()
+        self.run.mcp_death.assert_called_once_with()
+        self.run.apple_event_timeout.assert_not_called()
+        self.run.clone.assert_not_called()
+
+    def test_case_failure_stops_without_dispatching_next_fault(self):
+        self.run.apple_event_timeout = Mock(side_effect=TimeoutError('recovery failed'))
+        self.run.preview_timeout = Mock()
+        with self.assertRaises(TimeoutError):
+            self.run.run_cases(['lens', 'preview'])
+        self.run.apple_event_timeout.assert_called_once_with(geometry=True, corrected=True)
+        self.run.preview_timeout.assert_not_called()
+
+    def test_full_case_dispatch_preserves_original_campaign(self):
+        calls = []
+        self.run.clone = Mock(return_value=({'workingRef': 'clone'}, {}))
+        self.run.cli = Mock(return_value=[{'id': '1'}])
+        self.run.apple_event_timeout = lambda **kw: calls.append(('timeout', kw))
+        self.run.preview_timeout = lambda: calls.append(('preview', {}))
+        self.run.mcp_death = lambda: calls.append(('mcp-death', {}))
+        self.run.run_cases(['all'])
+        self.assertEqual(self.run.clone.call_count, 10)
+        self.assertEqual(calls, [('timeout', {}), ('timeout', {'geometry': True}),
+                               ('timeout', {'geometry': True, 'corrected': True}),
+                               ('timeout', {'geometry': True, 'perspective': True}),
+                               ('timeout', {'geometry': True, 'keystone': True}),
+                               ('preview', {}), ('mcp-death', {})])
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

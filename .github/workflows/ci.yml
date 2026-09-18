@@ -22,19 +22,6 @@ jobs:
           xcode-select -p
           xcodebuild -version
 
-      - name: Build Debug
-        run: swift build -v
-
-      - name: Run Unit Tests
-        run: swift run --skip-build CaptureOneCoreTests
-
-      - name: Build Release
-        run: swift build -c release -v
-
-      - name: Test MCP Contract Without Capture One
-        run: python3 Tests/contract_test.py
-
-      - name: Package and Test Release Archive
-        run: |
-          ./scripts/package-release.sh v0.1.0 .build/release dist
-          python3 Tests/archive_test.py dist/*.tar.gz
+      # Release builds and relocated archive checks run in release.yml on main.
+      - name: Run Offline Checks (Debug)
+        run: make check
