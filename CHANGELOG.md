@@ -2,6 +2,13 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Unreleased — expanded native editing
+
+- Add `native_get`, `native_set`, and `native_action` to CLI/MCP (contract 1.10.0): 127 writable properties covering curves, levels, HDR, clarity, sharpening, noise reduction, color balance/editors, lens corrections and layer/luma settings.
+- Add layer creation/deletion, native mask operations, AI people masks, style application, dehaze actions and advanced color-element creation/deletion through typed, explicit handlers.
+- Retain existing editing-reference/Catalog guards, native state preconditions, before/after journal snapshots, and uncertain-operation recovery. Native unset values stay distinct from unavailable properties. Mask pixels are not exposed or restorable through property snapshots.
+- Add generated-dictionary drift checks, a packaged native editing suite, and native property/action recovery cases. See [native editing coverage and limitations](docs/native-editing/README.md).
+
 ## Unreleased — metadata editing and validation workflow
 
 - Add rating (0–5) and native color-tag (0–7) writes through CLI `metadata set` and MCP `metadata_set` (contract 1.9.0). Require an editing or managed-clone reference and a fresh metadata state token; preserve omitted fields.

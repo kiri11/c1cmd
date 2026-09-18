@@ -54,7 +54,7 @@ class HarnessTests(unittest.TestCase):
         self.run.mcp_death = lambda: calls.append(('mcp-death', {}))
         self.run.run_cases(['all'])
         self.assertEqual(self.run.clone.call_count, 10)
-        self.assertEqual(calls, [('timeout', {}), ('timeout', {'geometry': True}),
+        self.assertEqual(calls, [('timeout', {}), ('timeout', {'native': True}), ('timeout', {'native_action': True}), ('timeout', {'geometry': True}),
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),

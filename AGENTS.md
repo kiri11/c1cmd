@@ -62,7 +62,7 @@ The default profile permits all supported adjustments on existing editing refere
 
 ## 3. Supported Adjustment Fields & Valid Ranges
 
-The tonal `set`, `add`, and `reset` tools support only this table; use `geometry_set` for crop, rotation, and keystone:
+The legacy tonal `set`, `add`, and `reset` tools support only this table; use `geometry_set` for crop, rotation, and keystone:
 
 | Parameter | Aliases | Minimum | Maximum | Unit | Description |
 |---|---|---|---|---|---|
@@ -112,8 +112,29 @@ Inventory listing filters before full metadata reads and uses sequential bounded
 
 ## Validation workflow
 
-Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`. Use `make qualify-extended` for all nine regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
+Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`. Use `make qualify-extended` for all ten regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
 
 Run relevant recovery tests when a change can affect recovery behavior; a separate explicit user request is not required. Changes to mutation dispatch, durable journaling, unresolved-write blocking, lock ownership, timeout handling, application lifetime, restart/reconciliation, or stale-reference invalidation require affected live fault cases as well as offline safeguards. Use `make qualify-recovery RECOVERY_CASES="..."` against an archive rebuilt from the candidate. Select `tonal`, `geometry`, `lens`, `perspective`, or `keystone` for those mutation paths, `preview` for export timeout/completion, `mcp-death` for MCP cancellation/process lifetime, and `clone-readback` for clone-ID readback. Shared recovery changes need all affected fault paths; use `RECOVERY_CASES=all` when impact cannot be narrowed. Changes to the recovery harness's pause, dispatch detection, shutdown, identity checks, or reconciliation assertions require the cases they affect.
 
 Do not run live faults for unrelated features, documentation, build/CI changes, or test-selection/reporting changes that leave fault behavior and assertions unchanged; validate those with focused offline checks. Release checkpoints alone do not require a repeated fault campaign. `make qualify-full` combines all regular and recovery suites when broad coverage is needed. Keep Capture One calls sequential, retain real timeout durations and fixture/ownership guards, and never retry an uncertain mutation. Report selected and omitted coverage and explain any unavailable required live validation; do not claim a focused pass covers the full campaign.
+
+## Expanded native editing
+
+Use `native_get` / `c1 native get` to inspect all exposed adjustment properties,
+curves, lens corrections, layers, luma range and color-editor objects. Use the
+returned `nativeStateHash` as `ifNativeState` / `--if-native-state` for
+`native_set` or `native_action`. These require an existing `c1_edit_` reference
+or managed clone and all normal document/image/build guards. Property names,
+types and enumerations are listed in `capabilities.nativeEditing`.
+
+Inspect fresh previews and journal `beforeNative`/`afterNative` snapshots.
+Legacy `get`/`diff`/`reset` and editing baselines do not cover all native fields.
+Restore reviewed native property values with an explicit patch and fresh token.
+Mask pixels cannot be read, hashed or restored from native property snapshots;
+layer/mask deletion and destructive mask commands require photographer judgment.
+Take turns with the photographer and never retry an uncertain native operation.
+The composition profile excludes native mutations; geometry remains governed by
+its existing guards. See [native editing](docs/native-editing/README.md).
+
+Select `QUALIFY_SUITES=native` for regular native editing validation and
+`RECOVERY_CASES="native native-action"` for its affected fault paths.

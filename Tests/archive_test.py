@@ -28,6 +28,8 @@ def check_package(root):
     script = binary / 'c1_CaptureOneCore.bundle' / 'Contents' / 'Resources' / 'Handlers.applescript'
     if not script.exists(): script = binary / 'c1_CaptureOneCore.bundle' / 'Handlers.applescript'
     assert script.is_file(), 'Missing runtime AppleScript resource'
+    for name in ['NativeEditing.applescript','NativeActions.applescript','NativeEditing.json']:
+        assert (script.parent / name).is_file(), 'Missing native editing resource: ' + name
     run(binary / 'c1', binary / 'c1-mcp')
     result = subprocess.run([str(binary / 'c1'), 'doc', 'info'], capture_output=True, text=True, timeout=30)
     assert result.returncode >= 0, f'Packaged executable crashed: {result.stderr}'

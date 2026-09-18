@@ -1418,6 +1418,10 @@ public final class SessionController {
                     entry.afterAdjustments = current.adjustments
                     entry.afterGeometry = current.geometry
                     entry.afterMetadata = VariantMetadata.from(current.metadata)
+                    if entry.beforeNative != nil {
+                        let target = ["layer.delete", "color.delete"].contains(entry.nativeAction ?? "") ? NativeTarget() : entry.beforeNative!.target
+                        entry.afterNative = try nativeGet(ref: id, target: target)
+                    }
                     entry.status = "reconciled"
                     entry.error = "Previous app instance ended. Observed current adjustments, geometry, and metadata are recorded; they do not prove historical completion. Review before creating a fresh editing reference."
                 } else {
@@ -1430,9 +1434,113 @@ public final class SessionController {
         }
     }
 
+    // MARK: - Expanded native editing
+    public func nativeGet(ref: String, target: NativeTarget) throws -> NativeSnapshot {
+        try target.validate()
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            guard doc.appVersion == Self.pinnedBuild else { throw C1Error.invalidRequest("Native editing requires Capture One " + Self.pinnedBuild) }
+            let source = try get(ref: ref)
+            let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
+                [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
+            try checkedDocument(doc, writes: false)
+            var values: [String: NativeValue] = [:], unavailable: [String: String] = [:]
+            for row in wire.nativeRows {
+                if let error = row.unavailable { unavailable[row.fieldName] = error; continue }
+                if let flag = row.boolVal { values[row.fieldName] = .boolean(flag) }
+                else if let text = row.textVal { values[row.fieldName] = .text(text) }
+                else if let numbers = row.numbersVal {
+                    let field = NativeEditing.fields[target.scope]?.first { $0.name == row.fieldName }
+                    if field?.type == "curve" || field?.type == "RGB color" { values[row.fieldName] = .numbers(numbers) }
+                    else if numbers.count == 1 { values[row.fieldName] = .number(numbers[0]) }
+                    else { throw C1Error.invalidRequest("Malformed native field readback.") }
+                } else { values[row.fieldName] = .unset }
+            }
+            struct Token: Encodable { let document: String; let variant: String; let parent: String?; let target: NativeTarget; let values: [String:NativeValue]; let layers: [NativeLayer]; let tonal: String; let geometry: String?; let metadata: String?; let basicCount: Int; let advancedCount: Int; let journalRevision: String? }
+            let revision = try OperationJournal(sessionDirectory: URL(fileURLWithPath:doc.documentPath)).validatedEntries().last(where: { $0.nativeVariantId == source.id })?.operationId
+            let token = try NativeEditing.hash(Token(document: doc.openToken, variant: source.id, parent: source.parentImagePath, target: target,
+                values: values, layers: wire.nativeLayers, tonal: source.stateHash, geometry: source.geometryStateHash, metadata: source.metadataStateHash, basicCount:wire.basicColorCount, advancedCount:wire.advancedColorCount, journalRevision:revision))
+            return NativeSnapshot(ref: ref, target: target, values: values, unavailable: unavailable, layers: wire.nativeLayers,
+                basicColorCount: wire.basicColorCount, advancedColorCount: wire.advancedColorCount, nativeStateHash: token)
+        }
+    }
+
+    public func nativeSet(workingRef: String, target: NativeTarget, ifNativeState: String,
+                          patch: [String:NativeValue], dryRun: Bool = false) throws -> NativeMutationResult {
+        try NativeEditing.validate(patch, target: target)
+        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: patch, action: nil, arguments: [:], dryRun: dryRun)
+    }
+
+    public func nativeAction(workingRef: String, target: NativeTarget, ifNativeState: String,
+                             action: String, arguments: [String:NativeValue] = [:], dryRun: Bool = false) throws -> NativeMutationResult {
+        try NativeEditing.validateAction(action, target: target, arguments: arguments)
+        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: [:], action: action, arguments: arguments, dryRun: dryRun)
+    }
+
+    private func nativeMutate(workingRef: String, target: NativeTarget, expected: String, patch: [String:NativeValue],
+                              action: String?, arguments: [String:NativeValue], dryRun: Bool) throws -> NativeMutationResult {
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "native editing")
+            _ = try adjustmentTarget(workingRef, document: doc)
+            try checkedDocument(doc, writes: !dryRun)
+            let current = try get(ref: workingRef)
+            try assertWritableImage(doc: doc, source: current)
+            let before = try nativeGet(ref: workingRef, target: target)
+            guard before.nativeStateHash == expected else { throw C1Error.stateChanged("Native editing state changed. Read native_get again.") }
+            for key in patch.keys where before.values[key] == nil { throw C1Error.invalidRequest("Native field unavailable on this target: " + key) }
+            if target.layer > before.layers.count { throw C1Error.invalidRequest("Layer no longer exists.") }
+            if (action?.hasPrefix("mask.") == true && action != "mask.people") || action == "layer.delete" {
+                guard target.layer > 0, before.layers[target.layer-1].nativeKind != "background" else { throw C1Error.invalidRequest("The image layer cannot be deleted or masked.") }
+            }
+            if case .number(let sourceLayer) = arguments["sourceLayer"], Int(sourceLayer) > before.layers.count { throw C1Error.invalidRequest("Source mask layer does not exist.") }
+            if dryRun { return NativeMutationResult(operationId: "dry-run", before: before, after: before, dryRun: true) }
+            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            var entry = try prepare(OperationRecord(operationType: "native", workingRef: workingRef, documentPath: doc.documentPath,
+                preconditionStateHash: expected, beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
+            entry.beforeNative = before; entry.nativePatch = action == nil ? patch : arguments; entry.nativeAction = action
+            try journal.append(entry: entry)
+            let fields = before.values.keys.sorted(), keys = (action == nil ? patch : arguments).keys.sorted()
+            var args = [NSAppleEventDescriptor(string: doc.documentId), .init(string: current.id)] + target.descriptors + [
+                .init(string: current.parentImagePath ?? ""), .init(list: fields.map { .init(string: $0) }),
+                .init(list: fields.map { before.values[$0]!.descriptor }), .init(list: before.layers.map { .init(list:[.init(string:$0.nativeName), .init(string:$0.nativeKind), .init(int32:Int32($0.nativeOpacity)), .init(boolean:$0.nativeEnabled)]) })]
+            if let action { args.append(.init(string: action)) }
+            args += [.init(list: keys.map { .init(string: $0) }), .init(list: keys.map { (action == nil ? patch : arguments)[$0]!.descriptor })]
+            do {
+                let _: Bool = try executor.executeAndDecode(handler: action == nil ? "nativeApply" : "nativeAction", args: args)
+                try checkedDocument(doc, writes: false)
+                // Deleted targets no longer exist; inspect the image scope and layer inventory instead.
+                let afterTarget = ["layer.delete", "color.delete"].contains(action ?? "") ? NativeTarget() : target
+                let after = try nativeGet(ref: workingRef, target: afterTarget)
+                entry.afterNative = after
+                if let action {
+                    let change = after.layers.count - before.layers.count
+                    if action == "layer.create", change != 1 { throw C1Error.readbackMismatch("Layer creation did not add exactly one layer.") }
+                    if action == "layer.delete", change != -1 { throw C1Error.readbackMismatch("Layer deletion did not remove exactly one layer.") }
+                    if action == "color.create", after.advancedColorCount != before.advancedColorCount + 1 { throw C1Error.readbackMismatch("Color correction creation readback differs.") }
+                }
+                for (key, value) in patch {
+                    let tolerance = key == "temperature" ? 0.1 : key == "tint" ? 0.01 : 0.0001
+                    guard let actual = after.values[key], value.matches(actual, tolerance: tolerance) else {
+                        entry.status = "partial-failure"; entry.error = "Native readback mismatch: " + key
+                        try journal.append(entry: entry)
+                        throw C1Error.readbackMismatch(entry.error!)
+                    }
+                }
+                entry.status = "succeeded"
+                try journal.append(entry: entry)
+                return NativeMutationResult(operationId: entry.operationId, before: before, after: after, dryRun: false)
+            } catch {
+                if entry.status == "pending" { entry.status = "outcome-unknown"; entry.error = error.localizedDescription; try? journal.append(entry: entry) }
+                throw OperationFailure(operationId: entry.operationId, cause: error)
+            }
+        }
+    }
+
     // MARK: - Capabilities
     public func capabilities() -> [String: Any] {
         [
+            "nativeEditing": ["fields": NativeEditing.fields.mapValues { $0.map { ["name":$0.name, "type":$0.type, "writable":$0.writable, "values":$0.values, "route":$0.route] as [String:Any] } }, "actions":NativeEditing.actions, "status":"experimental", "precondition":"nativeStateHash", "maskPixelsReadable":false] as [String:Any],
             "pinnedBuild": Self.pinnedBuild,
             "testedBuilds": Self.testedBuilds,
             "supportedVersionRange": "16.4+ through 16.x",

@@ -13,12 +13,18 @@ or competing exports during a workflow. Existing variants are editable through
 saved `c1_edit_` references; separate managed clones remain optional. Only
 agent-created clones can be deleted.
 
-Sessions support the five tonal fields, crop/rotation, keystone, ratings, and
-color tags. Catalogs remain read-only by default; exact-path opt-in enables
+Sessions support the five legacy tonal fields, crop/rotation, keystone, ratings,
+and color tags. The experimental [native editing API](native-editing/README.md) adds
+127 writable properties plus layer/mask/color-editor commands. Catalogs remain read-only by default; exact-path opt-in enables
 experimental editing of online referenced originals outside the Catalog package.
 Catalog-stored originals and Catalog fault recovery remain unqualified.
 
-The latest retained regular feature campaign is **contract 1.9.0**:
+The expanded native surface is **contract 1.10.0**: **941/941 offline assertions**,
+29 recovery-harness tests, the packaged CLI/MCP/native workflows, and two final-payload
+native timeout/recovery cases passed. Coverage is focused, not every native field,
+mask-pixel state, or Catalog workflow. See [native qualification](native-editing/16.8.5.30/README.md).
+
+The preceding broad regular campaign was **contract 1.9.0**:
 **907/907 offline assertions**, **25 recovery-harness tests**, contract/profile
 checks, and all **nine packaged live suites** passed. Metadata writes preserved
 tone, geometry, variant count, and RAW checksums in Session and referenced-Catalog
@@ -57,6 +63,7 @@ and interpretation limits. A pass applies only to its recorded scope.
 
 | Area | Retained result and limits |
 |---|---|
+| [Native editing, 2026-09-18](native-editing/16.8.5.30/README.md) | Contract 1.10.0; focused CLI/MCP/native coverage, 40 native operations, and two native SIGTERM recovery cases. Dictionary availability is distinguished from tested runtime behavior; mask pixels remain unavailable. |
 | [Metadata, 2026-09-17](metadata/16.8.5.30/README.md) | Contract 1.9.0; all nine regular suites. Every rating/tag value, clearing, omitted fields, stale tokens, and restore passed. No new live fault campaign. |
 | [Keystone, 2026-09-17](geometry/16.8.5.30/keystone/README.md) | Contract 1.8.0; nine regular suites, 13 control cases and two lens combinations. Native export variance required a pixel-error assertion instead of exact hashes. Tonal/standard-geometry faults passed; interrupted lens work was reconciled without retry. Remaining faults were not run. |
 | [Perspective and movements, 2026-09-17](geometry/16.8.5.30/perspective/README.md) | Contract 1.7.0; eight perspective/movement cases and all regular suites passed. Three timeout recoveries passed; the combined-correction campaign was stopped. Native lens-profile fixtures do not establish optical accuracy or real tilt/shift capture coverage. |
@@ -73,7 +80,7 @@ and interpretation limits. A pass applies only to its recorded scope.
 
 Choose tests by changed behavior. `make check` is the offline development loop.
 `make qualify` runs packaged CLI, MCP, and existing-variant workflows;
-`QUALIFY_SUITES` selects affected matrices and `make qualify-extended` runs all nine.
+`QUALIFY_SUITES` selects affected matrices and `make qualify-extended` runs all ten, including `native`.
 Documentation-only changes need syntax/link checks. Live suites remain sequential.
 
 Run affected live faults when production recovery or fault-harness behavior
@@ -91,6 +98,7 @@ current archive with `make archive` (or reuse the same candidate from `make qual
 | Changed behavior | Relevant `RECOVERY_CASES` |
 |---|---|
 | Tonal mutation dispatch or timeout | `tonal` |
+| Expanded native property or editing-command dispatch | `native native-action` |
 | Crop/rotation dispatch or partial writes | `geometry`; add `lens`, `perspective`, and `keystone` for affected corrected-image paths |
 | Lens, perspective/movements, or keystone mutation/recovery | Corresponding `lens`, `perspective`, or `keystone` |
 | Preview export, timeout, or completion detection | `preview mcp-death` |
@@ -100,7 +108,7 @@ current archive with `make archive` (or reuse the same candidate from `make qual
 | Fault harness pause/resume, dispatch detection, shutdown, identity checks, or recovery assertions | Cases using the changed behavior |
 | Unrelated features, docs, build/CI, or selection/reporting only | Offline checks; no live fault campaign |
 
-For example, `make qualify-recovery RECOVERY_CASES="preview mcp-death" C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-preview-recovery` skips unrelated Apple Event timeout cases and clone stress. Cases run sequentially and stop on the first failure. Selected/skipped cases are recorded in evidence; a partial selection is never reported as an all-case pass. `all` retains the original seven faults plus the ten-cycle clone-readback regression. New recovery paths (such as metadata partial writes) need a matching regression; existing cases do not establish coverage for a path they never exercise.
+For example, `make qualify-recovery RECOVERY_CASES="preview mcp-death" C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-preview-recovery` skips unrelated Apple Event timeout cases and clone stress. Cases run sequentially and stop on the first failure. Selected/skipped cases are recorded in evidence; a partial selection is never reported as an all-case pass. `all` includes the original seven faults, the two native editing faults, and the ten-cycle clone-readback regression. New recovery paths (such as metadata partial writes) need a matching regression; existing cases do not establish coverage for a path they never exercise.
 
 A release checkpoint alone does not require a repeated fault campaign. Selection
 and reporting changes can be checked with mocked orchestration; changes to actual

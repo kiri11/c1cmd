@@ -1,0 +1,51 @@
+{
+  "files": {
+    "bin/c1-mcp": "b1f1c7dba586395170184f336402946fd35c343338e04581d02f1ea293a8ef80",
+    "bin/c1": "fee87883fe575bac7664302bc35a183abe4802fd37973c8705be0cd49f17de51",
+    "bin/c1_CaptureOneCore.bundle/Handlers.applescript": "7c68e146bf979d8f039b6fcb55dce31fae926b4c8ac475c3e504b77cba5f1f82",
+    "bin/c1_CaptureOneCore.bundle/NativeEditing.json": "bbee5e5259167f0a13096ae40824960c68e36090ff8f8dd3d709c92e9f435dcc",
+    "bin/c1_CaptureOneCore.bundle/NativeEditing.applescript": "eb2febc6314bf22c21a6011a3877b85fa830da9dad9eed2cb69e84d178ba6822",
+    "bin/c1_CaptureOneCore.bundle/NativeActions.applescript": "a9ab787c9c5caa1b3653e36008067e78ccea2ba91d9f1b361510801c217ca52a"
+  },
+  "regularNativeResourcesUnchanged": true,
+  "testedArchiveBeforeEvidenceSHA256": "301eca36818ad2989ef12ea8c41fa5337d24b180ae416416dd3995c887529d92",
+  "contract": "1.10.0",
+  "offlineAssertions": 941,
+  "recoveryHarnessTests": 29,
+  "releaseRunnerTests": 4,
+  "selectedRecoveryCases": [
+    "native",
+    "native-action"
+  ],
+  "omittedRecoveryCases": [
+    "clone-readback",
+    "tonal",
+    "geometry",
+    "lens",
+    "perspective",
+    "keystone",
+    "preview",
+    "mcp-death"
+  ],
+  "recoveryShutdown": "sigterm",
+  "finalChangesAfterRegularRun": [
+    "Lazy separate compilation of native handlers; native resource contents unchanged",
+    "Invalid native value decoding normalized to invalid-request",
+    "MCP native_action destructive-action annotation",
+    "CLI native request diagnostics identify the subcommand"
+  ],
+  "recoveryPassed": true,
+  "sourceSHA256": {
+    "Sources/CaptureOneCore/NativeEditing.swift": "d66257d399f1a8adad2ea365b22f1b5de18ea686ccc79fa4a322d349e3f27ee1",
+    "Sources/CaptureOneCore/AppleScriptExecutor.swift": "cdca1a77e877453c0ce3d276a8178112e8f16c832b030466b5ea694eb0f29407",
+    "Sources/CaptureOneCore/SessionController.swift": "8975547d934e3646ee185c07b3cd0cb949572b83c6a05b794e89b3537e5d0775",
+    "Sources/CaptureOneCore/OperationJournal.swift": "25fbd40e8a84716dda43f3a0961d05ac40c3647b26b9b153836c9bc977a5b34a",
+    "Sources/CaptureOneCore/ContractSchema.swift": "dc855a6d48aaaaf36e4a3cf12c6370ca0cbf75514650a778b62c81efa29d608a",
+    "Sources/c1/main.swift": "74c8562791f422f2c85cf02bba715cc2459fca92c72d563421ceb3962bb363c0",
+    "Sources/c1-mcp/main.swift": "95a3d7d463b41f1da44ec2938901e666789e5680ac15b77fc365356060ac522d",
+    "scripts/generate-native-editing.py": "9dc860d4f83eb211bab8b2d45a579c0eec6dccc9f495c04544a45cd47af2d6b5",
+    "Tests/native_editing_integration_test.py": "07d3e017dd8114352e4720e1e2a097b78aeeb6e931c6a20d9918cef0dc83ca2a",
+    "Tests/recovery_integration_test.py": "c726c9636fe8299b946d0ccab86bc449a5858b72fe5a8ef4d826017a38170541",
+    "Tests/CaptureOneCoreTests/NativeEditingTests.swift": "9987c4fe966b60266c91e91f11ed2b68b149a39e133864619f54e126b4cf5bf5"
+  }
+}

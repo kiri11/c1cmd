@@ -1,0 +1,350 @@
+/Library/Developer/CommandLineTools/usr/bin/make archive
+swift build -c release
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for production...
+[2/16] Copying NativeEditing.json
+[2/16] Write sources
+[2/16] Copying NativeEditing.applescript
+[3/16] Copying NativeActions.applescript
+[5/16] Write sources
+[9/16] Write swift-version--1AB21518FC5DEDBE.txt
+[11/17] Compiling CaptureOneCore AppleScriptExecutor.swift
+[12/20] Compiling c1_mcp main.swift
+[12/20] Write Objects.LinkFileList
+[13/20] Linking c1-mcp
+[15/20] Compiling c1 main.swift
+[15/20] Write Objects.LinkFileList
+[16/20] Linking c1
+[18/20] Compiling CaptureOneCoreTests CatalogGuardTests.swift
+[18/20] Write Objects.LinkFileList
+[19/20] Linking CaptureOneCoreTests
+Build complete! (30.96s)
+./scripts/package-release.sh v0.1.0 .build/release dist
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.FfM1A44IzR/c1-v0.1.0-macos-arm64/bin/c1: replacing existing signature
+/var/folders/8c/vlph69sx0t77p1xjsdry0vv80000gn/T/tmp.FfM1A44IzR/c1-v0.1.0-macos-arm64/bin/c1-mcp: replacing existing signature
+/Library/Developer/CommandLineTools/usr/bin/make check-built-core TEST_BUILD_DIR=.build/release
+/usr/bin/time -p ".build/release/CaptureOneCoreTests"
+=== Starting CaptureOneCore Unit Test Suite ===
+Running FieldSpecTests...
+Running StateHashTests...
+Running WorkingReferenceTests...
+Running ProvenanceStoreTests...
+Running OperationJournalTests...
+Running LockTests...
+Running ResetTests...
+Running DiffTests...
+Running DumpTests...
+Running CatalogGuardTests...
+Running CatalogEditingTests...
+Running ExistingVariantTests...
+Running MetadataTests...
+Running NativeEditingTests...
+Running VersionCompatibilityTests...
+Running ReleaseSafetyTests...
+Running RatingFilterTests...
+Running InventoryTests...
+Running RequestContextTests...
+Running GeometryTests...
+
+=== Test Results ===
+Total Assertions : 941
+Passed           : 941
+Failed           : 0
+SUCCESS: All unit tests passed!
+real 4.52
+user 0.98
+sys 0.17
+/Library/Developer/CommandLineTools/usr/bin/make check-python
+python3 -B scripts/generate-native-editing.py --check
+python3 -B Tests/recovery_harness_test.py
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 0.038s
+
+OK
+python3 -B Tests/release_runner_test.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.014s
+
+OK
+mkdir -p "/Users/kiri11/projects/c1cmd/.build/native-packaged-1"
+C1_TEST_RAW_FIXTURE="/Users/kiri11/projects/c1cmd/.build/keystone-qualification/live-sk58uxsv/keystone/Capture/2U6A7257.CR3" C1_GEOMETRY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/geometry" C1_LENS_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/lens" C1_PERSPECTIVE_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/perspective" C1_KEYSTONE_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/keystone" C1_CATALOG_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/catalog" C1_EXISTING_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/existing" C1_INVENTORY_EVIDENCE="/Users/kiri11/projects/c1cmd/.build/native-packaged-1/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "dist/c1-v0.1.0-macos-arm64.tar.gz" --suites cli mcp native
+Selected live suites: cli, mcp, native
+Skipped live suites: geometry, lens, perspective, keystone, catalog, existing, inventory
+PASS: shared CLI/MCP schemas, 24 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal and metadata mutation tools
+PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation
+TIMING archive and contract: 2.841s
+Running integration_test.py using extracted binaries with build resources hidden
+=== c1 M1 End-to-End Integration Verification ===
+Initial document path: None
+
+[Step 1] Creating disposable Session at /private/tmp/c1-m1-e2e...
+Copied RAW fixture: /private/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/Capture/fixture.CR3 (SHA-256: 2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868)
+
+[Step 2] Testing c1 doctor...
+PASS: doctor healthy on 16.8.5.30 for session c1-m1-e2e.cosessiondb
+
+[Step 3] Testing c1 doc info...
+PASS: doc info verified (token: 20863:1789695697.382307|/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4477919|1789696288.1736546)
+
+[Step 4] Testing c1 variants list...
+PASS: found variant ID 1 (fixture)
+
+[Step 5] Testing c1 get on original variant 1...
+PASS: initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a, adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 6] Testing c1 variant clone 1...
+PASS: created working clone c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62 (native ID: 2)
+
+[Step 7] Testing safety check: rejecting mutation to original variant 1...
+PASS: core rejected mutation on original: unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 8] Testing c1 set on working variant c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62...
+PASS: set applied accurately (new hash: 2c07831efb75a80d9cf62b83d49e12392386639fb58acc01e7a755bdcbc29baf)
+
+[Step 9] Testing c1 add on working variant c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62...
+PASS: add delta applied accurately (0.75 - 0.25 = 0.5, new hash: 667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56)
+
+[Step 10] Testing optimistic concurrency conflict detection...
+PASS: stale hash rejected: state-changed: Optimistic concurrency conflict for 'c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62'. Expected stateHash 'b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a', but actual is '667e47da69c20183264b06f705ff845afc1d2f65fb8c4ddc3f91306f8e810a56'.
+
+[Step 11] Testing c1 preview on working variant c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62...
+PASS: preview generated and decoded: /private/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/Output/c1-previews/9a91e44f-ac9a-43b4-a2b5-be98d7ca1420/preview.jpg (1500x1000 px, size: 178692 B)
+PASS: custom output routing ignores stale JPEG and associates variant/state
+
+[Step 12] Verifying core invariants (Original variant & RAW file)...
+PASS: Original variant adjustments and RAW SHA-256 strictly preserved!
+
+[Step 13] Testing c1 variant delete c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62...
+PASS: working variant c1_wrk_67424cfc-35bd-4339-a72c-a57371f5ab62 (clone 2) cleanly deleted.
+PASS: RAW file still 100% byte-for-byte identical after variant deletion.
+
+[Step 14] Testing examples/grade-folder.py workflow...
+=== c1 Automated Grading Workflow ===
+Preset : /Users/kiri11/projects/c1cmd/examples/presets/daylight.json
+Binary : /private/tmp/c1-release-live-61j2hluv/c1-v0.1.0-macos-arm64/bin/c1
+Dry run: False
+
+[1/4] Running c1 doctor check...
+Capture One 16.8.5.30 running. Document: c1-m1-e2e.cosessiondb
+
+[2/4] Inspecting active document info...
+Document path: /tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e
+Open token   : 20863:1789695697.382307|/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/c1-m1-e2e.cosessiondb|16777232|4477919|1789696288.1736546
+Preset adjustments: {'exposure': 0.25, 'contrast': 8.0, 'saturation': -5.0, 'temperature': 5600.0, 'tint': 2.5}
+
+[3/4] Found 1 total variants.
+Original variants to process: 1
+
+[4/4] Processing variants...
+
+--- [1/1] Variant 1 (fixture) ---
+  Editing reference: c1_wrk_c5da2858-0632-4c88-9f94-aa6d28462505
+  Initial stateHash: b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+  Applying preset adjustments...
+  Applied! New stateHash: d66d4eab0a40c286ef2c6d89c62edd14476080087e48a0e90059b5d1c922fe96
+  Rendering preview...
+  Preview ready: /private/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/Output/c1-previews/263b72cd-d887-4629-b05c-fecf35fd20c3/preview.jpg (1500x1000 px)
+  Saved decision record: /tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/.c1/decisions/c1_wrk_c5da2858-0632-4c88-9f94-aa6d28462505.json
+
+=======================================================
+Grading Complete — Summary for Photographer Review:
+=======================================================
+WORKING REF                           SOURCE    STATUS      PREVIEW
+--------------------------------------------------------------------------------
+c1_wrk_c5da2858-0632-4c88-9f94-aa6d28462505  1         READY       /private/tmp/c1-m1-e2e-v1223kpe/c1-m1-e2e/Output/c1-previews/263b72cd-d887-4629-b05c-fecf35fd20c3/preview.jpg
+
+Review the clones. To discard one: c1 variant delete <workingRef>
+
+PASS: examples/grade-folder.py completed successfully!
+
+[Step 15] Testing c1 variant baseline on source variant...
+PASS: created managed baseline variant c1_wrk_c270ef55-0798-4d89-b9db-5dfdfe4bb9c6 (native ID: 4)
+PASS: retrieved baseline adjustments: {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}
+
+[Step 16] Testing c1 diff on mutated working variant...
+PASS: single-ref diff accurately computed against baseline
+PASS: two-ref diff accurately computed between native variants 1 and 4
+PASS: human-formatted diff output verified
+
+[Step 17] Testing c1 reset on mutated working variant...
+PASS: selective reset of exposure verified (contrast remained untouched)
+PASS: full reset restored all fields and returned stateHash to baseline b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a
+
+[Step 18] Testing c1 dump in Session...
+PASS: c1 dump produced 2 valid JSONL records
+PASS: c1 dump human table verified
+
+[Step 19] Testing Catalog read-only detection & mutation guards...
+PASS: c1 doctor passes on Catalog (isSession=False, allChecksPassed=True)
+PASS: c1 doc info returns isSession=False on Catalog
+PASS: Catalog guard strictly blocked clone (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked set (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'set' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked reset (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'reset' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked baseline (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'baseline' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked delete (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'delete' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'add' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'add' is blocked for 'c1-cat-guard-test'.)
+PASS: Catalog guard strictly blocked 'geometry' (invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'geometry_set' is blocked for 'c1-cat-guard-test'.)
+
+=======================================================
+ALL M1 & M2 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!
+=======================================================
+
+[Cleanup] Cleaning up test session and temporary documents...
+Cleanup completed.
+TIMING integration_test.py: 71.568s
+Running mcp_test.py using extracted binaries with build resources hidden
+=== c1-mcp Stdio Server Comprehensive Test Suite ===
+Initial document path: None
+
+[Step 0] Creating disposable Session at /private/tmp/c1-mcp-e2e...
+Waiting for Capture One to index fixture variant...
+  ✓ RAW variant indexed by Capture One
+
+[Step 1] Testing MCP initialization handshake...
+  ✓ Handshake successful: c1-mcp v0.1.0 ready
+
+[Step 2] Testing tools/list and schema inspection...
+  ✓ All 24 tools discovered with complete schemas: ['add', 'capabilities', 'diff', 'doc_info', 'doctor', 'dump', 'geometry_restore', 'geometry_set', 'get', 'metadata_set', 'native_action', 'native_get', 'native_set', 'operation_status', 'preview', 'request_status', 'reset', 'schema', 'set', 'variant_baseline', 'variant_clone', 'variant_delete', 'variant_edit', 'variants_list']
+
+[Step 3] Testing read-only metadata tools...
+  ✓ Metadata tools verified. Active Session: 'c1-mcp-e2e.cosessiondb' (token: 20863:1789695697.382307|/tmp/c1-mcp-e2e-uqbki316/c1-mcp-e2e/c1-mcp-e2e.cosessiondb|16777232|4478279|1789696359.9828339)
+
+[Step 4] Testing doctor tool...
+  ✓ Doctor diagnostic passed. Build: 16.8.5.30 (matched: True)
+
+[Step 5] Testing variants_list and dump tools...
+  ✓ Listed 1 variant(s). Source ID '1', Name 'fixture'
+  ✓ Dump returned 1 comprehensive record(s)
+
+[Step 6] Testing safety guard: rejecting mutation on unmanaged variant...
+  ✓ Unmanaged variant mutation blocked: [unmanaged-variant] unmanaged-variant: Reference '1' is not a c1-managed working reference. Native IDs alone do not authorize writes; use variant edit for existing variants or variant clone for separate proposals.
+
+[Step 7] Testing variant_clone, variant_baseline, and get tools...
+  ✓ Created working clone: c1_wrk_43a1dfef-9f1f-40ab-9e6f-98b55ca0ccdc (baseline hash: b4d3341df126...)
+  ✓ Created managed baseline variant: c1_wrk_c316488a-eb5e-47c5-ae85-b190ad9488a9
+
+[Step 8] Testing set, add, diff, and reset tools on working clone...
+  ✓ 'set' applied successfully. New stateHash: 64b31405ca1f...
+  ✓ 'diff' against baseline confirmed changed adjustments
+  ✓ 'add' delta applied (-0.10 EV -> 0.25 EV)
+  ✓ 'reset' restored adjustments to baseline stateHash: b4d3341df126...
+
+[Step 9] Testing preview (with MCP image block) and variant_delete...
+  ✓ Preview metadata: 1500x1000 (160736 bytes), SHA-256: 7e80e4e8181a...
+  ✓ Image content block validated: 160736 bytes base64-decoded, valid JPEG header confirmed
+  ✓ Cleaned up working clone c1_wrk_43a1dfef-9f1f-40ab-9e6f-98b55ca0ccdc
+  ✓ Cleaned up baseline variant c1_wrk_c316488a-eb5e-47c5-ae85-b190ad9488a9
+
+[Step 10] Testing Catalog fail-closed mutation guard over MCP...
+  ✓ Open document is Catalog: 'c1-cat-guard-test'
+  ✓ Catalog mutation guard verified over MCP: invalid-request: Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation 'clone' is blocked for 'c1-cat-guard-test'.
+
+=======================================================
+ALL c1-mcp INTEGRATION TESTS PASSED SUCCESSFULLY!
+Total Test Steps : 10
+Passed           : 10
+=======================================================
+TIMING mcp_test.py: 30.569s
+Running native_editing_integration_test.py using extracted binaries with build resources hidden
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_set
+native_get
+native_get
+native_set
+native_get
+native_set
+native_get
+native_action
+native_get
+native_get
+native_set
+native_get
+native_set
+native_get
+native_get
+native_set
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_get
+native_set
+native_get
+native_set
+native_get
+native_action
+native_get
+native_get
+native_get
+native_set
+native_get
+native_action
+native_get
+native_action
+native_get
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+native_get
+native_action
+preview
+passed
+TIMING native_editing_integration_test.py: 523.313s
+PASS: selected packaged live suites: cli, mcp, native
+real 628.43
+user 44.07
+sys 21.07

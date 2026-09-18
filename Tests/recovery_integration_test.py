@@ -28,7 +28,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
-RECOVERY_CASES = ('clone-readback', 'tonal', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
+RECOVERY_CASES = ('clone-readback', 'tonal', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
 
 
 def selected_cases(cases):
@@ -316,6 +316,14 @@ class Run:
                 self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
+        if label.startswith('native-'):
+            native_current = self.cli('native', 'get', fresh['workingRef'])
+            if label == 'native-property-timeout':
+                resumed = self.cli('native', 'set', fresh['workingRef'], '--if-native-state', native_current['nativeStateHash'], '--json', '{"clarity amount":5}')
+                assert resumed['after']['values']['clarity amount'] == 5
+            else:
+                resumed = self.cli('native', 'action', fresh['workingRef'], 'layer.create', '--if-native-state', native_current['nativeStateHash'], '--json', '{"name":"Fresh recovered layer","kind":"filled"}')
+                assert len(resumed['after']['layers']) == len(native_current['layers']) + 1
         self.cli('variant', 'delete', fresh['workingRef'])
         assert self.identities() == before
         self.log('case-passed', case=label, operationId=operation,
@@ -353,11 +361,13 @@ set keystone horizontal of adjustments of v to -5
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False):
         clone, current = self.clone()
         if corrected or perspective:
             assert geometry
             current = self.enable_lens_correction(clone, perspective=perspective)
+        native_state = self.cli('native', 'get', clone['workingRef']) if native or native_action else None
+        native_source = self.cli('native', 'get', self.source) if native or native_action else None
         known = {r['operationId'] for r in self.records()}
         pid = self.pid()
         # Watchdog is independent of this controller. Never leave the GUI suspended.
@@ -367,6 +377,10 @@ set keystone horizontal of adjustments of v to -5
             command = ([str(self.c1), 'geometry', 'set', clone['workingRef'], '--if-geometry-state',
                         current['geometryStateHash'], '--rotation', '3', '--aspect-ratio', '1.5'] if geometry else
                        [str(self.c1), 'set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.625'])
+            if native:
+                command = [str(self.c1), 'native', 'set', clone['workingRef'], '--if-native-state', native_state['nativeStateHash'], '--json', '{"clarity amount":12}']
+            if native_action:
+                command = [str(self.c1), 'native', 'action', clone['workingRef'], 'layer.create', '--if-native-state', native_state['nativeStateHash'], '--json', '{"name":"Recovery layer","kind":"filled"}']
             if keystone:
                 assert geometry
                 command += ['--keystone-vertical=12', '--keystone-horizontal=-7']
@@ -396,7 +410,16 @@ set keystone horizontal of adjustments of v to -5
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
         label = 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        if native or native_action: label = 'native-action-timeout' if native_action else 'native-property-timeout'
         self.recovery(pending['operationId'], clone, label)
+        if native or native_action:
+            observed = self.cli('operation', 'status', pending['operationId'])
+            assert observed.get('beforeNative') and observed.get('afterNative'), observed
+            source_after = self.cli('native', 'get', self.source)
+            assert source_after['values'] == native_source['values'], 'Native fault changed the original adjustments'
+            assert source_after['layers'] == native_source['layers'], 'Native fault changed the original layers'
+            expired = self.cli('native', 'get', clone['workingRef'], ok=False)
+            assert expired['error']['code'] == 'document-changed', expired
 
     def preview_timeout(self):
         clone, _ = self.clone()
@@ -513,6 +536,8 @@ set keystone horizontal of adjustments of v to -5
                 self.log('clone-readback-regression-passed', cycles=10)
             elif case == 'tonal':
                 self.apple_event_timeout()
+            elif case in ('native', 'native-action'):
+                self.apple_event_timeout(**{'native_action' if case == 'native-action' else 'native': True})
             elif case in ('geometry', 'lens', 'perspective', 'keystone'):
                 options = {'geometry': True}
                 if case != 'geometry':

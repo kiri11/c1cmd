@@ -32,6 +32,10 @@ public struct OperationRecord: Codable, Equatable {
     public let intendedAdjustments: Adjustments?
     public let beforeAdjustments: Adjustments?
     public var afterAdjustments: Adjustments?
+    public var beforeNative: NativeSnapshot?
+    public var afterNative: NativeSnapshot?
+    public var nativePatch: [String: NativeValue]?
+    public var nativeAction: String?
     public var beforeMetadata: VariantMetadata?
     public var intendedMetadata: VariantMetadata?
     public var afterMetadata: VariantMetadata?

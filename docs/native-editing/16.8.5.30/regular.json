@@ -1,0 +1,1949 @@
+{
+  "contract": "1.10.0",
+  "build": "16.8.5.30",
+  "selectedSuites": [
+    "cli",
+    "mcp",
+    "native"
+  ],
+  "omittedSuites": [
+    "geometry",
+    "lens",
+    "perspective",
+    "keystone",
+    "catalog",
+    "existing",
+    "inventory"
+  ],
+  "cliSteps": 19,
+  "mcpSteps": 10,
+  "nativeOperations": 40,
+  "nativeSeconds": 523.313,
+  "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "sourceAndUntouchedSiblingPreserved": true,
+  "payload": {
+    "archiveSHA256": "bc9f300fb667b13411f2f637180c51846bea68a1764b41a5a80b424b35e7e4b9",
+    "files": {
+      "bin/c1-mcp": "b72ec11e3059889b8b0fa26a253f33910700dbded53d165f589ad4f7cbb5a14b",
+      "bin/c1": "b252eded294ce8ae63be94f51030a7ae31bfd673a35ae2be0a53f5c955dc376e",
+      "bin/c1_CaptureOneCore.bundle/Handlers.applescript": "7c68e146bf979d8f039b6fcb55dce31fae926b4c8ac475c3e504b77cba5f1f82",
+      "bin/c1_CaptureOneCore.bundle/NativeEditing.json": "bbee5e5259167f0a13096ae40824960c68e36090ff8f8dd3d709c92e9f435dcc",
+      "bin/c1_CaptureOneCore.bundle/NativeEditing.applescript": "eb2febc6314bf22c21a6011a3877b85fa830da9dad9eed2cb69e84d178ba6822",
+      "bin/c1_CaptureOneCore.bundle/NativeActions.applescript": "a9ab787c9c5caa1b3653e36008067e78ccea2ba91d9f1b361510801c217ca52a"
+    }
+  },
+  "operations": [
+    {
+      "operationId": "04ad3e33-6fd5-4442-91a3-53af8618c1ef",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "rgb curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "rgb curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "rgb curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "e04a56791a2f7b806e13b0646ca375e9f986c64969f319b116582ba473666e0a",
+      "afterNativeStateHash": "5c76f6ebba144c8b4144a5138e27479ee9d34b9738b9bf16c04e1fca5d314ee8"
+    },
+    {
+      "operationId": "23909f2d-2dc1-44e5-a85f-ba0052184569",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "rgb curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "rgb curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "rgb curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "5c76f6ebba144c8b4144a5138e27479ee9d34b9738b9bf16c04e1fca5d314ee8",
+      "afterNativeStateHash": "7a910a7a4c62adb9b828eaacdae3c3e76dd33dc7f413cdbb9da7b4b94b9b69f1"
+    },
+    {
+      "operationId": "737e5450-eeb2-4ddd-a0e3-619b0ecc0734",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "luma curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "luma curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "luma curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "7a910a7a4c62adb9b828eaacdae3c3e76dd33dc7f413cdbb9da7b4b94b9b69f1",
+      "afterNativeStateHash": "3ddd51f7accaea3e06b1c6b11abd37ab6010f474e908a8576a7cd7db5a6489fa"
+    },
+    {
+      "operationId": "89df0b66-7014-4fd4-8225-95157405d815",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "luma curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "luma curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "luma curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "3ddd51f7accaea3e06b1c6b11abd37ab6010f474e908a8576a7cd7db5a6489fa",
+      "afterNativeStateHash": "d47e9ec4926e607f1eefdc0b88668cc1c37a62dda53998e8536fc8cab9ae669a"
+    },
+    {
+      "operationId": "ae9ff21c-457a-4dce-ab6d-7e845a1ce1fa",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "red curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "red curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "red curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "d47e9ec4926e607f1eefdc0b88668cc1c37a62dda53998e8536fc8cab9ae669a",
+      "afterNativeStateHash": "2d7504d39e993f29f7f1c461db378d5fcdca1c30f7e897bbe87896cee38ddffb"
+    },
+    {
+      "operationId": "9bd58e67-625c-44a8-88c9-b21ace472b53",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "red curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "red curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "red curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "2d7504d39e993f29f7f1c461db378d5fcdca1c30f7e897bbe87896cee38ddffb",
+      "afterNativeStateHash": "fa802da95684245c897d665d0ce3d0c517f5a6bec142ccc705db01eb0471fca2"
+    },
+    {
+      "operationId": "65d033ab-ff58-4427-95fa-dd40bb037f24",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "green curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "green curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "green curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "fa802da95684245c897d665d0ce3d0c517f5a6bec142ccc705db01eb0471fca2",
+      "afterNativeStateHash": "0899160b2f396c723d5b38d53b717d52ef1f4fdf7539191fc11f81702e144ea4"
+    },
+    {
+      "operationId": "1a4749dd-c921-4bde-9b63-bc53e560821e",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "green curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "green curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "green curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "0899160b2f396c723d5b38d53b717d52ef1f4fdf7539191fc11f81702e144ea4",
+      "afterNativeStateHash": "e5438ca5987983c2f1fc5a3c010ae3e9e5f128235d3f6485e124662b7d18dfb9"
+    },
+    {
+      "operationId": "84113290-04d7-4b49-88d6-9af053e4f966",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "blue curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "blue curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "blue curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "e5438ca5987983c2f1fc5a3c010ae3e9e5f128235d3f6485e124662b7d18dfb9",
+      "afterNativeStateHash": "2259c81d31732b3c12cd26ac99bd6c20cb8d3de5b4e6e2577227ad2b44ab4ed0"
+    },
+    {
+      "operationId": "dc4a6ea2-8680-4c91-9ab6-84dfd8406286",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "blue curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "before": {
+        "blue curve": [
+          0,
+          0,
+          50,
+          55,
+          100,
+          100
+        ]
+      },
+      "after": {
+        "blue curve": [
+          0,
+          0,
+          100,
+          100
+        ]
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "2259c81d31732b3c12cd26ac99bd6c20cb8d3de5b4e6e2577227ad2b44ab4ed0",
+      "afterNativeStateHash": "f83df579fe51a9c4fdcd0092ae723a089bccb1e1399553a9dc13f7935909bc3c"
+    },
+    {
+      "operationId": "da6a4094-f184-49b8-8252-fc9e1119dff8",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "black recovery": 5,
+        "highlight adjustment": 20,
+        "shadow recovery": 15,
+        "white recovery": -5
+      },
+      "before": {
+        "black recovery": 0,
+        "highlight adjustment": 0,
+        "shadow recovery": 0,
+        "white recovery": 0
+      },
+      "after": {
+        "black recovery": 5,
+        "highlight adjustment": 20,
+        "shadow recovery": 15,
+        "white recovery": -5
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "f83df579fe51a9c4fdcd0092ae723a089bccb1e1399553a9dc13f7935909bc3c",
+      "afterNativeStateHash": "7f61c8edab547c6581b8dbc669d2dd2f793b18104c879ecd6c6db650238ba270"
+    },
+    {
+      "operationId": "976bcf68-afc9-40c5-93c8-507d27d15375",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "clarity amount": 12,
+        "sharpening radius": 0.9,
+        "noise reduction luminance": 30,
+        "noise reduction color": 40,
+        "sharpening amount": 170,
+        "clarity structure": 8
+      },
+      "before": {
+        "clarity amount": 0,
+        "sharpening radius": 0.800000011920929,
+        "noise reduction luminance": 50,
+        "noise reduction color": 50,
+        "sharpening amount": 180,
+        "clarity structure": 0
+      },
+      "after": {
+        "clarity amount": 12,
+        "sharpening radius": 0.8999999761581421,
+        "noise reduction luminance": 30,
+        "noise reduction color": 40,
+        "sharpening amount": 170,
+        "clarity structure": 8
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "7f61c8edab547c6581b8dbc669d2dd2f793b18104c879ecd6c6db650238ba270",
+      "afterNativeStateHash": "824a8a3e5b37b3361977bc16a5ee706d3f6335b83d65debf59254609f5c02af8"
+    },
+    {
+      "operationId": "cea3c5c5-8dce-4e92-b93f-0c7801c0e23a",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "level midtone rgb": 0.1,
+        "level shadow rgb": 3,
+        "level highlight rgb": 250
+      },
+      "before": {
+        "level midtone rgb": 0,
+        "level shadow rgb": 0,
+        "level highlight rgb": 255
+      },
+      "after": {
+        "level midtone rgb": 0.10000000149011612,
+        "level shadow rgb": 3,
+        "level highlight rgb": 250
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "824a8a3e5b37b3361977bc16a5ee706d3f6335b83d65debf59254609f5c02af8",
+      "afterNativeStateHash": "f9e18d96a9e60b6d3f2443ef06e4164d15495ebf67303f4c239e9366d5680da1"
+    },
+    {
+      "operationId": "2e9ea31d-2068-4ee9-b5ae-734c724de979",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "black and white red sensitivity": 10,
+        "black and white": true
+      },
+      "before": {
+        "black and white red sensitivity": 0,
+        "black and white": false
+      },
+      "after": {
+        "black and white red sensitivity": 10,
+        "black and white": true
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "f9e18d96a9e60b6d3f2443ef06e4164d15495ebf67303f4c239e9366d5680da1",
+      "afterNativeStateHash": "e6c9468223cd55e8d833ba872780351e27d8667a7a881c0588aaeb9375024002"
+    },
+    {
+      "operationId": "2647a6e9-8c8d-47cc-9dd7-c43f00201d64",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "black and white": false
+      },
+      "before": {
+        "black and white": true
+      },
+      "after": {
+        "black and white": false
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "e6c9468223cd55e8d833ba872780351e27d8667a7a881c0588aaeb9375024002",
+      "afterNativeStateHash": "73bca3c18908259e805854e10307bccd5239af91a325e60fb81bb36910594e97"
+    },
+    {
+      "operationId": "f367d0f6-c05b-44b4-83f2-fa4f7d558900",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "color balance shadow saturation": 0.05
+      },
+      "before": {
+        "color balance shadow saturation": 0
+      },
+      "after": {
+        "color balance shadow saturation": 0.04999995112419242
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "73bca3c18908259e805854e10307bccd5239af91a325e60fb81bb36910594e97",
+      "afterNativeStateHash": "3ed51b02eb82209ffe6e948caf7cac12f0f348c5ad8bad0d0674bc828ef2d35e"
+    },
+    {
+      "operationId": "c41ba303-a0d0-4963-aaa9-1676b41d1be3",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "clarity method": "natural"
+      },
+      "before": {
+        "clarity method": "natural"
+      },
+      "after": {
+        "clarity method": "natural"
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "3ed51b02eb82209ffe6e948caf7cac12f0f348c5ad8bad0d0674bc828ef2d35e",
+      "afterNativeStateHash": "0ef89141c0427b3e535008611d8148ed8ce381c4a2cfa8d47c3fff27c18e0efb"
+    },
+    {
+      "operationId": "eeb8fad4-f77f-4ea8-8787-b8b5ef42b58e",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "lens"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "chromatic aberration": true
+      },
+      "before": {
+        "chromatic aberration": true
+      },
+      "after": {
+        "chromatic aberration": true
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "79f1ff0b979f25f92222ef541791d032cf080a9f9b3f2ac210282c12d75040cf",
+      "afterNativeStateHash": "a130a83348fc96212d34acc2f77418d351b2849c63f4e5a42c815ba75368b97b"
+    },
+    {
+      "operationId": "d2b7ff58-47a6-4d1b-a5cd-7633d25c288e",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "lens"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "chromatic aberration": true
+      },
+      "before": {
+        "chromatic aberration": true
+      },
+      "after": {
+        "chromatic aberration": true
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "a130a83348fc96212d34acc2f77418d351b2849c63f4e5a42c815ba75368b97b",
+      "afterNativeStateHash": "3e6a70071075958db8ab0ed27fb5d40064d1f87c1ffcbfac3f5a664c1c490bab"
+    },
+    {
+      "operationId": "d7234fdd-1ff1-48aa-8d76-5f325fb9cee5",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": "layer.create",
+      "patchOrArguments": {
+        "kind": "filled",
+        "name": "Native qualification"
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native qualification",
+          "nativeKind": "filled",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "ecea8bbdba2eb76bf7d3fc7fd0415dc127bd803e692f33aeccd29a17a2224817",
+      "afterNativeStateHash": "fe6ff53b7ec7167a94ce114ddadf1b923a64d3a45846940039a7c42943eac0d7"
+    },
+    {
+      "operationId": "b81e5f16-f3f2-4f40-aac0-fc266f802d33",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "opacity": 63,
+        "name": "Native tested"
+      },
+      "before": {
+        "opacity": 100,
+        "name": "Native qualification"
+      },
+      "after": {
+        "opacity": 63,
+        "name": "Native tested"
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native qualification",
+          "nativeKind": "filled",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "5c35b39a943eb45b5796ed5c7e321368bf29f0a76029cae0dfc9d2f3c644b751",
+      "afterNativeStateHash": "20fbf83f4b3f216548d5c32f3f1a9c2cefe3c2b3f7fa3e8a983a357f93cf5e3e"
+    },
+    {
+      "operationId": "25194d29-23eb-4ebd-af85-1efcfb668b98",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "exposure": 0.35,
+        "clarity amount": 7
+      },
+      "before": {
+        "exposure": null,
+        "clarity amount": null
+      },
+      "after": {
+        "exposure": 0.3499999940395355,
+        "clarity amount": 7
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "1d0a41c765702b4f3e978b758a24a748c75f190322403bb7081723982f8f41e1",
+      "afterNativeStateHash": "9e55dc0ea273a4aebf1c1d957d1c53e5d829d4cde50edf34a697f0e8fa470477"
+    },
+    {
+      "operationId": "27620cf0-cdcc-484f-af76-5c3185ba54de",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "luma"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "range low": 10,
+        "range high": 240
+      },
+      "before": {
+        "range low": 0,
+        "range high": 255
+      },
+      "after": {
+        "range low": 10,
+        "range high": 240
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "745a302e63469cbe04ad7af557e28d3c23afadbc4f550347dd423c5fabc993cf",
+      "afterNativeStateHash": "d7a557e5641b4dfa358bcf138b54559e4c2936504e8ca52c17b184eda050553a"
+    },
+    {
+      "operationId": "30615edc-16d6-4542-bc56-c3536d85763f",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "luma.clear",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "fd957ca29c802860ad0c0438f3821345d085bcf9efa013099b0dbeba9d97ad4a",
+      "afterNativeStateHash": "ee898ab60a618330514e28a64af3cab8c8d9f9585d287cd3fe238a6ac6e9c621"
+    },
+    {
+      "operationId": "386063c7-e57a-4dbb-9e8c-9799c201e277",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.clear",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "ee898ab60a618330514e28a64af3cab8c8d9f9585d287cd3fe238a6ac6e9c621",
+      "afterNativeStateHash": "2ba8d10b1b396fc24b460c611337869e5409789cb473beb6eb83f017d63121f3"
+    },
+    {
+      "operationId": "9c11d5b8-b60e-4ef5-ac30-3de3ff7d2b37",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.fill",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "2ba8d10b1b396fc24b460c611337869e5409789cb473beb6eb83f017d63121f3",
+      "afterNativeStateHash": "9f61df2216f985774ae80802d6b1f6fda4679418ecaaa871f287d2fcef2ad256"
+    },
+    {
+      "operationId": "2b22d77f-f879-4b57-bcf8-6bf3a803a50a",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.invert",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "filled",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "9f61df2216f985774ae80802d6b1f6fda4679418ecaaa871f287d2fcef2ad256",
+      "afterNativeStateHash": "a2aba3d246211f826e05312a1af2491dd96703c4cc8cc9bd2b6b4175f72cbc9f"
+    },
+    {
+      "operationId": "18c3b3e2-86f3-4047-b563-b42fb59aff3a",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.rasterize",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "a2aba3d246211f826e05312a1af2491dd96703c4cc8cc9bd2b6b4175f72cbc9f",
+      "afterNativeStateHash": "049328d822ee1d1230cbedeb52a4938ca05f74bb13c45c712fb471d42aa77aa3"
+    },
+    {
+      "operationId": "3051ba85-2fda-4cc5-ab1f-f69545de86e2",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.feather",
+      "patchOrArguments": {
+        "amount": 10
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "049328d822ee1d1230cbedeb52a4938ca05f74bb13c45c712fb471d42aa77aa3",
+      "afterNativeStateHash": "101228f444f3890695e34f978d7d4a8681c30db56c6f51a377ae3901700e86d0"
+    },
+    {
+      "operationId": "243e2c50-138a-4390-a511-f7ba895a3b2d",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.refine",
+      "patchOrArguments": {
+        "amount": 10
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "101228f444f3890695e34f978d7d4a8681c30db56c6f51a377ae3901700e86d0",
+      "afterNativeStateHash": "4ff549d1d71e2b5f42b966bd21510b01d91e790dcc8adfbb6545e3737f79e4dc"
+    },
+    {
+      "operationId": "a9419db6-299c-4a88-84b4-ae88c7b1b397",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 1,
+        "scope": "basicColor"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "hue change": 5
+      },
+      "before": {
+        "hue change": 0
+      },
+      "after": {
+        "hue change": 5
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "c528c5493d98bd8eae711e695f57cc96f58e9fa6c943d7de58c980628e9c97c7",
+      "afterNativeStateHash": "ccff0a45a546405451dd9541e2898444c947d2944d4cfa61229fadf4b31e424b"
+    },
+    {
+      "operationId": "3663b75c-ba19-4010-a4e2-6ec578d6cb9b",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 1,
+        "scope": "basicColor"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "hue change": 0
+      },
+      "before": {
+        "hue change": 5
+      },
+      "after": {
+        "hue change": 0
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "ccff0a45a546405451dd9541e2898444c947d2944d4cfa61229fadf4b31e424b",
+      "afterNativeStateHash": "269dcd5593193b5728c8b757c8ae61da78151eaae5c941cdce3df5bb53259b29"
+    },
+    {
+      "operationId": "257cf9fe-a155-431a-ae70-3dba4aa19e24",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": "color.create",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "66262523118736438747c4f1803e1282107e979fa48e5e3f6ca7896e92fa2a0d",
+      "afterNativeStateHash": "4a99ebfc559940b930a597fb62843cca5a4aee950e75428b9c34c450676c0ceb"
+    },
+    {
+      "operationId": "cdc187e7-1eeb-4914-9f0e-4e7bb8e40ce4",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 1,
+        "scope": "advancedColor"
+      },
+      "action": null,
+      "patchOrArguments": {
+        "hue change": 5
+      },
+      "before": {
+        "hue change": 0
+      },
+      "after": {
+        "hue change": 5
+      },
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "49c16e626d8440dffa12a2b41409cde02f2bf9b88e0d341612e3b9b3266ca884",
+      "afterNativeStateHash": "84fb5f55a8d5f28406cd6d249d4a52a318f1eed902fa672e4e52dab979e8d5ce"
+    },
+    {
+      "operationId": "7745d215-d7b3-4997-be60-776bdfa25b81",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 1,
+        "scope": "advancedColor"
+      },
+      "action": "color.delete",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "84fb5f55a8d5f28406cd6d249d4a52a318f1eed902fa672e4e52dab979e8d5ce",
+      "afterNativeStateHash": "fe9cd33a3d7a181a7ecad5ef85cbe6beae03c4f6118e144475ba8d5a988a6ad5"
+    },
+    {
+      "operationId": "a7181d63-e634-48c2-a30f-cdc5dfec966e",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": "layer.create",
+      "patchOrArguments": {
+        "kind": "adjustment",
+        "name": "Mask copy target"
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Mask copy target",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "fe9cd33a3d7a181a7ecad5ef85cbe6beae03c4f6118e144475ba8d5a988a6ad5",
+      "afterNativeStateHash": "b0abec394050f4e98fd6d70b8f4090f1d6714ea7cc1f848a4e61f49570b8127c"
+    },
+    {
+      "operationId": "67d65c0c-5ffd-496b-8ea7-d613f1de5a91",
+      "status": "succeeded",
+      "target": {
+        "layer": 3,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "mask.copy",
+      "patchOrArguments": {
+        "sourceLayer": 2
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Mask copy target",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Mask copy target",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "90091cdf5a7d74cc1c40e3e07d861cc4c1f71171a5d679102d1902117029b1bb",
+      "afterNativeStateHash": "f6526a10d384dacf96176af6bcfa363194072647a2e09550b75bcc0e6a17081e"
+    },
+    {
+      "operationId": "3eb870b9-d445-4d34-95e2-2139cd2cd958",
+      "status": "succeeded",
+      "target": {
+        "layer": 3,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "layer.delete",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Mask copy target",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "beforeNativeStateHash": "f6526a10d384dacf96176af6bcfa363194072647a2e09550b75bcc0e6a17081e",
+      "afterNativeStateHash": "da1cd2ed6ae4a2d315f9953a77ab2331afdb02181b2e55556d95f2515580c12f"
+    },
+    {
+      "operationId": "1ce516af-ec0d-4d18-aee8-9d6bbe278f1d",
+      "status": "succeeded",
+      "target": {
+        "layer": 0,
+        "element": 0,
+        "scope": "adjustments"
+      },
+      "action": "mask.people",
+      "patchOrArguments": {
+        "separateLayers": false,
+        "areas": [
+          "body skin",
+          "face skin"
+        ]
+      },
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Skin Mask 1",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "da1cd2ed6ae4a2d315f9953a77ab2331afdb02181b2e55556d95f2515580c12f",
+      "afterNativeStateHash": "6d3a82c156057b3c7a770f403f811be262cb2362735f481c846fc27d80b3ca3d"
+    },
+    {
+      "operationId": "c63ff2a8-fc10-4b8a-8c60-9cf16db6258f",
+      "status": "succeeded",
+      "target": {
+        "layer": 2,
+        "element": 0,
+        "scope": "layer"
+      },
+      "action": "layer.delete",
+      "patchOrArguments": {},
+      "before": {},
+      "after": {},
+      "beforeLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Native tested",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 63
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Skin Mask 1",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "afterLayers": [
+        {
+          "nativeEnabled": true,
+          "nativeName": "Background",
+          "nativeKind": "background",
+          "nativeOpacity": 100
+        },
+        {
+          "nativeEnabled": true,
+          "nativeName": "Skin Mask 1",
+          "nativeKind": "adjustment",
+          "nativeOpacity": 100
+        }
+      ],
+      "beforeNativeStateHash": "7008c4371f7df90eb636133583a865a7a9d4fa59851a6ea22d1033c1e21f649f",
+      "afterNativeStateHash": "c9e22fb082611007199d3cafc914ddec538f3dcf70d895a1e917d4399833e44e"
+    }
+  ]
+}

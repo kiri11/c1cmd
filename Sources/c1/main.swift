@@ -23,7 +23,7 @@ struct GlobalOptions: ParsableArguments {
 
 func handleExecution<T>(format: OutputFormat, progressMode: String? = nil, _ block: () throws -> T) -> ExitCode {
     let args = Array(CommandLine.arguments.dropFirst())
-    let subcommands: Set<String> = ["variants", "variant", "doc", "geometry", "operation", "request"]
+    let subcommands: Set<String> = ["native", "variants", "variant", "doc", "geometry", "operation", "request"]
     let command = args.first ?? "cli"
     let tool = subcommands.contains(command) && args.count > 1 ? command + "_" + args[1] : command
     let context = RequestContext(tool: tool, progressMode: progressMode)
@@ -59,6 +59,7 @@ struct C1: ParsableCommand {
         commandName: "c1",
         abstract: "Unofficial CLI interface for Capture One automation.",
         subcommands: [
+            NativeCommand.self,
             DoctorCommand.self,
             VersionCommand.self,
             CapabilitiesCommand.self,
@@ -694,5 +695,58 @@ struct MetadataSetCommand: ParsableCommand {
             print(OutputFormatter.formatJson(result))
         }
         if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+// MARK: - Native editing
+struct NativeCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "native", abstract: "Typed native adjustments, curves, layers, and masks.", subcommands: [NativeGetCommand.self, NativeSetCommand.self, NativeActionCommand.self])
+}
+struct NativeTargetOptions: ParsableArguments {
+    @Option(help: "adjustments, lens, layer, luma, basicColor, advancedColor, or variant.") var scope: String = "adjustments"
+    @Option(help: "1-based layer index; 0 means image adjustments.") var layer: Int = 0
+    @Option(help: "1-based color-editor element index.") var element: Int = 0
+    var target: NativeTarget { NativeTarget(scope:scope, layer:layer, element:element) }
+}
+struct NativeGetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName:"get")
+    @OptionGroup var globals: GlobalOptions
+    @OptionGroup var target: NativeTargetOptions
+    @Argument var ref: String
+    mutating func run() throws {
+        let code = handleExecution(format:globals.outputFormat) {
+            print(OutputFormatter.formatJson(try SessionController.shared.nativeGet(ref:ref, target:target.target)))
+        }; if code != .success { throw code }
+    }
+}
+struct NativeSetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName:"set")
+    @OptionGroup var globals: GlobalOptions
+    @OptionGroup var target: NativeTargetOptions
+    @Argument var workingRef: String
+    @Option var ifNativeState: String
+    @Option(help:"JSON object using exact dictionary property names. Curves are flat x,y pairs.") var json: String
+    @Flag var dryRun = false
+    mutating func run() throws {
+        let code = handleExecution(format:globals.outputFormat) {
+            let patch = try NativeEditing.parsePatch(Data(json.utf8), target:target.target)
+            print(OutputFormatter.formatJson(try SessionController.shared.nativeSet(workingRef:workingRef, target:target.target, ifNativeState:ifNativeState, patch:patch, dryRun:dryRun)))
+        }; if code != .success { throw code }
+    }
+}
+struct NativeActionCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName:"action")
+    @OptionGroup var globals: GlobalOptions
+    @OptionGroup var target: NativeTargetOptions
+    @Argument var workingRef: String
+    @Argument var action: String
+    @Option var ifNativeState: String
+    @Option(help:"JSON action arguments.") var json: String = "{}"
+    @Flag var dryRun = false
+    mutating func run() throws {
+        let code = handleExecution(format:globals.outputFormat) {
+            let args = try NativeEditing.parseValues(Data(json.utf8))
+            print(OutputFormatter.formatJson(try SessionController.shared.nativeAction(workingRef:workingRef, target:target.target, ifNativeState:ifNativeState, action:action, arguments:args, dryRun:dryRun)))
+        }; if code != .success { throw code }
     }
 }

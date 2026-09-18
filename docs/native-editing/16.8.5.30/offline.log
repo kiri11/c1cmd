@@ -1,0 +1,81 @@
+swift build
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/12] Write sources
+[5/12] Write swift-version--1AB21518FC5DEDBE.txt
+[7/15] Emitting module CaptureOneCore
+[8/15] Compiling CaptureOneCore AppleScriptExecutor.swift
+[9/15] Compiling CaptureOneCore NativeEditing.swift
+[10/17] Compiling CaptureOneCore SessionController.swift
+[11/17] Compiling CaptureOneCore ContractSchema.swift
+[12/26] Compiling CaptureOneCoreTests NativeEditingTests.swift
+[13/26] Emitting module CaptureOneCoreTests
+[13/26] Write Objects.LinkFileList
+[15/26] Compiling c1_mcp main.swift
+[16/26] Emitting module c1_mcp
+[16/26] Write Objects.LinkFileList
+[17/26] Linking CaptureOneCoreTests
+[18/26] Applying CaptureOneCoreTests
+[19/26] Linking c1-mcp
+[20/26] Applying c1-mcp
+[22/26] Compiling c1 main.swift
+[23/26] Emitting module c1
+[23/26] Write Objects.LinkFileList
+[24/26] Linking c1
+[25/26] Applying c1
+Build complete! (7.90s)
+/Library/Developer/CommandLineTools/usr/bin/make check-built-core TEST_BUILD_DIR=.build/debug
+/usr/bin/time -p ".build/debug/CaptureOneCoreTests"
+=== Starting CaptureOneCore Unit Test Suite ===
+Running FieldSpecTests...
+Running StateHashTests...
+Running WorkingReferenceTests...
+Running ProvenanceStoreTests...
+Running OperationJournalTests...
+Running LockTests...
+Running ResetTests...
+Running DiffTests...
+Running DumpTests...
+Running CatalogGuardTests...
+Running CatalogEditingTests...
+Running ExistingVariantTests...
+Running MetadataTests...
+Running NativeEditingTests...
+Running VersionCompatibilityTests...
+Running ReleaseSafetyTests...
+Running RatingFilterTests...
+Running InventoryTests...
+Running RequestContextTests...
+Running GeometryTests...
+
+=== Test Results ===
+Total Assertions : 941
+Passed           : 941
+Failed           : 0
+SUCCESS: All unit tests passed!
+real 4.62
+user 1.13
+sys 0.18
+/Library/Developer/CommandLineTools/usr/bin/make check-python
+python3 -B scripts/generate-native-editing.py --check
+python3 -B Tests/recovery_harness_test.py
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 0.043s
+
+OK
+python3 -B Tests/release_runner_test.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.014s
+
+OK
+C1_TEST_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1" C1_TEST_MCP_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+PASS: shared CLI/MCP schemas, 24 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal and metadata mutation tools
+real 3.01
+user 0.95
+sys 0.39

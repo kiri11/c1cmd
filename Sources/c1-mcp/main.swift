@@ -72,6 +72,9 @@ struct C1MCPServer {
         )
         
         let definitions: [(String, String, Bool)] = [
+            ("native_get", "Read typed native editing properties, curves, layer inventory and color-element counts. Use a target scope, optional 1-based layer and color element. Returns nativeStateHash. Mask pixels are not exposed by Capture One.", true),
+            ("native_set", "Set typed native editing properties using exact dictionary field names and ifNativeState from native_get. Curves use flat x,y pairs in 0...100. Saves before-state in the operation journal. Geometry guards still apply.", false),
+            ("native_action", "Run an allowlisted layer, mask, color-editor, style or dehaze operation with a fresh nativeStateHash. Mask pixels cannot be captured or restored from property snapshots. Inspect a preview after commands.", false),
             ("doctor", "Check environment, app status, exact build, document readiness, and unresolved operations.", true),
             ("doc_info", "Show current open document info, folders, and open token.", true),
             ("capabilities", "Show capability matrix for the running Capture One build.", true),
@@ -95,14 +98,14 @@ struct C1MCPServer {
             ("operation_status", "Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),
         ]
         let compositionOnly = ProcessInfo.processInfo.environment["C1_MCP_PROFILE"] == "composition"
-        let excluded: Set<String> = ["set", "add", "reset", "variant_baseline", "metadata_set"]
+        let excluded: Set<String> = ["native_set", "native_action", "set", "add", "reset", "variant_baseline", "metadata_set"]
         let enabled = definitions.filter { !compositionOnly || !excluded.contains($0.0) }
         let enabledNames = Set(enabled.map { $0.0 })
         let tools: [Tool] = try enabled.map { name, description, readOnly in
             let data = try JSONSerialization.data(withJSONObject: ContractSchema.input(name))
             let input = try JSONDecoder().decode(Value.self, from: data)
             return Tool(name: name, description: description, inputSchema: input,
-                        annotations: .init(readOnlyHint: readOnly, destructiveHint: name == "variant_delete"))
+                        annotations: .init(readOnlyHint: readOnly, destructiveHint: ["variant_delete", "native_action"].contains(name)))
         }
 
         // Register tools list handler
@@ -218,6 +221,22 @@ struct C1MCPServer {
                                 let json = OutputFormatter.formatJson(res)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
                         
+                            case "native_get":
+                                let result = try SessionController.shared.nativeGet(ref: args["ref"] as! String, target: NativeEditing.target(args["target"]))
+                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
+                            case "native_set", "native_action":
+                                let target = try NativeEditing.target(args["target"])
+                                let core = SessionController.shared
+                                let ref = args["workingRef"] as! String, token = args["ifNativeState"] as! String
+                                let result: NativeMutationResult
+                                if params.name == "native_set" {
+                                    let patch = try NativeEditing.parsePatch(JSONSerialization.data(withJSONObject: args["patch"]!), target: target)
+                                    result = try core.nativeSet(workingRef: ref, target: target, ifNativeState: token, patch: patch, dryRun: args["dryRun"] as? Bool ?? false)
+                                } else {
+                                    let values = try NativeEditing.parseValues(JSONSerialization.data(withJSONObject: args["arguments"] ?? [String:Any]()))
+                                    result = try core.nativeAction(workingRef: ref, target: target, ifNativeState: token, action: args["action"] as! String, arguments: values, dryRun: args["dryRun"] as? Bool ?? false)
+                                }
+                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
                             case "get":
                                 guard let ref = extractString(from: params.arguments, key: "ref") else {
                                     throw C1Error.invalidRequest("Missing required argument: 'ref'")

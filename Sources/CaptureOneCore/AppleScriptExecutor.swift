@@ -85,29 +85,37 @@ public final class AppleScriptExecutor: ScriptExecuting {
     public static let shared = AppleScriptExecutor()
 
     private var compiledScript: NSAppleScript?
+    private var compiledNativeScript: NSAppleScript?
     private let lock = NSLock()
 
     private init() {}
 
-    private func loadScriptSource() throws -> String {
+    private func loadScriptSource(includeNative: Bool) throws -> String {
         // Try loading from Bundle.module first
         #if SWIFT_PACKAGE
         if let bundleUrl = Bundle.module.url(forResource: "Handlers", withExtension: "applescript"),
            let content = try? String(contentsOf: bundleUrl, encoding: .utf8) {
-            return content
+            if !includeNative { return content }
+            guard let nativeURL = Bundle.module.url(forResource: "NativeEditing", withExtension: "applescript"),
+                  let native = try? String(contentsOf: nativeURL, encoding: .utf8),
+                  let actionsURL = Bundle.module.url(forResource: "NativeActions", withExtension: "applescript"),
+                  let actions = try? String(contentsOf: actionsURL, encoding: .utf8) else {
+                throw C1Error.scriptError("Missing native editing resources.", code: nil)
+            }
+            return content + "\n" + native + "\n" + actions
         }
         #endif
 
         throw C1Error.scriptError("Could not locate Handlers.applescript resource.", code: nil)
     }
 
-    private func getCompiledScript() throws -> NSAppleScript {
+    private func getCompiledScript(includeNative: Bool) throws -> NSAppleScript {
         lock.lock()
         defer { lock.unlock() }
-        if let script = compiledScript {
+        if let script = includeNative ? compiledNativeScript : compiledScript {
             return script
         }
-        let source = try loadScriptSource()
+        let source = try loadScriptSource(includeNative: includeNative)
         guard let script = NSAppleScript(source: source) else {
             throw C1Error.scriptError("Failed to initialize NSAppleScript from source.", code: nil)
         }
@@ -118,12 +126,12 @@ public final class AppleScriptExecutor: ScriptExecuting {
             let num = err[NSAppleScript.errorNumber] as? Int
             throw C1Error.scriptError("Failed to compile Handlers.applescript: \(msg)", code: num)
         }
-        self.compiledScript = script
+        if includeNative { self.compiledNativeScript = script } else { self.compiledScript = script }
         return script
     }
 
     public func executeHandler(name: String, args: [NSAppleEventDescriptor]) throws -> NSAppleEventDescriptor {
-        let script = try getCompiledScript()
+        let script = try getCompiledScript(includeNative: name.hasPrefix("native"))
 
         let parameters = NSAppleEventDescriptor(list: args)
         var psn = ProcessSerialNumber(highLongOfPSN: UInt32(0), lowLongOfPSN: UInt32(kCurrentProcess))

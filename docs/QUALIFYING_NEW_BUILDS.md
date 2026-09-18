@@ -75,7 +75,7 @@ lens-profile limits; a single RAW does not establish broad camera/lens coverage.
 
 For ordinary development on an already qualified build, `make qualify` defaults
 to `cli mcp existing`. Select only affected suites with `QUALIFY_SUITES`, or use
-`make qualify-extended` for all nine. See each retained feature report for native
+`make qualify-extended` for all ten. See each retained feature report for native
 probes and detailed coverage.
 
 ## Qualify recovery separately

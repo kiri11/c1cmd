@@ -22,7 +22,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 - **Other builds:** 16.4+ through 16.x are permitted by the compatibility check, but are **unverified**, not qualified support. Older/future major builds require `C1_ALLOW_UNTESTED_BUILD=1`. Check `doctor` for the tested-build match before editing.
 - **Platform:** the package targets macOS 13+, but this is a deployment target, not evidence that every macOS version is tested. Intel and older macOS runtime qualification are deferred.
 
-This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, layers/masks, automatic keystone detection, style learning, and general recipe export are outside v0.1.
+This is a narrow first release, not a general-purpose Capture One automation API. Session creation, image import, automatic keystone detection, style learning, and general recipe export are outside v0.1. Expanded adjustments, curves, layers and masks are available through the experimental [native editing API](docs/native-editing/README.md).
 
 ## Installation
 
@@ -61,7 +61,7 @@ macOS Automation permission must allow the launching application to control Capt
 
 No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `allChecksPassed`, `writesEnabled`, and `exactBuildMatched` before editing. `isSession` identifies the document type; it is not an editing permission.
 
-The default server exposes 21 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
+The default server exposes 24 tools: `native_get`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -317,7 +317,7 @@ Live suites copy the fixture and create disposable Sessions/Catalogs under `/pri
 
 `make check` is the default development loop: all offline Swift assertions, CLI/MCP contracts, and mocked failure safeguards. Documentation-only changes need relevant syntax/link checks. Run live tests when native behavior or the live harness changes; avoid rerunning unrelated matrices.
 
-`make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory`. `make qualify-extended` runs all nine regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
+`make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory native`. `make qualify-extended` runs all ten regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
 
 The retained [metadata qualification log](docs/metadata/16.8.5.30/qualification.log) recorded about 28.5 minutes across all nine live suites; the three default suites accounted for about 6 minutes (79% less live-suite time on that run). This is a historical comparison, not a new runtime measurement. Local qualification also avoids a separate debug build. CI runs debug offline checks; the publication workflow builds release once and checks its unit tests, harnesses, and packaged CLI/MCP before publishing. Release packaging is therefore checked on main rather than on every pull request.
 

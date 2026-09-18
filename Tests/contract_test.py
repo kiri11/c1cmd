@@ -75,7 +75,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 21
+        assert len(tools) == 24
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
         metadata_tool = next(t for t in tools if t['name'] == 'metadata_set')
@@ -108,8 +108,19 @@ def run(cli, mcp):
         assert rating_schema['properties']['deadlineSeconds']['maximum'] == 86400
         for name in ['preview', 'operation_status', 'variant_edit', 'geometry_restore']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
+        assert next(t for t in tools if t['name'] == 'native_action')['annotations']['destructiveHint'] is True
         metadata_args = {'workingRef': 'x', 'ifMetadataState': 'h'}
+        native_props = cli_schema['requests']['native_set']['properties']['patch']['properties']
+        assert native_props['rgb curve']['items']['maximum'] == 100
+        assert native_props['clarity amount']['type'] == 'number'
+        assert native_props['enabled']['type'] == 'boolean'
+        assert 'shift x' in native_props and 'range low' in native_props
+        native_args = {'workingRef':'x','ifNativeState':'h','target':{'scope':'adjustments'}}
         for name, args in [
+            *[('native_set', dict(native_args, patch=p)) for p in [None, 1, 'bad', [], {}, {'clarity amount':True}, {'rgb curve':[True,False]}, {'clarity amount':{}}, {'unknown':1}, {'flip':'horizontal'}]],
+            *[('native_action', dict(native_args, action='layer.create', arguments=p)) for p in [None, 1, [], {}, {'name':'x','kind':'background'}]],
+            ('native_get', {'ref':'x','target':{'scope':'adjustments','layer':True}}),
+            ('native_get', {'ref':'x','target':{'scope':'bad'}}),
             ('metadata_set', metadata_args),
             ('metadata_set', {'workingRef': 'x', 'rating': 5}),
             ('metadata_set', dict(metadata_args, unexpected=1, rating=5)),
@@ -178,7 +189,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 21 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 24 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
@@ -211,7 +222,7 @@ def run(cli, mcp):
         assert 'variants_list' in names
         result = composition.tool('variants_list', {'rating': 6})
         assert result['isError']; assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
-        assert not names.intersection({'set','add','reset','variant_baseline','metadata_set'})
+        assert not names.intersection({'set','add','reset','variant_baseline','metadata_set','native_set','native_action'})
         result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
         assert result['isError'] and 'not enabled' in result['content'][0]['text']
         result = composition.tool('metadata_set', {'workingRef':'x','ifMetadataState':'h','rating':5})

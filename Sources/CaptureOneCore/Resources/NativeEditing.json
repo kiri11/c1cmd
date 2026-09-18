@@ -1,0 +1,1008 @@
+{
+  "adjustments": [
+    {
+      "name": "orientation",
+      "type": "integer",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "rotation",
+      "type": "real",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "flip",
+      "type": "flip type",
+      "writable": false,
+      "values": [
+        "none",
+        "horizontal",
+        "vertical"
+      ],
+      "route": "geometry_set"
+    },
+    {
+      "name": "keystone amount",
+      "type": "integer",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "keystone vertical",
+      "type": "real",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "keystone horizontal",
+      "type": "real",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "keystone skew",
+      "type": "real",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "keystone aspect",
+      "type": "real",
+      "writable": false,
+      "values": [],
+      "route": "geometry_set"
+    },
+    {
+      "name": "color profile",
+      "type": "text",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "film curve",
+      "type": "text",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "white balance preset",
+      "type": "text",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "temperature",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "tint",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "exposure",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "brightness",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "contrast",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "saturation",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance master hue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance master saturation",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance shadow hue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance shadow saturation",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance shadow lightness",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance midtone hue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance midtone saturation",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance midtone lightness",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance highlight hue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance highlight saturation",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "color balance highlight lightness",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white red sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white yellow sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white green sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white cyan sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white blue sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white magenta sensitivity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white split highlight hue",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white split highlight saturation",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white split shadow hue",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black and white split shadow saturation",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level highlight rgb",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level shadow rgb",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level highlight red",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level shadow red",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level highlight green",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level shadow green",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level highlight blue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level shadow blue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target highlight rgb",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target shadow rgb",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target highlight red",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target shadow red",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target highlight green",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target shadow green",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target highlight blue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level target shadow blue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level midtone rgb",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level midtone red",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level midtone green",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "level midtone blue",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "rgb curve",
+      "type": "curve",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "luma curve",
+      "type": "curve",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "red curve",
+      "type": "curve",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "green curve",
+      "type": "curve",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "blue curve",
+      "type": "curve",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "highlight recovery",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "highlight adjustment",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "shadow recovery",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "white recovery",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "black recovery",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "clarity method",
+      "type": "clarity method",
+      "writable": true,
+      "values": [
+        "natural",
+        "punch",
+        "neutral",
+        "classic"
+      ],
+      "route": "native_set"
+    },
+    {
+      "name": "clarity amount",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "clarity structure",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "dehaze amount",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "dehaze color",
+      "type": "RGB color",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "vignetting amount",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "vignetting method",
+      "type": "vignette method",
+      "writable": true,
+      "values": [
+        "elliptic on crop",
+        "circular on crop",
+        "circular"
+      ],
+      "route": "native_set"
+    },
+    {
+      "name": "sharpening amount",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "sharpening radius",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "sharpening threshold",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "sharpening halo suppression",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "noise reduction luminance",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "noise reduction details",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "noise reduction color",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "noise reduction single pixel",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "film grain type",
+      "type": "grain type",
+      "writable": true,
+      "values": [
+        "fine",
+        "silver rich",
+        "soft",
+        "cubic",
+        "tabular",
+        "harsh"
+      ],
+      "route": "native_set"
+    },
+    {
+      "name": "film grain impact",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "film grain granularity",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "moire amount",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "moire pattern",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "lens": [
+    {
+      "name": "lens profile",
+      "type": "text",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "chromatic aberration",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "custom chromatic aberration",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "diffraction correction",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "hide distorted areas",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "distortion",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "sharpness falloff",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "light falloff",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "focal length",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "aperture",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "tilt",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "tilt direction",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "shift",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "shift direction",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "shift x",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "shift y",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "layer": [
+    {
+      "name": "name",
+      "type": "text",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "kind",
+      "type": "layer type",
+      "writable": false,
+      "values": [
+        "adjustment",
+        "clone",
+        "heal",
+        "filled",
+        "subject mask",
+        "background mask",
+        "background"
+      ],
+      "route": "native_set"
+    },
+    {
+      "name": "enabled",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "opacity",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "luma": [
+    {
+      "name": "range low",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "range high",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "falloff low",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "falloff high",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "invert",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "radius",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "sensitivity",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "basicColor": [
+    {
+      "name": "name",
+      "type": "text",
+      "writable": false,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "hue change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "saturation change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "lightness change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "advancedColor": [
+    {
+      "name": "enabled",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "red",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "green",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "blue",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "hue start",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "hue end",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "saturation start",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "saturation end",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "smoothness",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "hue change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "saturation change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "lightness change",
+      "type": "real",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ],
+  "variant": [
+    {
+      "name": "processing mode",
+      "type": "technical processing mode",
+      "writable": true,
+      "values": [
+        "photography",
+        "film negative",
+        "repro negative",
+        "repro positive"
+      ],
+      "route": "native_set"
+    },
+    {
+      "name": "LCC color cast",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "LCC dust removal",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "LCC uniform light",
+      "type": "boolean",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    },
+    {
+      "name": "LCC uniform light amount",
+      "type": "integer",
+      "writable": true,
+      "values": [],
+      "route": "native_set"
+    }
+  ]
+}
