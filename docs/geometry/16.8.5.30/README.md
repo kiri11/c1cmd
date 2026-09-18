@@ -38,7 +38,7 @@ python3 Tests/contract_test.py
 export C1_TEST_RAW_FIXTURE=/path/to/fixture.CR3
 python3 probes/geometry/probe.py "$C1_TEST_RAW_FIXTURE" /private/tmp/new-probe-evidence
 make archive
-caffeinate -i python3 Tests/release_integration_test.py dist/c1-v0.1.0-macos-arm64.tar.gz
+caffeinate -i python3 Tests/release_integration_test.py dist/c1-v0.1.0-macos-arm64.tar.gz --suites cli mcp geometry
 ```
 
 The packaged runner exercises existing tonal CLI/MCP workflows followed by geometry, with build-tree resource fallback hidden. Geometry tests cover 3:2 and 3:4 ratios, signed rotations, boundary angles, off-center rectangles, context previews, orientation, baseline restoration, proposal sidecars, stale preconditions, and unchanged source/RAW checksums. Offline fault tests cover dispatch conflicts, partial writes, timeouts/lost replies, readback mismatch, preview geometry races, blocked subsequent writes, restart reconciliation, and invalid old references. Real geometry timeout recovery is separately tracked in the summary when exercised.

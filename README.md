@@ -15,7 +15,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 
 ## Support boundary for v0.1
 
-- **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. The retained M0 evidence is from an M1 Pro running macOS 26.4.1. See [release validation](docs/RELEASE_VALIDATION.md) for the current decision and remaining distribution gates; the [M0 report](docs/m0_requalification_16.8.5.30.md) is historical evidence.
+- **Qualified application:** Capture One **16.8.5.30**, on Apple Silicon. See [release validation](docs/RELEASE_VALIDATION.md) for retained qualification evidence, scope, and remaining distribution gates.
 - **One open document:** the implementation rejects operations when more than one document is open. Sessions (`.cosessiondb`) support editing and preview export. Catalogs default to read-only inspection; [experimental catalog editing](#catalog-editing-experimental) requires an exact-path opt-in.
 - **One operator, sequential calls:** keep the document open throughout a workflow. Do not switch/reopen/replace databases, edit in the UI, or launch competing exports during a command. The advisory lock serializes inventory scans and cooperating c1 writers; it does not lock the photographer UI, other automation, or delayed Apple Events. Multi-process workflows remain unqualified.
 - **Reference lifetime:** a working reference is bound to the canonical database file identity, Capture One process/launch, and parent-image path. Restarting Capture One or replacing the database invalidates it; inspect current state and create a fresh editing reference. Capture One does not expose a reliable same-file close/reopen token within one application launch. Such workflows remain unsupported, rather than being presented as automatically detected.
@@ -282,7 +282,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.8.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.9.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards

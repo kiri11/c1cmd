@@ -1,9 +1,0 @@
-{
-  "appleScriptNestedAndArrayPass" : true,
-  "appVersion" : "16.8.5.30",
-  "decoded" : "Payload(nestedVal: M0BridgeProbe.Nested(kelvinVal: 5400.0, tintVal: nil), valuesVal: [Optional(1.25), nil, Optional(3.5)])",
-  "descriptor" : "<NSAppleEventDescriptor: { 'usrf':[ 'utxt'(\"nestedVal\"), { 'usrf':[ 'utxt'(\"kelvinVal\"), 5400, 'utxt'(\"tintVal\"), 'msng' ] }, 'utxt'(\"valuesVal\"), [ 1.25, 'msng', 3.5 ] ] }>",
-  "revision" : "58946d7fd5b38b6a92c13ccb413d30ba1f0e9179",
-  "roundtrip_missingValue" : true,
-  "roundtrip_null" : true
-}

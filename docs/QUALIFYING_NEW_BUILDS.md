@@ -1,122 +1,126 @@
-# Qualifying New Capture One Builds for `c1`
+# Qualifying new Capture One builds
 
-This document provides the standard operating procedure for testing, verifying, and adding a new Capture One build to the `testedBuilds` registry in `c1`.
+Qualification is exact-build and machine-sensitive. The
+[release validation report](RELEASE_VALIDATION.md) records current evidence and
+limits; adding a version string alone does not qualify a build.
 
----
+## Compatibility and feature gates
 
-## 1. Version Compatibility Policy
+| Build | Behavior |
+|---|---|
+| Listed in `SessionController.testedBuilds` | `exactBuildMatched: true`; other doctor checks must still pass. |
+| Unlisted 16.4+ through 16.x | Allowed with a compatibility warning; `exactBuildMatched: false`. |
+| Below 16.4 or 17+ | Rejected unless `C1_ALLOW_UNTESTED_BUILD=1` is explicitly set. |
 
-`c1` implements a three-tier version compatibility model:
+Compatibility and feature authorization are separate. Existing-variant editing,
+geometry, metadata, Catalog writes, and native inventory filtering have their own
+build gates. An override or a passing `doctor.allChecksPassed` does not qualify
+those paths or bypass their restrictions. Check `writesEnabled` and
+`exactBuildMatched` too.
 
-1. **Tested Builds (`testedBuilds`)**:
-   - Explicitly verified builds (e.g. `16.8.5.30`).
-   - `exactBuildMatched: true`; `allChecksPassed` also requires the other health checks.
-   - Executes with **zero warnings**.
-2. **Allowed Untested Builds (`16.4+ < 17.0`)**:
-   - Modern Capture One 16 builds that have not yet been explicitly added to `testedBuilds`.
-   - `exactBuildMatched: false`; `allChecksPassed` can still be true and is not a qualification signal.
-   - Executes with an informational warning:  
-     `"Running on unverified Capture One build '<version>' (tested: ...). Compatibility allowed for Capture One 16.4+. Core safety guards and readback checks remain active."`
-3. **Unsupported Builds (`< 16.4` or `>= 17.0`)**:
-   - Fails closed with `unsupported-version` error.
-   - Can only be executed if the user explicitly overrides with environment variable `C1_ALLOW_UNTESTED_BUILD=1`.
+## Prepare the candidate
 
----
+Preserve the source RAW outside build/scratch directories. Close all documents
+and reserve exclusive use of Capture One. Tests must create their own disposable
+Sessions/Catalogs; do not use a main Catalog to qualify a new build.
 
-## 2. Step-by-Step Qualification Workflow
+Save the installed application's dictionary and compare it with the retained
+[SDEF](../sdef/16.8.5.30.sdef):
 
-Follow these steps whenever a new version of Capture One is released:
-
-### Step 1: Dump and Diff the Scripting Definition (SDEF)
-
-Capture One exposes its AppleScript dictionary via the OS `sdef` command. Dump the dictionary for the newly installed version:
-
-```bash
-# Dump new SDEF
+```sh
 sdef "/Applications/Capture One.app" > "sdef/<version>.sdef"
-
-# Diff against the previous tested SDEF
 diff -u sdef/16.8.5.30.sdef "sdef/<version>.sdef"
 ```
 
-**What to check for:**
-- Core adjustment properties (`exposure`, `contrast`, `saturation`, `temperature`, `tint`) and their 4-character codes (`CVex`, `CVcn`, `CVsa`, etc.).
-- Range specifiers and enumerations (e.g., `recipeRootType`).
-- Variant commands (`add variant`, `delete`, `process`).
-- Any new, deprecated, or conflicting terms.
+Review property codes and ranges, clone/delete/process commands, crop bounds and
+keystone controls, ratings/tags, recipe behavior, and inventory predicates.
+Dictionary compatibility is only a starting point; native behavior needs testing.
 
-### Step 2: Run End-to-End CLI Integration Tests
+Locate explicit build assumptions before adapting the candidate:
 
-Run the automated integration test suite against a live, disposable Capture One session using a real RAW image fixture:
-
-```bash
-# Set path to a local RAW image (CR3, ARW, NEF, etc.)
-export C1_TEST_RAW_FIXTURE="/path/to/my_test_fixture.CR3"
-
-# Build debug binaries
-swift build
-
-# Run integration tests
-python3 Tests/integration_test.py
+```sh
+rg -n '16\.8\.5\.30|testedBuilds|pinnedBuild' Sources Tests probes
 ```
 
-**Verification criteria:**
-- Disposable Session created at `/private/tmp/c1-m1-e2e`.
-- Working clone created (`c1 variant clone 1`).
-- Mutations applied (`set`, `add`, `reset`) and verified within tolerance.
-- **Zero RAW corruption**: Cryptographic SHA-256 of the source RAW file is byte-for-byte identical before and after all operations.
-- Dedicated preview exported and ImageIO decoded.
-- Clean variant deletion without removing source RAW or original variant.
-- Catalog mutation guards fail closed.
+Update the relevant guards, capability/schema declarations, and harness assertions
+together on the candidate branch. Those changes enable qualification; do not
+publish them as supported until the corresponding checks pass. Keep unsupported
+paths gated if coverage is incomplete.
 
-### Step 3: Run MCP Server Integration Tests
+## Run offline and packaged feature checks
 
-Verify that the stdio MCP adapter communicates seamlessly with the new build:
+Start with `make check` for Swift assertions, CLI/MCP contract/profile parity,
+and mocked harness/recovery guards. Tool counts and supported fields come from
+the shared contract, not a fixed count in this guide.
 
-```bash
-python3 Tests/mcp_test.py
+For a new application build, exercise all regular matrices against an extracted
+candidate archive:
+
+```sh
+make check
+export C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3
+make qualify-extended EVIDENCE_DIR=/absolute/path/to/new-feature-evidence
 ```
 
-**Verification criteria:**
-- Protocol handshake and tool listing (17 tools; 13 in the composition profile).
-- Mutation operations through MCP tool calls.
-- Dual text/JSON metadata + `image/jpeg` base64 preview rendering.
-- Catalog protection barriers.
+This builds release, checks the package with build-tree resource fallback hidden,
+and runs `cli mcp geometry lens perspective keystone catalog existing inventory`
+sequentially. Existing-variant cases include metadata writes in both Session and
+referenced-original Catalog fixtures.
 
-### Step 4: Qualify the packaged recovery paths
+Verify native identity/count and RAW preservation, concurrency tokens, clone-only
+deletion, existing-variant baseline/restore, previews and coordinate mapping,
+geometry with lens/perspective corrections, keystone controls, every metadata value,
+Catalog opt-out, filtering, request progress and cancellation. Preserve fixture and
+lens-profile limits; a single RAW does not establish broad camera/lens coverage.
 
-Run `Tests/release_integration_test.py` against the candidate archive, then close all documents and run `Tests/recovery_integration_test.py` sequentially. The recovery harness is intentionally pinned to 16.8.5.30; adapting its explicit build assertion for a new candidate is qualification work, not permission to label that build tested. Retain successful and failed runs, artifact/executable hashes, app/OS/toolchain identity, RAW checksums and journal evidence. Review the limited claims and remaining gates in [release validation](RELEASE_VALIDATION.md).
+For ordinary development on an already qualified build, `make qualify` defaults
+to `cli mcp existing`. Select only affected suites with `QUALIFY_SUITES`, or use
+`make qualify-extended` for all nine. See each retained feature report for native
+probes and detailed coverage.
 
-### Step 5: Qualify geometry and add the build
+## Qualify recovery separately
 
-Crop and rotation writes have a separate exact-build gate. Run the [geometry probes and workflow](geometry/16.8.5.30/README.md), including rotated coordinates, all four orientations, aspect-ratio preset interaction, unsupported transform rejection, crop-aware previews and real geometry timeout recovery. Also run the [corrected-lens suite](geometry/16.8.5.30/lens/README.md): native bounds after rotation, both hide-distorted-areas settings, off-center preview mapping, correction preservation, baseline restore, and corrected-lens timeout recovery. Run the perspective/movement suite too: vertical/horizontal/skew/aspect keystone, a native movement-capable lens profile, ratio normalization, strict explicit crops, rotation-only, preview mapping, baseline restore, and combined-correction timeout recovery. The geometry harnesses and production gate currently pin 16.8.5.30; changing those assertions alone does not qualify a new build. Retain evidence before extending the geometry gate.
+A new application build can affect every native recovery path. Use the archive
+built above and a new evidence directory:
 
-Once the packaged workflow and recovery qualification pass and their scope has been reviewed, add the new build version string to `testedBuilds` in `Sources/CaptureOneCore/SessionController.swift`:
-
-```swift
-public static let testedBuilds: [String] = [
-    "16.8.5.30",
-    "<new-build-string>"
-]
+```sh
+make qualify-recovery RECOVERY_CASES=all \
+  C1_RECOVERY_SHUTDOWN_MODE=sigterm \
+  EVIDENCE_DIR=/absolute/path/to/new-recovery-evidence
 ```
 
-### Step 6: Run Unit Tests
+`sigterm` explicitly tests process-termination recovery after closing the owned
+fixture; it does not qualify graceful native quit. The default `quit` mode is a
+separate path with no automatic fallback. Recovery fixtures default to
+`.build/recovery-fixtures`, outside the /tmp alias. See
+[recovery settings and interpretation](RELEASE_VALIDATION.md#reproduce-packaged-live-recovery-qualification).
 
-Execute the unit test suite to ensure no regressions:
+Keep real timeout durations, exclusive access, fixture ownership and identity
+guards. An uncertain operation must never be retried automatically. Preserve
+failed runs and journals; verify process exit before restart/reconciliation.
+`reconciled` records observations, not historical success. New fault paths need
+matching cases: existing cases do not establish metadata-specific partial-write
+coverage, for example.
 
-```bash
-swift run CaptureOneCoreTests
-```
+For changes to an already qualified build, follow the
+[recovery selection guide](RELEASE_VALIDATION.md#recovery-test-selection).
+Documentation, build/CI, unrelated features, and selection/reporting changes that
+leave fault behavior unchanged need focused offline checks. A release checkpoint
+alone does not require another fault campaign.
 
-### Step 7: Submit Pull Request
+## Record and review the result
 
-Commit your changes:
-1. `sdef/<version>.sdef` (new dictionary snapshot)
-2. Updated `SessionController.swift` with the new build added to `testedBuilds`
-3. Any relevant test logs or release notes
+Retain the candidate source revision, any source patch, archive/executable/handler
+and harness hashes, app/OS/toolchain identity, selected/skipped suites, fixture
+checksums, results, failures, and recovery journals. Curate evidence that supports
+the claims; do not commit RAWs, previews, disposable databases, or scratch copies.
 
-Submit a PR with the title: `feat: qualify Capture One <version>`.
+Update the tested-build registry and relevant feature gates only for demonstrated
+support, together with their tests and capability declarations. Update the
+[release validation report](RELEASE_VALIDATION.md) and support documentation with
+scope and remaining gaps. Rerun affected offline checks after final edits; if the
+runtime payload changes, validate affected native paths on the final archive.
 
-## Validation tiers
-
-`make check` runs offline tests, including injected failure/recovery guards. `make qualify` adds packaged live workflows and excludes deliberate timeout/process-death tests. Use `make qualify-recovery` against an existing archive when changing recovery-sensitive behavior or at a release checkpoint; `make qualify-full` explicitly runs both tiers. Real timeout evidence is reported separately and is never inferred from mocked tests. Use a new `EVIDENCE_DIR` for each command.
+Downloaded-artifact launch, Automation consent, signing/notarization, other
+architectures, and additional macOS targets remain separate distribution checks.
+A passing local campaign does not silently waive them.

@@ -42,7 +42,7 @@ One builds remain outside the qualified boundary.
 Reproduce with:
 
 ```sh
-make qualify C1_TEST_RAW_FIXTURE=/path/to/preserved.CR3 EVIDENCE_DIR=/new/evidence/path
+make qualify-extended C1_TEST_RAW_FIXTURE=/path/to/preserved.CR3 EVIDENCE_DIR=/new/evidence/path
 ```
 
 Start with zero open documents and exclusive Capture One use. Source RAWs and

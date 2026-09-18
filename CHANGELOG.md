@@ -1,9 +1,21 @@
+Entries describe changes at their recorded contract version. See the [README](README.md)
+for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
+support limits and test-selection policy.
+
+## Unreleased — metadata editing and validation workflow
+
+- Add rating (0–5) and native color-tag (0–7) writes through CLI `metadata set` and MCP `metadata_set` (contract 1.9.0). Require an editing or managed-clone reference and a fresh metadata state token; preserve omitted fields.
+- Save metadata baselines, expose metadata differences, and journal writes with native concurrency and readback checks. The composition profile excludes metadata writes. See [qualification and limits](docs/metadata/16.8.5.30/README.md).
+- Default `make qualify` to packaged CLI, MCP, and existing-variant workflows; select affected suites with `QUALIFY_SUITES`, or all nine with `make qualify-extended`.
+- Select recovery cases by changed behavior with `RECOVERY_CASES`. Affected recovery and fault-harness changes require live fault validation; unrelated changes and release checkpoints alone do not. A separate user request is not required.
+- Remove superseded M0 feasibility probes/evidence and the old follow-up roadmap; retain feature/recovery qualification evidence and consolidate current support guidance.
+
 ## Unreleased — keystone corrections
 
 - Add absolute keystone amount, vertical, horizontal, skew, and aspect controls to CLI `geometry set` and MCP `geometry_set` (contract 1.8.0), including the composition profile.
 - Preserve omitted controls, tonal edits, lens settings, and native variant identity. Validate native ranges before dispatch, obtain fresh crop bounds after transforms, and verify all five controls on readback.
 - Include keystone changes in diffs and durable geometry requests. Restore baseline keystone with crop/rotation through `geometry_restore`; reject predictive dry runs for keystone changes.
-- Add CLI/MCP control-range, preview, restoration, and referenced-Catalog coverage, plus an optional keystone timeout-recovery test case. Require an explicit user request before running timeout/process-death tests. See [qualification](docs/geometry/16.8.5.30/keystone/README.md).
+- Add CLI/MCP control-range, preview, restoration, and referenced-Catalog coverage, plus a keystone timeout-recovery test case. See [qualification](docs/geometry/16.8.5.30/keystone/README.md).
 
 ## Unreleased — preserved keystone and lens movements
 

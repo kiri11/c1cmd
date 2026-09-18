@@ -25,10 +25,10 @@ The matrix covers vertical/horizontal keystone, combined skew/aspect, correction
 ## Reproduction
 
 ```sh
-make qualify C1_TEST_RAW_FIXTURE=/absolute/path/to/fixture.CR3 \
+make qualify QUALIFY_SUITES="perspective" C1_TEST_RAW_FIXTURE=/absolute/path/to/fixture.CR3 \
   EVIDENCE_DIR=/absolute/new/evidence
-# Optional recovery testing against the existing archive:
-make qualify-recovery C1_TEST_RAW_FIXTURE=/absolute/path/to/fixture.CR3 \
+# Affected recovery path, against the archive built above:
+make qualify-recovery RECOVERY_CASES="perspective" C1_TEST_RAW_FIXTURE=/absolute/path/to/fixture.CR3 \
   C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/absolute/new/recovery
 ```
 

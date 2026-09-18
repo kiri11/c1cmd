@@ -48,7 +48,7 @@ Run 1 failed fixture setup because selection is not a writable variant property;
 
 The first packaged qualification attempt stopped when a Catalog full-frame preview exceeded the test client's 15-second receive timeout. Its [journal](initial-catalog-journal.jsonl) contained nine completed operations, including the preview; cleanup deletion had not been dispatched. The disposable Catalog was closed and retained, with no mutation retried. Live test clients now allow 150 seconds; offline contract clients retain their shorter wait. The final packaged Catalog suite passed. The retained failed fixture is `/private/tmp/c1-catalog-live-yyclamyp/qualification.cocatalog`.
 
-The repository retains focused measurements, the [qualification log](qualification.log), recovery event streams, continuation scripts, and the final recovery journal. Duplicate harness copies and intermediate snapshots are omitted: the tested harness matches `Tests/recovery_integration_test.py` at the hash in the summary. The full qualification directory remains at `/private/tmp/c1-inventory-qualification-20260916-final`.
+The repository retains focused measurements, the [qualification log](qualification.log), recovery event streams, continuation scripts, and the final recovery journal. Duplicate harness copies and intermediate snapshots are omitted. The summary identifies the historical harness by hash; `Tests/recovery_integration_test.py` has since changed. The original scratch directory was `/private/tmp/c1-inventory-qualification-20260916-final`; retained repository evidence does not depend on its continued availability.
 
 No main Catalog or user editing document was used. Source RAW bytes remain immutable; copied and source fixture SHA-256 is `2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868`. Catalog-stored originals, Catalog fault recovery, other Capture One builds, simultaneous UI operators, and general binary-distribution gates remain outside this qualification. Projections, pagination, caches, lock-owner identification, and bulk reads of additional metadata are deferred.
 
@@ -57,10 +57,10 @@ No main Catalog or user editing document was used. Source RAW bytes remain immut
 Close all documents, use a preserved RAW fixture, and run live suites sequentially:
 
 ```sh
-make qualify C1_TEST_RAW_FIXTURE=/path/to/local.CR3 EVIDENCE_DIR=/private/tmp/new-qualification
+make qualify QUALIFY_SUITES="inventory" C1_TEST_RAW_FIXTURE=/path/to/local.CR3 EVIDENCE_DIR=/private/tmp/new-qualification
 C1_TEST_RAW_FIXTURE=/path/to/local.CR3 \
   C1_NATIVE_PROBE_EVIDENCE=/private/tmp/native-probe.json \
   python3 -B Tests/native_inventory_probe.py
 ```
 
-The full qualification includes real timeout waits and application restarts. It retains uncertain clones for inspection. Status inspection itself requires neither an Apple Event nor the Capture One lock. Diagnostic snapshots are best-effort cache files, separate from durable mutation evidence; see the [usage documentation](../../../README.md#inventory-progress-and-cancellation).
+These commands exercise inventory behavior without fault injection. Use the [recovery selection guide](../../RELEASE_VALIDATION.md#recovery-test-selection) when a change also affects recovery; those cases include real timeout waits and application restarts and retain uncertain clones for inspection. Status inspection itself requires neither an Apple Event nor the Capture One lock. Diagnostic snapshots are best-effort cache files, separate from durable mutation evidence; see the [usage documentation](../../../README.md#inventory-progress-and-cancellation).
