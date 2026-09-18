@@ -71,6 +71,7 @@ struct C1: ParsableCommand {
             AddCommand.self,
             ResetCommand.self,
             GeometryCommand.self,
+            MetadataCommand.self,
             DiffCommand.self,
             DumpCommand.self,
             PreviewCommand.self,
@@ -669,6 +670,28 @@ struct RequestStatusCommand: ParsableCommand {
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             print(OutputFormatter.formatJson(try RequestContext.status(requestId: requestId)))
+        }
+        if code != .success { throw ExitCode(code.rawValue) }
+    }
+}
+
+
+struct MetadataCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "metadata", abstract: "Edit ratings and color tags.", subcommands: [MetadataSetCommand.self])
+}
+struct MetadataSetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set rating and/or color tag on an editing reference or managed clone.")
+    @OptionGroup var globals: GlobalOptions
+    @Argument var workingRef: String
+    @Option(help: "metadataStateHash from a fresh get.") var ifMetadataState: String
+    @Option(help: "Star rating: integer 0–5; 0 clears.") var rating: Int?
+    @Option(help: "Native color tag: integer 0–7; 0 clears.") var colorTag: Int?
+    @Flag var dryRun: Bool = false
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            let result = try SessionController.shared.metadataSet(workingRef: workingRef, ifMetadataState: ifMetadataState,
+                rating: rating, colorTag: colorTag, dryRun: dryRun)
+            print(OutputFormatter.formatJson(result))
         }
         if code != .success { throw ExitCode(code.rawValue) }
     }

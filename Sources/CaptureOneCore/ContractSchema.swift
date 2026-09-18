@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.8.0"
+    public static let version = "1.9.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,11 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = ["doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    static var writableMetadataSchema: [String: Any] {
+        object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
+                "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
+    }
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
     static var keystoneSchema: [String: Any] {
         var properties: [String: Any] = [:]
@@ -50,6 +54,12 @@ public enum ContractSchema {
         case "geometry_restore": return object(["workingRef": string, "ifGeometryState": string, "dryRun": boolean], required: ["workingRef", "ifGeometryState"])
         case "variant_clone", "variant_baseline": return object(["sourceRef": string], required: ["sourceRef"])
         case "variant_delete": return object(["workingRef": string], required: ["workingRef"])
+        case "metadata_set":
+            var props = writableMetadataSchema["properties"] as! [String: Any]
+            props["workingRef"] = string; props["ifMetadataState"] = string; props["dryRun"] = boolean
+            var result = object(props, required: ["workingRef", "ifMetadataState"])
+            result["anyOf"] = ["rating", "colorTag"].map { ["required": [$0]] }
+            return result
         case "get": return object(["ref": string], required: ["ref"])
         case "set", "add":
             let adj = adjustments(delta: name == "add", aliases: true)
@@ -104,6 +114,9 @@ public enum ContractSchema {
                 }
             }
         }
+        if tool == "metadata_set", arguments["rating"] == nil, arguments["colorTag"] == nil {
+            throw C1Error.invalidRequest("Provide rating and/or colorTag.")
+        }
         if tool == "geometry_set" {
             guard ["crop", "rotation", "aspectRatio", "keystone"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
                 throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, or keystone; crop and aspectRatio are mutually exclusive.")
@@ -149,7 +162,7 @@ public enum ContractSchema {
         let diffs: [String: Any] = ["type": "object", "additionalProperties": diff]
         let adj = adjustments()
         let metadata: [String: Any] = ["type": "object", "properties": Dictionary(uniqueKeysWithValues: ["camera", "lens", "iso", "shutterSpeed", "asShotWB", "captureDate"].map { ($0, string) }).merging(["rating": ["type": "integer"], "colorTag": ["type": "integer"]]) { _, b in b }]
-        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
+        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "metadataStateHash": string, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
         let mutation = object(["operationId": string, "workingRef": string, "before": adj, "after": adj, "diff": diffs, "stateHash": string, "isDryRun": boolean], required: ["operationId", "workingRef", "before", "after", "diff", "stateHash", "isDryRun"])
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
         let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
@@ -170,17 +183,20 @@ public enum ContractSchema {
             "capabilities": ["type": "object"], "schema": ["type": "object"],
             "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,
             "variant_delete": object(["deleted": boolean, "workingRef": string, "cloneVariantId": string]),
+            "metadata_set": object(["operationId": string, "workingRef": string, "before": writableMetadataSchema,
+                "after": writableMetadataSchema, "diff": diffs, "metadataStateHash": string, "isDryRun": boolean],
+                required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
             "get": get, "set": mutation, "add": mutation, "reset": mutation,
             "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
-            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs]),
+            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
-            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema])
+            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
         responses["geometry_restore"] = responses["geometry_set"]
         responses["variant_edit"] = object(["workingRef": string, "variantId": string, "documentPath": string, "documentToken": string,
             "parentImagePath": string, "baselineAdjustments": adj, "baselineGeometry": geometrySchema, "baselineStateHash": string,
-            "baselineGeometryStateHash": string, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
+            "baselineGeometryStateHash": string, "baselineMetadata": writableMetadataSchema, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses,
                 "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string], required: ["code", "message"])], required: ["error"])]]

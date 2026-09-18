@@ -47,6 +47,7 @@ public struct ProvenanceRecord: Codable, Equatable {
     public let createdAt: String
     public let documentToken: String?
     public let baselineAdjustments: Adjustments
+    public let baselineMetadata: VariantMetadata?
     public let baselineGeometry: Geometry?
     public let baselineStateHash: String
 
@@ -62,8 +63,10 @@ public struct ProvenanceRecord: Codable, Equatable {
         baselineAdjustments: Adjustments,
         baselineStateHash: String,
         documentToken: String? = nil,
-        baselineGeometry: Geometry? = nil
+        baselineGeometry: Geometry? = nil,
+        baselineMetadata: VariantMetadata? = nil
     ) {
+        self.baselineMetadata = baselineMetadata
         self.baselineGeometry = baselineGeometry
         self.documentToken = documentToken
         self.workingRef = workingRef

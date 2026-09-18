@@ -76,6 +76,12 @@ The tonal `set`, `add`, and `reset` tools support only this table; use `geometry
 
 ---
 
+## Rating and Color Tag Writes
+
+Use `metadata_set` / `c1 metadata set` on a `c1_edit_` editing reference or managed clone. Read `get` immediately before writing and require `ifMetadataState` / `--if-metadata-state` from `metadataStateHash`; the tonal state hash does not cover these fields. `rating` is an integer 0–5, `colorTag` is a native integer 0–7, and 0 clears either. Omitted fields stay unchanged. Metadata writes require Capture One 16.8.5.30 and the existing Catalog/image guards. They are unavailable in the geometry-only composition profile.
+
+New references save `baselineMetadata`; `diff` exposes metadata differences. Restore by explicitly setting the saved values with a fresh metadata token. Tonal `reset` does not reset ratings or tags. Native writes are sequential and may partially apply; the same journal, outcome-unknown, restart, and reconciliation rules apply. Never retry an uncertain classification write automatically.
+
 ## 4. MCP Server Usage Notes
 
 When using `c1-mcp`:

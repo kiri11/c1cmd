@@ -240,14 +240,8 @@ on getAdjustmentsBatch(docName, variantIds)
                 set lVal to (lens profile of lens correction of v as text)
             end try
             
-            set rVal to 0
-            try
-                set rVal to (rating of v as integer)
-            end try
-            set tagVal to 0
-            try
-                set tagVal to (color tag of v as integer)
-            end try
+            set rVal to (rating of v as integer)
+            set tagVal to (color tag of v as integer)
             
             set parentPath to POSIX path of (path of parent image of v as text)
             set geo to missing value
@@ -487,3 +481,16 @@ on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, ex
         return {targetCropValues:targetCrop, boundsValues:nativeBounds, fittedCropValues:crop of v}
     end tell
 end applyCorrectedGeometry
+
+-- Classification writes are a patch and compare both values immediately before dispatch.
+on applyMetadata(docName, variantId, ratingValue, tagValue, expectedRating, expectedTag, expectedPath)
+    tell application "/Applications/Capture One.app"
+        set d to my checkedDocument(docName)
+        set v to variant id (variantId as text) of d
+        my assertParent(v, expectedPath)
+        if (rating of v as integer) is not expectedRating or (color tag of v as integer) is not expectedTag then error "Metadata changed immediately before write." number -27002
+        if ratingValue is not missing value then set rating of v to (ratingValue as integer)
+        if tagValue is not missing value then set color tag of v to (tagValue as integer)
+        return {variantId:(id of v as text), ratingVal:(rating of v as integer), colorTagVal:(color tag of v as integer)}
+    end tell
+end applyMetadata

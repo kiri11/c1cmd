@@ -75,9 +75,15 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 20
+        assert len(tools) == 21
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
+        metadata_tool = next(t for t in tools if t['name'] == 'metadata_set')
+        assert metadata_tool['annotations']['readOnlyHint'] is False
+        assert metadata_tool['inputSchema']['properties']['colorTag']['maximum'] == 7
+        for flag, value in [('rating', '-1'), ('rating', '6'), ('rating', '1.5'), ('color-tag', '-1'), ('color-tag', '8')]:
+            result = subprocess.run([str(cli), 'metadata', 'set', 'x', '--if-metadata-state', 'h', '--' + flag, value], capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0 and 'applyMetadata' not in result.stderr
         rating_schema = cli_schema['requests']['variants_list']
         assert cli_schema['requests']['request_status'] == {
             'type': 'object', 'properties': {'requestId': {'type': 'string', 'minLength': 1}},
@@ -102,7 +108,13 @@ def run(cli, mcp):
         assert rating_schema['properties']['deadlineSeconds']['maximum'] == 86400
         for name in ['preview', 'operation_status', 'variant_edit', 'geometry_restore']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
+        metadata_args = {'workingRef': 'x', 'ifMetadataState': 'h'}
         for name, args in [
+            ('metadata_set', metadata_args),
+            ('metadata_set', {'workingRef': 'x', 'rating': 5}),
+            ('metadata_set', dict(metadata_args, unexpected=1, rating=5)),
+            *[('metadata_set', dict(metadata_args, rating=value)) for value in [-1, 6, 1.5, True, '5', None]],
+            *[('metadata_set', dict(metadata_args, colorTag=value)) for value in [-1, 8, 1.5, True, '4', None]],
             *[('variants_list', {key: value}) for key in ['rating', 'minRating']
               for value in [-1, 6, 4.5, True, '5', None]],
             ('variants_list', {'rating': 5, 'minRating': 4}),
@@ -166,7 +178,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 20 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 21 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
@@ -199,10 +211,12 @@ def run(cli, mcp):
         assert 'variants_list' in names
         result = composition.tool('variants_list', {'rating': 6})
         assert result['isError']; assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
-        assert not names.intersection({'set','add','reset','variant_baseline'})
+        assert not names.intersection({'set','add','reset','variant_baseline','metadata_set'})
         result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
         assert result['isError'] and 'not enabled' in result['content'][0]['text']
-        print('PASS: composition profile hides and rejects tonal mutation tools')
+        result = composition.tool('metadata_set', {'workingRef':'x','ifMetadataState':'h','rating':5})
+        assert result['isError'] and 'not enabled' in result['content'][0]['text']
+        print('PASS: composition profile hides and rejects tonal and metadata mutation tools')
     finally:
         composition.close()
 

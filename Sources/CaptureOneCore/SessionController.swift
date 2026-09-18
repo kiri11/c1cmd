@@ -119,6 +119,7 @@ public struct DeleteResult: Codable, Equatable {
 }
 
 public struct GetResult: Codable, Equatable {
+    public var metadataStateHash: String? = nil
     public var geometry: Geometry? = nil
     public var geometryStateHash: String? = nil
     public var geometryUsableBounds: CropRect? = nil
@@ -142,6 +143,9 @@ public struct MutationResult: Codable, Equatable {
 }
 
 public struct DiffResult: Codable, Equatable {
+    public var metadataBefore: VariantMetadata? = nil
+    public var metadataAfter: VariantMetadata? = nil
+    public var metadataDiff: [String: DoubleDiff]? = nil
     public var geometryBefore: Geometry? = nil
     public var geometryAfter: Geometry? = nil
     public var geometryDiff: [String: DoubleDiff]? = nil
@@ -151,7 +155,9 @@ public struct DiffResult: Codable, Equatable {
     public let stateHash2: String
     public let diff: [String: DoubleDiff]
 
-    public init(ref1: String, ref2: String, stateHash1: String, stateHash2: String, diff: [String: DoubleDiff], geometryBefore: Geometry? = nil, geometryAfter: Geometry? = nil) {
+    public init(ref1: String, ref2: String, stateHash1: String, stateHash2: String, diff: [String: DoubleDiff], geometryBefore: Geometry? = nil, geometryAfter: Geometry? = nil, metadataBefore: VariantMetadata? = nil, metadataAfter: VariantMetadata? = nil) {
+        self.metadataBefore = metadataBefore; self.metadataAfter = metadataAfter
+        if let before = metadataBefore, let after = metadataAfter { self.metadataDiff = after.changes(from: before) }
         self.geometryBefore = geometryBefore; self.geometryAfter = geometryAfter
         if let before = geometryBefore, let after = geometryAfter { self.geometryDiff = after.changes(from: before) }
         self.ref1 = ref1
@@ -648,7 +654,7 @@ public final class SessionController {
                 try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
                     cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
                     parentImagePath: parent, creationOperationId: entry.operationId,
-                    baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken, baselineGeometry: created.geometry))
+                    baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken, baselineGeometry: created.geometry, baselineMetadata: VariantMetadata.from(created.metadata)))
                 try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: created.adjustments)
                 return CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
                                    documentPath: doc.documentPath, baselineStateHash: created.stateHash)
@@ -763,6 +769,7 @@ public final class SessionController {
 
         let geometry = normalizedGeometry(first)
         return GetResult(
+            metadataStateHash: VariantMetadata.from(metadata)?.stateHash,
             geometry: geometry,
             geometryStateHash: geometry?.stateHash(tonalHash: hash.hex),
             geometryUsableBounds: geometry?.unsupportedReason == nil ? try geometry?.safeBounds(rotation: geometry?.rotation ?? 0) : nil,
@@ -1123,14 +1130,16 @@ public final class SessionController {
                 ref2: secondRef,
                 stateHash1: get1.stateHash,
                 stateHash2: get2.stateHash,
-                diff: diffDict, geometryBefore: get1.geometry, geometryAfter: get2.geometry
+                diff: diffDict, geometryBefore: get1.geometry, geometryAfter: get2.geometry,
+                metadataBefore: VariantMetadata.from(get1.metadata), metadataAfter: VariantMetadata.from(get2.metadata)
             )
         } else {
             if EditingRecord.isEditingReference(ref1) {
                 let record = try EditingStore(document: docInfo).resolve(ref1, document: docInfo)
                 return DiffResult(ref1: "baseline", ref2: ref1, stateHash1: record.baselineStateHash, stateHash2: get1.stateHash,
                     diff: computeDiff(before: record.baselineAdjustments, after: get1.adjustments),
-                    geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry)
+                    geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry,
+                    metadataBefore: record.baselineMetadata, metadataAfter: VariantMetadata.from(get1.metadata))
             }
             guard WorkingRef.isWorkingRefString(ref1) else {
                 throw C1Error.invalidRequest("Single-reference diff requires an editing reference (c1_edit_<uuid>) or managed clone (c1_wrk_<uuid>). To compare native variants, provide two references: c1 diff <ref1> <ref2>")
@@ -1149,7 +1158,8 @@ public final class SessionController {
                 ref2: ref1,
                 stateHash1: baselineHash,
                 stateHash2: get1.stateHash,
-                diff: diffDict, geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry
+                diff: diffDict, geometryBefore: record.baselineGeometry, geometryAfter: get1.geometry,
+                    metadataBefore: record.baselineMetadata, metadataAfter: VariantMetadata.from(get1.metadata)
             )
         }
     }
@@ -1313,6 +1323,69 @@ public final class SessionController {
         }
     }
 
+    // MARK: - Rating and color tag writes
+    public func metadataSet(workingRef: String, ifMetadataState: String, rating: Int? = nil,
+                            colorTag: Int? = nil, dryRun: Bool = false) throws -> MetadataMutationResult {
+        var arguments: [String: Any] = ["workingRef": workingRef, "ifMetadataState": ifMetadataState, "dryRun": dryRun]
+        if let rating { arguments["rating"] = rating }
+        if let colorTag { arguments["colorTag"] = colorTag }
+        try ContractSchema.validate(tool: "metadata_set", arguments: arguments)
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            try assertSessionWritable(docInfo: doc, operation: "metadata_set")
+            guard doc.appVersion == Self.pinnedBuild else { throw C1Error.unsupportedVersion("Metadata writes require Capture One \(Self.pinnedBuild).") }
+            try checkedDocument(doc, writes: !dryRun)
+            let target = try adjustmentTarget(workingRef, document: doc)
+            let current = try get(ref: workingRef)
+            try assertWritableImage(doc: doc, source: current)
+            guard let before = VariantMetadata.from(current.metadata), before.stateHash == ifMetadataState else {
+                throw C1Error.stateChanged("Rating or color tag changed or is unavailable; read get again.")
+            }
+            let intended = VariantMetadata(rating: rating ?? before.rating, colorTag: colorTag ?? before.colorTag)
+            if dryRun {
+                return MetadataMutationResult(operationId: "dry-run", workingRef: workingRef, before: before,
+                    after: intended, diff: intended.changes(from: before), metadataStateHash: before.stateHash, isDryRun: true)
+            }
+            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            var entry = try prepare(OperationRecord(operationType: "metadata_set", workingRef: workingRef,
+                documentPath: doc.documentPath, preconditionStateHash: ifMetadataState,
+                beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
+            entry.beforeMetadata = before
+            entry.intendedMetadata = intended
+            try journal.append(entry: entry)
+            do {
+                struct NativeResult: Decodable { let variantId: String; let ratingVal: Int; let colorTagVal: Int }
+                let native: NativeResult = try executor.executeAndDecode(handler: "applyMetadata", args: [
+                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: target.variantId),
+                    rating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
+                    colorTag.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
+                    NSAppleEventDescriptor(int32: Int32(before.rating)), NSAppleEventDescriptor(int32: Int32(before.colorTag)),
+                    NSAppleEventDescriptor(string: current.parentImagePath ?? "")])
+                try checkedDocument(doc, writes: false)
+                let readback = try get(ref: workingRef)
+                let after = VariantMetadata.from(readback.metadata)
+                entry.afterMetadata = after
+                entry.afterAdjustments = readback.adjustments
+                entry.afterGeometry = readback.geometry
+                guard native.variantId == target.variantId, readback.id == target.variantId,
+                      native.ratingVal == intended.rating, native.colorTagVal == intended.colorTag, after == intended,
+                      readback.stateHash == current.stateHash, readback.geometryStateHash == current.geometryStateHash else {
+                    throw C1Error.readbackMismatch("Metadata readback did not match, or tone/geometry changed during the operation.")
+                }
+                entry.diff = intended.changes(from: before)
+                entry.status = "succeeded"
+                try journal.append(entry: entry)
+                return MetadataMutationResult(operationId: entry.operationId, workingRef: workingRef, before: before,
+                    after: intended, diff: intended.changes(from: before), metadataStateHash: intended.stateHash, isDryRun: false)
+            } catch {
+                entry.status = "outcome-unknown"
+                entry.error = error.localizedDescription
+                try? journal.append(entry: entry)
+                throw OperationFailure(operationId: entry.operationId, cause: error)
+            }
+        }
+    }
+
     // MARK: - Operation Status & Reconciliation
     /// A restarted app cannot still execute an Apple Event from its previous process.
     /// Reconciliation records observations, never retries an uncertain mutation or rebinds a reference.
@@ -1344,8 +1417,9 @@ public final class SessionController {
                     let current = try get(ref: id)
                     entry.afterAdjustments = current.adjustments
                     entry.afterGeometry = current.geometry
+                    entry.afterMetadata = VariantMetadata.from(current.metadata)
                     entry.status = "reconciled"
-                    entry.error = "Previous app instance ended. Observed current adjustments are recorded; they do not prove historical completion. Review before creating a fresh working clone."
+                    entry.error = "Previous app instance ended. Observed current adjustments, geometry, and metadata are recorded; they do not prove historical completion. Review before creating a fresh editing reference."
                 } else {
                     entry.status = "reconciled"
                     entry.error = "Previous app instance ended; the target variant is absent. No retry was performed."
@@ -1380,7 +1454,9 @@ public final class SessionController {
                     "operations": spec.operations.map { $0.rawValue }
                 ]
             },
-            "readOnlyMetadataFields": registry.supportedMetadataFields.map { spec in
+            "writableMetadataFields": ["rating": ["type": "integer", "minimum": 0, "maximum": 5], "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]],
+            "metadataWrites": ["tool": "metadata_set", "precondition": "metadataStateHash", "requiredBuild": Self.pinnedBuild],
+            "readOnlyMetadataFields": registry.supportedMetadataFields.filter { !$0.operations.contains(.set) }.map { spec in
                 [
                     "name": spec.name,
                     "aliases": spec.aliases,
@@ -1397,7 +1473,7 @@ public final class SessionController {
             ],
             "concurrency": "advisory-lock",
             "workingVariantEnforced": true,
-            "existingVariantEditing": ["beginTool": "variant_edit", "referencePrefix": "c1_edit_", "fields": ["crop", "rotation", "exposure", "contrast", "saturation", "temperature", "tint"],
+            "existingVariantEditing": ["beginTool": "variant_edit", "referencePrefix": "c1_edit_", "fields": ["rating", "colorTag", "crop", "rotation", "keystone", "exposure", "contrast", "saturation", "temperature", "tint"],
                                        "restoreTool": "geometry_restore", "createsVariant": false, "tonalWrites": true, "deletion": false]
         ]
     }

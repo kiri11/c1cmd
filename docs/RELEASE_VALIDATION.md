@@ -10,6 +10,24 @@ normal-validation failure.
 
 This is the current release authority. The M0 report preserves historical feasibility evidence; it does not override the decision here.
 
+## Rating and color tag editing candidate (2026-09-17 UTC)
+
+Contract **1.9.0** adds `metadata_set` / `c1 metadata set` for ratings 0–5 and
+native color tags 0–7, with an independent metadata state token, saved baselines,
+diffs, pre-dispatch journaling, native state checks, and readback verification.
+The [metadata report](metadata/16.8.5.30/README.md) records **907/907 offline
+assertions**, **25 recovery-harness tests**, shared contract/profile checks,
+and all **nine packaged live suites** passing with build resource fallback hidden.
+
+Every rating and color-tag value, clearing, omitted-field preservation, stale
+metadata rejection, and baseline restoration passed on existing variants in a
+Session and an explicitly enabled referenced-original Catalog. Tone, geometry,
+variant count, and RAW checksums were preserved. Removing Catalog authorization
+blocked further metadata writes. The composition profile excludes the new tool.
+Only mocked partial-write/readback/recovery failures were exercised; no new
+live timeout or process-death qualification is claimed. Existing distribution
+and Catalog storage/recovery limits remain unchanged.
+
 ## Keystone corrections candidate (2026-09-17 UTC)
 
 Contract **1.8.0** adds manual keystone amount, vertical, horizontal, skew, and

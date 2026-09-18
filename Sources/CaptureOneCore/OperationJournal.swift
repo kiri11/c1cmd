@@ -32,6 +32,9 @@ public struct OperationRecord: Codable, Equatable {
     public let intendedAdjustments: Adjustments?
     public let beforeAdjustments: Adjustments?
     public var afterAdjustments: Adjustments?
+    public var beforeMetadata: VariantMetadata?
+    public var intendedMetadata: VariantMetadata?
+    public var afterMetadata: VariantMetadata?
     public var beforeGeometry: Geometry?
     public var intendedGeometry: Geometry?
     public var requestedGeometry: GeometryRequest?
@@ -133,11 +136,12 @@ public final class OperationJournal {
     }
 
     public func update(operationId: String, status: String, afterAdjustments: Adjustments? = nil,
-                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil, afterGeometry: Geometry? = nil) throws {
+                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil, afterGeometry: Geometry? = nil, afterMetadata: VariantMetadata? = nil) throws {
         guard var entry = try validatedEntries().first(where: { $0.operationId == operationId }) else {
             throw C1Error.invalidRequest("Operation not found: \(operationId)")
         }
         entry.status = status
+        if let value = afterMetadata { entry.afterMetadata = value }
         if let value = afterGeometry { entry.afterGeometry = value }
         if let value = afterAdjustments { entry.afterAdjustments = value }
         if let value = diff { entry.diff = value }

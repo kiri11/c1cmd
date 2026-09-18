@@ -123,6 +123,7 @@ public struct OutputFormatter {
             lines.append("Working Ref  : \(w)")
         }
         lines.append("State Hash   : \(res.stateHash)")
+        lines.append("Metadata Hash: \(res.metadataStateHash ?? "unavailable")")
         lines.append("\nAdjustments:")
         if let v = res.adjustments.exposure { lines.append(String(format: "  exposure    : %+.4f EV", v)) }
         if let v = res.adjustments.contrast { lines.append(String(format: "  contrast    : %+.2f", v)) }
@@ -179,6 +180,10 @@ public struct OutputFormatter {
             lines.append("No adjustment differences found between \(res.ref1) and \(res.ref2).")
         }
         if !res.diff.isEmpty { lines.append(contentsOf: renderDiffTable(res.diff)) }
+        if let metadataDiff = res.metadataDiff, !metadataDiff.isEmpty {
+            lines.append("\nRating / color tag differences:")
+            lines.append(contentsOf: renderDiffTable(metadataDiff))
+        }
         if let geometryDiff = res.geometryDiff, !geometryDiff.isEmpty {
             lines.append("\nCrop / rotation differences:")
             lines.append(contentsOf: renderDiffTable(geometryDiff))

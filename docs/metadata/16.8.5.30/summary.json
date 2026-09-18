@@ -1,0 +1,832 @@
+{
+  "contractVersion": "1.9.0",
+  "captureOneBuild": "16.8.5.30",
+  "date": "2026-09-17",
+  "validation": "normal packaged qualification; no deliberate live faults",
+  "offlineAssertions": 907,
+  "recoveryHarnessTests": 25,
+  "archiveSHA256": "b16ffa0eb7c6317735b62f599b78e6672b545edfe3f4adcdce207aafa3310d4a",
+  "baseCommit": "ff8ea854f0ff9c9f04385a41730865b11168e62f",
+  "workingTreeChanges": true,
+  "events": [
+    {
+      "event": "environment",
+      "cliSHA256": "6dcf83cc4e1e42f1d6e9cc82a8286159a214d86d1cc1c7b71cef6a16f693560c",
+      "mcpSHA256": "d9d833d709cdf8f2153206ba8c301e0e19dfe482696602ee97f0631c6cbf3154",
+      "sourceSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+      "contract": "1.9.0"
+    },
+    {
+      "event": "session-metadata",
+      "operations": [
+        "7b662212-592d-4518-bbcf-dbd5353e2272",
+        "fb19f6a8-a70b-4a28-b7cb-d4914ffa9195",
+        "286fb0f2-d6a3-4349-b965-b52fb0f58380",
+        "525746a1-3ce5-46d1-8f13-fb172c163b39",
+        "bcaa3a6c-22e1-45e5-8e34-5fb8cf8b9f93",
+        "3583b47d-69b9-4618-b047-39f9d101aa66",
+        "a305971f-4cbc-4a99-802c-a0834429f1c2",
+        "dcca3ecd-a9e8-4d7b-ae07-6440c01e6a9d",
+        "7e7b175e-3517-4a6f-8af5-d96f7f71ed45",
+        "8685beb1-87e6-47ec-8187-8dda20b5cf5d",
+        "25c5aca6-d7fd-48e7-80de-3a85f8d93941",
+        "f3413a6d-354f-46ab-a4a3-63d66db0fafe",
+        "7e03e235-c25f-439e-9cf6-a80cf7b444a9",
+        "0f60b07e-45e8-4856-99ec-cfe8f2219639"
+      ],
+      "restored": {
+        "after": {
+          "colorTag": 0,
+          "rating": 5
+        },
+        "before": {
+          "colorTag": 7,
+          "rating": 2
+        },
+        "diff": {
+          "colorTag": {
+            "after": 0,
+            "before": 7,
+            "delta": -7
+          },
+          "rating": {
+            "after": 5,
+            "before": 2,
+            "delta": 3
+          }
+        },
+        "isDryRun": false,
+        "metadataStateHash": "metadata-v1:b281170349e925b2801f2932eaaaea434dbeedcf68efa94900f37f593525d08f",
+        "operationId": "c21398d0-f004-4499-a28b-7276f91ba838",
+        "workingRef": "c1_edit_25957595-3aca-4592-8d38-eef9bd37917b"
+      },
+      "journal": {
+        "afterAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "afterGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "afterMetadata": {
+          "colorTag": 7,
+          "rating": 5
+        },
+        "appInstance": "10728:1789689080.3677049",
+        "beforeAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "beforeGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "beforeMetadata": {
+          "colorTag": 6,
+          "rating": 5
+        },
+        "diff": {
+          "colorTag": {
+            "after": 7,
+            "before": 6,
+            "delta": 1
+          }
+        },
+        "documentIdentity": "/tmp/c1-existing-live-h4tuyv8i/existing/existing.cosessiondb|16777232|4447182|1789691197.3946266",
+        "documentPath": "/tmp/c1-existing-live-h4tuyv8i/existing",
+        "intendedMetadata": {
+          "colorTag": 7,
+          "rating": 5
+        },
+        "nativeVariantId": "1",
+        "operationId": "0f60b07e-45e8-4856-99ec-cfe8f2219639",
+        "operationType": "metadata_set",
+        "parentImagePath": "/tmp/c1-existing-live-h4tuyv8i/existing/Capture/fixture.CR3",
+        "preconditionStateHash": "metadata-v1:45a38f9c2fc7afbcd249e691fb31a7956bf60cdb02334df01a25234c1dedbd99",
+        "status": "succeeded",
+        "timestamp": "2026-09-18T00:27:30Z",
+        "workingRef": "c1_edit_25957595-3aca-4592-8d38-eef9bd37917b"
+      },
+      "ratings": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "colorTags": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+    },
+    {
+      "event": "passed-session",
+      "variantId": "1",
+      "variantCount": 1,
+      "operations": 30,
+      "document": {
+        "appVersion": "16.8.5.30",
+        "captureFolder": "/tmp/c1-existing-live-h4tuyv8i/existing/Capture",
+        "documentId": "/private/tmp/c1-existing-live-h4tuyv8i/existing",
+        "documentName": "existing.cosessiondb",
+        "documentPath": "/tmp/c1-existing-live-h4tuyv8i/existing",
+        "isSession": true,
+        "openToken": "10728:1789689080.3677049|/tmp/c1-existing-live-h4tuyv8i/existing/existing.cosessiondb|16777232|4447182|1789691197.3946266",
+        "outputFolder": "/tmp/c1-existing-live-h4tuyv8i/existing/Output",
+        "writesEnabled": true
+      },
+      "baseline": {
+        "baselineAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "baselineGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "baselineGeometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "baselineMetadata": {
+          "colorTag": 0,
+          "rating": 5
+        },
+        "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "createdAt": "2026-09-18T00:26:43Z",
+        "documentPath": "/tmp/c1-existing-live-h4tuyv8i/existing",
+        "documentToken": "10728:1789689080.3677049|/tmp/c1-existing-live-h4tuyv8i/existing/existing.cosessiondb|16777232|4447182|1789691197.3946266",
+        "parentImagePath": "/tmp/c1-existing-live-h4tuyv8i/existing/Capture/fixture.CR3",
+        "variantId": "1",
+        "workingRef": "c1_edit_25957595-3aca-4592-8d38-eef9bd37917b"
+      },
+      "final": {
+        "adjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "geometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "geometryUsableBounds": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "id": "1",
+        "metadata": {
+          "asShotWB": "Manual",
+          "camera": "Canon EOS R6m2",
+          "colorTag": 0,
+          "iso": "ISO 2500",
+          "lens": "Canon EF 35mm f/1.4L II USM",
+          "rating": 5,
+          "shutterSpeed": "1/800 s"
+        },
+        "metadataStateHash": "metadata-v1:b281170349e925b2801f2932eaaaea434dbeedcf68efa94900f37f593525d08f",
+        "parentImagePath": "/tmp/c1-existing-live-h4tuyv8i/existing/Capture/fixture.CR3",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "workingRef": "c1_edit_25957595-3aca-4592-8d38-eef9bd37917b"
+      },
+      "preview": {
+        "fileSizeBytes": 177010,
+        "geometry": {
+          "crop": {
+            "centerX": 3089,
+            "centerY": 2105,
+            "height": 3757,
+            "width": 2818
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            10,
+            -5,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3089,
+            "centerY": 2105,
+            "height": 3758,
+            "width": 5637
+          },
+          "orientation": 0,
+          "rotation": 2
+        },
+        "geometryStateHash": "geometry-v1:5465fae1e13d8387e721ec2f21b30d19c2c6eee462eddc1b27c5211b5686a1df",
+        "height": 1500,
+        "nativeVariantId": "1",
+        "operationId": "39d9044c-3081-4065-9177-fffa94efd3af",
+        "outputPath": "/private/tmp/c1-existing-live-h4tuyv8i/existing/Output/c1-previews/39d9044c-3081-4065-9177-fffa94efd3af/preview.jpg",
+        "pixelSha256": "885031bbc318c3ba952007c2957ede7696a88bbff29f48f83393749e935519c1",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "width": 1125,
+        "workingRef": "c1_edit_25957595-3aca-4592-8d38-eef9bd37917b"
+      },
+      "noCloneEvents": true,
+      "rawUnchanged": true
+    },
+    {
+      "event": "catalog-metadata",
+      "operations": [
+        "ea7d19d2-3cba-4c76-9307-5f9da789865e",
+        "16502bb1-2aa2-42d2-a5ad-421f4ecb307d",
+        "72942e50-8a0b-45e8-95a0-01c8caf0c2b9",
+        "c3352dc3-c290-4be9-acb5-942da13beda0",
+        "576a04a7-f910-48fd-819a-2a2cca372bad",
+        "eefc094b-0f66-4692-8782-716a26f1aff6",
+        "92dda381-645b-48f3-8f8f-e3005f714576",
+        "2622cc5e-f90f-4e4b-aff0-fb9e1ef8d1df",
+        "13659a12-e2ae-42f2-8831-f6944ea642c5",
+        "1618e61c-b737-4d8e-98d1-d3363fd632f9",
+        "6d66ab73-53a9-4f45-a484-357644d2afba",
+        "659d24f4-7512-4205-9e70-55f0ab2784fa",
+        "700cc497-778a-4dc5-98ea-55675dcc2f1a",
+        "d190fd2e-6ba8-4a36-b1be-3c4703dd67e6"
+      ],
+      "restored": {
+        "after": {
+          "colorTag": 0,
+          "rating": 5
+        },
+        "before": {
+          "colorTag": 7,
+          "rating": 2
+        },
+        "diff": {
+          "colorTag": {
+            "after": 0,
+            "before": 7,
+            "delta": -7
+          },
+          "rating": {
+            "after": 5,
+            "before": 2,
+            "delta": 3
+          }
+        },
+        "isDryRun": false,
+        "metadataStateHash": "metadata-v1:b281170349e925b2801f2932eaaaea434dbeedcf68efa94900f37f593525d08f",
+        "operationId": "a148e192-70af-4e7d-877e-e3f36fe5600e",
+        "workingRef": "c1_edit_5e002e39-32d4-4d38-bdf6-cabdd88702ca"
+      },
+      "journal": {
+        "afterAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "afterGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "afterMetadata": {
+          "colorTag": 7,
+          "rating": 5
+        },
+        "appInstance": "10728:1789689080.3677049",
+        "beforeAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "beforeGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "beforeMetadata": {
+          "colorTag": 6,
+          "rating": 5
+        },
+        "diff": {
+          "colorTag": {
+            "after": 7,
+            "before": 6,
+            "delta": 1
+          }
+        },
+        "documentIdentity": "/tmp/c1-existing-live-zzylin6b/existing.cocatalog/existing.cocatalogdb|16777232|4447852|1789691333.7544086",
+        "documentPath": "/tmp/c1-existing-live-zzylin6b/existing.cocatalog",
+        "intendedMetadata": {
+          "colorTag": 7,
+          "rating": 5
+        },
+        "nativeVariantId": "1",
+        "operationId": "d190fd2e-6ba8-4a36-b1be-3c4703dd67e6",
+        "operationType": "metadata_set",
+        "parentImagePath": "/tmp/c1-existing-live-zzylin6b/fixture.CR3",
+        "preconditionStateHash": "metadata-v1:45a38f9c2fc7afbcd249e691fb31a7956bf60cdb02334df01a25234c1dedbd99",
+        "status": "succeeded",
+        "timestamp": "2026-09-18T00:29:48Z",
+        "workingRef": "c1_edit_5e002e39-32d4-4d38-bdf6-cabdd88702ca"
+      },
+      "ratings": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "colorTags": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+    },
+    {
+      "event": "passed-catalog",
+      "variantId": "1",
+      "variantCount": 1,
+      "operations": 30,
+      "document": {
+        "appVersion": "16.8.5.30",
+        "captureFolder": "",
+        "documentId": "/private/tmp/c1-existing-live-zzylin6b/existing.cocatalog",
+        "documentName": "existing",
+        "documentPath": "/tmp/c1-existing-live-zzylin6b/existing.cocatalog",
+        "isSession": false,
+        "openToken": "10728:1789689080.3677049|/tmp/c1-existing-live-zzylin6b/existing.cocatalog/existing.cocatalogdb|16777232|4447852|1789691333.7544086",
+        "outputFolder": "/tmp/c1-existing-live-zzylin6b/existing.cocatalog.c1-output",
+        "writesEnabled": true
+      },
+      "baseline": {
+        "baselineAdjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "baselineGeometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "baselineGeometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "baselineMetadata": {
+          "colorTag": 0,
+          "rating": 5
+        },
+        "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "createdAt": "2026-09-18T00:28:59Z",
+        "documentPath": "/tmp/c1-existing-live-zzylin6b/existing.cocatalog",
+        "documentToken": "10728:1789689080.3677049|/tmp/c1-existing-live-zzylin6b/existing.cocatalog/existing.cocatalogdb|16777232|4447852|1789691333.7544086",
+        "parentImagePath": "/tmp/c1-existing-live-zzylin6b/fixture.CR3",
+        "variantId": "1",
+        "workingRef": "c1_edit_5e002e39-32d4-4d38-bdf6-cabdd88702ca"
+      },
+      "final": {
+        "adjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "geometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "geometryUsableBounds": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "id": "1",
+        "metadata": {
+          "asShotWB": "Manual",
+          "camera": "Canon EOS R6m2",
+          "colorTag": 0,
+          "iso": "ISO 2500",
+          "lens": "Canon EF 35mm f/1.4L II USM",
+          "rating": 5,
+          "shutterSpeed": "1/800 s"
+        },
+        "metadataStateHash": "metadata-v1:b281170349e925b2801f2932eaaaea434dbeedcf68efa94900f37f593525d08f",
+        "parentImagePath": "/tmp/c1-existing-live-zzylin6b/fixture.CR3",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "workingRef": "c1_edit_5e002e39-32d4-4d38-bdf6-cabdd88702ca"
+      },
+      "preview": {
+        "fileSizeBytes": 176954,
+        "geometry": {
+          "crop": {
+            "centerX": 3089,
+            "centerY": 2105,
+            "height": 3757,
+            "width": 2818
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            10,
+            -5,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 3089,
+            "centerY": 2105,
+            "height": 3758,
+            "width": 5637
+          },
+          "orientation": 0,
+          "rotation": 2
+        },
+        "geometryStateHash": "geometry-v1:5465fae1e13d8387e721ec2f21b30d19c2c6eee462eddc1b27c5211b5686a1df",
+        "height": 1500,
+        "nativeVariantId": "1",
+        "operationId": "a9d70ff7-de1e-4aab-b1b3-87a30738a237",
+        "outputPath": "/private/tmp/c1-existing-live-zzylin6b/existing.cocatalog.c1-output/c1-previews/a9d70ff7-de1e-4aab-b1b3-87a30738a237/preview.jpg",
+        "pixelSha256": "fea111c6ab39a2a3f974ca7d553e190e4b5fa849988871a69eb2f427618b17a5",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "width": 1125,
+        "workingRef": "c1_edit_5e002e39-32d4-4d38-bdf6-cabdd88702ca"
+      },
+      "noCloneEvents": true,
+      "rawUnchanged": true
+    },
+    {
+      "event": "passed",
+      "storage": "session-and-referenced-catalog",
+      "noDuplicateVariants": true,
+      "rawUnchanged": true
+    }
+  ],
+  "sourceSHA256": {
+    "Sources/CaptureOneCore/AppleScriptExecutor.swift": "bcf676698ecf956dcd5d4b0a32b6cb175cdad3710ea80b522a61c081474a3c40",
+    "Sources/CaptureOneCore/C1Error.swift": "1137aaa2976c91e8327d082b94cc759d3ef9ecde18fbcfea92ab239ee159a9df",
+    "Sources/CaptureOneCore/CaptureOneLock.swift": "4359bcf1533ea757b4f9091ab1614dbba4e367e649ce08c748146d108c0e10a9",
+    "Sources/CaptureOneCore/CatalogLocation.swift": "b2e67152994c6cfd2008de5f4f4287b9ec3fff486235a3b0985c1de48cf87705",
+    "Sources/CaptureOneCore/ContractSchema.swift": "44cea75d39fcd42a7655eb080b8ce57cb80e58a2344ba68dbb42740a59bebcac",
+    "Sources/CaptureOneCore/EditingStore.swift": "847d0e845010b0071de3c529f25fed6a6c5ca1e68e8ef435b5718e63a5840147",
+    "Sources/CaptureOneCore/FieldSpec.swift": "e4a6696d698e4978b9339c280cf52f70bb3bacb3d1c405696f46ce767100cd21",
+    "Sources/CaptureOneCore/Geometry.swift": "4d20980f0df647c20b30d8e77529a16db16a85ba7ecd014c9ac7a143c3250c1f",
+    "Sources/CaptureOneCore/ImageDimensions.swift": "acf2ecded55b03c33de2d168eeb488210e84b163d690b2805ed221ec138de6bd",
+    "Sources/CaptureOneCore/OperationJournal.swift": "c8433c2c1b0c6c54e14e89f3eb5c0d58a82d72d7b7e73689076a01ae6023f04e",
+    "Sources/CaptureOneCore/OutputFormatter.swift": "fc1a9c3af19505e752a2824a55ef6dc7042e5606630ca3917af35afc93a3722b",
+    "Sources/CaptureOneCore/PreviewManager.swift": "7178689847710ff056ce0d656897aa52d2784faec08ec4446af3ad77ad730a35",
+    "Sources/CaptureOneCore/ProvenanceStore.swift": "809ec6eb304c1b51ff2a376882245f4f1d8421eed2215b7f3f35108a0e2bf508",
+    "Sources/CaptureOneCore/RequestContext.swift": "86dffcf46ca1c2704df6e1d43b8c8115984641572d9596add423cedda35945bb",
+    "Sources/CaptureOneCore/Resources/Handlers.applescript": "7c68e146bf979d8f039b6fcb55dce31fae926b4c8ac475c3e504b77cba5f1f82",
+    "Sources/CaptureOneCore/SafetyContext.swift": "b220d848a04103153a821e0b8c3c11d8885af2e0c13a44e36cb1e9662f493f6c",
+    "Sources/CaptureOneCore/SessionController.swift": "89b67c087a29f371cf87b38f2c524940fe3d26005ac5bf9fd3b20714182c67b7",
+    "Sources/CaptureOneCore/StateHash.swift": "b880f7610fb3bdf978b07b690d0c33745301937ee1f81b3986de6a17ffeaa50f",
+    "Sources/CaptureOneCore/VariantMetadata.swift": "51cc026d1ca58d49eebbcc082399e7fa309e2084181744a8163907ed859cbc17",
+    "Sources/CaptureOneCore/WorkingReference.swift": "7ff2633f8d1d798ba3ef5b860d653cfa2785559bda2557100f0816990231aecb",
+    "Sources/c1/main.swift": "31d90eebca1fa6e42213f4953394da9491c6a961ee14c33cc701c03d1414f3ef",
+    "Sources/c1-mcp/main.swift": "f0c42a5c7d34ad658d571f20eb2b85484cb0ba2d8f26d9df4ad7ca7785e685c5"
+  },
+  "testSHA256": {
+    "Tests/CaptureOneCoreTests/MetadataTests.swift": "400d2bcaef5ec74baeed5c203d768d9e8e5d522f520d726dcbfe08037aa67f1a",
+    "Tests/CaptureOneCoreTests/ReleaseSafetyTests.swift": "2548f02b50d99a1edf0b1d10849fcdba6dcce09d464a762599f593c484dabef2",
+    "Tests/contract_test.py": "fe9cb28ca9d101e638c0e19f756576c6323533b3bce4a2d09704324f4773060c",
+    "Tests/existing_variant_integration_test.py": "cac44e3baf9703530318ed0edd3008cc6ce80ccc9f3720d94c26780c23a56606",
+    "Tests/mcp_test.py": "489ce793e0a96b6b1e84c8bae968459deecefea948adce6528f5a2f2b766729b",
+    "Tests/release_integration_test.py": "e66e5608e81b1dad812d70de98230411933c8a9e3b98028889ea5774289d8155"
+  }
+}

@@ -61,7 +61,7 @@ macOS Automation permission must allow the launching application to control Capt
 
 No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `allChecksPassed`, `writesEnabled`, and `exactBuildMatched` before editing. `isSession` identifies the document type; it is not an editing permission.
 
-The default server exposes 20 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
+The default server exposes 21 tools: `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -83,7 +83,7 @@ For MCP, add this to the server's `env` and restart the server:
 }
 ```
 
-The default profile permits all supported tonal and geometry changes. Optionally add `C1_MCP_PROFILE=composition` to restrict an agent to crop/rotation/keystone. An absolute `.cocatalogdb` path inside the package is also accepted. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
+The default profile permits all supported tonal, geometry, rating, and color-tag changes. Optionally add `C1_MCP_PROFILE=composition` to restrict an agent to crop/rotation/keystone. An absolute `.cocatalogdb` path inside the package is also accepted. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
 
 Before using a main catalog, make a fresh **File → Backup Catalog** backup and keep your RAW backups. Capture One's [catalog backup](https://support.captureone.com/hc/en-us/articles/27502751010333-How-Catalog-and-Session-Backups-Work-in-Capture-One) includes its database and adjustments, not original image files. `c1` does not create or verify this backup automatically.
 
@@ -179,6 +179,27 @@ For inventory, Ctrl-C in the CLI or MCP cancellation requests stop work at the n
 All values must be finite. Writes touch requested fields only; white balance is written and checked as a temperature/tint pair. Bounds, managed identity, and the state precondition are checked before dispatch. The handler checks the expected five-field state again immediately before its setters. Apple Event property writes are sequential, not atomic transactions: a later failure can leave an earlier field applied. Do not edit concurrently in the UI.
 
 MCP accepts either a nested `adjustments` object or flat fields. Mixed forms, duplicate aliases, unknown fields, and wrong types are rejected. `dump.batchSize` must be 1–1000; preview timeout must be greater than zero and at most 300 seconds.
+
+### Ratings and color tags
+
+Use `c1 metadata set` / MCP `metadata_set` on an existing editing reference or managed clone. `rating` accepts integers **0–5** and `colorTag` accepts native integers **0–7**; **0 clears** either field. Supply one or both fields. Omitted fields, tonal adjustments, and geometry are preserved. These writes require Capture One **16.8.5.30** and the same Catalog opt-in and referenced-original restrictions as other edits.
+
+Read `get` immediately before writing and pass its **`metadataStateHash`** as `--if-metadata-state` / `ifMetadataState`. This token covers both rating and color tag, independently of the tonal `stateHash` and geometry token. The native handler checks both values and the parent image again before writing. Stale tokens reject the request; read the state again and reconcile the photographer's changes.
+
+```sh
+c1 get <working-ref>
+c1 metadata set <working-ref> --if-metadata-state <metadataStateHash> --rating 5 --color-tag 4
+```
+
+```json
+{"workingRef":"c1_edit_...","ifMetadataState":"metadata-v1:...","rating":5,"colorTag":4}
+```
+
+`--dry-run` / `dryRun` reports the proposed values without writing; its metadata token is the **current** token. Responses contain `before`, `after`, `diff`, and the resulting metadata token. `get` exposes current values under `metadata`. Rating filters in `variants_list` reflect subsequent edits.
+
+New editing references and clones retain `baselineMetadata`; `diff` includes `metadataBefore`, `metadataAfter`, and `metadataDiff`. Restore a saved rating/tag by explicitly setting those values with a fresh token. Older records remain readable but have no metadata baseline. Tonal `reset` does not reset ratings or tags. Each mutation journals its before, intended, and observed values. A partial write or uncertain reply blocks further writes until normal restart/reconciliation; never retry automatically.
+
+The geometry-only `C1_MCP_PROFILE=composition` hides and rejects `metadata_set`. Use the default profile for culling edits. Other metadata remains read-only. See [metadata validation](docs/metadata/16.8.5.30/README.md) for test evidence.
 
 ### Crop and rotation
 

@@ -10,6 +10,7 @@ public struct EditingRecord: Codable, Equatable {
     public let documentToken: String
     public let parentImagePath: String
     public let baselineAdjustments: Adjustments
+    public let baselineMetadata: VariantMetadata?
     public let baselineGeometry: Geometry?
     public let baselineStateHash: String
     public let baselineGeometryStateHash: String?
@@ -22,6 +23,7 @@ public struct EditingRecord: Codable, Equatable {
         documentToken = document.openToken
         parentImagePath = source.parentImagePath!
         baselineAdjustments = source.adjustments
+        baselineMetadata = VariantMetadata.from(source.metadata)
         baselineGeometry = source.geometry
         baselineStateHash = source.stateHash
         baselineGeometryStateHash = source.geometryStateHash

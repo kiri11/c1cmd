@@ -7,6 +7,8 @@ final class FakeScript: ScriptExecuting {
     let directory: URL
     var values: [String: [Double]] = ["1": [0, 0, 0, 5000, 0]]
     var ratings: [String: Int] = [:]
+    var colorTags: [String: Int] = [:]
+    var metadataFault: String?
     var selectedIDs: Set<String> = []
     var listArguments: [NSAppleEventDescriptor] = []
     var documentCount = 1
@@ -50,7 +52,7 @@ final class FakeScript: ScriptExecuting {
     func item(_ id: String) -> [String: Any] {
         let a = values[id]!
         return ["variantId": id, "parentImagePath": parentOverride ?? parent,
-                "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4], "starRating": 0, "colorTagVal": 0]
+                "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4], "starRating": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0]
     }
     private func ids(from descriptor: NSAppleEventDescriptor?) -> [String] {
         guard let descriptor else { return [] }
@@ -64,13 +66,13 @@ final class FakeScript: ScriptExecuting {
     private func summary(_ id: String) -> [String: Any] {
         let a = values[id] ?? [0, 0, 0, 5000, 0]
         return ["variantId": id, "variantName": "fixture", "parentImagePath": parentOverride ?? parent,
-                "isSelected": selectedIDs.contains(id), "starRating": ratings[id] ?? 0, "colorTagVal": 0,
+                "isSelected": selectedIDs.contains(id), "starRating": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0,
                 "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4]]
     }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
         calls.append(handler)
         beforeHandler?(handler)
-        if ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyAdjustments", "ensurePreviewRecipe", "processPreview"].contains(handler) {
+        if ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyMetadata", "applyAdjustments", "ensurePreviewRecipe", "processPreview"].contains(handler) {
             preparedBeforeDispatch = preparedBeforeDispatch && OperationJournal(sessionDirectory: directory).unresolvedEntries().contains { $0.status == "pending" }
         }
         if fail == handler { throw C1Error.timeout("injected late reply") }
@@ -83,7 +85,7 @@ final class FakeScript: ScriptExecuting {
         case "listVariants":
             listArguments = args
             result = values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }.map {
-                ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": 0] as [String: Any]
+                ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": colorTags[$0] ?? 0] as [String: Any]
             }
         case "discoverVariantIDs":
             beforeDiscover?()
@@ -133,6 +135,19 @@ final class FakeScript: ScriptExecuting {
             let target = URL(fileURLWithPath: args[3].stringValue!).appendingPathComponent(args[4].stringValue!).appendingPathComponent("preview.jpg")
             try FakeScript.jpeg().write(to: target)
             result = ["jobId": "job-1"]
+        case "applyMetadata":
+            beforeApply?()
+            let id = args[1].stringValue!
+            guard args[6].stringValue == (parentOverride ?? parent) else { throw C1Error.identityAmbiguous("parent changed") }
+            guard ratings[id] ?? 0 == Int(args[4].int32Value), colorTags[id] ?? 0 == Int(args[5].int32Value) else {
+                throw C1Error.stateChanged("metadata changed at dispatch")
+            }
+            if let rating = optionalInt(from: args[2]) { ratings[id] = rating }
+            if metadataFault == "partial" { throw C1Error.timeout("lost reply after rating") }
+            if let tag = optionalInt(from: args[3]) { colorTags[id] = tag }
+            if metadataFault == "mismatch" { colorTags[id] = 0 }
+            if metadataFault == "tone" { values[id]![0] = 1 }
+            result = ["variantId": id, "ratingVal": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0] as [String: Any]
         case "applyAdjustments":
             beforeApply?()
             let id = args[1].stringValue!
@@ -202,7 +217,7 @@ struct ReleaseSafetyTests {
         }
         // Isolate each fault's journal so assertions cannot accidentally pass on an earlier blocker.
         try? FileManager.default.removeItem(at: journal.journalFile)
-        for operation in ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyAdjustments", "processPreview"] {
+        for operation in ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyMetadata", "applyAdjustments", "processPreview"] {
             XCTAssertNoThrowBlock {
                 fake.fail = nil
                 let clone = try core.cloneVariant(sourceRef: "1")
@@ -213,6 +228,9 @@ struct ReleaseSafetyTests {
                     case "createBaselineVariant": _ = try core.createBaselineVariant(sourceRef: "1")
                     case "deleteVariant": _ = try core.deleteVariant(workingRefString: clone.workingRef)
                     case "processPreview": _ = try core.preview(ref: clone.workingRef)
+                    case "applyMetadata":
+                        let current = try core.get(ref: clone.workingRef)
+                        _ = try core.metadataSet(workingRef: clone.workingRef, ifMetadataState: current.metadataStateHash!, rating: 5)
                     default:
                         let current = try core.get(ref: clone.workingRef)
                         _ = try core.mutate(workingRefString: clone.workingRef, ifState: current.stateHash, setAdjustments: Adjustments(exposure: 1), addAdjustments: nil)

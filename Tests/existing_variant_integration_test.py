@@ -97,6 +97,42 @@ def main():
             assert len(cli('variants', 'list')) == 1
             assert not cli('variants', 'list')[0]['isManagedWorkingClone']
             cli('variant', 'delete', ref, error='unmanaged-variant')
+            # Classification writes use a separate token and preserve the image edit.
+            baseline_metadata = edit['baselineMetadata']
+            assert baseline_metadata == {'rating': 5, 'colorTag': source['metadata']['colorTag']}
+            token = source['metadataStateHash']
+            dry, _ = tool('metadata_set', {'workingRef': ref, 'ifMetadataState': token, 'rating': 0, 'colorTag': 7, 'dryRun': True})
+            assert dry['metadataStateHash'] == token and cli('get', ref)['metadataStateHash'] == token
+            cli('metadata', 'set', source_id, '--if-metadata-state', token, '--rating', 1, error='unmanaged-variant')
+            metadata_operations = []
+            for rating in range(6):
+                result = cli('metadata', 'set', ref, '--if-metadata-state', token, '--rating', rating)
+                validate_response(result, contract['responses']['metadata_set'])
+                assert result['after'] == {'rating': rating, 'colorTag': baseline_metadata['colorTag']}
+                token = result['metadataStateHash']
+                metadata_operations.append(result['operationId'])
+                assert [v['id'] for v in cli('variants', 'list', '--rating', rating)] == [source_id]
+            for tag in range(8):
+                result, _ = tool('metadata_set', {'workingRef': ref, 'ifMetadataState': token, 'colorTag': tag})
+                assert result['after'] == {'rating': 5, 'colorTag': tag}
+                token = result['metadataStateHash']
+                metadata_operations.append(result['operationId'])
+            state = cli('get', ref)
+            assert state['stateHash'] == source['stateHash'] and state['geometryStateHash'] == source['geometryStateHash']
+            assert state['metadata']['colorTag'] == 7
+            # Simulate normal photographer changes between turns, not timeout injection.
+            apple(f'set rating of variant id "{source_id}" of current document to 2')
+            tool('metadata_set', {'workingRef': ref, 'ifMetadataState': token, 'colorTag': 4}, error='state-changed')
+            current = cli('get', ref)
+            restored_metadata, _ = tool('metadata_set', {'workingRef': ref, 'ifMetadataState': current['metadataStateHash'], **baseline_metadata})
+            assert restored_metadata['after'] == baseline_metadata
+            metadata_diff, _ = tool('diff', {'ref1': ref})
+            assert not metadata_diff['metadataDiff']
+            metadata_entry, _ = tool('operation_status', {'operationId': metadata_operations[-1]})
+            assert metadata_entry['status'] == 'succeeded' and metadata_entry['afterMetadata'] == {'rating': 5, 'colorTag': 7}
+            assert sha(fixture) == original_sha and sha(raw) == original_sha
+            log(kind + '-metadata', operations=metadata_operations, restored=restored_metadata, journal=metadata_entry,
+                ratings=list(range(6)), colorTags=list(range(8)), rawSHA256=sha(fixture))
             changed = cli('set', ref, '--if-state', source['stateHash'], 'exposure=0.5', 'contrast=5', 'saturation=8', 'temperature=5100', 'tint=2')
             tool('set', {'workingRef': ref, 'ifState': source['stateHash'], 'exposure': 1}, error='state-changed')
             added, _ = tool('add', {'workingRef': ref, 'ifState': changed['stateHash'], 'exposure': .25})
@@ -154,6 +190,7 @@ def main():
                 denied = dict(environment); denied.pop('C1_CATALOG_WRITE_PATH')
                 client = Client(MCP, env=denied, timeout=150)
                 tool('set', {'workingRef': ref, 'ifState': next_edit['stateHash'], 'exposure': 1}, error='invalid-request')
+                tool('metadata_set', {'workingRef': ref, 'ifMetadataState': source['metadataStateHash'], 'rating': 1}, error='invalid-request')
             journal = Path(doc['documentPath']) / '.c1/journal.jsonl'
             records = [json.loads(line) for line in journal.read_text().splitlines()]
             latest = {r['operationId']: r for r in records}

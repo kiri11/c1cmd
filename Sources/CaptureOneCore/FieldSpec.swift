@@ -199,8 +199,8 @@ public final class FieldRegistry {
             FieldSpec(name: "shutterSpeed", aliases: ["shutter"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
             FieldSpec(name: "asShotWB", aliases: ["asShotWhiteBalance"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
             FieldSpec(name: "captureDate", aliases: ["date"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
-            FieldSpec(name: "rating", type: "integer", minValue: 0, maxValue: 5, tolerance: 0, operations: [.get], isMetadata: true),
-            FieldSpec(name: "colorTag", type: "integer", tolerance: 0, operations: [.get], isMetadata: true)
+            FieldSpec(name: "rating", type: "integer", minValue: 0, maxValue: 5, tolerance: 0, operations: [.get, .set], isMetadata: true),
+            FieldSpec(name: "colorTag", type: "integer", minValue: 0, maxValue: 7, tolerance: 0, operations: [.get, .set], isMetadata: true)
         ]
     }
 
