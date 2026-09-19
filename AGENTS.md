@@ -156,9 +156,11 @@ coverage limits; reference hashes are evidence, never mutation permission.
 Registration does not authorize reuse. Verify each exact payload on an explicitly
 created disposable managed clone; inspect its preview. Only verified payloads can
 be applied, and changed payloads need new verification. Recipes currently support
-fourteen global numeric settings and explicit exposure/white-balance policies;
-mask/layer reconstruction, curves, indexed color fields and camera/lens profiles
-are excluded from recipe transfer.
+fourteen global numeric settings, five point curves, grain type/impact/granularity,
+vignette method/amount and explicit exposure/white-balance policies. Omitted fields
+retain destination values; a supplied curve replaces its full channel point list.
+Mask/layer reconstruction, indexed color fields and camera/lens profiles (including
+`film curve`) are excluded from recipe transfer.
 
 `edit_apply` prepares one existing variant and retains fresh per-step native
 preconditions, before-state, readback and child operation IDs. Exposure/WB policies

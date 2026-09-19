@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-19",
+  "contractVersion": "2.6.0",
+  "captureOneVersion": "16.8.5.30",
+  "assertions": 1187,
+  "archiveSHA256": "9d05d950c9d67f4dba9b4bb9ae822e9af73a06daa467b01d64d50bea153659e0",
+  "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+  "cliSHA256": "f36d636b25101dc57e5ebaaafa7d2e98032bae643613b5723c0e173115b48f38",
+  "mcpSHA256": "9126ed2c6d86c567bea234ae63eb92d57c7b4cccf5421bf8bc2d01602c16566d",
+  "session": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-fwy4zg0b/recipes",
+  "recoveryCases": [
+    "compound-native-timeout",
+    "compound-caller-death-between-steps"
+  ],
+  "cleanupOpenDocuments": 0
+}

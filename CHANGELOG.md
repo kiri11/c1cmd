@@ -5,6 +5,11 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Curves, grain and vignette recipes
+
+- Extend shared CLI/MCP recipe settings and per-photo overrides to five point curves, grain type/impact/granularity and vignette method/amount (contract 2.6.0).
+- Independently verify typed values and preserve omitted settings. Exposure, paired white balance and crop remain governed by explicit policies; film profiles and indexed color bands remain excluded.
+
 ## Compound result bundles
 
 - Return and persist a consolidated final observation, aggregate before/after diff, recipe and operation provenance, coverage and optional preview for successful CLI/MCP compound edits and verification (contract 2.5.0).

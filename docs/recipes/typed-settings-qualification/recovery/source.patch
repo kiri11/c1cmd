@@ -1,0 +1,128 @@
+diff --git a/Sources/CaptureOneCore/ContractSchema.swift b/Sources/CaptureOneCore/ContractSchema.swift
+index 7b65c14..77f7654 100644
+--- a/Sources/CaptureOneCore/ContractSchema.swift
++++ b/Sources/CaptureOneCore/ContractSchema.swift
+@@ -3,7 +3,7 @@ import CoreFoundation
+ 
+ /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
+ public enum ContractSchema {
+-    public static let version = "2.5.0"
++    public static let version = "2.6.0"
+     static let string: [String: Any] = ["type": "string", "minLength": 1]
+     static let boolean: [String: Any] = ["type": "boolean"]
+     static let number: [String: Any] = ["type": "number"]
+diff --git a/Sources/CaptureOneCore/Recipes.swift b/Sources/CaptureOneCore/Recipes.swift
+index 5bf9de9..6fd3ccb 100644
+--- a/Sources/CaptureOneCore/Recipes.swift
++++ b/Sources/CaptureOneCore/Recipes.swift
+@@ -6,12 +6,15 @@ import CryptoKit
+ public enum Recipes {
+     public static let tools = ["reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status"]
+     public static let fields = ["brightness", "contrast", "saturation", "highlight adjustment", "shadow recovery", "white recovery", "black recovery", "clarity amount", "clarity structure", "sharpening amount", "sharpening radius", "sharpening threshold", "noise reduction luminance", "noise reduction color"]
+-    static let oracleFields = ["exposure", "temperature", "tint"] + fields
++    public static let curveFields = ["rgb curve", "luma curve", "red curve", "green curve", "blue curve"]
++    public static let finishFields = ["film grain type", "film grain impact", "film grain granularity", "vignetting method", "vignetting amount"]
++    public static var supportedFields: [String] { fields + curveFields + finishFields }
++    static let oracleFields = ["exposure", "temperature", "tint"] + fields + curveFields + finishFields
+     static let str = ContractSchema.string
+     static let num = ContractSchema.number
+     static var exposure: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute","relative"]], "value":num], required:["mode"]) }
+     static var whiteBalance: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute"]], "temperature":num, "tint":num], required:["mode"]) }
+-    static var settings: [String:Any] { ContractSchema.object(Dictionary(uniqueKeysWithValues: fields.map { ($0, num as Any) })) }
++    static var settings: [String:Any] { ContractSchema.object((NativeEditing.patchSchema["properties"] as! [String:Any]).filter { supportedFields.contains($0.key) }) }
+     static var recipe: [String:Any] { ContractSchema.object(["version":["type":"integer","enum":[1]], "referenceId":str, "settings":settings, "exposure":exposure, "whiteBalance":whiteBalance, "cropPolicy":["type":"string","enum":["preserve","per-photo"]]], required:["version","referenceId","settings","exposure","whiteBalance","cropPolicy"]) }
+     static var recipeSchema: [String:Any] { recipe }
+     static var geometry: [String:Any] {
+@@ -254,12 +257,12 @@ public final class RecipeWorkflow {
+             if verify {
+                 step = "verify"; try save()
+                 var expected = oracleBefore
+-                for (key,value) in patch { expected[key] = (value as! NSNumber).doubleValue }
+-                for (key,value) in tonal { expected[key] = (value as! NSNumber).doubleValue }
++                for (key,value) in nativePatch { expected[key] = value }
++                for (key,value) in tonal { expected[key] = .number((value as! NSNumber).doubleValue) }
+                 let observed = try core.recipeOracle(ref:ref)
+                 for key in Recipes.oracleFields {
+                     let tolerance = key == "temperature" ? 1.0 : (key == "tint" ? 0.05 : 0.0001)
+-                    guard let a = observed[key], let b = expected[key], abs(a-b) <= tolerance else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
++                    guard let a = observed[key], let b = expected[key], a.matches(b, tolerance:tolerance) else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
+                 }
+                 let fullAfter = try core.get(ref:ref,nativeTargets:[NativeTarget()])
+                 let nativeAfter = fullAfter.nativeSnapshots![0]
+@@ -275,7 +278,7 @@ public final class RecipeWorkflow {
+                 }
+                 let after = fullAfter
+                 guard after.geometry == initial.geometry, after.metadata == initial.metadata else { throw C1Error.readbackMismatch("Recipe changed geometry or metadata.") }
+-                try finish(["independentBefore":oracleBefore,"independentAfter":observed,"coverage":Recipes.oracleFields])
++                try finish(["independentBefore":try Recipes.object(oracleBefore),"independentAfter":try Recipes.object(observed),"coverage":Recipes.oracleFields])
+             }
+             if verify || args["preview"] as? Bool == true { step = "preview"; try save(); try finish(Recipes.object(core.preview(ref:ref))) }
+             step = "observe"; try save()
+diff --git a/Sources/CaptureOneCore/Resources/NativeActions.applescript b/Sources/CaptureOneCore/Resources/NativeActions.applescript
+index f981f7e..0bb4b0b 100644
+--- a/Sources/CaptureOneCore/Resources/NativeActions.applescript
++++ b/Sources/CaptureOneCore/Resources/NativeActions.applescript
+@@ -87,6 +87,37 @@ on nativeRecipeOracle(docName, variantId, expectedParent)
+         set v to variant id variantId of d
+         if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
+         set a to adjustments of v
+-        return {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real}
++        set observed to {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real}
++        set recipeCurvePoints to {}
++        repeat with p in every curve point of rgb curve of a
++            set end of recipeCurvePoints to (brightness of p as real)
++            set end of recipeCurvePoints to (amount of p as real)
++        end repeat
++        set end of observed to recipeCurvePoints
++        set recipeCurvePoints to {}
++        repeat with p in every curve point of luma curve of a
++            set end of recipeCurvePoints to (brightness of p as real)
++            set end of recipeCurvePoints to (amount of p as real)
++        end repeat
++        set end of observed to recipeCurvePoints
++        set recipeCurvePoints to {}
++        repeat with p in every curve point of red curve of a
++            set end of recipeCurvePoints to (brightness of p as real)
++            set end of recipeCurvePoints to (amount of p as real)
++        end repeat
++        set end of observed to recipeCurvePoints
++        set recipeCurvePoints to {}
++        repeat with p in every curve point of green curve of a
++            set end of recipeCurvePoints to (brightness of p as real)
++            set end of recipeCurvePoints to (amount of p as real)
++        end repeat
++        set end of observed to recipeCurvePoints
++        set recipeCurvePoints to {}
++        repeat with p in every curve point of blue curve of a
++            set end of recipeCurvePoints to (brightness of p as real)
++            set end of recipeCurvePoints to (amount of p as real)
++        end repeat
++        set end of observed to recipeCurvePoints
++        return observed & {film grain type of a as text, film grain impact of a as real, film grain granularity of a as real, vignetting method of a as text, vignetting amount of a as real}
+     end tell
+ end nativeRecipeOracle
+diff --git a/Sources/CaptureOneCore/SessionController.swift b/Sources/CaptureOneCore/SessionController.swift
+index 1a57bc1..8ad0b30 100644
+--- a/Sources/CaptureOneCore/SessionController.swift
++++ b/Sources/CaptureOneCore/SessionController.swift
+@@ -1604,14 +1604,16 @@ public final class SessionController {
+     }
+ 
+     /// Independent direct-property reader: does not call nativeRead/nativeReadField.
+-    func recipeOracle(ref: String) throws -> [String:Double] {
++    func recipeOracle(ref: String) throws -> [String:NativeValue] {
+         try lock.withLock {
+             let doc = try getDocumentInfo(), source = try get(ref:ref)
+             try checkedDocument(doc, writes:false)
+-            let values: [Double] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+-            guard values.count == Recipes.oracleFields.count, values.allSatisfy({ $0.isFinite }) else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
++            let values: [NativeValue] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
++            guard values.count == Recipes.oracleFields.count else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
+             try checkedDocument(doc,writes:false)
+-            return Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
++            let observation = Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
++            try NativeEditing.validate(observation,target:NativeTarget())
++            return observation
+         }
+     }
+ 

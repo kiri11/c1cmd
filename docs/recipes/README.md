@@ -6,14 +6,30 @@ Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
 path opt-in and referenced-original guards. Hand over exclusive control: the
 application lock coordinates c1 processes, not edits made in the Capture One UI.
 
-## Supported first version
+## Supported settings
 
 Global numeric settings: brightness, contrast, saturation, highlight adjustment,
 shadow/white/black recovery, clarity amount/structure, sharpening amount/radius/
 threshold, and luminance/color noise reduction. Exposure and white balance have
-separate mandatory policies. Native curves, color-editor bands, layers, masks,
-camera profiles and lens settings are excluded from recipe application in this
-version; they remain available through their existing native APIs.
+separate mandatory policies. Contract 2.6.0 also accepts:
+
+- `rgb curve`, `luma curve`, `red curve`, `green curve`, `blue curve`: flat x/y
+  point pairs in 0–100, with strictly increasing x (2–64 points).
+- `film grain type`: `fine`, `silver rich`, `soft`, `cubic`, `tabular`, `harsh`;
+  `film grain impact` and `film grain granularity`: numeric native amounts.
+- `vignetting method`: `elliptic on crop`, `circular on crop`, `circular`;
+  `vignetting amount`: numeric native amount.
+
+These use the same `settings` object and per-photo `overrides`. Each supplied
+curve replaces that channel's complete point list; omitted curves and grain or
+vignette properties retain the destination values. Method/type and amount are
+independent explicit fields. Recipes do not copy unspecified reference settings.
+Payload version 1 remains valid; changed content requires a new registration and
+independent verification. `film curve` (the camera processing curve/profile) is
+separate from these five point curves and remains excluded.
+
+Color-editor bands, layers, masks, camera profiles and lens settings are excluded
+from recipe application in this version; they remain available through their existing native APIs.
 
 A reference bundle captures compact settings, metadata, geometry, full image
 adjustment/lens/variant snapshots, document and parent-image identities, state
@@ -55,7 +71,15 @@ Registration requires the returned reference ID. For example:
   "recipe": {
     "version": 1,
     "referenceId": "REFERENCE_SHA256",
-    "settings": {"clarity amount": 5, "highlight adjustment": 10},
+    "settings": {
+      "clarity amount": 5,
+      "rgb curve": [0, 0, 50, 55, 100, 100],
+      "film grain type": "silver rich",
+      "film grain impact": 25,
+      "film grain granularity": 30,
+      "vignetting method": "circular",
+      "vignetting amount": -0.5
+    },
     "exposure": {"mode": "preserve"},
     "whiteBalance": {"mode": "preserve"},
     "cropPolicy": "per-photo"
@@ -75,15 +99,16 @@ its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument
 and `ifState`. It never chooses or creates a clone silently and rejects existing
 editing references and bare native IDs.
 
-Verification applies the payload, checks all 17 supported numeric values through
-an independent direct-property AppleScript reader, checks omitted image-native
-properties plus geometry/metadata/layers for preservation, and exports a preview.
+Verification applies the payload, checks all 27 supported values (numbers, enums
+and curve point lists) through an independent direct-property AppleScript reader,
+checks omitted image-native properties plus geometry/metadata/layers for
+preservation, and exports a preview.
 The native highlight-recovery alias is checked as the negative of highlight
 adjustment; it is not treated as an unrelated omitted field.
 
 Verification evidence is bound to the recipe hash, exact build and durable report
 hash. A failed verification never authorizes reuse. Inspect its preview for visual
-quality; numeric verification is not aesthetic approval. The clone remains for
+quality; value verification is not aesthetic approval. The clone remains for
 review and explicit deletion. No automatic restoration follows any failure.
 
 ### Apply one photo
@@ -201,3 +226,6 @@ binary hashes and exclusions.
 
 See [result bundle qualification](result-bundle-qualification/README.md) for the
 contract 2.5.0 focused checks and exclusions.
+
+See [typed settings qualification](typed-settings-qualification/README.md) for
+curve/grain/vignette transfer, omitted-field preservation and focused recovery evidence.

@@ -1,0 +1,46 @@
+Selected live suites: recipes
+Skipped live suites: cli, mcp, geometry, lens, perspective, keystone, catalog, existing, inventory, native
+PASS: shared CLI/MCP schemas, 35 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal and metadata mutation tools
+PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation
+TIMING archive and contract: 3.308s
+Running recipe_integration_test.py using extracted binaries with build resources hidden
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+cli
+Traceback (most recent call last):
+  File "/Users/kiri11/projects/c1cmd/Tests/recipe_integration_test.py", line 153, in <module>
+    main()
+    ~~~~^^
+  File "/Users/kiri11/projects/c1cmd/Tests/recipe_integration_test.py", line 71, in main
+    verified = recipe('verify',dict(recipeId=identifier,workingRef=clone['workingRef'],ifDocument=doc['openToken'],ifState=current['stateHash']))
+  File "/Users/kiri11/projects/c1cmd/Tests/recipe_integration_test.py", line 35, in recipe
+    return cli('recipe',action,'--file',path,ok=ok)
+  File "/Users/kiri11/projects/c1cmd/Tests/recipe_integration_test.py", line 30, in cli
+    assert (r.returncode == 0) == ok, value
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'activeStep': 'prepare', 'completed': [], 'compoundId': '5cb2d888dc83c9d4577986766c37c02ddb72b439a8bdee23520195c3a8d180ba', 'documentToken': '57376:1789842643.529743|/Users/kiri11/projects/c1cmd/.build/c1-recipes-2mm_u0vd/recipes/recipes.cosessiondb|16777232|4679116|1789847726.5924544', 'error': {'code': 'script-error', 'message': 'script-error (-10006): Capture One got an error: Can’t set every point to {}.'}, 'initial': {'adjustments': {'contrast': 0, 'exposure': 0, 'saturation': 0, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086}, 'geometry': {'crop': {'centerX': 3000, 'centerY': 2000, 'height': 4000, 'width': 6000}, 'cropOutsideImage': False, 'flip': 'none', 'hideDistortedAreas': True, 'imageHeight': 4000, 'imageWidth': 6000, 'keystone': [100, 0, 0, 0, 0], 'lensGeometry': [0, 35, 0, 0, 0, 0, 0, 0], 'lensProfile': 'Canon EF 35mm f/1.4L II USM', 'maximumCrop': {'centerX': 2999, 'centerY': 2000, 'height': 3999, 'width': 5999}, 'orientation': 0, 'rotation': 0}, 'geometryStateHash': 'geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59', 'geometryUsableBounds': {'centerX': 3000, 'centerY': 2000, 'height': 4000, 'width': 6000}, 'id': '2', 'metadata': {'asShotWB': 'Manual', 'camera': 'Canon EOS R6m2', 'colorTag': 0, 'iso': 'ISO 2500', 'lens': 'Canon EF 35mm f/1.4L II USM', 'rating': 0, 'shutterSpeed': '1/800 s'}, 'metadataStateHash': 'metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201', 'nativeSnapshots': [{'advancedColorCount': 0, 'basicColorCount': 9, 'layers': [{'nativeEnabled': True, 'nativeKind': 'background', 'nativeName': 'Background', 'nativeOpacity': 100}], 'nativeStateHash': '99188d207cba0b03f9f22bda6f4268ac2d952c3e03cd90728d426416acaa9575', 'ref': 'c1_wrk_46c891b0-fd9b-4d2e-8bb8-87ff1d76eea9', 'target': {'element': 0, 'layer': 0, 'scope': 'adjustments'}, 'unavailable': {}, 'values': {'black and white': False, 'black and white blue sensitivity': 0, 'black and white cyan sensitivity': 0, 'black and white green sensitivity': 0, 'black and white magenta sensitivity': 0, 'black and white red sensitivity': 0, 'black and white split highlight hue': 0, 'black and white split highlight saturation': 0, 'black and white split shadow hue': 0, 'black and white split shadow saturation': 0, 'black and white yellow sensitivity': 0, 'black recovery': 0, 'blue curve': [0, 0, 100, 100], 'brightness': 0, 'clarity amount': 0, 'clarity method': 'natural', 'clarity structure': 0, 'color balance highlight hue': 0, 'color balance highlight lightness': 0, 'color balance highlight saturation': 0, 'color balance master hue': 0, 'color balance master saturation': 0, 'color balance midtone hue': 0, 'color balance midtone lightness': 0, 'color balance midtone saturation': 0, 'color balance shadow hue': 0, 'color balance shadow lightness': 0, 'color balance shadow saturation': 0, 'color profile': 'Canon EOS R6 Mark II ProStandard', 'contrast': 0, 'dehaze amount': 0, 'dehaze color': [264, 2366, 878], 'exposure': 0, 'film curve': 'Auto', 'film grain granularity': 50, 'film grain impact': 0, 'film grain type': 'fine', 'flip': 'none', 'green curve': [0, 0, 100, 100], 'highlight adjustment': 0, 'highlight recovery': 0, 'keystone amount': 100, 'keystone aspect': 0, 'keystone horizontal': 0, 'keystone skew': 0, 'keystone vertical': 0, 'level highlight blue': 255, 'level highlight green': 255, 'level highlight red': 255, 'level highlight rgb': 255, 'level midtone blue': 0, 'level midtone green': 0, 'level midtone red': 0, 'level midtone rgb': 0, 'level shadow blue': 0, 'level shadow green': 0, 'level shadow red': 0, 'level shadow rgb': 0, 'level target highlight blue': 255, 'level target highlight green': 255, 'level target highlight red': 255, 'level target highlight rgb': 255, 'level target shadow blue': 0, 'level target shadow green': 0, 'level target shadow red': 0, 'level target shadow rgb': 0, 'luma curve': [0, 0, 100, 100], 'moire amount': 0, 'moire pattern': 8, 'noise reduction color': 50, 'noise reduction details': 50, 'noise reduction luminance': 50, 'noise reduction single pixel': 0, 'orientation': 0, 'red curve': [0, 0, 100, 100], 'rgb curve': [0, 0, 100, 100], 'rotation': 0, 'saturation': 0, 'shadow recovery': 0, 'sharpening amount': 180, 'sharpening halo suppression': 0, 'sharpening radius': 0.800000011920929, 'sharpening threshold': 1, 'temperature': 3200.113037109375, 'tint': 0.006856377236545086, 'vignetting amount': 0, 'vignetting method': 'elliptic on crop', 'white balance preset': 'Tungsten', 'white recovery': 0}}], 'openToken': '57376:1789842643.529743|/Users/kiri11/projects/c1cmd/.build/c1-recipes-2mm_u0vd/recipes/recipes.cosessiondb|16777232|4679116|1789847726.5924544', 'parentImagePath': '/Users/kiri11/projects/c1cmd/.build/c1-recipes-2mm_u0vd/recipes/Capture/2U6A7257.CR3', 'stateHash': 'b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a', 'workingRef': 'c1_wrk_46c891b0-fd9b-4d2e-8bb8-87ff1d76eea9'}, 'journalOffset': 2, 'plan': ['prepare', 'settings', 'tonal', 'verify', 'preview', 'observe'], 'recipeId': '5b52e2879827e562a869ed56c3c9e4bb800f9d74463f4c392281b07c15d945fb', 'request': {'ifDocument': '57376:1789842643.529743|/Users/kiri11/projects/c1cmd/.build/c1-recipes-2mm_u0vd/recipes/recipes.cosessiondb|16777232|4679116|1789847726.5924544', 'ifState': 'b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a', 'recipeId': '5b52e2879827e562a869ed56c3c9e4bb800f9d74463f4c392281b07c15d945fb', 'workingRef': 'c1_wrk_46c891b0-fd9b-4d2e-8bb8-87ff1d76eea9'}, 'sourceRef': 'c1_wrk_46c891b0-fd9b-4d2e-8bb8-87ff1d76eea9', 'status': 'failed', 'unattempted': ['settings', 'tonal', 'verify', 'preview', 'observe']}
+Traceback (most recent call last):
+  File "/Users/kiri11/projects/c1cmd/Tests/release_integration_test.py", line 101, in <module>
+    main()
+    ~~~~^^
+  File "/Users/kiri11/projects/c1cmd/Tests/release_integration_test.py", line 97, in main
+    run(args.archive, args.suites)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kiri11/projects/c1cmd/Tests/release_integration_test.py", line 85, in run
+    subprocess.run([sys.executable, '-B', '-u', str(ROOT / 'Tests' / script)], env=environment,
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                   cwd=tmp, check=True, timeout=timeout)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/opt/homebrew/opt/python@3.14/bin/python3.14', '-B', '-u', '/Users/kiri11/projects/c1cmd/Tests/recipe_integration_test.py']' returned non-zero exit status 1.

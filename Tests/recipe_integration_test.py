@@ -55,7 +55,12 @@ def main():
             'brightness':4,'contrast':3,'saturation':2,'highlight adjustment':5,'shadow recovery':6,
             'white recovery':4,'black recovery':3,'clarity amount':5,'clarity structure':2,
             'sharpening amount':170,'sharpening radius':.8,'sharpening threshold':1,
-            'noise reduction luminance':35,'noise reduction color':40},
+            'noise reduction luminance':35,'noise reduction color':40,
+            'rgb curve':[0,0,50,55,100,100], 'luma curve':[0,0,50,52,100,100],
+            'red curve':[0,0,50,53,100,100], 'green curve':[0,0,50,54,100,100],
+            'blue curve':[0,0,50,56,100,100],
+            'film grain type':'silver rich','film grain impact':25,'film grain granularity':30,
+            'vignetting method':'circular','vignetting amount':-.5},
             exposure=dict(mode='relative',value=.125),whiteBalance=dict(mode='preserve'),cropPolicy='per-photo')
         registered = recipe('register',dict(recipe=payload))
         identifier = registered['recipeId']
@@ -70,7 +75,7 @@ def main():
         cli('variant','delete',clone['workingRef'])
         client = Client(MCP,timeout=240)
         schema = json.loads(client.tool("schema")["content"][0]["text"])
-        request.update(overrides={'clarity amount':7},exposure=dict(mode='absolute',value=.25),
+        request.update(overrides={'clarity amount':7,'rgb curve':[0,0,50,57,100,100],'film grain type':'soft','vignetting method':'circular on crop'},exposure=dict(mode='absolute',value=.25),
                        whiteBalance=dict(mode='absolute',temperature=5200,tint=2),
                        ifGeometryState=source['geometryStateHash'],geometry=dict(aspectRatio=1.5),preview=True)
         result = client.tool('edit_apply',request)
@@ -97,6 +102,16 @@ def main():
         assert abs(exposure['delta']-(exposure['after']-exposure['before'])) < .000001
         assert bundle['diff']['nativeAdjustments']['clarity amount']['after'] == 7
         assert bundle['diff']['metadata'] == {}
+        native = observed['nativeSnapshots'][0]['values']
+        effective = dict(payload['settings'],**request['overrides'])
+        for key, wanted in effective.items():
+            actual = native[key]
+            if isinstance(wanted,list):
+                assert len(actual) == len(wanted) and all(abs(a-b)<.0001 for a,b in zip(actual,wanted)), (key,actual)
+            elif isinstance(wanted,str): assert actual == wanted, (key,actual)
+            else: assert abs(actual-wanted)<.0001, (key,actual)
+        for key in ['rgb curve','film grain type','vignetting method']:
+            assert bundle['diff']['nativeAdjustments'][key]['after'] == native[key]
         assert bundle['coverage']['geometry'] == 'compared'
         assert bundle['coverage']['maskPixels'] == 'unsupported'
         assert bundle['coverage']['atomicSnapshot'] is False
@@ -108,6 +123,23 @@ def main():
         assert abs(observed['geometry']['crop']['width']/observed['geometry']['crop']['height']-1.5) < .002
         status = recipe('status',dict(compoundId=value['compoundId']))
         assert status == value
+        # A sparse recipe must preserve non-default curves, grain, vignette and all policies.
+        sparse = dict(version=1,referenceId=capture['referenceId'],settings={'clarity amount':8},
+            exposure=dict(mode='preserve'),whiteBalance=dict(mode='preserve'),cropPolicy='preserve')
+        sparse_id = recipe('register',dict(recipe=sparse))['recipeId']
+        clone = cli('variant','clone',source['id'])
+        current = cli('get',clone['workingRef'])
+        sparse_verified = recipe('verify',dict(recipeId=sparse_id,workingRef=clone['workingRef'],ifDocument=doc['openToken'],ifState=current['stateHash']))
+        assert sparse_verified['status'] == 'succeeded'
+        cli('variant','delete',clone['workingRef'])
+        sparse_applied = recipe('apply',dict(recipeId=sparse_id,sourceRef=source['id'],ifDocument=doc['openToken'],ifState=observed['stateHash']))
+        assert sparse_applied['status'] == 'succeeded'
+        validate_response(sparse_applied,schema['responses']['edit_apply'])
+        sparse_bundle = sparse_applied['resultBundle']
+        assert set(sparse_bundle['diff']['nativeAdjustments']) == {'clarity amount'}
+        for group in ['adjustments','geometry','metadata']: assert sparse_bundle['diff'][group] == {}
+        for key, before in native.items():
+            if key != 'clarity amount': assert sparse_bundle['observed']['nativeSnapshots'][0]['values'][key] == before, key
         assert len(cli('variants','list')) == 1, 'Compound edits must not duplicate variants'
         assert sha(raw) == sha(fixture) == original
         log('passed',dict(rawSHA256=original,cliSHA256=sha(CLI),mcpSHA256=sha(MCP),session=str(base/'recipes')))

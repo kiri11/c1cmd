@@ -87,6 +87,37 @@ on nativeRecipeOracle(docName, variantId, expectedParent)
         set v to variant id variantId of d
         if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
         set a to adjustments of v
-        return {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real}
+        set observed to {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real}
+        set recipeCurvePoints to {}
+        repeat with p in every curve point of rgb curve of a
+            set end of recipeCurvePoints to (brightness of p as real)
+            set end of recipeCurvePoints to (amount of p as real)
+        end repeat
+        set end of observed to recipeCurvePoints
+        set recipeCurvePoints to {}
+        repeat with p in every curve point of luma curve of a
+            set end of recipeCurvePoints to (brightness of p as real)
+            set end of recipeCurvePoints to (amount of p as real)
+        end repeat
+        set end of observed to recipeCurvePoints
+        set recipeCurvePoints to {}
+        repeat with p in every curve point of red curve of a
+            set end of recipeCurvePoints to (brightness of p as real)
+            set end of recipeCurvePoints to (amount of p as real)
+        end repeat
+        set end of observed to recipeCurvePoints
+        set recipeCurvePoints to {}
+        repeat with p in every curve point of green curve of a
+            set end of recipeCurvePoints to (brightness of p as real)
+            set end of recipeCurvePoints to (amount of p as real)
+        end repeat
+        set end of observed to recipeCurvePoints
+        set recipeCurvePoints to {}
+        repeat with p in every curve point of blue curve of a
+            set end of recipeCurvePoints to (brightness of p as real)
+            set end of recipeCurvePoints to (amount of p as real)
+        end repeat
+        set end of observed to recipeCurvePoints
+        return observed & {film grain type of a as text, film grain impact of a as real, film grain granularity of a as real, vignetting method of a as text, vignetting amount of a as real}
     end tell
 end nativeRecipeOracle

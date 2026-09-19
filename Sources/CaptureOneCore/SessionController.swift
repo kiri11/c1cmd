@@ -1604,14 +1604,16 @@ public final class SessionController {
     }
 
     /// Independent direct-property reader: does not call nativeRead/nativeReadField.
-    func recipeOracle(ref: String) throws -> [String:Double] {
+    func recipeOracle(ref: String) throws -> [String:NativeValue] {
         try lock.withLock {
             let doc = try getDocumentInfo(), source = try get(ref:ref)
             try checkedDocument(doc, writes:false)
-            let values: [Double] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
-            guard values.count == Recipes.oracleFields.count, values.allSatisfy({ $0.isFinite }) else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
+            let values: [NativeValue] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+            guard values.count == Recipes.oracleFields.count else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
             try checkedDocument(doc,writes:false)
-            return Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
+            let observation = Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
+            try NativeEditing.validate(observation,target:NativeTarget())
+            return observation
         }
     }
 

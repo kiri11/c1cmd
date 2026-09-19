@@ -6,12 +6,15 @@ import CryptoKit
 public enum Recipes {
     public static let tools = ["reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status"]
     public static let fields = ["brightness", "contrast", "saturation", "highlight adjustment", "shadow recovery", "white recovery", "black recovery", "clarity amount", "clarity structure", "sharpening amount", "sharpening radius", "sharpening threshold", "noise reduction luminance", "noise reduction color"]
-    static let oracleFields = ["exposure", "temperature", "tint"] + fields
+    public static let curveFields = ["rgb curve", "luma curve", "red curve", "green curve", "blue curve"]
+    public static let finishFields = ["film grain type", "film grain impact", "film grain granularity", "vignetting method", "vignetting amount"]
+    public static var supportedFields: [String] { fields + curveFields + finishFields }
+    static let oracleFields = ["exposure", "temperature", "tint"] + fields + curveFields + finishFields
     static let str = ContractSchema.string
     static let num = ContractSchema.number
     static var exposure: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute","relative"]], "value":num], required:["mode"]) }
     static var whiteBalance: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute"]], "temperature":num, "tint":num], required:["mode"]) }
-    static var settings: [String:Any] { ContractSchema.object(Dictionary(uniqueKeysWithValues: fields.map { ($0, num as Any) })) }
+    static var settings: [String:Any] { ContractSchema.object((NativeEditing.patchSchema["properties"] as! [String:Any]).filter { supportedFields.contains($0.key) }) }
     static var recipe: [String:Any] { ContractSchema.object(["version":["type":"integer","enum":[1]], "referenceId":str, "settings":settings, "exposure":exposure, "whiteBalance":whiteBalance, "cropPolicy":["type":"string","enum":["preserve","per-photo"]]], required:["version","referenceId","settings","exposure","whiteBalance","cropPolicy"]) }
     static var recipeSchema: [String:Any] { recipe }
     static var geometry: [String:Any] {
@@ -254,12 +257,12 @@ public final class RecipeWorkflow {
             if verify {
                 step = "verify"; try save()
                 var expected = oracleBefore
-                for (key,value) in patch { expected[key] = (value as! NSNumber).doubleValue }
-                for (key,value) in tonal { expected[key] = (value as! NSNumber).doubleValue }
+                for (key,value) in nativePatch { expected[key] = value }
+                for (key,value) in tonal { expected[key] = .number((value as! NSNumber).doubleValue) }
                 let observed = try core.recipeOracle(ref:ref)
                 for key in Recipes.oracleFields {
                     let tolerance = key == "temperature" ? 1.0 : (key == "tint" ? 0.05 : 0.0001)
-                    guard let a = observed[key], let b = expected[key], abs(a-b) <= tolerance else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
+                    guard let a = observed[key], let b = expected[key], a.matches(b, tolerance:tolerance) else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
                 }
                 let fullAfter = try core.get(ref:ref,nativeTargets:[NativeTarget()])
                 let nativeAfter = fullAfter.nativeSnapshots![0]
@@ -275,7 +278,7 @@ public final class RecipeWorkflow {
                 }
                 let after = fullAfter
                 guard after.geometry == initial.geometry, after.metadata == initial.metadata else { throw C1Error.readbackMismatch("Recipe changed geometry or metadata.") }
-                try finish(["independentBefore":oracleBefore,"independentAfter":observed,"coverage":Recipes.oracleFields])
+                try finish(["independentBefore":try Recipes.object(oracleBefore),"independentAfter":try Recipes.object(observed),"coverage":Recipes.oracleFields])
             }
             if verify || args["preview"] as? Bool == true { step = "preview"; try save(); try finish(Recipes.object(core.preview(ref:ref))) }
             step = "observe"; try save()
