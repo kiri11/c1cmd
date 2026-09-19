@@ -54,6 +54,24 @@ Reads use Capture One's AppleScript interface to observe live application state.
 Verify indexed color-band targets against an independent bulk oracle before
 using them for palette transfer.
 
+Native mutation preparation uses the same fresh single-target read for token
+validation and the journal's compact/native before-state. This removes one
+redundant `getAdjustmentsBatch` call per `native_set` or `native_action` (including
+recipe native steps): a successful mutation needs two compact reads instead of
+three, one during preparation and one during independent readback. No observation
+is retained across operations or reused after a write, export, failure, or restart.
+Reference/parent and document identity checks, native dispatch preconditions,
+durable pending records, and uncertain-outcome blocking remain in place.
+
+Offline regression coverage checks read counts, stale tonal/native tokens,
+parent identity, durable before-state, and timeout/restart behavior. This is a
+handler-count reduction, not a measured end-to-end speedup; nested profiling
+totals must not be added together. Live qualification of this optimization is
+pending: the development run had a photographer Session open, while the harness
+requires zero open documents. Required focused coverage is regular `native
+recipes`, recovery `native native-action`, and recipe recovery `native mcp-death`
+against a rebuilt candidate archive. Other mutation paths are unchanged.
+
 ## Targets and coverage
 
 | Scope | Properties exposed | Writable | Target |

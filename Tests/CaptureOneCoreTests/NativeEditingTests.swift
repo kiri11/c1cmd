@@ -6,9 +6,13 @@ final class NativeFake: ScriptExecuting {
     var clarity = 0.0
     var fault = false
     var prepared = false
+    var calls: [String] = []
+    var onNativeRead: (() -> Void)?
     init(_ base: FakeScript) { self.base = base }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
+        calls.append(handler)
         if handler == "nativeRead" {
+            onNativeRead?()
             let result: [String:Any] = ["nativeRows":[["fieldName":"clarity amount", "numbersVal":[clarity]]], "nativeLayers":[], "basicColorCount":0, "advancedColorCount":0]
             return try JSONDecoder().decode(T.self, from:JSONSerialization.data(withJSONObject:result))
         }
@@ -63,12 +67,31 @@ struct NativeEditingTests {
             let dry = try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:initial.nativeStateHash, patch:["clarity amount":.number(5)], dryRun:true)
             XCTAssertEqual(dry.after, initial)
             XCTAssertEqual(bridge.clarity, 0)
-            let result = try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:initial.nativeStateHash, patch:["clarity amount":.number(5)])
+            // A prior read/dry run must never authorize reuse across operations.
+            fake.values["1"]![0] = 0.75
+            bridge.calls.removeAll()
+            XCTAssertThrowsError(try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:initial.nativeStateHash, patch:["clarity amount":.number(5)]))
+            XCTAssertFalse(bridge.calls.contains("nativeApply"))
+            let fresh = try core.get(ref:edit.workingRef, nativeTargets:[target])
+            fake.parentOverride = "/different.CR3"
+            XCTAssertThrowsError(try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:fresh.nativeSnapshots![0].nativeStateHash, patch:["clarity amount":.number(5)]))
+            fake.parentOverride = nil
+            bridge.onNativeRead = { fake.generation = "changed-during-read" }
+            XCTAssertThrowsError(try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:fresh.nativeSnapshots![0].nativeStateHash, patch:["clarity amount":.number(5)]))
+            XCTAssertFalse(bridge.calls.contains("nativeApply"))
+            bridge.onNativeRead = nil
+            fake.generation = "app-1"
+            bridge.calls.removeAll()
+            let result = try core.nativeSet(workingRef:edit.workingRef, target:target, ifNativeState:fresh.nativeSnapshots![0].nativeStateHash, patch:["clarity amount":.number(5)])
+            XCTAssertEqual(bridge.calls.filter { $0 == "getAdjustmentsBatch" }.count, 2, "One fresh preparation read and one independent post-write read")
+            XCTAssertEqual(bridge.calls.filter { $0 == "nativeRead" }.count, 2)
             XCTAssertTrue(bridge.prepared)
             XCTAssertEqual(result.after.values["clarity amount"], .number(5))
             XCTAssertTrue(result.after.nativeStateHash != initial.nativeStateHash)
             let journal = OperationJournal(sessionDirectory:directory)
             XCTAssertEqual(journal.find(operationId:result.operationId)?.status, "succeeded")
+            XCTAssertEqual(journal.find(operationId:result.operationId)?.beforeAdjustments, fresh.adjustments)
+            XCTAssertEqual(journal.find(operationId:result.operationId)?.beforeNative, fresh.nativeSnapshots![0])
             bridge.fault = true
             var operation = ""
             do { _ = try core.nativeSet(workingRef:edit.workingRef,target:target,ifNativeState:result.after.nativeStateHash,patch:["clarity amount":.number(10)]) }

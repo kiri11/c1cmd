@@ -1551,9 +1551,16 @@ public final class SessionController {
             try assertSessionWritable(docInfo: doc, operation: "native editing")
             _ = try adjustmentTarget(workingRef, document: doc)
             try checkedDocument(doc, writes: !dryRun)
-            let current = try get(ref: workingRef)
+            // One fresh, operation-local observation supplies both the native
+            // precondition and durable before-state. Do not cache it across calls:
+            // readNative validates reference/parent identity and checks the document
+            // after the native read; dispatch still verifies native values/layers.
+            let current = try readNative(ref: workingRef, target: target)
+            guard current.openToken == doc.openToken else {
+                throw C1Error.documentChanged("Active database changed during native mutation preparation.")
+            }
             try assertWritableImage(doc: doc, source: current)
-            let before = try nativeGet(ref: workingRef, target: target)
+            let before = current.nativeSnapshots![0]
             guard before.nativeStateHash == expected else { throw C1Error.stateChanged("Native editing state changed. Read get with nativeTargets again.") }
             for key in patch.keys where before.values[key] == nil { throw C1Error.invalidRequest("Native field unavailable on this target: " + key) }
             if target.layer > before.layers.count { throw C1Error.invalidRequest("Layer no longer exists.") }
