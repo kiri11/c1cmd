@@ -65,6 +65,8 @@ def main():
         current = cli('get',clone['workingRef'])
         verified = recipe('verify',dict(recipeId=identifier,workingRef=clone['workingRef'],ifDocument=doc['openToken'],ifState=current['stateHash']))
         assert verified['status'] == 'succeeded'
+        assert verified['resultBundle']['preview']['outputPath']
+        assert verified['resultBundle']['provenance']['mode'] == 'recipe-verification'
         cli('variant','delete',clone['workingRef'])
         client = Client(MCP,timeout=240)
         schema = json.loads(client.tool("schema")["content"][0]["text"])
@@ -77,6 +79,29 @@ def main():
         assert value['status'] == 'succeeded'
         validate_response(value,schema['responses']['edit_apply'])
         observed = value['observed']
+        bundle = value['resultBundle']
+        assert bundle['observed'] == observed
+        provenance = bundle['provenance']
+        assert provenance['recipeId'] == identifier and provenance['recipe'] == payload
+        assert provenance['referenceId'] == capture['referenceId']
+        assert provenance['verification']['compoundId'] == verified['compoundId']
+        assert provenance['nativeVariantId'] == source['id']
+        assert provenance['initialHashes']['stateHash'] == source['stateHash']
+        assert provenance['finalHashes']['stateHash'] == observed['stateHash']
+        assert provenance['effectivePolicy']['settings']['clarity amount'] == 7
+        assert provenance['operations'] == [dict(step=s['step'],operationId=s['result']['operationId'])
+            for s in value['completed'] if 'operationId' in s.get('result',{})]
+        exposure = bundle['diff']['adjustments']['exposure']
+        assert exposure['before'] == source['adjustments']['exposure']
+        assert exposure['after'] == observed['adjustments']['exposure']
+        assert abs(exposure['delta']-(exposure['after']-exposure['before'])) < .000001
+        assert bundle['diff']['nativeAdjustments']['clarity amount']['after'] == 7
+        assert bundle['diff']['metadata'] == {}
+        assert bundle['coverage']['geometry'] == 'compared'
+        assert bundle['coverage']['maskPixels'] == 'unsupported'
+        assert bundle['coverage']['atomicSnapshot'] is False
+        assert bundle['preview'] == next(s['result'] for s in value['completed'] if s['step'] == 'preview')
+        assert Path(bundle['preview']['outputPath']).is_file()
         assert observed['nativeSnapshots'][0]['values']['clarity amount'] == 7
         assert abs(observed['adjustments']['exposure']-.25) < .001
         assert abs(observed['adjustments']['temperature']-5200) < 1

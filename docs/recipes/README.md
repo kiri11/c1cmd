@@ -116,6 +116,36 @@ portrait when those ratios fit the intended composition. Geometry retains native
 bounds, lens preservation and existing uncertainty rules. Precise cropping after
 a rotation that needs visual inspection remains a second reviewed operation.
 
+## Consolidated result bundle
+
+Successful `edit_apply` and `recipe_verify` reports include `resultBundle`
+(contract 2.5.0). It contains:
+
+- `observed`: final live settings, geometry, metadata and image-native snapshot.
+- `diff`: net changes from the fresh pre-edit observation to the final observation,
+  grouped as `adjustments`, `geometry`, `metadata` and `nativeAdjustments`.
+  Nested fields use dotted paths. Changed values include `before`, `after`, presence
+  flags and a numeric `delta` when applicable. Differences reflect exact observed
+  values, including native normalization, rather than requested patches.
+- `provenance`: document and photo identity, immutable recipe payload and reference
+  ID, prior verification evidence, effective per-photo policies, initial/final
+  hashes, working reference and per-step operation IDs.
+- `preview`: the exported preview result, or `null` when none was requested.
+- `coverage`: compared and unavailable native fields and explicit exclusions for
+  masks, layers, color-editor elements and native lens/variant snapshots.
+
+Native fields are compared only when available in both observations. Unavailable
+fields are reported as coverage gaps, not deletions or proof of preservation.
+Geometry includes the fields exposed by the geometry snapshot. These sequential
+observations are not an atomic snapshot or a complete backup.
+
+The same bundle is persisted for `edit_status`, so evidence-only follow-up reads
+are unnecessary. Existing `observed` and per-step results remain compatible.
+Failed, uncertain or interrupted runs have partial reports without a final bundle;
+older saved reports may also lack it. Hashes describe those observations: obtain
+fresh preconditions before any later independent mutation. This feature adds no
+read caching or execution-context optimization.
+
 ## Partial completion and recovery
 
 A bounded application holds one application lock, prepares the existing variant,
@@ -168,3 +198,6 @@ Session and retains failed/ambiguous evidence; it never retries a faulted edit.
 
 See [retained qualification results](qualification/README.md) for tested scope,
 binary hashes and exclusions.
+
+See [result bundle qualification](result-bundle-qualification/README.md) for the
+contract 2.5.0 focused checks and exclusions.

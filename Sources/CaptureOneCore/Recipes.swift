@@ -13,6 +13,7 @@ public enum Recipes {
     static var whiteBalance: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute"]], "temperature":num, "tint":num], required:["mode"]) }
     static var settings: [String:Any] { ContractSchema.object(Dictionary(uniqueKeysWithValues: fields.map { ($0, num as Any) })) }
     static var recipe: [String:Any] { ContractSchema.object(["version":["type":"integer","enum":[1]], "referenceId":str, "settings":settings, "exposure":exposure, "whiteBalance":whiteBalance, "cropPolicy":["type":"string","enum":["preserve","per-photo"]]], required:["version","referenceId","settings","exposure","whiteBalance","cropPolicy"]) }
+    static var recipeSchema: [String:Any] { recipe }
     static var geometry: [String:Any] {
         var props = ContractSchema.input("geometry_set")["properties"] as! [String:Any]
         for k in ["workingRef","ifGeometryState","dryRun"] { props.removeValue(forKey:k) }
@@ -35,7 +36,7 @@ public enum Recipes {
             "documentToken":str,"sourceRef":str,"workingRef":str,"journalOffset":["type":"integer"],"plan":strings,
             "completed":["type":"array","items":ContractSchema.object(["step":str,"result":object],required:["step","result"])],
             "request":object,"initial":existing["get"]!,"activeStep":["type":["string","null"]],
-            "observed":existing["get"]!,"error":object,"unattempted":strings,"referencesExpired":ContractSchema.boolean,
+            "resultBundle":CompoundResultBundle.schema(existing),"observed":existing["get"]!,"error":object,"unattempted":strings,"referencesExpired":ContractSchema.boolean,
             "childOperations":["type":"array","items":existing["operation_status"]!]],required:["compoundId","recipeId","status","completed","plan"])
         return ["reference_capture":ContractSchema.object(["referenceId":str,"bundle":object],required:["referenceId","bundle"]),
                 "recipe_register":ContractSchema.object(["recipeId":str,"status":["enum":["unverified"]],"recipe":recipe],required:["recipeId","status","recipe"]),
@@ -165,6 +166,7 @@ public final class RecipeWorkflow {
         let recipe = try Recipes.loadContent(doc,"recipes",id)
         try Recipes.validate("recipe_register",["recipe":recipe])
         _ = try Recipes.loadContent(doc,"references",recipe["referenceId"] as! String)
+        var verificationEvidence: [String:Any]?
         if !verify {
             let evidence = try Recipes.load(Recipes.file(doc,"verified-recipes",id))
             guard evidence["recipeId"] as? String == id, evidence["build"] as? String == doc.appVersion,
@@ -173,11 +175,12 @@ public final class RecipeWorkflow {
             try Recipes.identifier(verificationID)
             let verification = try Recipes.load(Recipes.file(doc,"compounds",verificationID))
             guard try Recipes.digest(verification) == evidence["reportHash"] as? String, verification["status"] as? String == "succeeded", verification["recipeId"] as? String == id else { throw C1Error.invalidRequest("Verification report was changed.") }
+            verificationEvidence = evidence
         }
         if args["geometry"] != nil, recipe["cropPolicy"] as? String != "per-photo" { throw C1Error.invalidRequest("Recipe crop policy preserves geometry.") }
         let sourceRef = args[verify ? "workingRef" : "sourceRef"] as! String
         if verify, !WorkingRef.isWorkingRefString(sourceRef) { throw C1Error.invalidRequest("Verification requires an explicitly created managed clone.") }
-        let initial = try core.get(ref:sourceRef)
+        let initial = try core.get(ref:sourceRef,nativeTargets:[NativeTarget()])
         guard initial.stateHash == args["ifState"] as? String,
               args["ifGeometryState"] == nil || initial.geometryStateHash == args["ifGeometryState"] as? String else { throw C1Error.stateChanged("Compound source changed since inspection.") }
         var patch = recipe["settings"] as! [String:Any]
@@ -273,12 +276,15 @@ public final class RecipeWorkflow {
             let observed = try core.get(ref:ref,nativeTargets:[NativeTarget()])
             try finish(Recipes.object(observed))
             guard try core.getDocumentInfo().openToken == doc.openToken else { throw C1Error.documentChanged("Compound document changed.") }
+            report["resultBundle"] = CompoundResultBundle.make(initial:try Recipes.object(initial), observed:try Recipes.object(observed), completed:completed,
+                document:try Recipes.object(doc), recipe:recipe, verification:verificationEvidence, request:args, compoundId:compoundId, workingRef:ref)
             report["status"] = "succeeded"; report["observed"] = try Recipes.object(observed); report["activeStep"] = NSNull(); try Recipes.write(report,to:path)
             if verify {
                 try Recipes.write(["recipeId":id,"build":doc.appVersion,"status":"verified","compoundId":compoundId,"reportHash":try Recipes.digest(report),"coverage":Recipes.oracleFields,"maskPixels":"excluded","visualReview":"required"],to:Recipes.file(doc,"verified-recipes",id))
             }
             return report
         } catch {
+            report.removeValue(forKey:"resultBundle")
             report["status"] = error is OperationFailure ? "outcome-unknown" : "failed"
             report["error"] = ErrorResponse.payload(error)["error"]
             report["completed"] = completed; report["activeStep"] = step

@@ -5,6 +5,11 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Compound result bundles
+
+- Return and persist a consolidated final observation, aggregate before/after diff, recipe and operation provenance, coverage and optional preview for successful CLI/MCP compound edits and verification (contract 2.5.0).
+- Compare against a fresh native pre-edit snapshot; preserve fresh per-step checks and partial/unknown reporting. No execution-context caching is introduced.
+
 ## Reference recipes and compound edits
 
 - Add shared CLI/MCP reference capture, content-addressed recipe registration, managed-clone verification, single-photo compound application and durable status inspection (contract 2.4.0).

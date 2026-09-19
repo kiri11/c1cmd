@@ -1,0 +1,148 @@
+swift build
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/14] Write sources
+[4/14] Write swift-version--1AB21518FC5DEDBE.txt
+[6/18] Emitting module CaptureOneCore
+[7/18] Compiling CaptureOneCore Recipes.swift
+[8/18] Compiling CaptureOneCore CompoundResultBundle.swift
+[9/18] Compiling CaptureOneCore ContractSchema.swift
+[10/22] Compiling CaptureOneCore CatalogReader.swift
+[11/22] Compiling CaptureOneCore NativeEditing.swift
+[12/22] Compiling CaptureOneCore ReadWorkflow.swift
+[13/22] Compiling CaptureOneCore SessionController.swift
+[14/48] Emitting module CaptureOneCoreTests
+[15/51] Compiling CaptureOneCoreTests StateHashTests.swift
+[16/51] Compiling CaptureOneCoreTests VersionCompatibilityTests.swift
+[17/51] Compiling CaptureOneCoreTests WorkingReferenceTests.swift
+[18/51] Compiling CaptureOneCoreTests PerformanceTraceTests.swift
+[19/51] Compiling CaptureOneCoreTests ProvenanceStoreTests.swift
+[20/51] Compiling CaptureOneCoreTests RatingFilterTests.swift
+[21/51] Compiling CaptureOneCoreTests DumpTests.swift
+[22/51] Compiling CaptureOneCoreTests ExistingVariantTests.swift
+[23/51] Compiling CaptureOneCoreTests FieldSpecTests.swift
+[24/51] Compiling CaptureOneCoreTests RequestContextTests.swift
+[25/51] Compiling CaptureOneCoreTests ResetTests.swift
+[26/51] Compiling CaptureOneCoreTests ScopedGetTests.swift
+[27/51] Compiling CaptureOneCoreTests MetadataTests.swift
+[28/51] Compiling CaptureOneCoreTests NativeEditingTests.swift
+[29/51] Compiling CaptureOneCoreTests OperationJournalTests.swift
+[30/51] Compiling CaptureOneCoreTests CatalogGuardTests.swift
+[31/51] Compiling CaptureOneCoreTests DiffTests.swift
+[32/51] Compiling CaptureOneCoreTests DoctorTests.swift
+[33/51] Compiling CaptureOneCoreTests GeometryTests.swift
+[34/51] Compiling CaptureOneCoreTests InventoryTests.swift
+[35/51] Compiling CaptureOneCoreTests LockTests.swift
+[36/51] Emitting module c1_mcp
+[37/51] Compiling c1_mcp main.swift
+[37/51] Write Objects.LinkFileList
+[39/51] Compiling CaptureOneCoreTests ReadWorkflowTests.swift
+[40/51] Compiling CaptureOneCoreTests RecipeTests.swift
+[41/51] Compiling CaptureOneCoreTests ReleaseSafetyTests.swift
+[41/51] Write Objects.LinkFileList
+[43/51] Compiling c1 main.swift
+[44/51] Emitting module c1
+[44/51] Write Objects.LinkFileList
+[45/51] Linking CaptureOneCoreTests
+[46/51] Applying CaptureOneCoreTests
+[47/51] Linking c1-mcp
+[48/51] Applying c1-mcp
+[49/51] Linking c1
+[50/51] Applying c1
+Build complete! (5.14s)
+/Library/Developer/CommandLineTools/usr/bin/make check-built-core TEST_BUILD_DIR=.build/debug
+/usr/bin/time -p ".build/debug/CaptureOneCoreTests"
+=== Starting CaptureOneCore Unit Test Suite ===
+Running FieldSpecTests...
+Running StateHashTests...
+Running WorkingReferenceTests...
+Running ProvenanceStoreTests...
+Running OperationJournalTests...
+Running LockTests...
+Running ResetTests...
+Running DiffTests...
+Running DumpTests...
+Running CatalogGuardTests...
+Running CatalogEditingTests...
+Running ExistingVariantTests...
+Running MetadataTests...
+Running NativeEditingTests...
+Running VersionCompatibilityTests...
+Running ReleaseSafetyTests...
+Running RatingFilterTests...
+Running InventoryTests...
+Running ReadWorkflowTests...
+Running RequestContextTests...
+Running GeometryTests...
+Running RecipeTests...
+
+=== Test Results ===
+Total Assertions : 1170
+Passed           : 1170
+Failed           : 0
+SUCCESS: All unit tests passed!
+real 5.84
+user 1.37
+sys 0.28
+/Library/Developer/CommandLineTools/usr/bin/make check-python
+python3 -B Tests/contained_crop_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+python3 -B Tests/catalog_freshness_probe_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.022s
+
+OK
+python3 -B Tests/benchmark_reads_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 1.151s
+
+OK
+python3 -B scripts/generate-native-editing.py --check
+python3 -B Tests/recovery_harness_test.py
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 0.042s
+
+OK
+python3 -B Tests/recipe_harness_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+python3 -B Tests/release_runner_test.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.015s
+
+OK
+C1_TEST_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1" C1_TEST_MCP_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1-mcp" python3 -B Tests/catalog_reader_test.py
+......./opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=8 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/case.py:615: ResourceWarning: unclosed file <_io.TextIOWrapper name=6 encoding='UTF-8'>
+  result = method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+....
+----------------------------------------------------------------------
+Ran 11 tests in 2.073s
+
+OK
+C1_TEST_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1" C1_TEST_MCP_BIN="/Users/kiri11/projects/c1cmd/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+PASS: shared CLI/MCP schemas, 35 tool schemas, invalid requests, server survival
+PASS: local request status, CLI quiet/JSON progress, stable stdout
+PASS: composition profile hides and rejects tonal and metadata mutation tools
+real 2.77
+user 1.08
+sys 0.41

@@ -72,13 +72,35 @@ struct RecipeTests {
             let clone = try core.cloneVariant(sourceRef:"1")
             let verification = try workflow.run("recipe_verify",arguments:["workingRef":clone.workingRef,"ifState":try core.get(ref:clone.workingRef).stateHash,"ifDocument":doc.openToken,"recipeId":id])
             XCTAssertEqual(verification["status"] as? String,"succeeded")
+            fake.properties["clarity amount"] = 1
             let result = try workflow.run("edit_apply",arguments:request)
             XCTAssertEqual(result["status"] as? String,"succeeded")
             XCTAssertNotNil(result["observed"])
+            let bundle = result["resultBundle"] as! [String:Any]
+            let diff = bundle["diff"] as! [String:[String:Any]]
+            let clarity = diff["nativeAdjustments"]!["clarity amount"] as! [String:Any]
+            XCTAssertEqual(clarity["before"] as? Double,1)
+            XCTAssertEqual(clarity["after"] as? Double,5)
+            XCTAssertEqual(clarity["delta"] as? Double,4)
+            XCTAssertTrue(diff["adjustments"]!.isEmpty)
+            XCTAssertTrue(diff["geometry"]!.isEmpty)
+            XCTAssertTrue(bundle["preview"] is NSNull)
+            let provenance = bundle["provenance"] as! [String:Any]
+            XCTAssertEqual(provenance["recipeId"] as? String,id)
+            XCTAssertEqual(provenance["referenceId"] as? String,capture["referenceId"] as? String)
+            XCTAssertEqual(provenance["nativeVariantId"] as? String,"1")
+            XCTAssertEqual((provenance["verification"] as? [String:Any])?["compoundId"] as? String,verification["compoundId"] as? String)
+            let savedStatus = try workflow.run("edit_status",arguments:["compoundId":result["compoundId"]!])
+            let returnedHash = try Recipes.digest(bundle), savedHash = try Recipes.digest(savedStatus["resultBundle"]!)
+            XCTAssertEqual(returnedHash,savedHash)
+            let verifiedBundle = verification["resultBundle"] as! [String:Any]
+            XCTAssertNotNil(verifiedBundle["preview"] as? [String:Any])
+            XCTAssertTrue((verifiedBundle["provenance"] as! [String:Any])["verification"] is NSNull)
             let compound = result["compoundId"] as! String
             let child = try OperationJournal(sessionDirectory:directory).validatedEntries().filter { $0.compoundId == compound }
             XCTAssertEqual(child.count,1)
             XCTAssertEqual(child.first?.status,"succeeded")
+            XCTAssertEqual(((provenance["operations"] as? [[String:Any]])?.first)?["operationId"] as? String,child.first?.operationId)
             // An independent oracle disagreement must never qualify a payload.
             var other = recipe; other["settings"] = ["clarity amount":6]
             let otherID = try workflow.run("recipe_register",arguments:["recipe":other])["recipeId"] as! String
@@ -101,6 +123,7 @@ struct RecipeTests {
             var failRequest = request; failRequest["exposure"] = ["mode":"absolute","value":0.3]; failRequest["preview"] = true
             let failed = try workflow.run("edit_apply",arguments:failRequest)
             XCTAssertEqual(failed["status"] as? String,"outcome-unknown")
+            XCTAssertNil(failed["resultBundle"],"Unknown outcomes must not have a final result bundle")
             XCTAssertEqual(failed["unattempted"] as? [String],["tonal","preview","observe"])
             XCTAssertEqual(base.values["1"]![0],0)
             XCTAssertThrowsError(try workflow.run("edit_apply",arguments:request))
@@ -110,6 +133,7 @@ struct RecipeTests {
             try JSONSerialization.data(withJSONObject:interrupted).write(to:directory.appendingPathComponent(".c1/compounds/" + failedID + ".json"))
             let status = try workflow.run("edit_status",arguments:["compoundId":failedID])
             XCTAssertEqual(status["status"] as? String,"interrupted")
+            XCTAssertNil(status["resultBundle"])
             XCTAssertEqual((status["childOperations"] as? [[String:Any]])?.count,1)
         }
     }
