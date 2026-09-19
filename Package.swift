@@ -35,9 +35,11 @@ let package = Package(
         )
     ],
     targets: [
+        .systemLibrary(name: "CSQLite"),
         .target(
             name: "CaptureOneCore",
             dependencies: [
+                "CSQLite",
                 .product(name: "AppleScriptBridge", package: "AppleScriptBridge")
             ],
             resources: [

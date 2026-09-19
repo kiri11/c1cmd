@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "2.1.0"
+    public static let version = "2.2.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = [ "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = [ "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var writableMetadataSchema: [String: Any] {
         object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
                 "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
@@ -41,6 +41,9 @@ public enum ContractSchema {
     public static func input(_ name: String) -> [String: Any] {
         if name.hasPrefix("native_") { return NativeEditing.input(name) }
         switch name {
+        case "catalog_variants": return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": ["type": "integer", "minimum": 0, "maximum": 5], "minRating": ["type": "integer", "minimum": 0, "maximum": 5]], required: ["database"])
+        case "catalog_inspect": return object(["database": string], required: ["database"])
+        case "catalog_snapshot": return object(["database": string, "destination": string], required: ["database", "destination"])
         case "variants_list":
             var result = object([
                 "collection": string, "selected": boolean,
@@ -182,7 +185,22 @@ public enum ContractSchema {
         for name in ["processId", "elapsedMs", "lastProgressAgoMs", "candidatesScanned", "matchesFound", "summariesCompleted", "totalCandidates", "rating", "minRating", "handlerCalls"] {
             requestStatusProperties[name] = ["type": "integer"]
         }
+        let observation: [String: Any] = ["databasePath": string, "databaseFileIdentity": string,
+            "databaseDocumentUUID": string, "schemaFingerprint": string, "readerVersion": ["const": 1],
+            "backend": ["const": "sqlite"], "observationStartedAt": string, "observedAt": string,
+            "storedStateOnly": ["const": true], "limitation": string]
+        var inspectProps = observation
+        for key in ["document", "version", "collections", "images", "variants", "imageMembership", "variantMembership", "pathLocations", "storedSettings", "storedMetadata", "storedRetouching", "documentSettings"] {
+            inspectProps[key] = array(["type": "object"])
+        }
+        var storedVariantProps = observation
+        storedVariantProps["variants"] = array(["type": "object"])
+        storedVariantProps["membershipSemantics"] = string; storedVariantProps["collectionID"] = ["type": "integer"]
+        var snapshotProps = observation; snapshotProps["snapshotPath"] = string
         var responses: [String: Any] = [
+            "catalog_inspect": object(inspectProps, required: inspectProps.keys.sorted()),
+            "catalog_snapshot": object(snapshotProps, required: snapshotProps.keys.sorted()),
+            "catalog_variants": object(storedVariantProps, required: observation.keys.sorted() + ["variants", "membershipSemantics"]),
             "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),
             "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
             "request_status": object(requestStatusProperties, required: ["requestId", "tool", "phase", "status", "elapsedMs", "processAlive", "stale"]),

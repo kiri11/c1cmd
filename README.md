@@ -68,7 +68,7 @@ uses direct validation. See [scoped reads](docs/native-editing/README.md#scoped-
 
 `doctor` reports `unresolvedOperationsCount` only after successfully inspecting the journal. An absent count means unknown; `diagnosticError` preserves an inspection failure and `allChecksPassed` remains false.
 
-The default server exposes 23 tools: `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
+The default server exposes 26 tools: `catalog_inspect`, `catalog_variants`, `catalog_snapshot`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -291,7 +291,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.1.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.2.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
@@ -339,3 +339,7 @@ For read latency investigations, see [performance profiling and local CLI/MCP be
 Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. Style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
 
 [MIT License](LICENSE).
+
+### Read-only Catalog discovery and archives
+
+Use `c1 variants list --database /absolute/path/Library.cocatalog/Library.cocatalogdb` for concurrent SQLite stored discovery, `c1 catalog inspect` for raw stored settings and membership, and `c1 catalog snapshot` for a SQLite backup to a new file. Each response reports database provenance and observation time. Stored observations may lag Capture One and never authorize writes. See [the supported schema, commands, performance evidence, and limits](docs/catalog-reader.md).

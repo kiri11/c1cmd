@@ -72,6 +72,9 @@ struct C1MCPServer {
         )
         
         let definitions: [(String, String, Bool)] = [
+            ("catalog_variants", "Discover distinct stored variants with explicit image/variant membership and optional ratings. No live mutation tokens or smart collection evaluation.", true),
+            ("catalog_inspect", "Read versioned stored Catalog records from an explicit database path. No native references or live tokens; may lag Capture One.", true),
+            ("catalog_snapshot", "Archive a Catalog using SQLite backup to a new destination file. Does not modify the source or include originals or external masks.", false),
             ("native_set", "Set typed native editing properties using exact dictionary field names and ifNativeState from get.nativeSnapshots. Curves use flat x,y pairs in 0...100. Saves before-state in the operation journal. Geometry guards still apply.", false),
             ("native_action", "Run an allowlisted layer, mask, color-editor, style or dehaze operation with a fresh nativeStateHash. Mask pixels cannot be captured or restored from property snapshots. Inspect a preview after commands.", false),
             ("doctor", "Check environment, app status, exact build, document readiness, and unresolved operations.", true),
@@ -138,6 +141,21 @@ struct C1MCPServer {
                         try ContractSchema.validate(tool: params.name, arguments: args)
                         let status = try CaptureOneCore.RequestContext.status(requestId: args["requestId"] as! String)
                         return CallTool.Result(content: [textContent(OutputFormatter.formatJson(status))], isError: false)
+                    }
+                    if ["catalog_inspect", "catalog_variants", "catalog_snapshot"].contains(params.name) {
+                        let data = try JSONEncoder().encode(params.arguments ?? [:])
+                        let args = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+                        try ContractSchema.validate(tool: params.name, arguments: args)
+                        return try await Task.detached {
+                            let reader = try CatalogReader(database: args["database"] as! String)
+                            let result: [String: Any]
+                            if params.name == "catalog_variants" {
+                                result = try reader.variants(collectionID: extractInt(from: params.arguments, key: "collectionID"), rating: extractInt(from: params.arguments, key: "rating"), minRating: extractInt(from: params.arguments, key: "minRating"))
+                            } else if params.name == "catalog_inspect" { result = try reader.inspect() }
+                            else { result = try reader.snapshot(destination: args["destination"] as! String) }
+                            let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+                            return CallTool.Result(content: [textContent(String(data: data, encoding: .utf8)!)], isError: false)
+                        }.value
                     }
                     return try await MainActor.run {
                         try context.withCurrent {

@@ -59,6 +59,7 @@ struct C1: ParsableCommand {
         commandName: "c1",
         abstract: "Unofficial CLI interface for Capture One automation.",
         subcommands: [
+            CatalogCommand.self,
             NativeCommand.self,
             DoctorCommand.self,
             VersionCommand.self,
@@ -209,8 +210,14 @@ struct VariantsCommand: ParsableCommand {
 }
 
 struct VariantsListCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "list", abstract: "List variants in the current Session.")
+    static let configuration = CommandConfiguration(commandName: "list", abstract: "List live variants, or stored Catalog variants with --database.")
     @OptionGroup var globals: GlobalOptions
+
+    @Option(help: "Explicit .cocatalogdb: use parallel-capable SQLite stored discovery; returns provenance and database identities, not live references.")
+    var database: String?
+
+    @Option(help: "Explicit stored collection ID; requires --database. Does not evaluate smart collections.")
+    var collectionID: Int?
 
     @Flag(help: "List only selected variants.")
     var selected: Bool = false
@@ -232,6 +239,15 @@ struct VariantsListCommand: ParsableCommand {
 
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            if let database {
+                guard !selected, collection == nil, deadlineSeconds == nil, batchSize == 32 else {
+                    throw C1Error.invalidRequest("--database uses stored discovery: --selected, --collection, --deadline-seconds and custom --batch-size require live AppleScript reads. Use --collection-id for explicit stored membership.")
+                }
+                let result = try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating)
+                print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
+                return
+            }
+            guard collectionID == nil else { throw C1Error.invalidRequest("--collection-id requires --database.") }
             let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating, batchSize: batchSize, deadlineSeconds: deadlineSeconds)
             print(OutputFormatter.renderVariants(list, format: globals.outputFormat))
         }
@@ -746,5 +762,50 @@ struct NativeActionCommand: ParsableCommand {
             let args = try NativeEditing.parseValues(Data(json.utf8))
             print(OutputFormatter.formatJson(try SessionController.shared.nativeAction(workingRef:workingRef, target:target.target, ifNativeState:ifNativeState, action:action, arguments:args, dryRun:dryRun)))
         }; if code != .success { throw code }
+    }
+}
+
+struct CatalogCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "catalog", abstract: "Inspect stored Catalog records or archive a SQLite snapshot without contacting Capture One.", subcommands: [CatalogInspect.self, CatalogSnapshot.self, CatalogVariants.self])
+}
+struct CatalogInspect: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "inspect")
+    @Option var database: String
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let result = try CatalogReader(database: database).inspect()
+            print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
+        }
+        if code != .success { throw code }
+    }
+}
+struct CatalogSnapshot: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "snapshot")
+    @Option var database: String
+    @Option var destination: String
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let result = try CatalogReader(database: database).snapshot(destination: destination)
+            print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
+        }
+        if code != .success { throw code }
+    }
+}
+
+struct CatalogVariants: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "variants", abstract: "Discover distinct stored variants through SQLite; explicit memberships only.")
+    @Option var database: String
+    @Option var collectionID: Int?
+    @Option var rating: Int?
+    @Option var minRating: Int?
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) {
+            let result = try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating)
+            print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
+        }
+        if code != .success { throw code }
     }
 }
