@@ -3,6 +3,10 @@ import ArgumentParser
 import CaptureOneCore
 
 struct GlobalOptions: ParsableArguments {
+    @Option(help: "Read workflow ID from read-session begin; alternatively set C1_READ_WORKFLOW for the agent batch.")
+    var readWorkflow: String?
+    var readWorkflowID: String? { readWorkflow ?? ProcessInfo.processInfo.environment["C1_READ_WORKFLOW"] }
+
     @Option(name: .shortAndLong, help: "Output format: auto, json, or human.")
     var format: String = "auto"
 
@@ -59,6 +63,7 @@ struct C1: ParsableCommand {
         commandName: "c1",
         abstract: "Unofficial CLI interface for Capture One automation.",
         subcommands: [
+            ReadSessionCommand.self,
             CatalogCommand.self,
             NativeCommand.self,
             DoctorCommand.self,
@@ -212,6 +217,8 @@ struct VariantsCommand: ParsableCommand {
 struct VariantsListCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "list", abstract: "List live variants, or stored Catalog variants with --database.")
     @OptionGroup var globals: GlobalOptions
+    @Flag(help: "Force fresh native reads, including mutation tokens; bypass the browsing workflow.")
+    var live = false
 
     @Option(help: "Explicit .cocatalogdb: use parallel-capable SQLite stored discovery; returns provenance and database identities, not live references.")
     var database: String?
@@ -240,7 +247,7 @@ struct VariantsListCommand: ParsableCommand {
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             if let database {
-                guard !selected, collection == nil, deadlineSeconds == nil, batchSize == 32 else {
+                guard !live, !selected, collection == nil, deadlineSeconds == nil, batchSize == 32 else {
                     throw C1Error.invalidRequest("--database uses stored discovery: --selected, --collection, --deadline-seconds and custom --batch-size require live AppleScript reads. Use --collection-id for explicit stored membership.")
                 }
                 let result = try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating)
@@ -248,6 +255,13 @@ struct VariantsListCommand: ParsableCommand {
                 return
             }
             guard collectionID == nil else { throw C1Error.invalidRequest("--collection-id requires --database.") }
+            var request: [String: Any] = ["batchSize": batchSize]
+            if let rating { request["rating"] = rating }; if let minRating { request["minRating"] = minRating }
+            if let deadlineSeconds { request["deadlineSeconds"] = deadlineSeconds }
+            try ContractSchema.validate(tool: "variants_list", arguments: request)
+            if !live, deadlineSeconds == nil, let rows = try ReadWorkflow.shared.variants(collection: collection, selected: selected, rating: rating, minRating: minRating, workflowID: globals.readWorkflowID) {
+                print(try ReadWorkflow.json(rows)); return
+            }
             let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating, batchSize: batchSize, deadlineSeconds: deadlineSeconds)
             print(OutputFormatter.renderVariants(list, format: globals.outputFormat))
         }
@@ -339,6 +353,8 @@ struct VariantBaselineCommand: ParsableCommand {
 struct GetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "get", abstract: "Get adjustments and metadata for a variant or working ref.")
     @OptionGroup var globals: GlobalOptions
+    @Flag(help: "Force fresh native reads, including mutation tokens; bypass the browsing workflow.")
+    var live = false
 
     @Argument(help: "Native variant ID or working reference.")
     var ref: String
@@ -346,8 +362,18 @@ struct GetCommand: ParsableCommand {
     @Option(help: "Optional JSON array of native scopes, e.g. [{\"scope\":\"adjustments\"},{\"scope\":\"lens\"}].")
     var nativeTargets: String?
 
+    @Option(help: "Inspect a stored variant in an explicit Catalog database, even when closed. No native tokens.")
+    var database: String?
+
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            if let database {
+                guard !live, nativeTargets == nil, let id = Int(ref) else { throw C1Error.invalidRequest("--database requires a numeric stored variant ID and cannot combine with --live or --native-targets.") }
+                print(try ReadWorkflow.json(CatalogReader(database: database).get(variantID: id))); return
+            }
+            if !live, nativeTargets == nil, let result = try ReadWorkflow.shared.get(ref: ref, workflowID: globals.readWorkflowID) {
+                print(try ReadWorkflow.json(result)); return
+            }
             let res: GetResult
             if let nativeTargets {
                 let value = try JSONSerialization.jsonObject(with: Data(nativeTargets.utf8))
@@ -488,6 +514,8 @@ struct ResetCommand: ParsableCommand {
 struct DiffCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "diff", abstract: "Compare adjustments between two variants or compare a working variant against its baseline.")
     @OptionGroup var globals: GlobalOptions
+    @Flag(help: "Force fresh native reads, including mutation tokens; bypass the browsing workflow.")
+    var live = false
 
     @Argument(help: "First variant reference (or working reference to compare against its baseline).")
     var ref1: String
@@ -497,6 +525,7 @@ struct DiffCommand: ParsableCommand {
 
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            if !live, let result = try ReadWorkflow.shared.diff(ref1: ref1, ref2: ref2, workflowID: globals.readWorkflowID) { print(try ReadWorkflow.json(result)); return }
             let res = try SessionController.shared.diff(ref1: ref1, ref2: ref2)
             print(OutputFormatter.renderDiffResult(res, format: globals.outputFormat))
         }
@@ -508,6 +537,8 @@ struct DiffCommand: ParsableCommand {
 struct DumpCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "dump", abstract: "Batched export of variants, adjustments, and metadata as JSONL.")
     @OptionGroup var globals: GlobalOptions
+    @Flag(help: "Force fresh native reads, including mutation tokens; bypass the browsing workflow.")
+    var live = false
 
     @Option(help: "Name of collection to dump variants from.")
     var collection: String?
@@ -523,6 +554,13 @@ struct DumpCommand: ParsableCommand {
 
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
+            guard (1...1000).contains(batchSize) else { throw C1Error.invalidRequest("batchSize must be between 1 and 1000.") }
+            if !live, let rows = try ReadWorkflow.shared.dump(collection: collection, selected: selected, workflowID: globals.readWorkflowID) {
+                if dumpFormat.lowercased() == "jsonl" {
+                    for row in rows { print(String(data: try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]), encoding: .utf8)!) }
+                } else { print(try ReadWorkflow.json(rows)) }
+                return
+            }
             let records = try SessionController.shared.dump(
                 collectionName: collection,
                 selectedOnly: selected,
@@ -806,6 +844,36 @@ struct CatalogVariants: ParsableCommand {
             let result = try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating)
             print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
         }
+        if code != .success { throw code }
+    }
+}
+
+struct ReadSessionCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "read-session", abstract: "Begin/end exclusive c1 browsing; end before returning to UI editing.", subcommands: [ReadSessionBegin.self, ReadSessionEnd.self, ReadSessionStatus.self])
+}
+struct ReadSessionBegin: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "begin")
+    @OptionGroup var globals: GlobalOptions
+    @Option var collection: String?
+    @Flag var selected = false
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) { print(try ReadWorkflow.json(ReadWorkflow.shared.begin(collection: collection, selected: selected))) }
+        if code != .success { throw code }
+    }
+}
+struct ReadSessionEnd: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "end")
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) { print(try ReadWorkflow.json(ReadWorkflow.shared.end(workflowID: globals.readWorkflowID))) }
+        if code != .success { throw code }
+    }
+}
+struct ReadSessionStatus: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "status")
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        let code = handleExecution(format: globals.outputFormat) { print(try ReadWorkflow.json(ReadWorkflow.shared.status(workflowID: globals.readWorkflowID))) }
         if code != .success { throw code }
     }
 }

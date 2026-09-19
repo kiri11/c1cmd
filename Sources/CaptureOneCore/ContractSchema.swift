@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "2.2.0"
+    public static let version = "2.3.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = [ "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var writableMetadataSchema: [String: Any] {
         object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
                 "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
@@ -41,12 +41,15 @@ public enum ContractSchema {
     public static func input(_ name: String) -> [String: Any] {
         if name.hasPrefix("native_") { return NativeEditing.input(name) }
         switch name {
+        case "read_session_end", "read_session_status": return object(["readWorkflow": string], required: ["readWorkflow"])
+        case "read_session_begin": return object(["collection": string, "selected": boolean])
+        case "catalog_get": return object(["database": string, "variantID": ["type": "integer", "minimum": 1]], required: ["database", "variantID"])
         case "catalog_variants": return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": ["type": "integer", "minimum": 0, "maximum": 5], "minRating": ["type": "integer", "minimum": 0, "maximum": 5]], required: ["database"])
         case "catalog_inspect": return object(["database": string], required: ["database"])
         case "catalog_snapshot": return object(["database": string, "destination": string], required: ["database", "destination"])
         case "variants_list":
             var result = object([
-                "collection": string, "selected": boolean,
+                "collection": string, "selected": boolean, "live": boolean, "readWorkflow": string,
                 "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
                 "deadlineSeconds": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
                 "rating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."],
@@ -64,7 +67,7 @@ public enum ContractSchema {
             var result = object(props, required: ["workingRef", "ifMetadataState"])
             result["anyOf"] = ["rating", "colorTag"].map { ["required": [$0]] }
             return result
-        case "get": return object(["ref": string, "nativeTargets": ["type": "array", "items": NativeEditing.targetSchema,
+        case "get": return object(["ref": string, "live": boolean, "readWorkflow": string, "nativeTargets": ["type": "array", "items": NativeEditing.targetSchema,
             "minItems": 1, "maxItems": 16]], required: ["ref"])
         case "set", "add":
             let adj = adjustments(delta: name == "add", aliases: true)
@@ -81,8 +84,8 @@ public enum ContractSchema {
             result["not"] = ["required": ["crop", "aspectRatio"]]
             return result
         case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
-        case "diff": return object(["ref1": string, "ref2": string], required: ["ref1"])
-        case "dump": return object(["collection": string, "selected": boolean, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
+        case "diff": return object(["ref1": string, "ref2": string, "live": boolean, "readWorkflow": string], required: ["ref1"])
+        case "dump": return object(["collection": string, "selected": boolean, "live": boolean, "readWorkflow": string, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
         case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean], required: ["ref"])
         case "request_status": return object(["requestId": string], required: ["requestId"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
@@ -171,11 +174,15 @@ public enum ContractSchema {
         let diffs: [String: Any] = ["type": "object", "additionalProperties": diff]
         let adj = adjustments()
         let metadata: [String: Any] = ["type": "object", "properties": Dictionary(uniqueKeysWithValues: ["camera", "lens", "iso", "shutterSpeed", "asShotWB", "captureDate"].map { ($0, string) }).merging(["rating": ["type": "integer"], "colorTag": ["type": "integer"]]) { _, b in b }]
-        let get = object(["nativeSnapshots": ["type": "array", "items": NativeEditing.snapshotSchema, "minItems": 1, "maxItems": 16], "openToken": string, "id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "metadataStateHash": string, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
+        let readObservation = object(["workflowId": string, "backend": ["enum": ["sqlite+native-cache", "native-cache"]],
+            "nativeConfirmedAt": number, "metadataInSQLite": boolean, "tonalInSQLite": boolean,
+            "mutationTokensAvailable": ["const": false]], required: ["workflowId", "backend", "nativeConfirmedAt", "mutationTokensAvailable"])
+        var get = object(["readObservation": readObservation,"nativeSnapshots": ["type": "array", "items": NativeEditing.snapshotSchema, "minItems": 1, "maxItems": 16], "openToken": string, "id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "metadataStateHash": string, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata"])
+        get["anyOf"] = [["required": ["stateHash"]], ["required": ["readObservation"]]]
         let mutation = object(["operationId": string, "workingRef": string, "before": adj, "after": adj, "diff": diffs, "stateHash": string, "isDryRun": boolean], required: ["operationId", "workingRef", "before", "after", "diff", "stateHash", "isDryRun"])
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
-        let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
-        var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string; dumpProps["geometry"] = geometrySchema; dumpProps["geometryStateHash"] = string; dumpProps["geometryUnavailableReason"] = string
+        let variantProps: [String: Any] = ["readObservation": readObservation,"id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
+        var dumpProps = variantProps; dumpProps["adjustments"] = adj; dumpProps["metadata"] = metadata; dumpProps["stateHash"] = string; dumpProps["geometry"] = geometrySchema; dumpProps["geometryStateHash"] = string; dumpProps["geometryUnavailableReason"] = string; dumpProps["geometryUsableBounds"] = cropSchema
         var requestStatusProperties: [String: Any] = [
             "requestId": string, "tool": string, "phase": string, "status": string,
             "documentIdentity": string, "scope": string, "operationId": string, "handler": string,
@@ -197,7 +204,15 @@ public enum ContractSchema {
         storedVariantProps["variants"] = array(["type": "object"])
         storedVariantProps["membershipSemantics"] = string; storedVariantProps["collectionID"] = ["type": "integer"]
         var snapshotProps = observation; snapshotProps["snapshotPath"] = string
+        let readStatus = object(["active": boolean, "workflowId": string, "documentPath": string,
+            "variantCount": ["type": "integer"], "sqliteEnabled": boolean, "pendingVariantCount": ["type": "integer"],
+            "catchUpIntervalSeconds": ["const": 60], "reason": string], required: ["active"])
+        var storedGetProps = observation
+        storedGetProps["variant"] = ["type": "object"]; storedGetProps["image"] = ["type": "object"]
+        for key in ["storedSettings", "storedMetadata", "storedRetouching"] { storedGetProps[key] = array(["type": "object"]) }
         var responses: [String: Any] = [
+            "read_session_begin": readStatus, "read_session_end": readStatus, "read_session_status": readStatus,
+            "catalog_get": object(storedGetProps, required: observation.keys.sorted() + ["variant", "storedSettings", "storedMetadata", "storedRetouching"]),
             "catalog_inspect": object(inspectProps, required: inspectProps.keys.sorted()),
             "catalog_snapshot": object(snapshotProps, required: snapshotProps.keys.sorted()),
             "catalog_variants": object(storedVariantProps, required: observation.keys.sorted() + ["variants", "membershipSemantics"]),
@@ -212,7 +227,7 @@ public enum ContractSchema {
                 required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
             "get": get, "set": mutation, "add": mutation, "reset": mutation,
             "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
-            "diff": object(["ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
+            "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
             "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])

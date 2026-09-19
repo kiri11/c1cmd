@@ -1,0 +1,446 @@
+[
+  {
+    "event": "environment",
+    "cliSHA256": "c20d34581c6ba2cdef6dd10c832232db95a633dd0b8b37d99dd831919d8bb8df",
+    "mcpSHA256": "6ee7cfb29e9307293406a101f2d11232eadae6495f3ba30c112a9a9228974cb6",
+    "sourceSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868"
+  },
+  {
+    "event": "session-fixture",
+    "path": "/private/tmp/c1-read-workflow-_bh96jyv"
+  },
+  {
+    "event": "session-overlay",
+    "start": {
+      "active": true,
+      "catchUpIntervalSeconds": 60,
+      "documentPath": "/tmp/c1-read-workflow-_bh96jyv/reads",
+      "pendingVariantCount": 1,
+      "reason": "Exclusive c1 workflow; end before UI edits.",
+      "sqliteEnabled": false,
+      "variantCount": 1,
+      "workflowId": "8874d20f-a1e4-4dc2-97ba-f4fe6f97fde9"
+    },
+    "read": {
+      "adjustments": {
+        "contrast": 3,
+        "exposure": 0.375,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 2,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 5,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-read-workflow-_bh96jyv/reads/Capture/source.CR3",
+      "readObservation": {
+        "backend": "native-cache",
+        "metadataInSQLite": false,
+        "mutationTokensAvailable": false,
+        "nativeConfirmedAt": 1789835885.505896,
+        "tonalInSQLite": false,
+        "workflowId": "8874d20f-a1e4-4dc2-97ba-f4fe6f97fde9"
+      }
+    },
+    "profile": {
+      "elapsedMs": 334.4087919977028,
+      "handlers": [
+        "getAppAndDocInfo",
+        "getAppAndDocInfo"
+      ]
+    }
+  },
+  {
+    "event": "session-timings",
+    "timings": {
+      "get": {
+        "workflow": {
+          "samplesMs": [
+            316.32137499400415,
+            301.9366250082385,
+            315.62454099184833
+          ],
+          "medianMs": 315.62454099184833
+        },
+        "live": {
+          "samplesMs": [
+            1359.8512499884237,
+            1302.1482910116902,
+            1269.6230000001378
+          ],
+          "medianMs": 1302.1482910116902
+        }
+      },
+      "variants": {
+        "workflow": {
+          "samplesMs": [
+            336.066584000946,
+            351.0539999988396,
+            382.1238750097109
+          ],
+          "medianMs": 351.0539999988396
+        },
+        "live": {
+          "samplesMs": [
+            707.3539169941796,
+            683.7477499939268,
+            720.6021250021877
+          ],
+          "medianMs": 707.3539169941796
+        }
+      }
+    }
+  },
+  {
+    "event": "session-stored-immediate",
+    "rows": []
+  },
+  {
+    "event": "session-storage",
+    "rows": [
+      [
+        1,
+        0.0,
+        0
+      ]
+    ],
+    "sidecars": [
+      "Capture/CaptureOne/Settings1680/source.CR3.cos"
+    ]
+  },
+  {
+    "event": "session-passed",
+    "restored": true,
+    "rawUnchanged": true,
+    "closedOwnedDocument": true
+  },
+  {
+    "event": "catalog-fixture",
+    "path": "/private/tmp/c1-read-workflow-nsuj13xf"
+  },
+  {
+    "event": "catalog-overlay",
+    "start": {
+      "active": true,
+      "catchUpIntervalSeconds": 60,
+      "documentPath": "/tmp/c1-read-workflow-nsuj13xf/reads.cocatalog",
+      "pendingVariantCount": 0,
+      "reason": "Exclusive c1 workflow; end before UI edits.",
+      "sqliteEnabled": true,
+      "variantCount": 1,
+      "workflowId": "006fc72b-c23a-484e-b139-1833794c12aa"
+    },
+    "read": {
+      "adjustments": {
+        "contrast": 3,
+        "exposure": 0.375,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 2,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 5,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-read-workflow-nsuj13xf/source.CR3",
+      "readObservation": {
+        "backend": "native-cache",
+        "metadataInSQLite": false,
+        "mutationTokensAvailable": false,
+        "nativeConfirmedAt": 1789835920.135099,
+        "tonalInSQLite": false,
+        "workflowId": "006fc72b-c23a-484e-b139-1833794c12aa"
+      }
+    },
+    "profile": {
+      "elapsedMs": 333.5157499968773,
+      "handlers": [
+        "getAppAndDocInfo",
+        "getAppAndDocInfo"
+      ]
+    }
+  },
+  {
+    "event": "catalog-timings",
+    "timings": {
+      "get": {
+        "workflow": {
+          "samplesMs": [
+            358.92466599761974,
+            312.4684999929741,
+            293.04283400415443
+          ],
+          "medianMs": 312.4684999929741
+        },
+        "live": {
+          "samplesMs": [
+            873.4549159999005,
+            967.321375006577,
+            954.2585420131218
+          ],
+          "medianMs": 954.2585420131218
+        }
+      },
+      "variants": {
+        "workflow": {
+          "samplesMs": [
+            311.2602499895729,
+            318.84908299252857,
+            314.46704200061504
+          ],
+          "medianMs": 314.46704200061504
+        },
+        "live": {
+          "samplesMs": [
+            747.6573329913663,
+            775.0933329953114,
+            756.3590829959139
+          ],
+          "medianMs": 756.3590829959139
+        }
+      }
+    }
+  },
+  {
+    "event": "catalog-stored-immediate",
+    "rows": [
+      [
+        1,
+        0.375,
+        5
+      ]
+    ]
+  },
+  {
+    "event": "catalog-catch-up",
+    "read": {
+      "adjustments": {
+        "contrast": 3,
+        "exposure": 0.375,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "geometry": {
+        "crop": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "cropOutsideImage": false,
+        "flip": "none",
+        "hideDistortedAreas": true,
+        "imageHeight": 4000,
+        "imageWidth": 6000,
+        "keystone": [
+          100,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensGeometry": [
+          0,
+          35,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lensProfile": "Canon EF 35mm f/1.4L II USM",
+        "maximumCrop": {
+          "centerX": 2999,
+          "centerY": 2000,
+          "height": 3999,
+          "width": 5999
+        },
+        "orientation": 0,
+        "rotation": 0
+      },
+      "geometryUsableBounds": {
+        "centerX": 3000,
+        "centerY": 2000,
+        "height": 4000,
+        "width": 6000
+      },
+      "id": "1",
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 2,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 5,
+        "shutterSpeed": "1/800 s"
+      },
+      "parentImagePath": "/tmp/c1-read-workflow-nsuj13xf/source.CR3",
+      "readObservation": {
+        "backend": "sqlite+native-cache",
+        "metadataInSQLite": true,
+        "mutationTokensAvailable": false,
+        "nativeConfirmedAt": 1789835920.135099,
+        "tonalInSQLite": true,
+        "workflowId": "006fc72b-c23a-484e-b139-1833794c12aa"
+      }
+    },
+    "profile": {
+      "elapsedMs": 345.6233750039246,
+      "handlers": [
+        "getAppAndDocInfo",
+        "getAppAndDocInfo"
+      ]
+    },
+    "stored": [
+      [
+        1,
+        0.375,
+        5
+      ]
+    ]
+  },
+  {
+    "event": "closed-catalog",
+    "profile": {
+      "elapsedMs": 23.396083008265123,
+      "handlers": []
+    },
+    "variant": {
+      "Z_ENT": 15,
+      "Z_PK": 1,
+      "ZADJUSTMENTLAYER": 2,
+      "ZANNOTATION": null,
+      "ZCANVASSIZE": "5999.999023;4000.002197",
+      "ZCOMBINEDSETTINGS": 3,
+      "ZDEFAULTLAYER": 1,
+      "ZHIGHRESPROCESSCOUNTER": null,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZISMODIFIED": 1,
+      "ZLASTMETADATAMODIFICATIONDATE": 1789835991.624136,
+      "ZLOWRESPROCESSCOUNTER": 9,
+      "ZOFFLINEPROPERTIES": null,
+      "ZPROCESSINGENGINE": 1300,
+      "ZPRODUCTID": "CanonEOSR6Mk2",
+      "ZRAWMETADATAMODIFICATIONDATE": null,
+      "ZSYNCPROCESSCOUNTER": null,
+      "ZVARIANTUUID": "97A5B522-CEC7-4547-9BB3-28944BABC0BC",
+      "ZXMPMETADATAMODIFICATIONDATE": null
+    }
+  },
+  {
+    "event": "catalog-passed",
+    "restored": true,
+    "rawUnchanged": true,
+    "closedOwnedDocument": true
+  },
+  {
+    "event": "passed",
+    "omitted": "No UI edits, load/large Catalog matrix, or recovery fault injection; mutation/recovery implementation unchanged."
+  }
+]

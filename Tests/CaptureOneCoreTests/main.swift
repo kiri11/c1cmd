@@ -23,6 +23,7 @@ DoctorTests.run()
 ReleaseSafetyTests.run()
 RatingFilterTests.run()
 InventoryTests.run()
+ReadWorkflowTests.run()
 RequestContextTests.run()
 GeometryTests.run()
 

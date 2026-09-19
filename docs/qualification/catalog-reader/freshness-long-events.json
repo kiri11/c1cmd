@@ -1,0 +1,483 @@
+[
+  {
+    "event": "fixture",
+    "observedAt": "2026-09-19T14:39:45.977159+00:00",
+    "base": "/private/tmp/c1-freshness-7_rpglc1",
+    "sourceSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "cliSHA256": "4ee78313eff690a4ced4501f36a774a2cdffb5f0c081581023916abb6205ce80"
+  },
+  {
+    "event": "environment",
+    "observedAt": "2026-09-19T14:40:07.220364+00:00",
+    "document": {
+      "appVersion": "16.8.5.30",
+      "captureFolder": "",
+      "documentId": "/private/tmp/c1-freshness-7_rpglc1/freshness.cocatalog",
+      "documentName": "freshness",
+      "documentPath": "/tmp/c1-freshness-7_rpglc1/freshness.cocatalog",
+      "isSession": false,
+      "openToken": "37736:1789826884.227705|/tmp/c1-freshness-7_rpglc1/freshness.cocatalog/freshness.cocatalogdb|16777232|4586876|1789828786.8670297",
+      "outputFolder": "/tmp/c1-freshness-7_rpglc1/freshness.cocatalog.c1-output",
+      "writesEnabled": true
+    },
+    "journalMode": "delete",
+    "schemaFingerprint": "3459e1ff96966cd65dafdfa7a1157daefd5061e09c50fe35f453c887dfec438c",
+    "saveOrRevisionCandidates": []
+  },
+  {
+    "event": "mutation-acknowledged",
+    "observedAt": "2026-09-19T14:40:12.381915+00:00",
+    "label": "metadata-0",
+    "result": {
+      "after": {
+        "colorTag": 1,
+        "rating": 1
+      },
+      "before": {
+        "colorTag": 0,
+        "rating": 0
+      },
+      "diff": {
+        "colorTag": {
+          "after": 1,
+          "before": 0,
+          "delta": 1
+        },
+        "rating": {
+          "after": 1,
+          "before": 0,
+          "delta": 1
+        }
+      },
+      "isDryRun": false,
+      "metadataStateHash": "metadata-v1:1a43b2b8cce4761fe3d8519bde86d07fcb4e6bc7deb2779cb1062ce0d2795df7",
+      "operationId": "dddfb730-7756-4ba6-b5f1-1f0db4478a2a",
+      "workingRef": "c1_edit_a716f943-76c8-4a3d-935c-d44fedafed37"
+    }
+  },
+  {
+    "event": "observation",
+    "observedAt": "2026-09-19T14:40:43.207970+00:00",
+    "label": "metadata-0",
+    "expected": {
+      "rating": 1,
+      "colorTag": 1
+    },
+    "firstReadMatched": false,
+    "firstMatchMs": null,
+    "observedThroughMs": 30003.779417005717,
+    "pollCount": 1128,
+    "beforeMutationStamp": {
+      "databaseMtimeNS": 1789828806981132277,
+      "dataVersion": 1
+    },
+    "samples": [
+      {
+        "afterAcknowledgementMs": 0.5574170063482597,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 0,
+          "colorTag": 0,
+          "exposure": 0.0,
+          "contrast": 0.0,
+          "saturation": 0.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828806981132277,
+          "dataVersion": 1
+        }
+      },
+      {
+        "afterAcknowledgementMs": 30003.779417005717,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 0,
+          "colorTag": 0,
+          "exposure": 0.0,
+          "contrast": 0.0,
+          "saturation": 0.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828806981132277,
+          "dataVersion": 1
+        }
+      }
+    ],
+    "nativeAfter": {
+      "adjustments": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 1,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 1,
+        "shutterSpeed": "1/800 s"
+      }
+    }
+  },
+  {
+    "event": "mutation-acknowledged",
+    "observedAt": "2026-09-19T14:40:45.505096+00:00",
+    "label": "tonal-0",
+    "result": {
+      "after": {
+        "contrast": 3,
+        "exposure": 0.125,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "before": {
+        "contrast": 0,
+        "exposure": 0,
+        "saturation": 0,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "diff": {
+        "contrast": {
+          "after": 3,
+          "before": 0,
+          "delta": 3
+        },
+        "exposure": {
+          "after": 0.125,
+          "before": 0,
+          "delta": 0.125
+        },
+        "saturation": {
+          "after": -4,
+          "before": 0,
+          "delta": -4
+        }
+      },
+      "isDryRun": false,
+      "operationId": "0bf7490e-db68-4741-84e9-9fb926bb4456",
+      "stateHash": "dc7724da2ec3179dc0b79f5378b415db717e151d1a9a0f76f04cd72ba0926542",
+      "workingRef": "c1_edit_a716f943-76c8-4a3d-935c-d44fedafed37"
+    }
+  },
+  {
+    "event": "observation",
+    "observedAt": "2026-09-19T14:41:09.174260+00:00",
+    "label": "tonal-0",
+    "expected": {
+      "exposure": 0.125,
+      "contrast": 3,
+      "saturation": -4
+    },
+    "firstReadMatched": false,
+    "firstMatchMs": 22569.639583001845,
+    "observedThroughMs": 22569.639583001845,
+    "pollCount": 882,
+    "beforeMutationStamp": {
+      "databaseMtimeNS": 1789828806981132277,
+      "dataVersion": 1
+    },
+    "samples": [
+      {
+        "afterAcknowledgementMs": 1.8111250101355836,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 0,
+          "colorTag": 0,
+          "exposure": 0.0,
+          "contrast": 0.0,
+          "saturation": 0.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828806981132277,
+          "dataVersion": 1
+        }
+      },
+      {
+        "afterAcknowledgementMs": 22569.639583001845,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 1,
+          "colorTag": 1,
+          "exposure": 0.125,
+          "contrast": 3.0,
+          "saturation": -4.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": true,
+        "stamp": {
+          "databaseMtimeNS": 1789828868066806031,
+          "dataVersion": 2
+        }
+      }
+    ],
+    "nativeAfter": {
+      "adjustments": {
+        "contrast": 3,
+        "exposure": 0.125,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 1,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 1,
+        "shutterSpeed": "1/800 s"
+      }
+    }
+  },
+  {
+    "event": "mutation-acknowledged",
+    "observedAt": "2026-09-19T14:41:12.766179+00:00",
+    "label": "metadata-1",
+    "result": {
+      "after": {
+        "colorTag": 2,
+        "rating": 2
+      },
+      "before": {
+        "colorTag": 1,
+        "rating": 1
+      },
+      "diff": {
+        "colorTag": {
+          "after": 2,
+          "before": 1,
+          "delta": 1
+        },
+        "rating": {
+          "after": 2,
+          "before": 1,
+          "delta": 1
+        }
+      },
+      "isDryRun": false,
+      "metadataStateHash": "metadata-v1:34a1a7854249f6daff9c012db43d166af3eba9dcc4670fd368affeb4cd61578e",
+      "operationId": "164449c5-724e-4d72-8f1b-3516179f701d",
+      "workingRef": "c1_edit_a716f943-76c8-4a3d-935c-d44fedafed37"
+    }
+  },
+  {
+    "event": "observation",
+    "observedAt": "2026-09-19T14:41:45.211772+00:00",
+    "label": "metadata-1",
+    "expected": {
+      "rating": 2,
+      "colorTag": 2
+    },
+    "firstReadMatched": false,
+    "firstMatchMs": null,
+    "observedThroughMs": 30009.55095900281,
+    "pollCount": 1101,
+    "beforeMutationStamp": {
+      "databaseMtimeNS": 1789828868066806031,
+      "dataVersion": 2
+    },
+    "samples": [
+      {
+        "afterAcknowledgementMs": 1.5423750010086223,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 1,
+          "colorTag": 1,
+          "exposure": 0.125,
+          "contrast": 3.0,
+          "saturation": -4.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828868066806031,
+          "dataVersion": 2
+        }
+      },
+      {
+        "afterAcknowledgementMs": 30009.55095900281,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 1,
+          "colorTag": 1,
+          "exposure": 0.125,
+          "contrast": 3.0,
+          "saturation": -4.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828868066806031,
+          "dataVersion": 2
+        }
+      }
+    ],
+    "nativeAfter": {
+      "adjustments": {
+        "contrast": 3,
+        "exposure": 0.125,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 2,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 2,
+        "shutterSpeed": "1/800 s"
+      }
+    }
+  },
+  {
+    "event": "mutation-acknowledged",
+    "observedAt": "2026-09-19T14:41:46.689354+00:00",
+    "label": "tonal-1",
+    "result": {
+      "after": {
+        "contrast": 6,
+        "exposure": 0.25,
+        "saturation": -8,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "before": {
+        "contrast": 3,
+        "exposure": 0.125,
+        "saturation": -4,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "diff": {
+        "contrast": {
+          "after": 6,
+          "before": 3,
+          "delta": 3
+        },
+        "exposure": {
+          "after": 0.25,
+          "before": 0.125,
+          "delta": 0.125
+        },
+        "saturation": {
+          "after": -8,
+          "before": -4,
+          "delta": -4
+        }
+      },
+      "isDryRun": false,
+      "operationId": "96d4b16d-2aa5-4abc-b2b5-1b58e04393ef",
+      "stateHash": "d4267b580643913a7c65605d12b4655ab1770c13ded19d016428894e36a44f3c",
+      "workingRef": "c1_edit_a716f943-76c8-4a3d-935c-d44fedafed37"
+    }
+  },
+  {
+    "event": "observation",
+    "observedAt": "2026-09-19T14:42:11.555741+00:00",
+    "label": "tonal-1",
+    "expected": {
+      "exposure": 0.25,
+      "contrast": 6,
+      "saturation": -8
+    },
+    "firstReadMatched": false,
+    "firstMatchMs": 22468.82637499948,
+    "observedThroughMs": 22468.82637499948,
+    "pollCount": 775,
+    "beforeMutationStamp": {
+      "databaseMtimeNS": 1789828868066806031,
+      "dataVersion": 2
+    },
+    "samples": [
+      {
+        "afterAcknowledgementMs": 1.1910419998457655,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 1,
+          "colorTag": 1,
+          "exposure": 0.125,
+          "contrast": 3.0,
+          "saturation": -4.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": false,
+        "stamp": {
+          "databaseMtimeNS": 1789828868066806031,
+          "dataVersion": 2
+        }
+      },
+      {
+        "afterAcknowledgementMs": 22468.82637499948,
+        "row": {
+          "variantID": 1,
+          "uuid": "C5772C98-C650-4304-A6A3-8159B6914172",
+          "rating": 2,
+          "colorTag": 2,
+          "exposure": 0.25,
+          "contrast": 6.0,
+          "saturation": -8.0,
+          "whiteBalance": "1.339000;1.000000;2.170000",
+          "rotation": 0.0,
+          "crop": "0.000000;0.000000;0.000000;0.000000"
+        },
+        "matched": true,
+        "stamp": {
+          "databaseMtimeNS": 1789828929142434648,
+          "dataVersion": 3
+        }
+      }
+    ],
+    "nativeAfter": {
+      "adjustments": {
+        "contrast": 6,
+        "exposure": 0.25,
+        "saturation": -8,
+        "temperature": 3200.113037109375,
+        "tint": 0.006856377236545086
+      },
+      "metadata": {
+        "asShotWB": "Manual",
+        "camera": "Canon EOS R6m2",
+        "colorTag": 2,
+        "iso": "ISO 2500",
+        "lens": "Canon EF 35mm f/1.4L II USM",
+        "rating": 2,
+        "shutterSpeed": "1/800 s"
+      }
+    }
+  }
+]

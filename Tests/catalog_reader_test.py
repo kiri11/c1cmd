@@ -66,6 +66,30 @@ class CatalogReaderTests(unittest.TestCase):
         self.cli('variants','--rating',1,'--min-rating',2,error=True)
         self.cli('variants','--collection-id',999,error=True)
 
+    def test_single_variant_cli_mcp(self):
+        command = [str(CLI), 'get', '2', '--database', str(self.path), '--format', 'json']
+        before = hashlib.sha256(self.path.read_bytes()).hexdigest()
+        p = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        record = json.loads(p.stdout)
+        self.assertEqual(record['variant']['Z_PK'], 2)
+        self.assertEqual(record['storedSettings'][0]['ZEXPOSURE'], .2)
+        self.assertEqual(record['storedMetadata'][0]['ZBASIC_RATING'], 2)
+        self.assertTrue(record['storedStateOnly'])
+        self.assertNotIn('stateHash', json.dumps(record))
+        client = Client(MCP)
+        try:
+            result = client.tool('catalog_get', {'database': str(self.path), 'variantID': 2})
+            self.assertFalse(result.get('isError'))
+            self.assertEqual(json.loads(result['content'][0]['text'])['variant'], record['variant'])
+            missing = client.tool('catalog_get', {'database': str(self.path), 'variantID': 999})
+            self.assertTrue(missing['isError'])
+            invalid = client.tool('catalog_get', {'database': str(self.path), 'variantID': 0})
+            self.assertTrue(invalid['isError'])
+        finally:
+            client.close()
+        self.assertEqual(before, hashlib.sha256(self.path.read_bytes()).hexdigest())
+
     def test_schema_and_session_rejection(self):
         self.db.execute('ALTER TABLE ZIMAGE ADD COLUMN FUTURE INTEGER'); self.db.commit()
         self.assertIn('Unsupported Catalog schema',self.cli(error=True))

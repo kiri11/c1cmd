@@ -72,6 +72,10 @@ struct C1MCPServer {
         )
         
         let definitions: [(String, String, Bool)] = [
+            ("read_session_begin", "Begin exclusive c1 browsing with a native scope baseline. No UI changes until read_session_end. Auto-routed browse results omit mutation tokens; use live:true before edits.", false),
+            ("read_session_end", "End accelerated browsing before returning control to the photographer.", false),
+            ("read_session_status", "Inspect read workflow state and process new journal observations.", true),
+            ("catalog_get", "Inspect raw stored settings for one variant in an explicit Catalog database. Works while closed; no native tokens.", true),
             ("catalog_variants", "Discover distinct stored variants with explicit image/variant membership and optional ratings. No live mutation tokens or smart collection evaluation.", true),
             ("catalog_inspect", "Read versioned stored Catalog records from an explicit database path. No native references or live tokens; may lag Capture One.", true),
             ("catalog_snapshot", "Archive a Catalog using SQLite backup to a new destination file. Does not modify the source or include originals or external masks.", false),
@@ -142,14 +146,15 @@ struct C1MCPServer {
                         let status = try CaptureOneCore.RequestContext.status(requestId: args["requestId"] as! String)
                         return CallTool.Result(content: [textContent(OutputFormatter.formatJson(status))], isError: false)
                     }
-                    if ["catalog_inspect", "catalog_variants", "catalog_snapshot"].contains(params.name) {
+                    if ["catalog_get", "catalog_inspect", "catalog_variants", "catalog_snapshot"].contains(params.name) {
                         let data = try JSONEncoder().encode(params.arguments ?? [:])
                         let args = try JSONSerialization.jsonObject(with: data) as! [String: Any]
                         try ContractSchema.validate(tool: params.name, arguments: args)
                         return try await Task.detached {
                             let reader = try CatalogReader(database: args["database"] as! String)
                             let result: [String: Any]
-                            if params.name == "catalog_variants" {
+                            if params.name == "catalog_get" { result = try reader.get(variantID: extractInt(from: params.arguments, key: "variantID")!) }
+                            else if params.name == "catalog_variants" {
                                 result = try reader.variants(collectionID: extractInt(from: params.arguments, key: "collectionID"), rating: extractInt(from: params.arguments, key: "rating"), minRating: extractInt(from: params.arguments, key: "minRating"))
                             } else if params.name == "catalog_inspect" { result = try reader.inspect() }
                             else { result = try reader.snapshot(destination: args["destination"] as! String) }
@@ -192,11 +197,21 @@ struct C1MCPServer {
                                 }
                                 return CallTool.Result(content: [textContent(str)], isError: false)
                         
+                            case "read_session_begin":
+                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.begin(collection: args["collection"] as? String, selected: args["selected"] as? Bool ?? false)))], isError: false)
+                            case "read_session_end":
+                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.end(workflowID: args["readWorkflow"] as? String)))], isError: false)
+                            case "read_session_status":
+                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.status(workflowID: args["readWorkflow"] as? String)))], isError: false)
                             case "variants_list":
                                 let collection = extractString(from: params.arguments, key: "collection")
                                 let selected = extractBool(from: params.arguments, key: "selected") ?? false
                                 let rating = (args["rating"] as? NSNumber)?.intValue
                                 let minRating = (args["minRating"] as? NSNumber)?.intValue
+                                if args["live"] as? Bool != true, args["deadlineSeconds"] == nil,
+                                   let rows = try ReadWorkflow.shared.variants(collection: collection, selected: selected, rating: rating, minRating: minRating, workflowID: args["readWorkflow"] as? String) {
+                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
+                                }
                                 let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating, batchSize: extractInt(from: params.arguments, key: "batchSize") ?? 32, deadlineSeconds: extractDouble(from: params.arguments, key: "deadlineSeconds"))
                                 let json = OutputFormatter.formatJson(list)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
@@ -254,6 +269,9 @@ struct C1MCPServer {
                             case "get":
                                 guard let ref = extractString(from: params.arguments, key: "ref") else {
                                     throw C1Error.invalidRequest("Missing required argument: 'ref'")
+                                }
+                                if args["live"] as? Bool != true, args["nativeTargets"] == nil, let result = try ReadWorkflow.shared.get(ref: ref, workflowID: args["readWorkflow"] as? String) {
+                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(result))], isError: false)
                                 }
                                 let res: GetResult
                                 if let targets = args["nativeTargets"] {
@@ -313,6 +331,9 @@ struct C1MCPServer {
                                     throw C1Error.invalidRequest("Missing required argument: 'ref1'")
                                 }
                                 let ref2 = extractString(from: params.arguments, key: "ref2")
+                                if args["live"] as? Bool != true, let result = try ReadWorkflow.shared.diff(ref1: ref1, ref2: ref2, workflowID: args["readWorkflow"] as? String) {
+                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(result))], isError: false)
+                                }
                                 let res = try SessionController.shared.diff(ref1: ref1, ref2: ref2)
                                 let json = OutputFormatter.formatJson(res)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
@@ -321,6 +342,9 @@ struct C1MCPServer {
                                 let collection = extractString(from: params.arguments, key: "collection")
                                 let selected = extractBool(from: params.arguments, key: "selected") ?? false
                                 let batchSize = extractInt(from: params.arguments, key: "batchSize") ?? 100
+                                if args["live"] as? Bool != true, let rows = try ReadWorkflow.shared.dump(collection: collection, selected: selected, workflowID: args["readWorkflow"] as? String) {
+                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
+                                }
                                 let records = try SessionController.shared.dump(
                                     collectionName: collection,
                                     selectedOnly: selected,

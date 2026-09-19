@@ -75,7 +75,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 26
+        assert len(tools) == 30
         assert "native_get" not in cli_schema["requests"]
         removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
         assert removed.get('isError'), removed
@@ -199,7 +199,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 26 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 30 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:

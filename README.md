@@ -68,9 +68,13 @@ uses direct validation. See [scoped reads](docs/native-editing/README.md#scoped-
 
 `doctor` reports `unresolvedOperationsCount` only after successfully inspecting the journal. An absent count means unknown; `diagnosticError` preserves an inspection failure and `allChecksPassed` remains false.
 
-The default server exposes 26 tools: `catalog_inspect`, `catalog_variants`, `catalog_snapshot`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
+The default server exposes 30 tools: `read_session_begin`, `read_session_end`, `read_session_status`, `catalog_get`, `catalog_inspect`, `catalog_variants`, `catalog_snapshot`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
+
+## Faster browsing during an agent workflow
+
+The agent can call `read-session begin`, pass its `workflowId` as `--read-workflow` on browsing calls, and call `read-session end --read-workflow <id>` before returning control to the photographer. Catalog browsing combines native-confirmed cache entries, acknowledged edits, and matching SQLite values. Sessions use the native cache. Cached responses carry `readObservation` and no mutation tokens; use `get --live` before preparing edits. Ordinary calls without a workflow ID remain native. Closed Catalogs support direct `variants list --database` and `get <id> --database` reads without a handoff. See [routing, limitations, and validation](docs/catalog-reader.md#controlled-browsing-workflow).
 
 ## Catalog editing (experimental)
 

@@ -176,6 +176,48 @@ public final class CatalogReader {
         return output
     }
 
+    struct Projection: Decodable {
+        let id: Int64
+        let name: String?
+        let path: String?
+        let rating: Int?
+        let colorTag: Int?
+        let exposure: Double?
+        let contrast: Double?
+        let saturation: Double?
+    }
+    func readProjection() throws -> [Projection] {
+        try beginObservation(); defer { endObservation() }
+        let records = try rows("""
+            SELECT v.Z_PK AS id,i.ZDISPLAYNAME AS name,
+            CASE WHEN i.ZISINSIDECATALOG=0 AND p.ZISRELATIVE=0 AND p.ZMACROOT='/'
+                 THEN '/' || trim(p.ZRELATIVEPATH,'/') || '/' || i.ZIMAGEFILENAME ELSE NULL END AS path,
+            m.ZBASIC_RATING AS rating,COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,
+            l.ZEXPOSURE AS exposure,l.ZCONTRAST AS contrast,l.ZSATURATION AS saturation
+            FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
+            LEFT JOIN ZPATHLOCATION p ON p.Z_PK=i.ZIMAGELOCATION
+            LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
+            LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA ORDER BY v.Z_PK
+            """)
+        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
+        return try JSONDecoder().decode([Projection].self, from: JSONSerialization.data(withJSONObject: records))
+    }
+
+    /// Offline inspection: no Capture One lookup, native token, or warm-up required.
+    public func get(variantID: Int) throws -> [String: Any] {
+        guard variantID > 0 else { throw C1Error.invalidRequest("variantID must be positive.") }
+        try beginObservation(); defer { endObservation() }
+        guard let variant = try rows("SELECT * FROM ZVARIANT WHERE Z_PK=\(variantID)").first,
+              let imageID = variant["ZIMAGE"] as? Int64 else { throw C1Error.variantNotFound("Stored variant not found.") }
+        var result = provenance(); result["variant"] = variant
+        result["image"] = try rows("SELECT * FROM ZIMAGE WHERE Z_PK=\(imageID)").first
+        result["storedSettings"] = try rows("SELECT * FROM ZVARIANTLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
+        result["storedMetadata"] = try rows("SELECT m.* FROM ZVARIANTMETADATA m JOIN ZVARIANTLAYER l ON l.ZMETADATA=m.Z_PK WHERE l.ZVARIANT=\(variantID) ORDER BY m.Z_PK")
+        result["storedRetouching"] = try rows("SELECT * FROM ZRETOUCHINGLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
+        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
+        return result
+    }
+
     public func snapshot(destination: String) throws -> [String: Any] {
         try beginObservation()
         defer { endObservation() }

@@ -32,6 +32,12 @@ This file provides rules, architectural constraints, and standard operating proc
 
 Use exactly one open document and sequential calls. Do not edit in the UI, switch/reopen/replace documents, or launch competing exports during a workflow. Same-file close/reopen within one app launch is not reliably observable; it is unsupported. Database replacement and application restart invalidate references. Only Capture One 16.8.5.30 has retained runtime qualification; other allowed 16.x builds are unverified.
 
+## Optional accelerated browsing handoff
+
+The agent owns `read-session begin/end` (MCP `read_session_begin/end`). Begin only while the photographer has handed over control, retain `workflowId`, and pass `--read-workflow <id>` / `readWorkflow` on participating browsing calls. End before returning control to the photographer; after a crash begin anew. Do not export `C1_READ_WORKFLOW` globally or share the ID with unrelated callers. The workflow captures membership/selection at begin; use native reads for dynamic membership or start a new baseline.
+
+Cached browsing results carry `readObservation` and omit mutation tokens. Use `get --live` / `get(live: true)` immediately before preparing an existing variant; editing-reference reads and all mutation checks remain native automatically. Successful tonal/metadata writes update cached observations before rating filtering. Broader actions invalidate the workflow; resume with native reads or a new begin. Sessions use a native-confirmed cache; Catalogs additionally compare stored fields with that cache. Closed-Catalog `--database` reads require no handoff and never supply mutation tokens. See [details](docs/catalog-reader.md#controlled-browsing-workflow).
+
 ## 2. Canonical Editing Workflow
 
 1. Run `doctor` and confirm `allChecksPassed`, `writesEnabled`, and `exactBuildMatched`. Run `doc_info` and retain `openToken`.
