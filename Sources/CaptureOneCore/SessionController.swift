@@ -487,6 +487,91 @@ public final class SessionController {
     }
 
     // MARK: - Variants List
+    /// Bounded fresh discovery. No editing permissions or mutation tokens are returned.
+    public func listVariantSubset(ids: [String], collection: String? = nil, selected: Bool = false,
+                                  rating: Int? = nil, minRating: Int? = nil, parentPath: String? = nil, fields: String = "minimal",
+                                  batchSize: Int = 32, deadlineSeconds: Double? = nil) throws -> [[String: Any]] {
+        var args: [String: Any] = ["ids": ids, "fields": fields, "batchSize": batchSize]
+        if let rating { args["rating"] = rating }
+        if let minRating { args["minRating"] = minRating }
+        if let deadlineSeconds { args["deadlineSeconds"] = deadlineSeconds }
+        try ContractSchema.validate(tool: "variants_list", arguments: args)
+        if let parentPath, !parentPath.hasPrefix("/") { throw C1Error.invalidRequest("parentPath must be an absolute parent image path.") }
+        let started = ProcessInfo.processInfo.systemUptime
+        func checkpoint() throws {
+            try RequestContext.current?.checkReadCancellation()
+            if let deadlineSeconds, ProcessInfo.processInfo.systemUptime - started >= deadlineSeconds {
+                throw C1Error.deadlineExceeded("Subset deadline reached; no partial results returned.")
+            }
+        }
+        return try lock.withLock(checkpoint: checkpoint) {
+            try checkpoint()
+            let document = try getDocumentInfo()
+            RequestContext.current?.inventoryScope(collection: collection, selected: selected, rating: rating, minRating: minRating)
+            RequestContext.current?.document(document.openToken)
+            RequestContext.current?.inventoryStrategy("id-subset")
+            RequestContext.current?.update(phase: "discovering", total: ids.count)
+            let doc = NSAppleEventDescriptor(string: document.documentId)
+            func validateDocument() throws {
+                try checkpoint()
+                let current = try getDocumentInfo()
+                guard current.openToken == document.openToken, current.documentId == document.documentId else {
+                    throw C1Error.documentChanged("Document changed during subset discovery.")
+                }
+            }
+            struct Row: Decodable, Equatable {
+                let variantId: String
+                let starRating: Int
+                let parentImagePath: String
+                let inSelection: Bool
+            }
+            func read() throws -> [Row] {
+                var rows: [Row] = []
+                for offset in stride(from: 0, to: ids.count, by: batchSize) {
+                    try validateDocument()
+                    let batch = Array(ids[offset..<min(offset + batchSize, ids.count)])
+                    let values: [Row] = try executor.executeAndDecode(handler: "readVariantSubset", args: [doc,
+                        collection.map(NSAppleEventDescriptor.init(string:)) ?? .missingValue(),
+                        NSAppleEventDescriptor(boolean: selected),
+                        NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
+                    guard values.map(\.variantId) == batch,
+                          values.allSatisfy({ (0...5).contains($0.starRating) && $0.parentImagePath.hasPrefix("/") }) else {
+                        throw C1Error.stateChanged("Subset identity or metadata mismatch; no partial results returned.")
+                    }
+                    rows += values
+                    try checkpoint()
+                }
+                return rows
+            }
+            let baseline = try read()
+            let matches = baseline.filter { row in
+                (parentPath.map { row.parentImagePath == $0 } ?? true) && (!selected || row.inSelection) && (rating.map { row.starRating == $0 } ?? true) &&
+                    (minRating.map { row.starRating >= $0 } ?? true)
+            }
+            var result: [[String: Any]] = matches.map { ["id": $0.variantId, "rating": $0.starRating, "parentImagePath": $0.parentImagePath] }
+            if fields == "summary" {
+                result = []
+                for offset in stride(from: 0, to: matches.count, by: batchSize) {
+                    try validateDocument()
+                    let batch = Array(matches[offset..<min(offset + batchSize, matches.count)])
+                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc,
+                        NSAppleEventDescriptor(list: batch.map { NSAppleEventDescriptor(string: $0.variantId) })])
+                    guard summaries.map(\.variantId) == batch.map(\.variantId),
+                          summaries.map(\.starRating) == batch.map(\.starRating),
+                          summaries.map(\.parentImagePath) == batch.map(\.parentImagePath),
+                          !selected || summaries.allSatisfy(\.isSelected) else {
+                        throw C1Error.stateChanged("Subset changed during summary read.")
+                    }
+                    result += summaries.map { ["id": $0.variantId, "rating": $0.starRating, "parentImagePath": $0.parentImagePath,
+                                                "name": $0.variantName, "isSelected": $0.isSelected, "colorTag": $0.colorTagVal] }
+                }
+            }
+            guard try read() == baseline else { throw C1Error.stateChanged("Subset membership or identity changed; discard results.") }
+            try validateDocument()
+            return result
+        }
+    }
+
     public func listVariants(collectionName: String? = nil, selectedOnly: Bool = false, rating: Int? = nil, minRating: Int? = nil,
                              batchSize: Int = 32, deadlineSeconds: Double? = nil) throws -> [VariantSummary] {
         var filters: [String: Any] = ["batchSize": batchSize]

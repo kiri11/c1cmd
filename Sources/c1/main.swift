@@ -217,6 +217,15 @@ struct VariantsCommand: ParsableCommand {
 
 struct VariantsListCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "list", abstract: "List live variants, or stored Catalog variants with --database.")
+    @Option(help: "Known native IDs, comma-separated (1–512 unique IDs); always reads fresh.")
+    var ids: String?
+
+    @Option(help: "Subset fields: minimal (ID, rating, parent image path) or summary. Requires --ids.")
+    var fields: String?
+
+    @Option(help: "Exact absolute parent image path filter; requires --ids.")
+    var parentPath: String?
+
     @OptionGroup var globals: GlobalOptions
     @Flag(help: "Force fresh native reads, including mutation tokens; bypass the browsing workflow.")
     var live = false
@@ -248,7 +257,7 @@ struct VariantsListCommand: ParsableCommand {
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
             if let database {
-                guard !live, !selected, collection == nil, deadlineSeconds == nil, batchSize == 32 else {
+                guard ids == nil, fields == nil, parentPath == nil, !live, !selected, collection == nil, deadlineSeconds == nil, batchSize == 32 else {
                     throw C1Error.invalidRequest("--database uses stored discovery: --selected, --collection, --deadline-seconds and custom --batch-size require live AppleScript reads. Use --collection-id for explicit stored membership.")
                 }
                 let result = try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating)
@@ -259,7 +268,15 @@ struct VariantsListCommand: ParsableCommand {
             var request: [String: Any] = ["batchSize": batchSize]
             if let rating { request["rating"] = rating }; if let minRating { request["minRating"] = minRating }
             if let deadlineSeconds { request["deadlineSeconds"] = deadlineSeconds }
+            if let ids { request["ids"] = ids.components(separatedBy: ",") }
+            if let fields { request["fields"] = fields }
+            if let parentPath { request["parentPath"] = parentPath }
             try ContractSchema.validate(tool: "variants_list", arguments: request)
+            if let ids {
+                let rows = try SessionController.shared.listVariantSubset(ids: ids.components(separatedBy: ","), collection: collection,
+                    selected: selected, rating: rating, minRating: minRating, parentPath: parentPath, fields: fields ?? "minimal", batchSize: batchSize, deadlineSeconds: deadlineSeconds)
+                print(try ReadWorkflow.json(rows)); return
+            }
             if !live, deadlineSeconds == nil, let rows = try ReadWorkflow.shared.variants(collection: collection, selected: selected, rating: rating, minRating: minRating, workflowID: globals.readWorkflowID) {
                 print(try ReadWorkflow.json(rows)); return
             }

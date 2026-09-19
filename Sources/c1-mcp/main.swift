@@ -85,7 +85,7 @@ struct C1MCPServer {
             ("doc_info", "Show current open document info, folders, and open token.", true),
             ("capabilities", "Show capability matrix for the running Capture One build.", true),
             ("schema", "Output JSON Schema for c1 requests and responses.", true),
-            ("variants_list", "List variants in the current document or specified collection, optionally filtered by exact or minimum star rating. Filters narrow results without changing UI selection.", true),
+            ("variants_list", "List variants, optionally filtered by exact or minimum rating. Supply 1–512 known ids for fresh bounded discovery with minimal fields, optional summary fields and exact parentPath filtering. Subset reads return no mutation tokens.", true),
             ("variant_edit", "Prepare editing on an existing variant without cloning. Requires ifDocument from doc_info and ifState from get; optionally check ifGeometryState too. Saves its baseline and returns a c1_edit_ reference for supported adjustments and geometry. Does not authorize deletion.", false),
             ("geometry_restore", "Restore saved crop/rotation/keystone for an editing or clone reference. Requires fresh ifGeometryState; refuses changed lens/orientation context. Never delete an existing variant to reject a crop.", false),
             ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Use variant_edit to edit existing variants.", false),
@@ -208,6 +208,13 @@ struct C1MCPServer {
                                 let selected = extractBool(from: params.arguments, key: "selected") ?? false
                                 let rating = (args["rating"] as? NSNumber)?.intValue
                                 let minRating = (args["minRating"] as? NSNumber)?.intValue
+                                if let ids = args["ids"] as? [String] {
+                                    let rows = try SessionController.shared.listVariantSubset(ids: ids, collection: collection, selected: selected,
+                                        rating: rating, minRating: minRating, parentPath: args["parentPath"] as? String, fields: args["fields"] as? String ?? "minimal",
+                                        batchSize: extractInt(from: params.arguments, key: "batchSize") ?? 32,
+                                        deadlineSeconds: extractDouble(from: params.arguments, key: "deadlineSeconds"))
+                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
+                                }
                                 if args["live"] as? Bool != true, args["deadlineSeconds"] == nil,
                                    let rows = try ReadWorkflow.shared.variants(collection: collection, selected: selected, rating: rating, minRating: minRating, workflowID: args["readWorkflow"] as? String) {
                                     return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)

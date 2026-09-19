@@ -51,6 +51,9 @@ public enum ContractSchema {
         case "variants_list":
             var result = object([
                 "collection": string, "selected": boolean, "live": boolean, "readWorkflow": string,
+                "ids": ["type": "array", "items": ["type": "string", "minLength": 1], "minItems": 1, "maxItems": 512, "uniqueItems": true],
+                "fields": ["type": "string", "enum": ["minimal", "summary"]],
+                "parentPath": ["type": "string", "minLength": 1],
                 "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
                 "deadlineSeconds": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
                 "rating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."],
@@ -113,6 +116,17 @@ public enum ContractSchema {
         }
         if tool == "variants_list", arguments["rating"] != nil, arguments["minRating"] != nil {
             throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
+        }
+        if tool == "variants_list" {
+            if (arguments["fields"] != nil || arguments["parentPath"] != nil) && arguments["ids"] == nil {
+                throw C1Error.invalidRequest("fields and parentPath require ids.")
+            }
+            if let ids = arguments["ids"] as? [String], ids.isEmpty || ids.count > 512 || Set(ids).count != ids.count {
+                throw C1Error.invalidRequest("ids must contain 1–512 unique native IDs.")
+            }
+            if let fields = arguments["fields"] as? String, !["minimal", "summary"].contains(fields) {
+                throw C1Error.invalidRequest("fields must be minimal or summary.")
+            }
         }
         if tool == "set" || tool == "add" {
             let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]

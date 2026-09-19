@@ -84,6 +84,12 @@ def run(cli, mcp):
 
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
+        for args in [{"ids": []}, {"ids": ["1", "1"]}, {"ids": [str(i) for i in range(513)]},
+                     {"ids": ["1"], "fields": "unknown"}, {"fields": "minimal"}, {"parentPath": "/a.CR3"}]:
+            assert client.tool("variants_list", args).get("isError"), args
+        for flags in [["--ids", "1,1"], ["--ids", "1", "--fields", "unknown"], ["--fields", "minimal"]]:
+            result = subprocess.run([str(cli), "variants", "list", *flags], capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0 and "invalid-request" in result.stderr, result.stderr
         metadata_tool = next(t for t in tools if t['name'] == 'metadata_set')
         assert metadata_tool['annotations']['readOnlyHint'] is False
         assert metadata_tool['inputSchema']['properties']['colorTag']['maximum'] == 7
@@ -109,6 +115,7 @@ def run(cli, mcp):
         assert rating_schema['properties']['batchSize']['type'] == 'integer'
         assert rating_schema['properties']['batchSize']['minimum'] == 1
         assert rating_schema['properties']['batchSize']['maximum'] == 256
+        assert rating_schema['properties']['ids']['maxItems'] == 512
         assert rating_schema['properties']['deadlineSeconds']['type'] == 'number'
         assert rating_schema['properties']['deadlineSeconds']['exclusiveMinimum'] == 0
         assert rating_schema['properties']['deadlineSeconds']['maximum'] == 86400

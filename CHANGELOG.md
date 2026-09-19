@@ -5,6 +5,12 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Bounded known-ID discovery
+
+- CLI `variants list --ids` and MCP `variants_list.ids` resolve at most 512 known IDs without full-scope metadata discovery. Default fields are ID, exact rating and parent-image path; optional summaries add name, selection and color tag. Exact parent-path, rating and selection filtering preserve input order.
+- Fresh bounded checks reject identity/document drift and missing IDs without partial responses. Browsing caches are bypassed; existing fresh `get` and editing preconditions remain required. Rich adjustment/native reads continue through per-variant `get`; multi-variant native-token batching is not added.
+- Focused read-only CLI/MCP checks passed on a five-variant disposable Session, including collection/selection, filter parity and missing-ID failure. Minimal discovery measured 1.24 seconds on that fixture; the historical 100-of-1,335 workload has not been benchmarked. Recovery faults were omitted because mutation and recovery paths are unchanged.
+
 ## Documentation and qualification cleanup
 
 - Keep current implementation, usage, support limits and validation commands in docs. Remove generated results, journals, copied harnesses/source patches and dated reports; previously committed evidence remains in Git history. Generate detailed diagnostics in ignored `.build` directories or external artifact storage.

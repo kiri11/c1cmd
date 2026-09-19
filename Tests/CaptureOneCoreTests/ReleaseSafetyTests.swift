@@ -105,6 +105,13 @@ final class FakeScript: ScriptExecuting {
                 let value = ratings[id] ?? 0
                 return (exact.map { value == $0 } ?? true) && (minimum.map { value >= $0 } ?? true)
             }
+        case "readVariantSubset":
+            documentDrift?()
+            let requested = ids(from: args[3])
+            ratingBatches.append(requested)
+            let responseIDs = ratingResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
+            result = responseIDs.map { ["variantId": $0, "starRating": ratings[$0] ?? 0,
+                "parentImagePath": parentOverride ?? parent, "inSelection": !args[2].booleanValue || selectedIDs.contains($0)] as [String: Any] }
         case "readVariantRatings":
             beforeReadRatings?()
             documentDrift?()

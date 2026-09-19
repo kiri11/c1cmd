@@ -20,12 +20,71 @@ struct InventoryTests {
 
     static func run() {
         print("Running InventoryTests...")
+        testSubset()
         testFiltersBeforeHydration()
         testDuplicateAndSharedParentIDs()
         testMalformedAndVanishedResponsesFailClosed()
         testRatingAndMembershipDriftFailClosed()
         testDocumentDriftFailsClosed()
         testInvalidOptionsFailBeforeNativeCalls()
+    }
+
+    private static func testSubset() {
+        let (fake, core, dir) = fixture(512)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        XCTAssertNoThrowBlock {
+            let rows = try core.listVariantSubset(ids: ["5", "6", "11"], rating: 5, batchSize: 2)
+            XCTAssertEqual(rows.compactMap { $0["id"] as? String }, ["5", "11"])
+            XCTAssertTrue(rows.allSatisfy { Set($0.keys) == Set(["id", "rating", "parentImagePath"]) })
+            XCTAssertTrue(fake.hydrationBatches.isEmpty)
+            XCTAssertEqual(fake.ratingBatches, [["5", "6"], ["11"], ["5", "6"], ["11"]])
+            XCTAssertFalse(fake.calls.contains("discoverFilteredVariantIDs"))
+            XCTAssertFalse(fake.calls.contains("discoverVariantIDs"))
+            let rich = try core.listVariantSubset(ids: ["5", "6"], rating: 5, fields: "summary")
+            let absent = try core.listVariantSubset(ids: ["5"], parentPath: "/other.CR3")
+            let present = try core.listVariantSubset(ids: ["5"], parentPath: fake.parent)
+            XCTAssertEqual(absent.count, 0)
+            XCTAssertEqual(present.count, 1)
+            XCTAssertEqual(rich.count, 1)
+            XCTAssertEqual(fake.hydrationCounterIDs, ["5"])
+        }
+        for ids in [[], [""], ["1", "1"], (1...513).map(String.init)] {
+            let before = fake.calls.count
+            XCTAssertThrowsError(try core.listVariantSubset(ids: ids))
+            XCTAssertEqual(fake.calls.count, before)
+        }
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"], fields: "unknown"))
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"], parentPath: "relative.CR3"))
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"], deadlineSeconds: 0.000001))
+        XCTAssertNoThrowBlock {
+            fake.ratingBatches = []
+            let known = (1...100).map(String.init)
+            let hundred = try core.listVariantSubset(ids: known, batchSize: 32)
+            XCTAssertEqual(hundred.count, 100)
+            XCTAssertEqual(fake.ratingBatches.map(\.count), [32, 32, 32, 4, 32, 32, 32, 4])
+        }
+        XCTAssertNoThrowBlock {
+            fake.ratingBatches = []
+            let known = (1...512).map(String.init)
+            let rows = try core.listVariantSubset(ids: known)
+            XCTAssertEqual(rows.compactMap { $0["id"] as? String }, known)
+            XCTAssertEqual(fake.ratingBatches.map(\.count), Array(repeating: 32, count: 32))
+        }
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["missing"]))
+        var reads = 0
+        fake.beforeHandler = { handler in
+            if handler == "readVariantSubset" {
+                reads += 1
+                if reads == 2 { fake.ratings["5"] = 1 }
+            }
+        }
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"], rating: 5))
+        fake.beforeHandler = nil
+        fake.ratingResponseIDs = { _ in ["6"] }
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"]))
+        fake.ratingResponseIDs = nil
+        fake.documentDrift = { fake.generation = "app-2" }
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"]))
     }
 
     private static func testFiltersBeforeHydration() {

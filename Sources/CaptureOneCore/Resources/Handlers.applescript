@@ -494,3 +494,20 @@ on applyMetadata(docName, variantId, ratingValue, tagValue, expectedRating, expe
         return {variantId:(id of v as text), ratingVal:(rating of v as integer), colorTagVal:(color tag of v as integer)}
     end tell
 end applyMetadata
+
+-- Resolve only explicitly requested IDs. Missing or out-of-scope IDs fail the request.
+on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        set scope to d
+        if collectionName is not missing value and collectionName is not "" then set scope to collection collectionName of d
+        set results to {}
+        repeat with requestedID in variantIDs
+            set v to variant id (requestedID as text) of scope
+            set selectedValue to true
+            if selectedOnly then set selectedValue to selected of v as boolean
+            set end of results to {variantId:(id of v as text), starRating:(rating of v as integer), parentImagePath:(POSIX path of (path of parent image of v as text)), inSelection:selectedValue}
+        end repeat
+        return results
+    end tell
+end readVariantSubset

@@ -155,6 +155,19 @@ MCP `variants_list` accepts the same filters:
 
 Use `{"minRating": 4}` for four stars and above. Both arguments require integers from 0 through 5; choose either `rating` or `minRating`. Filters combine with `collection` and `selected`, narrow the returned variants, and leave Capture One's UI selection unchanged. No matches returns an empty list. Omitting both filters preserves the full listing for the requested scope.
 
+For a known subset, pass up to 512 unique native IDs in input order. This fresh path resolves only those IDs, bypasses the browsing cache, and defaults to just `id`, `rating`, and `parentImagePath`:
+
+```sh
+c1 variants list --ids 101,102,103 --rating 5 --batch-size 32
+c1 variants list --ids 101,102 --rating 5 --fields summary
+c1 variants list --ids 101,102 --parent-path /photos/Capture/photo.CR3
+```
+
+MCP: `variants_list({"ids":["101","102"],"rating":5,"fields":"minimal"})`.
+`parentPath` is an exact absolute parent-image file path, not a folder prefix. `fields: "summary"` adds name, selection and color tag; it does not supply clone provenance or editing permission. For richer adjustment/native observations, use fresh `get` reads with optional `nativeTargets` on the returned IDs.
+
+Subset reads obey `batchSize` and `deadlineSeconds`, and support collection and selection scope. A missing or out-of-collection ID fails the whole request; rating, path and selection nonmatches are omitted. The reader repeats the bounded identity/rating/path/selection observations and checks document identity before returning; drift or a failed batch produces no partial result. These observations are sequential, not an atomic snapshot. Subset discovery returns no mutation tokens: immediately before editing, use `get --live`, current `doc info`, and guarded `variant edit` as usual. `--ids`, `--fields` and `--parent-path` are unavailable with stored `--database` discovery.
+
 For “crop my five-star picks,” call `variants_list` with `rating: 5`, then prepare each intended existing variant with `variant_edit` and follow the crop workflow below. Results are variants: multiple edits of the same photo can appear, including existing managed clones. Review the IDs and `isManagedWorkingClone` before creating proposals. Filtering is also available in the composition MCP profile and for read-only Catalog inspection.
 
 ### Inventory progress and cancellation

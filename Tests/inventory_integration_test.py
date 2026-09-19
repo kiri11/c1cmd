@@ -300,6 +300,8 @@ end repeat''', timeout=600)
             self.benchmark(f"{count}-selected-dense-exact5", records, None, True, rating=5)
             self.benchmark(f"{count}-collection-selected-min4", records, "Capture", True, min_rating=4)
             self.benchmark(f"{count}-empty-exact4", records, None, False, rating=4)
+        from inventory_subset_test import run as test_subset
+        self.evidence.append(test_subset(self.variants()))
         from inventory_mcp_test import run as test_mcp, cli_cancellation
         self.evidence.append(test_mcp(self.status_dir, LARGE_COUNT))
         self.evidence.append(cli_cancellation(self.status_dir, LARGE_COUNT))
