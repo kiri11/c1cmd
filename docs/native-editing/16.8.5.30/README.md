@@ -6,11 +6,14 @@ scope-specific state tokens.
 
 ## Retained evidence
 
+- [Color-target bulk-oracle qualification](color-target-qualification.json): all nine basic bands and three advanced elements match independent bulk property records at image and layer scope. Guarded changes, restoration, sibling preservation and middle-element deletion passed in the full packaged native suite on 2026-09-19. The old evaluated basic-color reference returned `all` for element 2; direct and explicit-reference reads returned `orange`.
+
 - [Scope comparisons and executable hashes](../../performance/scoped-get-native-qualification.json): combined image and layer reads match independent single-scope reads, including values and state tokens. The packaged native suite passed with build-tree resources hidden.
+- [Color-target candidate recovery](color-target-recovery-events.jsonl): both `native` and `native-action` passed against the rebuilt candidate archive on 2026-09-19, using SIGTERM restart. These inject faults in the shared clarity-property and layer-creation paths, not individual color bands. Other regular and recovery matrices were omitted because their paths are unchanged.
 - [Native recovery events](../../performance/scoped-get-recovery-events.jsonl): property and layer-creation faults preserve the unresolved-write block, reconcile after SIGTERM restart, reject expired references and allow edits through fresh references.
 - [Release read benchmark](../../performance/local-release-scoped-get.json): five measured pairs compare separate and combined reads in one persistent MCP process.
 
-The offline suite passes 996 assertions, including source/document drift,
+The offline suite passes 1,023 assertions, including source/document drift,
 partial-read failure, stale references, scope validation, duplicate targets,
 compact responses and the single-scope fast path. CLI/MCP contract tests validate
 23 tool schemas and rejection of invalid requests.
@@ -29,13 +32,14 @@ compact responses and the single-scope fast path. CLI/MCP contract tests validat
 | Layers | Creation, name/opacity, initially unset exposure/clarity, addressed deletion |
 | Luma/masks | Luma bounds/clear; clear, fill, invert, rasterize, feather, refine and copy commands |
 | AI people | Combined body-skin/face-skin request and resulting layer snapshots |
-| Color editor | Basic hue change/restoration and advanced correction creation, change and deletion through the indexed interface |
+| Color editor | All nine basic bands and three advanced elements independently checked at image/layer scope; hue change/restoration and advanced middle-element deletion preserve siblings |
 | Isolation | Existing-variant editing, untouched sibling preservation and RAW checksum comparison |
 | Preview | Fresh preview export |
 
 Qualification applies to the exercised values and fixture on Capture One
-16.8.5.30. Indexed color-band targeting requires an independent bulk oracle for
-palette transfer. Layer property snapshots establish observable layer state;
+16.8.5.30. Color targeting was checked against an independent bulk oracle with
+the retained hue-change payloads; this is not a full palette-transfer qualification.
+Layer property snapshots establish observable layer state;
 mask-pixel fidelity requires rendered inspection. Catalog writes require the
 existing document opt-in and image-storage guards.
 

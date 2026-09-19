@@ -8,8 +8,9 @@ on nativeTarget(v, scopeName, layerNumber, elementNumber)
         if scopeName is "lens" then return lens correction of v
         if scopeName is "layer" then return layer layerNumber of v
         if scopeName is "luma" then return luma range of layer layerNumber of v
-        if scopeName is "basicColor" then return basic color correction elementNumber of color editor settings of a
-        if scopeName is "advancedColor" then return advanced color correction elementNumber of color editor settings of a
+        -- Keep indexed specifiers unevaluated: Capture One can return an aliased color object.
+        if scopeName is "basicColor" then return a reference to basic color correction elementNumber of color editor settings of a
+        if scopeName is "advancedColor" then return a reference to advanced color correction elementNumber of color editor settings of a
     end tell
     error "Unknown native editing scope."
 end nativeTarget

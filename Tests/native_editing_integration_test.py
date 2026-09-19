@@ -103,14 +103,61 @@ def main():
             action(mask,scope='layer',layer=index)
         action('mask.feather',{'amount':10},scope='layer',layer=index)
         action('mask.refine',{'amount':10},scope='layer',layer=index)
-        basic = get('basicColor',0,1)
-        patch({'hue change':5},'basicColor',0,1)
-        patch({'hue change':basic['values']['hue change']},'basicColor',0,1)
-        action('color.create')
-        n = get()['advancedColorCount']
-        advanced = get('advancedColor',0,n)
-        patch({'hue change':5},'advancedColor',0,n)
-        action('color.delete',scope='advancedColor',element=n)
+        def color_oracle(scope, layer):
+            # Read property records in one bulk event, never evaluated element objects.
+            fields = [f['name'] for f in json.loads(
+                (ROOT / 'Sources/CaptureOneCore/Resources/NativeEditing.json').read_text())[scope]]
+            kind = 'basic' if scope == 'basicColor' else 'advanced'
+            context = 'adjustments of v' if layer == 0 else f'adjustments of layer {layer} of v'
+            body = f'''if (count of documents) is not 1 then error "Document changed"
+set d to current document
+if (id of d as text) is not {json.dumps(doc['documentId'])} then error "Document changed"
+set v to variant id {json.dumps(source['id'])} of d
+set colorPropertyRows to properties of every {kind} color correction of color editor settings of {context}
+set rows to {{}}
+repeat with r in colorPropertyRows
+    set end of rows to {{{', '.join(f'({field} of r)' for field in fields)}}}
+end repeat
+return rows'''
+            rows = json.loads(apple(body).replace('{', '[').replace('}', ']'))
+            value = [dict(zip(fields, row)) for row in rows]
+            log('color-oracle', dict(scope=scope, layer=layer, values=value))
+            return value
+
+        for color_layer in [0, index]:
+            for scope in ['basicColor', 'advancedColor']:
+                if scope == 'advancedColor':
+                    # Three elements make an index alias observable through sibling checks.
+                    for _ in range(3):
+                        action('color.create', layer=color_layer)
+                before = color_oracle(scope, color_layer)
+                if scope == 'basicColor':
+                    assert [r['name'] for r in before] == [
+                        'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink', 'all']
+                else:
+                    assert len(before) == 3
+                for element, expected in enumerate(before, 1):
+                    assert get(scope, color_layer, element)['values'] == expected
+                # Address an interior band, verify every property of every sibling.
+                element = 2
+                changed = [dict(row) for row in before]
+                changed[element - 1]['hue change'] = 5.0
+                patch({'hue change':5}, scope, color_layer, element)
+                assert color_oracle(scope, color_layer) == changed
+                for n, expected in enumerate(changed, 1):
+                    assert get(scope, color_layer, n)['values'] == expected
+                patch({'hue change':before[element - 1]['hue change']}, scope, color_layer, element)
+                assert color_oracle(scope, color_layer) == before
+                if scope == 'advancedColor':
+                    # Distinguish siblings before deleting the middle element.
+                    patch({'hue change':3}, scope, color_layer, 1)
+                    patch({'hue change':7}, scope, color_layer, 3)
+                    marked = color_oracle(scope, color_layer)
+                    action('color.delete', scope=scope, layer=color_layer, element=2)
+                    assert color_oracle(scope, color_layer) == [marked[0], marked[2]]
+                    action('color.delete', scope=scope, layer=color_layer, element=2)
+                    action('color.delete', scope=scope, layer=color_layer, element=1)
+                    assert color_oracle(scope, color_layer) == []
         action('layer.create',{'name':'Mask copy target','kind':'adjustment'})
         copy_index = len(get()['layers'])
         action('mask.copy',{'sourceLayer':index},scope='layer',layer=copy_index)

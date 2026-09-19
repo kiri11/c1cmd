@@ -192,3 +192,11 @@ archive. Qualification results and exclusions must be recorded separately from
 this implemented capability inventory.
 
 See the [retained 16.8.5.30 qualification](16.8.5.30/README.md) for exact tested controls, payload hashes and omissions.
+
+Color-editor elements retain unevaluated indexed AppleScript references. On
+16.8.5.30, evaluating a basic-color object before reading its properties can
+alias the requested band to `all`. The native integration suite compares all
+nine named bands with independent bulk property records, changes and restores
+an interior band, and checks every sibling. It repeats this for image and layer
+adjustments, and checks three advanced-color elements including middle-element
+deletion. Indexed readback alone is not the target-correctness oracle.
