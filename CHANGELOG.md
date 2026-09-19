@@ -5,6 +5,22 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Documentation and qualification cleanup
+
+- Keep current implementation, usage, support limits and validation commands in docs. Remove generated results, journals, copied harnesses/source patches and dated reports; previously committed evidence remains in Git history. Generate detailed diagnostics in ignored `.build` directories or external artifact storage.
+- Cleanup validation passed `make check` in 28.64 seconds, including a 7.36-second incremental debug build and 9.44-second core assertions. Documentation links, generated-resource checks and the rebuilt relocated archive/CLI/MCP checks passed. Removed 269 report/artifact files (9.6 MB) and five closed disposable fixtures (121 MB); source RAWs were preserved.
+- Scoped-recipe validation on 2026-09-19 passed 1,233 offline assertions, the 35-tool CLI/MCP contract, broad and focused recipe live runs, and six recovery cases (camera, advanced-color deletion, lens, layer-color deletion, geometry after lens, MCP caller death). RAW hashes remained unchanged. Complete wedding-look qualification, arbitrary profiles/lenses, layers/masks and Catalog recovery were not established.
+- Recorded local timings: core assertions approximately 5.5–6 seconds before the scoped extension and 9 seconds afterward; typed recipe live checks 154 seconds, expanded recipe checks 546 seconds, focused scoped checks including combined lens/geometry 576 seconds. These were different payloads/runs, not a controlled benchmark. The six-case scoped recovery run took 21m46s, including five real 120-second timeouts, independent clone verification and guarded restarts.
+- Development found missing indexed color-band counts; the unknown deletion was reconciled without retry and image/layer count readback was corrected. The initial recovery attempt hit transient application discovery after restart; the scoped harness now confirms the exact document through repeated read-only CLI checks. The final regular binary preceded a reporting-only change retaining failed scoped observations; offline checks and recovery used the final binary.
+- Recorded broader qualification milestones: contract 1.10 passed 941 assertions and native property/action recovery; contract 1.9 passed 907 assertions and nine regular suites. Lens/perspective/keystone results were fixture-specific; later fault campaigns were incomplete, and metadata partial-write faults had mocked coverage only. No exhaustive current-payload or Catalog recovery campaign was claimed.
+- Local scoped-read benchmark: combined adjustment/lens/variant reads measured 3,245 ms median versus 4,082 ms for three calls on one disposable fixture. Catalog benchmarks measured roughly 34–47× faster stored reads and 4× SQL throughput with four workers; native acknowledgements could precede SQLite visibility by more than 30 seconds. These measurements do not establish live-state equivalence or broad scaling.
+
+## Explicit scoped recipes
+
+- Add version-2 camera/profile, lens, named basic-color patches and explicit advanced-color replacement to shared CLI/MCP recipes (contract 2.7.0); add all image color-balance controls to settings and overrides.
+- Bind camera/lens scopes to destination metadata, require explicit lens crop policy and geometry preconditions, and independently check omitted scoped values. Return scoped observations, hashes, diffs and per-step provenance.
+- Keep every scoped mutation separately journaled with fresh readback; verify color-deletion counts and retain partial/unknown recovery. Layers/masks, Skin Tone and style/profile installation remain excluded; payload qualification and visual review are still required.
+
 ## Curves, grain and vignette recipes
 
 - Extend shared CLI/MCP recipe settings and per-photo overrides to five point curves, grain type/impact/granularity and vignette method/amount (contract 2.6.0).
@@ -65,7 +81,7 @@ support limits and test-selection policy.
 ## Metadata editing and validation workflow
 
 - Add rating (0–5) and native color-tag (0–7) writes through CLI `metadata set` and MCP `metadata_set` (contract 1.9.0). Require an editing or managed-clone reference and a fresh metadata state token; preserve omitted fields.
-- Save metadata baselines, expose metadata differences, and journal writes with native concurrency and readback checks. The composition profile excludes metadata writes. See [qualification and limits](docs/metadata/16.8.5.30/README.md).
+- Save metadata baselines, expose metadata differences, and journal writes with native concurrency and readback checks. The composition profile excludes metadata writes. See [qualification and limits](docs/RELEASE_VALIDATION.md).
 - Default `make qualify` to packaged CLI, MCP, and existing-variant workflows; select affected suites with `QUALIFY_SUITES`, or all nine with `make qualify-extended`.
 - Select recovery cases by changed behavior with `RECOVERY_CASES`. Affected recovery and fault-harness changes require live fault validation; unrelated changes and release checkpoints alone do not. A separate user request is not required.
 - Remove superseded M0 feasibility probes/evidence and the old follow-up roadmap; retain feature/recovery qualification evidence and consolidate current support guidance.
@@ -75,7 +91,7 @@ support limits and test-selection policy.
 - Add absolute keystone amount, vertical, horizontal, skew, and aspect controls to CLI `geometry set` and MCP `geometry_set` (contract 1.8.0), including the composition profile.
 - Preserve omitted controls, tonal edits, lens settings, and native variant identity. Validate native ranges before dispatch, obtain fresh crop bounds after transforms, and verify all five controls on readback.
 - Include keystone changes in diffs and durable geometry requests. Restore baseline keystone with crop/rotation through `geometry_restore`; reject predictive dry runs for keystone changes.
-- Add CLI/MCP control-range, preview, restoration, and referenced-Catalog coverage, plus a keystone timeout-recovery test case. See [qualification](docs/geometry/16.8.5.30/keystone/README.md).
+- Add CLI/MCP control-range, preview, restoration, and referenced-Catalog coverage, plus a keystone timeout-recovery test case. See [qualification](docs/RELEASE_VALIDATION.md).
 
 ## Preserved keystone and lens movements
 
@@ -83,14 +99,14 @@ support limits and test-selection policy.
 - Validate native ratio-fit shrinkage inside the proposed rectangle. Keep explicit crops strict and retain native automatic crops for rotation-only requests.
 - Reject dry runs that would need native rotation or perspective/movement ratio normalization. Keep journal, state, context, and recovery checks.
 - Make real timeout/process-death validation opt-in via `qualify-recovery` or `qualify-full`; normal `qualify` retains offline and packaged live workflow checks.
-- Add representative movement-profile and keystone workflows, coordinate checks, and a combined-correction timeout case. See [qualification](docs/geometry/16.8.5.30/perspective/README.md).
+- Add representative movement-profile and keystone workflows, coordinate checks, and a combined-correction timeout case. See [qualification](docs/RELEASE_VALIDATION.md).
 
 ## Corrected-lens crop and rotation
 
 - Support preserved distortion correction from 0 through 100 on Capture One 16.8.5.30, using native bounds for crops, ratio fits, rotation, and full-frame context previews.
 - Query bounds after corrected-lens rotation inside the journaled operation. Retain `requestedGeometry` before dispatch and the resolved target afterward (contract 1.6.0); reject dry runs that would require a new native rotation.
 - Keep lens tilt/shift, keystone, flips, and crop-outside-image blocked. Preserve baseline restoration, state checks, and uncertain-mutation recovery.
-- Add corrected-lens CLI/MCP, preview-coordinate, preservation, and timeout-recovery qualification. See [evidence and limits](docs/geometry/16.8.5.30/lens/README.md).
+- Add corrected-lens CLI/MCP, preview-coordinate, preservation, and timeout-recovery qualification. See [evidence and limits](docs/RELEASE_VALIDATION.md).
 
 ## Filtered inventory and request progress
 
@@ -98,7 +114,7 @@ support limits and test-selection policy.
 - Preserve inventory fields, ordering, selection/collection scope, and duplicate variants; serialize scans with writes and validate identity and membership between work units.
 - Add background request diagnostics, CLI stderr progress/quiet modes, MCP progress notifications, and file-backed `request status` / `request_status` (contract 1.5.0, 20 MCP tools).
 - Support inventory batch limits, deadlines, and cancellation between Apple Events without returning partial inventories or weakening mutation recovery.
-- Add offline, native-predicate, packaged inventory, and concurrent status/progress qualification. See [inventory validation](docs/inventory/16.8.5.30/README.md) for measurements and limits.
+- Add offline, native-predicate, packaged inventory, and concurrent status/progress qualification. See [inventory validation](docs/RELEASE_VALIDATION.md) for measurements and limits.
 
 ## Edit existing variants by default
 

@@ -69,35 +69,11 @@ fields. Native values and scope tokens must match across every observation.
 Order alternates; one warmup pair is excluded. The report includes the MCP binary
 SHA-256, document identity, native snapshot digest, phase timings and raw samples.
 
-## Local release measurements
+## Validation and interpretation
 
-[Recorded samples](local-release-scoped-get.json) use Capture One 16.8.5.30 and a
-disposable copy of local `2U6A7257.CR3`. Five measured pairs followed one warmup
-pair. All native values and tokens matched. Screen lock state was unobserved and
-other application load was uncontrolled.
-
-| Read adjustment, lens and variant scopes | Median |
-| --- | ---: |
-| Three single-scope `get` calls | 4,082 ms |
-| One combined `get` call | 3,245 ms |
-
-The combined call took 21% less time in this local experiment. Measurements apply
-to this fixture, build and application state.
-
-## Validation
-
-[Native qualification evidence](scoped-get-native-qualification.json) records
-image and layer scope comparisons against separate reads, with matching values
-and state tokens. The packaged native suite exercises guarded editing, layer/mask
-actions, sibling preservation and preview export using a disposable RAW copy.
-
-`make check` passes 996 Swift assertions plus CLI/MCP contract, generated-resource,
-benchmark-runner and harness checks. [Recovery events](scoped-get-recovery-events.jsonl)
-record successful native property and layer-creation fault cases: real 120-second
-Apple Event timeouts, unresolved-write blocking, SIGTERM restart/reconciliation,
-stale-reference rejection and resumed writes through fresh references.
-
-Validation scope: the regular `native` suite and recovery cases `native` and
-`native-action`. Other regular and recovery matrices are outside this scoped-read
-qualification. Executable hashes identify the measured release binary and the
-separately signed packaged executables used for live qualification.
+Use `make check` for benchmark-runner and generated-resource checks. Changes to
+native reads need the affected packaged `native` or `recipes` suites; select
+`native native-action` recovery only when mutation preparation or recovery changes.
+Record fixture/build/application conditions with each measurement. A local speed
+comparison does not establish general scaling, state freshness, or aesthetic quality.
+Store generated reports outside tracked docs, for example under `.build/benchmarks`.

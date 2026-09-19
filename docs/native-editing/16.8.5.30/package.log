@@ -1,4 +1,0 @@
-PASS: shared CLI/MCP schemas, 24 tool schemas, invalid requests, server survival
-PASS: local request status, CLI quiet/JSON progress, stable stdout
-PASS: composition profile hides and rejects tonal and metadata mutation tools
-PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation

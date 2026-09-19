@@ -469,8 +469,11 @@ set keystone horizontal of adjustments of v to -5
                  limitation='File creation proves dispatch, not that rendering was still outstanding at SIGKILL.')
         self.recovery(pending['operationId'], clone, 'mcp-death-after-export-dispatch')
 
+    def select_cases(self, cases):
+        return selected_cases(cases)
+
     def run(self, cases=RECOVERY_CASES):
-        cases = selected_cases(cases)
+        cases = self.select_cases(cases)
         self.log('selected-cases', selected=cases, skipped=[case for case in RECOVERY_CASES if case not in cases])
         fixture = Path(os.environ['C1_TEST_RAW_FIXTURE']).resolve()
         assert fixture.is_file()

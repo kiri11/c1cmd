@@ -43,30 +43,14 @@ applying any reviewed proposal. Do not automatically restore an out-of-bounds
 baseline by substituting a normalized crop. An uncertain operation still requires
 normal reconciliation, with no automatic retry or undo.
 
-## Validation scope
+## Validation
 
-The September 19 disposable Session probe used a copy of `2U6A7257.CR3`.
-With distortion at 50 and hide-distorted-areas enabled, reported bounds were
-`(3001,2000,6000,4000)`. Requesting `(3301,2000,6000,4000)` directly in native
-fixture setup produced the observed stored crop `(3301,2000,5404,3603)`.
-Lens settings, rotation, orientation, and keystone were unchanged across that
-probe. The right edge is 6003 versus the reported bound's 6001: a two-pixel
-overhang, within the existing tolerance. This fixture does **not** demonstrate a
-stored overhang beyond that tolerance. It also demonstrates native normalization,
-not an exact copy of the requested crop.
-
-The strict contained proposal is `(3299,2000,5404,3603)`, with deltas
-`(-2,0,0,0)` and scale 1. The original observed ratio (about 1.49986123) is retained;
-it is not relabeled as exact 3:2. The proposal was not applied during this probe.
-See [retained observations](qualification/crop-bounds-20260919/lens/events.jsonl).
-
-No production bounds, dispatch, readback, journal, or recovery behavior changes
-in this investigation. Offline tests cover stored-crop rejection, lens-context
-preservation, numeric edge behavior, and proposal containment. The lens live
-suite additionally requests an off-center full-size crop on its owned clone,
+Offline tests cover stored-crop rejection, lens-context preservation, numeric edge
+behavior and proposal containment. The lens live suite checks an off-center crop,
 records native normalization and a contained proposal, verifies unchanged lens
-context, and restores its fixture after the successful observation.
+context, and restores its fixture after a successful observation.
 
-Any future production bounds change requires the packaged `geometry lens`
-suites and affected `geometry lens` recovery cases against a rebuilt archive.
-Broaden those selections if perspective/keystone or shared recovery paths change.
+Production bounds changes require the packaged `geometry lens` suites and affected
+`geometry lens` recovery cases against a rebuilt archive. Broaden selections when
+perspective, keystone or shared recovery paths change. Run diagnostics in disposable
+fixtures and keep generated observations outside tracked documentation.

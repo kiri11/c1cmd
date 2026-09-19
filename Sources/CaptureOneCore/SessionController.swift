@@ -1436,7 +1436,7 @@ public final class SessionController {
                     entry.afterGeometry = current.geometry
                     entry.afterMetadata = VariantMetadata.from(current.metadata)
                     if entry.beforeNative != nil {
-                        let target = ["layer.delete", "color.delete"].contains(entry.nativeAction ?? "") ? NativeTarget() : entry.beforeNative!.target
+                        let target = entry.nativeAction == "color.delete" ? NativeTarget(layer:entry.beforeNative!.target.layer) : entry.nativeAction == "layer.delete" ? NativeTarget() : entry.beforeNative!.target
                         entry.afterNative = try nativeGet(ref: id, target: target)
                     }
                     entry.status = "reconciled"
@@ -1584,7 +1584,7 @@ public final class SessionController {
                 let _: Bool = try executor.executeAndDecode(handler: action == nil ? "nativeApply" : "nativeAction", args: args)
                 try checkedDocument(doc, writes: false)
                 // Deleted targets no longer exist; inspect the image scope and layer inventory instead.
-                let afterTarget = ["layer.delete", "color.delete"].contains(action ?? "") ? NativeTarget() : target
+                let afterTarget = action == "color.delete" ? NativeTarget(layer:target.layer) : action == "layer.delete" ? NativeTarget() : target
                 let after = try nativeGet(ref: workingRef, target: afterTarget)
                 entry.afterNative = after
                 if let action {
@@ -1592,6 +1592,7 @@ public final class SessionController {
                     if action == "layer.create", change != 1 { throw C1Error.readbackMismatch("Layer creation did not add exactly one layer.") }
                     if action == "layer.delete", change != -1 { throw C1Error.readbackMismatch("Layer deletion did not remove exactly one layer.") }
                     if action == "color.create", after.advancedColorCount != before.advancedColorCount + 1 { throw C1Error.readbackMismatch("Color correction creation readback differs.") }
+                    if action == "color.delete", after.advancedColorCount != before.advancedColorCount - 1 { throw C1Error.readbackMismatch("Color correction deletion readback differs.") }
                 }
                 for (key, value) in patch {
                     guard let actual = after.values[key], NativeEditing.matchesReadback(field: key, expected: value, actual: actual) else {
@@ -1621,6 +1622,18 @@ public final class SessionController {
             let observation = Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
             try NativeEditing.validate(observation,target:NativeTarget())
             return observation
+        }
+    }
+
+    /// Bulk property records intentionally bypass nativeRead/nativeReadField and
+    /// never provide write tokens. Indexed color objects must remain unevaluated.
+    func recipeScopesOracle(ref: String) throws -> RecipeScopes.Observation {
+        try lock.withLock {
+            let doc = try getDocumentInfo(), source = try get(ref:ref)
+            try checkedDocument(doc,writes:false)
+            let wire: RecipeScopes.Wire = try executor.executeAndDecode(handler:"nativeRecipeScopesOracle",args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+            try checkedDocument(doc,writes:false)
+            return try RecipeScopes.Observation(wire)
         }
     }
 

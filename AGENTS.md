@@ -159,8 +159,13 @@ be applied, and changed payloads need new verification. Recipes currently suppor
 fourteen global numeric settings, five point curves, grain type/impact/granularity,
 vignette method/amount and explicit exposure/white-balance policies. Omitted fields
 retain destination values; a supplied curve replaces its full channel point list.
-Mask/layer reconstruction, indexed color fields and camera/lens profiles (including
-`film curve`) are excluded from recipe transfer.
+Version 2 adds explicit camera/profile and lens scopes bound to destination metadata,
+named basic-color patches and complete advanced-band replacement. Image color-balance
+controls are supported in settings. Lens scopes require an inspected geometry token
+and explicit crop policy. Read [scoped recipe rules](docs/recipes/README.md#explicit-scoped-recipes-version-2)
+before use. Layers, masks, Skin Tone and style/profile installation remain excluded.
+A changed payload must be registered again, independently verified on a disposable
+managed clone, and visually reviewed. Implementation alone does not qualify a look.
 
 `edit_apply` prepares one existing variant and retains fresh per-step native
 preconditions, before-state, readback and child operation IDs. Exposure/WB policies
@@ -175,7 +180,7 @@ for normal restart/reconciliation. Interrupted parent reports do not become
 successful when a child is reconciled. Production commands never quit Capture One.
 
 Select `QUALIFY_SUITES=recipes` for the regular suite. Use
-`make qualify-recipes-recovery RECIPE_RECOVERY_CASES="native tonal geometry preview mcp-death"`
+`make qualify-recipes-recovery RECIPE_RECOVERY_CASES="native native-action lens layer-color geometry mcp-death"`
 for affected compound fault paths against the candidate archive. Keep offline tests
 and live suites sequential because both use the application lock. See
 [recipe workflow](docs/recipes/README.md) for the full bounded contract.

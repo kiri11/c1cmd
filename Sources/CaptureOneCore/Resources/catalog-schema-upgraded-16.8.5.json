@@ -23,6 +23,6 @@
       "ZFORMAT": "16.8.5.30 Pro Mac"
     }
   ],
-  "qualification": "Exact upgraded Catalog schema and ordered version tuples; stored reads only. See docs/qualification/catalog-reader/upgraded.md.",
+  "qualification": "Exact upgraded Catalog schema and ordered version tuples; stored reads only. See docs/catalog-reader.md#data-and-identity.",
   "sourceFingerprint": "f7f6e8f56cafa1c26fb1a6e5e13a0218fc905fec691efbf754ce546482ca2475"
 }

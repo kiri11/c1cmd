@@ -2,7 +2,7 @@
 
 A recipe is a versioned c1 payload, not a Capture One processing/export recipe
 or an installed style. CLI and MCP use the same core and JSON request contract.
-Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
+The shared contract is 2.7.0. Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
 path opt-in and referenced-original guards. Hand over exclusive control: the
 application lock coordinates c1 processes, not edits made in the Capture One UI.
 
@@ -11,7 +11,7 @@ application lock coordinates c1 processes, not edits made in the Capture One UI.
 Global numeric settings: brightness, contrast, saturation, highlight adjustment,
 shadow/white/black recovery, clarity amount/structure, sharpening amount/radius/
 threshold, and luminance/color noise reduction. Exposure and white balance have
-separate mandatory policies. Contract 2.6.0 also accepts:
+separate mandatory policies. Settings also accept:
 
 - `rgb curve`, `luma curve`, `red curve`, `green curve`, `blue curve`: flat x/y
   point pairs in 0–100, with strictly increasing x (2–64 points).
@@ -26,16 +26,18 @@ vignette properties retain the destination values. Method/type and amount are
 independent explicit fields. Recipes do not copy unspecified reference settings.
 Payload version 1 remains valid; changed content requires a new registration and
 independent verification. `film curve` (the camera processing curve/profile) is
-separate from these five point curves and remains excluded.
+separate from these five point curves and belongs in the version-2 camera scope.
 
-Color-editor bands, layers, masks, camera profiles and lens settings are excluded
-from recipe application in this version; they remain available through their existing native APIs.
+All eleven image color-balance controls are supported in
+`settings`/`overrides`. Camera film curves/profiles, lens controls and indexed color
+bands use the explicit version-2 scopes below. Layers, masks, Skin Tone corrections,
+installed styles and profile installation remain excluded from recipe application.
 
 A reference bundle captures compact settings, metadata, geometry, full image
 adjustment/lens/variant snapshots, document and parent-image identities, state
 hashes, a preview with pixel hash and JPEG file checksum, and coverage metadata.
 It explicitly identifies unsupported mask pixels/Skin Tone and uncaptured layer
-settings/color-editor elements. This is not a complete Capture One backup or an
+settings and profile asset bytes. This is not a complete Capture One backup or an
 atomic snapshot. Capture rejects detected drift around preview export.
 
 ## CLI and MCP
@@ -99,7 +101,7 @@ its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument
 and `ifState`. It never chooses or creates a clone silently and rejects existing
 editing references and bare native IDs.
 
-Verification applies the payload, checks all 27 supported values (numbers, enums
+Verification applies the payload, checks all 38 supported image settings (numbers, enums
 and curve point lists) through an independent direct-property AppleScript reader,
 checks omitted image-native properties plus geometry/metadata/layers for
 preservation, and exports a preview.
@@ -140,6 +142,91 @@ policy copies reference crop coordinates. Supply 1.5 for landscape or 0.75 for
 portrait when those ratios fit the intended composition. Geometry retains native
 bounds, lens preservation and existing uncertainty rules. Precise cropping after
 a rotation that needs visual inspection remains a second reviewed operation.
+
+## Explicit scoped recipes (version 2)
+
+A version-2 payload keeps the required `settings`, `exposure`, `whiteBalance` and
+`cropPolicy`, and may add `scopes`. For example:
+
+```json
+{
+  "version": 2,
+  "referenceId": "REFERENCE_SHA256",
+  "settings": {
+    "color balance shadow saturation": 0.2,
+    "color balance shadow hue": 237
+  },
+  "exposure": {"mode": "preserve"},
+  "whiteBalance": {"mode": "preserve"},
+  "cropPolicy": "preserve",
+  "scopes": {
+    "camera": {
+      "cameraModel": "EXACT_METADATA_CAMERA",
+      "settings": {"film curve": "Linear Response"}
+    },
+    "lens": {
+      "cameraModel": "EXACT_METADATA_CAMERA",
+      "lensModel": "EXACT_METADATA_LENS",
+      "geometryPolicy": "preserve-crop",
+      "settings": {"light falloff": 15}
+    },
+    "basicColor": [
+      {"index": 2, "name": "orange", "settings": {"hue change": 5}}
+    ]
+  }
+}
+```
+
+Use identities from the destination's observed `metadata.camera` and
+`metadata.lens`; mismatches fail before dispatch. Camera settings accept `film
+curve` and `color profile` native names. These refer to installed Capture One
+assets, not embedded ICC/profile files. Names and observed values are recorded;
+profile asset bytes are neither captured nor independently hashed.
+
+Lens settings accept the writable fields in `capabilities.nativeEditing.fields.lens`.
+Every application of a lens scope requires a fresh inspected `ifGeometryState`,
+even without an explicit geometry patch. `preserve-crop` requires the crop,
+rotation, orientation, flip and keystone to remain unchanged. `allow-native-crop`
+permits native crop adjustment and requires `cropPolicy: per-photo`; it does not
+authorize rotation, flip or keystone changes. Explicit geometry still uses the
+existing guarded geometry step and its own fresh token. Lens/profile side effects
+that violate omitted-field or policy checks fail with partial observations; the
+workflow never automatically restores or retries them.
+
+Basic color patches are image-level, explicitly named indices (1–9). Index and
+name must match the destination; omitted bands and fields retain their values.
+
+Advanced corrections use `scopes.advancedColor: {"mode":"replace","bands":[...]}`.
+Each band must include all twelve exposed fields: `enabled`, `red`, `green`,
+`blue`, `hue start`, `hue end`, `saturation start`, `saturation end`, `smoothness`,
+`hue change`, `saturation change`, `lightness change`. Start from the reference's
+`scopedNative.advancedColor` observations; do not infer numeric values or units.
+Replacement deletes existing image-level advanced bands from last to first, then
+creates and writes the declared list in order. An empty list explicitly clears
+all advanced bands. Omitting this scope preserves the destination list. Up to 64
+advanced bands are supported; this is a limit, not a partial-capture mode.
+
+Each profile/lens/basic-band patch and each advanced-band deletion, creation and
+patch has a separate plan step, fresh native precondition, durable before-state,
+operation ID and readback. Deletion verifies the count decreased by exactly one.
+Scope payloads are immutable recipe content; changing a scope requires a new
+registration and disposable-clone verification. Per-photo tonal, white-balance,
+geometry and image-settings overrides remain explicit; arbitrary per-photo scope
+replacement is not a bypass for payload verification.
+
+Version-2 verification and application independently inspect all camera/lens and
+image color-band values, including omitted scopes. They reject unexpected changes.
+The result includes `scopedBefore`, `scopedObserved`, and
+`resultBundle.scopedNative` with before/after/diff evidence and observation hashes.
+These hashes are evidence only, never mutation preconditions. Reference capture
+includes the same independent indexed-color observations. Version-1 reports
+retain their narrower comparison coverage.
+
+Layer settings, mask pixels and Skin Tone remain excluded; installed style
+registration/application is not part of this route. Numeric verification must be
+followed by visual review of the disposable clone. Implementing these scopes does
+not qualify a complete wedding look or make a recipe portable across arbitrary
+camera/lens/profile combinations.
 
 ## Consolidated result bundle
 
@@ -193,7 +280,7 @@ not infer completion, retry, resume or reconcile. For an uncertain child, follow
 Restart invalidates old editing references. Even reconciled child observations
 do not prove the interrupted compound completed.
 
-The first version handles one photo per call. Multi-photo scheduling, automatic
+Each operation handles one photo per call. Multi-photo scheduling, automatic
 resume, native style installation, mask reconstruction and generalized native
 recipe transfer are intentionally outside this contract.
 
@@ -212,20 +299,21 @@ Run dedicated compound recovery against a freshly built archive:
 C1_RECOVERY_SHUTDOWN_MODE=sigterm \
   python3 -B Tests/recipe_recovery_integration_test.py \
   dist/c1-v0.1.0-macos-arm64.tar.gz /absolute/new/evidence \
-  --cases native tonal geometry preview mcp-death
+  --cases native native-action lens layer-color geometry mcp-death
 ```
 
 Set `C1_TEST_RAW_FIXTURE` to an existing RAW and close other documents first.
 This harness inherits the existing ownership, independent resume watchdog,
 real timeout, restart, stale-reference and original-preservation checks. The
-case names here select faults inside compound operations. It creates its own
+case names here select faults inside compound operations, except `layer-color`,
+which checks shared native deletion/reconciliation context on a layer. It creates its own
 Session and retains failed/ambiguous evidence; it never retries a faulted edit.
 
-See [retained qualification results](qualification/README.md) for tested scope,
-binary hashes and exclusions.
+For focused scoped regular checks, set `C1_RECIPE_TEST_GROUP=scopes`; the default
+`all` also repeats the version-1 recipe cases.
 
-See [result bundle qualification](result-bundle-qualification/README.md) for the
-contract 2.5.0 focused checks and exclusions.
-
-See [typed settings qualification](typed-settings-qualification/README.md) for
-curve/grain/vignette transfer, omitted-field preservation and focused recovery evidence.
+These live checks include sequential native reads/writes, independent verification
+and preview exports. They are intentionally separate from the fast offline loop.
+Recovery retains actual 120-second Apple Event timeouts. Save generated results
+and journals under `.build/qualification` or external artifact storage, not docs;
+record historical validation summaries in `CHANGELOG.md`.

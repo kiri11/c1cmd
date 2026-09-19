@@ -4,6 +4,11 @@ import CaptureOneCore
 private final class RecipeFake: ScriptExecuting {
     let geometry: GeometryFake
     var properties: [String:Any] = [:]
+    var lens: [String:Any] = Dictionary(uniqueKeysWithValues:NativeEditing.fields["lens"]!.map { ($0.name, $0.type == "text" ? "fixture" as Any : $0.type == "boolean" ? false as Any : 0.0 as Any) })
+    var basic: [[String:Any]] = (1...9).map { ["name":"band-\($0)","hue change":0.0,"saturation change":0.0,"lightness change":0.0] }
+    var advanced: [[String:Any]] = []
+    var corruptScope = false
+    var ignoreDelete = false
     var fault: String?
     var corruptOracle = false
     var corruptField = "clarity amount"
@@ -16,6 +21,8 @@ private final class RecipeFake: ScriptExecuting {
         for key in Recipes.curveFields { v[key] = properties[key] ?? [0.0,0,100,100] }
         v["film grain type"] = properties["film grain type"] ?? "fine"
         v["vignetting method"] = properties["vignetting method"] ?? "elliptic on crop"
+        v["color profile"] = properties["color profile"] ?? "fixture"
+        v["film curve"] = properties["film curve"] ?? "Auto"
         let a = geometry.base.values[id]!
         v["exposure"] = a[0]; v["contrast"] = a[1]; v["saturation"] = a[2]; v["temperature"] = a[3]; v["tint"] = a[4]
         return v
@@ -23,11 +30,33 @@ private final class RecipeFake: ScriptExecuting {
     func executeAndDecode<T:Decodable>(handler: String,args: [NSAppleEventDescriptor]) throws -> T {
         let result: Any
         if handler == "nativeRead" {
-            let v = args[2].stringValue == "adjustments" ? values(args[1].stringValue!) : [:]
+            let scope = args[2].stringValue!, index = Int(args[4].int32Value) - 1
+            let v: [String:Any]
+            switch scope {
+            case "adjustments": v = values(args[1].stringValue!)
+            case "lens": v = lens
+            case "basicColor": v = basic[index]
+            case "advancedColor": v = advanced[index]
+            default: v = [:]
+            }
             result = ["nativeRows":v.keys.sorted().map { key -> [String:Any] in
+                if NativeEditing.fields[scope]?.first(where: { $0.name == key })?.type == "boolean" { return ["fieldName":key,"boolVal":v[key]!] }
                 if let text = v[key] as? String { return ["fieldName":key,"textVal":text] }
                 return ["fieldName":key,"numbersVal":v[key] as? [Double] ?? [(v[key] as! NSNumber).doubleValue]]
-            },"nativeLayers":[],"basicColorCount":0,"advancedColorCount":0] as [String:Any]
+            },"nativeLayers":[],"basicColorCount":basic.count,"advancedColorCount":advanced.count] as [String:Any]
+        } else if handler == "nativeRecipeScopesOracle" {
+            var observedLens = lens
+            if corruptScope, writes > corruptAfterWrites { observedLens["light falloff"] = 99.0 }
+            result = ["recipeCameraValues":[values(args[1].stringValue!)["color profile"]!,values(args[1].stringValue!)["film curve"]!],
+                "recipeLensValues":NativeEditing.fields["lens"]!.map { observedLens[$0.name]! },
+                "recipeBasicValues":basic.map { row in ["name","hue change","saturation change","lightness change"].map { row[$0]! } },
+                "recipeAdvancedValues":advanced.map { row in NativeEditing.fields["advancedColor"]!.map { row[$0.name]! } }]
+        } else if handler == "nativeAction" {
+            writes += 1
+            if fault == "native-action" { throw C1Error.timeout("recipe injected action timeout") }
+            if args[9].stringValue == "color.delete", !ignoreDelete { advanced.remove(at:Int(args[4].int32Value)-1) }
+            if args[9].stringValue == "color.create" { advanced.append(Dictionary(uniqueKeysWithValues:NativeEditing.fields["advancedColor"]!.map { ($0.name,$0.type == "boolean" ? true as Any : 0.0 as Any) })) }
+            result = true
         } else if handler == "nativeRecipeOracle" {
             var v = values(args[1].stringValue!)
             if corruptOracle, writes > corruptAfterWrites { if Recipes.curveFields.contains(corruptField) { v[corruptField] = [0.0,0,50,70,100,100] }
@@ -42,9 +71,15 @@ private final class RecipeFake: ScriptExecuting {
                 let key = args[9].atIndex(i)!.stringValue!, descriptor = args[10].atIndex(i)!
                 let value: Any
                 if Recipes.curveFields.contains(key) { value = (1...descriptor.numberOfItems).map { descriptor.atIndex($0)!.doubleValue } }
-                else if ["film grain type","vignetting method"].contains(key) { value = descriptor.stringValue! }
+                else if NativeEditing.fields[args[2].stringValue!]?.first(where: { $0.name == key })?.type == "boolean" { value = descriptor.booleanValue }
+                else if ["film grain type","vignetting method","film curve","color profile","lens profile"].contains(key) { value = descriptor.stringValue! }
                 else { value = descriptor.doubleValue }
-                properties[key] = value
+                switch args[2].stringValue! {
+                case "lens": lens[key] = value
+                case "basicColor": basic[Int(args[4].int32Value)-1][key] = value
+                case "advancedColor": advanced[Int(args[4].int32Value)-1][key] = value
+                default: properties[key] = value
+                }
                 if let index = ["exposure","contrast","saturation","temperature","tint"].firstIndex(of:key) { geometry.base.values[id]![index] = value as! Double }
             }
             result = true
@@ -59,7 +94,7 @@ struct RecipeTests {
         let sha = String(repeating:"a",count:64)
         let policy: [String:Any] = ["version":1,"referenceId":sha,"settings":["clarity amount":5],"exposure":["mode":"preserve"],"whiteBalance":["mode":"preserve"],"cropPolicy":"preserve"]
         XCTAssertNoThrow(try ContractSchema.validate(tool:"recipe_register",arguments:["recipe":policy]))
-        for (key,value) in [("version",2 as Any),("cropPolicy","magic"),("settings",["film curve":"Auto"]),("exposure",["mode":"absolute"]),("whiteBalance",["mode":"absolute","temperature":5000])] {
+        for (key,value) in [("version",3 as Any),("cropPolicy","magic"),("settings",["film curve":"Auto"]),("exposure",["mode":"absolute"]),("whiteBalance",["mode":"absolute","temperature":5000])] {
             var bad = policy; bad[key] = value
             XCTAssertThrowsError(try ContractSchema.validate(tool:"recipe_register",arguments:["recipe":bad]))
         }
@@ -70,6 +105,19 @@ struct RecipeTests {
             var bad = policy; bad["settings"] = settings
             XCTAssertThrowsError(try ContractSchema.validate(tool:"recipe_register",arguments:["recipe":bad]))
         }
+        for scopes: [String:Any] in [
+            ["camera":["cameraModel":"camera","settings":["exposure":1]]],
+            ["camera":["cameraModel":"camera","settings":["film curve":""]]],
+            ["lens":["cameraModel":"camera","lensModel":"lens","geometryPolicy":"allow-native-crop","settings":["distortion":10]]],
+            ["basicColor":[["index":1,"name":"red","settings":["hue change":1]],["index":1,"name":"red","settings":["hue change":2]]]],
+            ["advancedColor":["mode":"merge","bands":[]]],
+            ["advancedColor":["mode":"replace","bands":[["hue change":3]]]]
+        ] {
+            var bad = policy; bad["version"] = 2; bad["scopes"] = scopes
+            XCTAssertThrowsError(try ContractSchema.validate(tool:"recipe_register",arguments:["recipe":bad]))
+        }
+        var wrongVersion = policy; wrongVersion["scopes"] = ["advancedColor":["mode":"replace","bands":[]]]
+        XCTAssertThrowsError(try ContractSchema.validate(tool:"recipe_register",arguments:["recipe":wrongVersion]))
         XCTAssertThrowsError(try ContractSchema.validate(tool:"edit_status",arguments:["compoundId":"../../oops"]))
         XCTAssertThrowsError(try ContractSchema.validate(tool:"edit_apply",arguments:["recipeId":sha,"sourceRef":"1","ifDocument":"d","ifState":"s","geometry":["rotation":1]]))
         XCTAssertNoThrowBlock {
@@ -145,6 +193,33 @@ struct RecipeTests {
                 XCTAssertFalse(FileManager.default.fileExists(atPath:directory.appendingPathComponent(".c1/verified-recipes/" + otherID + ".json").path))
             }
             fake.corruptOracle = false
+            // Scoped recipes explicitly replace advanced bands and preserve unrelated basic bands.
+            var scopedRecipe = recipe
+            scopedRecipe["version"] = 2
+            let band: [String:Any] = ["enabled":true,"red":30000,"green":20000,"blue":10000,"hue start":10,"hue end":30,"saturation start":10,"saturation end":90,"smoothness":20,"hue change":2,"saturation change":3,"lightness change":4]
+            scopedRecipe["scopes"] = ["basicColor":[["index":2,"name":"band-2","settings":["hue change":3]]],"advancedColor":["mode":"replace","bands":[band]]]
+            let scopedID = try workflow.run("recipe_register",arguments:["recipe":scopedRecipe])["recipeId"] as! String
+            let scopedVerification = try workflow.run("recipe_verify",arguments:["recipeId":scopedID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken])
+            XCTAssertEqual(scopedVerification["status"] as? String,"succeeded")
+            XCTAssertEqual(fake.advanced.count,1)
+            XCTAssertEqual(fake.basic[0]["hue change"] as? Double,0)
+            XCTAssertEqual(fake.basic[1]["hue change"] as? Double,3)
+            let applied = try workflow.run("edit_apply",arguments:["sourceRef":"1","recipeId":scopedID,"ifState":initial.stateHash,"ifDocument":doc.openToken])
+            XCTAssertEqual(applied["status"] as? String,"succeeded")
+            XCTAssertTrue((applied["plan"] as! [String]).contains("scope-advanced-delete-1"))
+            XCTAssertNotNil((applied["resultBundle"] as! [String:Any])["scopedNative"])
+            fake.corruptScope = true; fake.corruptAfterWrites = fake.writes
+            let drifted = try workflow.run("recipe_verify",arguments:["recipeId":scopedID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken])
+            XCTAssertEqual(drifted["status"] as? String,"failed")
+            XCTAssertNil(drifted["resultBundle"])
+            XCTAssertNotNil(drifted["scopedObserved"],"Failed verification must retain the observed scoped evidence")
+            fake.corruptScope = false
+            // An incompatible camera is rejected before dispatch.
+            scopedRecipe["scopes"] = ["camera":["cameraModel":"wrong-camera","settings":["film curve":"Auto"]]]
+            let wrongID = try workflow.run("recipe_register",arguments:["recipe":scopedRecipe])["recipeId"] as! String
+            let writesBeforeMismatch = fake.writes
+            XCTAssertThrowsError(try workflow.run("recipe_verify",arguments:["recipeId":wrongID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken]))
+            XCTAssertEqual(fake.writes,writesBeforeMismatch)
             // Corrupt verified evidence must fail before mutation.
             let evidence = directory.appendingPathComponent(".c1/verified-recipes/" + id + ".json")
             let saved = try Data(contentsOf:evidence)
@@ -171,5 +246,36 @@ struct RecipeTests {
             XCTAssertNil(status["resultBundle"])
             XCTAssertEqual((status["childOperations"] as? [[String:Any]])?.count,1)
         }
+        scopeFault(ignoreDelete:false)
+        scopeFault(ignoreDelete:true)
     }
+    static func scopeFault(ignoreDelete: Bool) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = RecipeFake(directory), base = fake.geometry.base
+        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let workflow = RecipeWorkflow(core:core)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let reference = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":source.stateHash])
+            let band = Dictionary(uniqueKeysWithValues:NativeEditing.fields["advancedColor"]!.map { ($0.name,$0.type == "boolean" ? true as Any : 0.0 as Any) })
+            let recipe: [String:Any] = ["version":2,"referenceId":reference["referenceId"]!,"settings":["clarity amount":5],"exposure":["mode":"preserve"],"whiteBalance":["mode":"preserve"],"cropPolicy":"preserve","scopes":["advancedColor":["mode":"replace","bands":[band]]]]
+            let id = try workflow.run("recipe_register",arguments:["recipe":recipe])["recipeId"]!
+            let clone = try core.cloneVariant(sourceRef:"1")
+            let checked = try workflow.run("recipe_verify",arguments:["recipeId":id,"workingRef":clone.workingRef,"ifDocument":doc.openToken,"ifState":try core.get(ref:clone.workingRef).stateHash])
+            XCTAssertEqual(checked["status"] as? String,"succeeded")
+            if ignoreDelete { fake.ignoreDelete = true } else { fake.fault = "native-action" }
+            let failed = try workflow.run("edit_apply",arguments:["recipeId":id,"sourceRef":"1","ifDocument":doc.openToken,"ifState":source.stateHash,"preview":true])
+            XCTAssertEqual(failed["status"] as? String,"outcome-unknown")
+            XCTAssertEqual(failed["activeStep"] as? String,"scope-advanced-delete-1")
+            XCTAssertNil(failed["resultBundle"])
+            XCTAssertEqual((failed["completed"] as! [[String:Any]]).count,1)
+            let linked = try OperationJournal(sessionDirectory:directory).validatedEntries().filter { $0.compoundId == failed["compoundId"] as? String }
+            XCTAssertEqual(linked.count,1)
+            XCTAssertEqual(linked.first?.nativeAction,"color.delete")
+            XCTAssertNotNil(linked.first?.beforeNative)
+        }
+    }
+
 }

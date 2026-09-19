@@ -158,10 +158,12 @@ on nativeRead(docName, variantId, scopeName, layerNumber, elementNumber, expecte
     end repeat
     set basicCount to 0
     set advancedCount to 0
-    if scopeName is "adjustments" then
+    if scopeName is "adjustments" or scopeName is "basicColor" or scopeName is "advancedColor" then
         tell application "/Applications/Capture One.app"
-            set basicCount to count of basic color corrections of color editor settings of t
-            set advancedCount to count of advanced color corrections of color editor settings of t
+            set inventoryAdjustments to adjustments of v
+            if layerNumber > 0 then set inventoryAdjustments to adjustments of layer layerNumber of v
+            set basicCount to count of basic color corrections of color editor settings of inventoryAdjustments
+            set advancedCount to count of advanced color corrections of color editor settings of inventoryAdjustments
         end tell
     end if
     return {nativeRows:rows, nativeLayers:(my nativeLayers(v)), basicColorCount:basicCount, advancedColorCount:advancedCount}

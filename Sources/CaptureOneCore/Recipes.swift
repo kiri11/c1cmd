@@ -1,21 +1,21 @@
 import Foundation
 import CryptoKit
 
-/// Versioned, deliberately bounded global recipes. Native styles, masks, indexed
-/// layer/color targets and camera-specific profiles are not portable recipes.
+/// Versioned image-level recipes. Layers, masks and installed styles are excluded.
 public enum Recipes {
     public static let tools = ["reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status"]
     public static let fields = ["brightness", "contrast", "saturation", "highlight adjustment", "shadow recovery", "white recovery", "black recovery", "clarity amount", "clarity structure", "sharpening amount", "sharpening radius", "sharpening threshold", "noise reduction luminance", "noise reduction color"]
     public static let curveFields = ["rgb curve", "luma curve", "red curve", "green curve", "blue curve"]
     public static let finishFields = ["film grain type", "film grain impact", "film grain granularity", "vignetting method", "vignetting amount"]
-    public static var supportedFields: [String] { fields + curveFields + finishFields }
-    static let oracleFields = ["exposure", "temperature", "tint"] + fields + curveFields + finishFields
+    public static let balanceFields = ["color balance master hue", "color balance master saturation", "color balance shadow hue", "color balance shadow saturation", "color balance shadow lightness", "color balance midtone hue", "color balance midtone saturation", "color balance midtone lightness", "color balance highlight hue", "color balance highlight saturation", "color balance highlight lightness"]
+    public static var supportedFields: [String] { fields + curveFields + finishFields + balanceFields }
+    static let oracleFields = ["exposure", "temperature", "tint"] + fields + curveFields + finishFields + balanceFields
     static let str = ContractSchema.string
     static let num = ContractSchema.number
     static var exposure: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute","relative"]], "value":num], required:["mode"]) }
     static var whiteBalance: [String:Any] { ContractSchema.object(["mode":["type":"string", "enum":["preserve","absolute"]], "temperature":num, "tint":num], required:["mode"]) }
     static var settings: [String:Any] { ContractSchema.object((NativeEditing.patchSchema["properties"] as! [String:Any]).filter { supportedFields.contains($0.key) }) }
-    static var recipe: [String:Any] { ContractSchema.object(["version":["type":"integer","enum":[1]], "referenceId":str, "settings":settings, "exposure":exposure, "whiteBalance":whiteBalance, "cropPolicy":["type":"string","enum":["preserve","per-photo"]]], required:["version","referenceId","settings","exposure","whiteBalance","cropPolicy"]) }
+    static var recipe: [String:Any] { ContractSchema.object(["version":["type":"integer","enum":[1,2]], "referenceId":str, "scopes":RecipeScopes.schema, "settings":settings, "exposure":exposure, "whiteBalance":whiteBalance, "cropPolicy":["type":"string","enum":["preserve","per-photo"]]], required:["version","referenceId","settings","exposure","whiteBalance","cropPolicy"]) }
     static var recipeSchema: [String:Any] { recipe }
     static var geometry: [String:Any] {
         var props = ContractSchema.input("geometry_set")["properties"] as! [String:Any]
@@ -39,7 +39,7 @@ public enum Recipes {
             "documentToken":str,"sourceRef":str,"workingRef":str,"journalOffset":["type":"integer"],"plan":strings,
             "completed":["type":"array","items":ContractSchema.object(["step":str,"result":object],required:["step","result"])],
             "request":object,"initial":existing["get"]!,"activeStep":["type":["string","null"]],
-            "resultBundle":CompoundResultBundle.schema(existing),"observed":existing["get"]!,"error":object,"unattempted":strings,"referencesExpired":ContractSchema.boolean,
+            "scopedBefore":RecipeScopes.evidenceSchema,"scopedObserved":RecipeScopes.evidenceSchema,"resultBundle":CompoundResultBundle.schema(existing),"observed":existing["get"]!,"error":object,"unattempted":strings,"referencesExpired":ContractSchema.boolean,
             "childOperations":["type":"array","items":existing["operation_status"]!]],required:["compoundId","recipeId","status","completed","plan"])
         return ["reference_capture":ContractSchema.object(["referenceId":str,"bundle":object],required:["referenceId","bundle"]),
                 "recipe_register":ContractSchema.object(["recipeId":str,"status":["enum":["unverified"]],"recipe":recipe],required:["recipeId","status","recipe"]),
@@ -55,6 +55,10 @@ public enum Recipes {
         }
         try enums(args,input(tool))
         let payload = args["recipe"] as? [String:Any] ?? args
+        if let scopes = payload["scopes"] as? [String:Any] {
+            guard payload["version"] as? Int == 2 else { throw C1Error.invalidRequest("Explicit scopes require recipe version 2.") }
+            try RecipeScopes.validate(scopes,cropPolicy:payload["cropPolicy"] as! String)
+        }
         if let p = payload["exposure"] as? [String:Any] {
             let mode = p["mode"] as! String
             guard (mode == "preserve") == (p["value"] == nil) else { throw C1Error.invalidRequest("Exposure preserve omits value; absolute/relative require value.") }
@@ -136,8 +140,11 @@ public final class RecipeWorkflow {
         let ref = args["ref"] as! String
         let before = try core.get(ref:ref, nativeTargets:[NativeTarget(),NativeTarget(scope:"lens"),NativeTarget(scope:"variant")])
         guard before.stateHash == args["ifState"] as? String else { throw C1Error.stateChanged("Reference changed since inspection.") }
+        let scopeBefore = try core.recipeScopesOracle(ref:ref)
         let preview = try core.preview(ref:ref)
         let after = try core.get(ref:ref, nativeTargets:[NativeTarget(),NativeTarget(scope:"lens"),NativeTarget(scope:"variant")])
+        let scopeAfter = try core.recipeScopesOracle(ref:ref)
+        guard scopeBefore == scopeAfter else { throw C1Error.stateChanged("Scoped reference values changed during capture.") }
         // Preview adds journal revisions to native tokens; compare observed values instead.
         guard before.adjustments == after.adjustments, before.geometry == after.geometry,
               before.metadata == after.metadata, before.parentImagePath == after.parentImagePath,
@@ -145,8 +152,8 @@ public final class RecipeWorkflow {
               try core.getDocumentInfo().openToken == doc.openToken else { throw C1Error.stateChanged("Reference changed while exporting preview.") }
         let bytes = try Data(contentsOf:URL(fileURLWithPath:preview.outputPath))
         let checksum = SHA256.hash(data:bytes).map { String(format:"%02x",$0) }.joined()
-        let bundle: [String:Any] = ["version":1,"document":try Recipes.object(doc),"observed":try Recipes.object(after),"preview":try Recipes.object(preview),"previewFileSha256":checksum,
-            "coverage":["capturedScopes":["adjustments","lens","variant"],"maskPixels":"unsupported","skinTone":"unsupported","layerSettings":"not-captured","colorEditorElements":"not-captured","rawBytes":"not-included","atomicSnapshot":false],"createdAt":ISO8601DateFormatter().string(from:Date())]
+        let bundle: [String:Any] = ["version":2,"scopedNative":try scopeAfter.evidence(),"document":try Recipes.object(doc),"observed":try Recipes.object(after),"preview":try Recipes.object(preview),"previewFileSha256":checksum,
+            "coverage":["capturedScopes":["adjustments","lens","variant","basicColor","advancedColor"],"maskPixels":"unsupported","skinTone":"unsupported","layerSettings":"not-captured","colorEditorElements":"captured-image-scope","rawBytes":"not-included","profileAssets":"names-only-bytes-not-captured","atomicSnapshot":false],"createdAt":ISO8601DateFormatter().string(from:Date())]
         let id = try Recipes.putContent(bundle,doc,"references")
         return ["referenceId":id,"bundle":bundle]
     }
@@ -186,6 +193,12 @@ public final class RecipeWorkflow {
         let initial = try core.get(ref:sourceRef,nativeTargets:[NativeTarget()])
         guard initial.stateHash == args["ifState"] as? String,
               args["ifGeometryState"] == nil || initial.geometryStateHash == args["ifGeometryState"] as? String else { throw C1Error.stateChanged("Compound source changed since inspection.") }
+        let scopes = recipe["scopes"] as? [String:Any] ?? [:]
+        let scoped = recipe["version"] as? Int == 2
+        try RecipeScopes.compatibility(scopes,source:initial)
+        if !verify, scopes["lens"] != nil, args["ifGeometryState"] == nil { throw C1Error.invalidRequest("Lens scopes require the inspected ifGeometryState.") }
+        let scopeBefore = scoped ? try core.recipeScopesOracle(ref:sourceRef) : nil
+        let scopeSteps = try scopeBefore.map { try RecipeScopes.steps(scopes,before:$0) } ?? []
         var patch = recipe["settings"] as! [String:Any]
         for (key,value) in args["overrides"] as? [String:Any] ?? [:] { patch[key] = value }
         let exposure = (args["exposure"] ?? recipe["exposure"]) as! [String:Any]
@@ -206,13 +219,15 @@ public final class RecipeWorkflow {
         let compoundId = try Recipes.digest(["nonce":UUID().uuidString])
         let path = Recipes.file(doc,"compounds",compoundId)
         var plan: [String] = ["prepare"]
+        plan += scopeSteps.map(\.name)
         if !patch.isEmpty { plan.append("settings") }
         if !tonal.isEmpty { plan.append("tonal") }
         if args["geometry"] != nil { plan.append("geometry") }
-        if verify { plan.append("verify") }
+        if verify || scoped { plan.append("verify") }
         if verify || args["preview"] as? Bool == true { plan.append("preview") }
         plan.append("observe")
         var report: [String:Any] = ["compoundId":compoundId,"recipeId":id,"status":"running","documentToken":doc.openToken,"sourceRef":sourceRef,"journalOffset":journalOffset,"plan":plan,"completed":[],"request":args,"initial":try Recipes.object(initial)]
+        if let scopeBefore { report["scopedBefore"] = try scopeBefore.evidence() }
         var completed: [[String:Any]] = [], ref = sourceRef, step = "prepare"
         try Recipes.write(report,to:path)
         Thread.current.threadDictionary["c1.compoundId"] = compoundId
@@ -220,8 +235,8 @@ public final class RecipeWorkflow {
         func save() throws { try RequestContext.current?.checkCompoundCancellation(); report["completed"] = completed; report["activeStep"] = step; try Recipes.write(report,to:path) }
         func finish(_ result: [String:Any]) throws { completed.append(["step":step,"result":result]); try save() }
         do {
-            let oracleBefore = verify ? try core.recipeOracle(ref:sourceRef) : [:]
-            let nativeBefore = verify ? try core.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
+            let oracleBefore = (verify || scoped) ? try core.recipeOracle(ref:sourceRef) : [:]
+            let nativeBefore = (verify || scoped) ? try core.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
             if verify {
                 // Existing mutation guards validate clone provenance before dispatch.
                 let snapshot = try core.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
@@ -233,6 +248,17 @@ public final class RecipeWorkflow {
                 ref = edit.workingRef; report["workingRef"] = ref; try finish(Recipes.object(edit))
             }
             report["workingRef"] = ref
+            for scopedStep in scopeSteps {
+                step = scopedStep.name; try save()
+                let fresh = try core.get(ref:ref,nativeTargets:[scopedStep.target]).nativeSnapshots![0]
+                let result: NativeMutationResult
+                if let action = scopedStep.action {
+                    result = try core.nativeAction(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,action:action)
+                } else {
+                    result = try core.nativeSet(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,patch:scopedStep.patch)
+                }
+                try finish(Recipes.object(result))
+            }
             if !patch.isEmpty {
                 step = "settings"; try save()
                 let fresh = try core.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
@@ -254,7 +280,7 @@ public final class RecipeWorkflow {
                 let keystone = try geometry["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self,from:Recipes.data($0)) }
                 try finish(Recipes.object(core.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,keystone:keystone)))
             }
-            if verify {
+            if verify || scoped {
                 step = "verify"; try save()
                 var expected = oracleBefore
                 for (key,value) in nativePatch { expected[key] = value }
@@ -262,11 +288,16 @@ public final class RecipeWorkflow {
                 let observed = try core.recipeOracle(ref:ref)
                 for key in Recipes.oracleFields {
                     let tolerance = key == "temperature" ? 1.0 : (key == "tint" ? 0.05 : 0.0001)
-                    guard let a = observed[key], let b = expected[key], a.matches(b, tolerance:tolerance) else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
+                    guard let a = observed[key], let b = expected[key], (key.hasPrefix("color balance") ? NativeEditing.matchesReadback(field:key,expected:b,actual:a) : a.matches(b, tolerance:tolerance)) else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
                 }
                 let fullAfter = try core.get(ref:ref,nativeTargets:[NativeTarget()])
                 let nativeAfter = fullAfter.nativeSnapshots![0]
                 var changedKeys = Set(patch.keys).union(tonal.keys).union(wb["mode"] as? String == "absolute" ? ["white balance preset"] : [])
+                if let camera = scopes["camera"] as? [String:Any] { changedKeys.formUnion((camera["settings"] as! [String:Any]).keys) }
+                if let geometry = args["geometry"] as? [String:Any] {
+                    if geometry["rotation"] != nil { changedKeys.insert("rotation") }
+                    if let keystone = geometry["keystone"] as? [String:Any] { changedKeys.formUnion(keystone.keys.map { "keystone " + $0 }) }
+                }
                 // Capture One exposes the same highlight control with opposite signs.
                 if let highlight = patch["highlight adjustment"] as? Double {
                     guard nativeAfter.values["highlight recovery"] == .number(-highlight) else { throw C1Error.readbackMismatch("Coupled highlight recovery differs from adjustment.") }
@@ -274,22 +305,51 @@ public final class RecipeWorkflow {
                 }
                 guard nativeBefore!.layers == nativeAfter.layers, nativeBefore!.unavailable == nativeAfter.unavailable else { throw C1Error.readbackMismatch("Recipe changed native coverage or layers.") }
                 for (key,value) in nativeBefore!.values where !changedKeys.contains(key) {
-                    guard nativeAfter.values[key] == value else { throw C1Error.readbackMismatch("Recipe changed omitted field: " + key) }
+                    guard let actual = nativeAfter.values[key], NativeEditing.matchesReadback(field:key,expected:value,actual:actual) else { throw C1Error.readbackMismatch("Recipe changed omitted field: " + key) }
                 }
                 let after = fullAfter
-                guard after.geometry == initial.geometry, after.metadata == initial.metadata else { throw C1Error.readbackMismatch("Recipe changed geometry or metadata.") }
+                guard after.metadata == initial.metadata else { throw C1Error.readbackMismatch("Recipe changed metadata.") }
+                if args["geometry"] == nil {
+                    if let lens = scopes["lens"] as? [String:Any] {
+                        let beforeGeometry = (try Recipes.object(initial))["geometry"] as? [String:Any] ?? [:]
+                        let afterGeometry = (try Recipes.object(after))["geometry"] as? [String:Any] ?? [:]
+                        let keys = ["rotation","orientation","flip","keystone","cropOutsideImage"] + (lens["geometryPolicy"] as? String == "preserve-crop" ? ["crop"] : [])
+                        guard NSDictionary(dictionary:beforeGeometry.filter { keys.contains($0.key) }).isEqual(to:afterGeometry.filter { keys.contains($0.key) }) else { throw C1Error.readbackMismatch("Lens scope changed protected composition.") }
+                    } else {
+                        guard after.geometry == initial.geometry else { throw C1Error.readbackMismatch("Recipe changed geometry.") }
+                    }
+                }
+                if let scopeBefore {
+                    let scopeAfter = try core.recipeScopesOracle(ref:ref)
+                    report["scopedObserved"] = try scopeAfter.evidence()
+                    try scopeAfter.assertMatches(scopeBefore.expected(scopes))
+                }
                 try finish(["independentBefore":try Recipes.object(oracleBefore),"independentAfter":try Recipes.object(observed),"coverage":Recipes.oracleFields])
             }
             if verify || args["preview"] as? Bool == true { step = "preview"; try save(); try finish(Recipes.object(core.preview(ref:ref))) }
             step = "observe"; try save()
             let observed = try core.get(ref:ref,nativeTargets:[NativeTarget()])
             try finish(Recipes.object(observed))
+            if let scopeBefore {
+                let finalScopes = try core.recipeScopesOracle(ref:ref)
+                report["scopedObserved"] = try finalScopes.evidence()
+                try finalScopes.assertMatches(scopeBefore.expected(scopes))
+            }
             guard try core.getDocumentInfo().openToken == doc.openToken else { throw C1Error.documentChanged("Compound document changed.") }
             report["resultBundle"] = CompoundResultBundle.make(initial:try Recipes.object(initial), observed:try Recipes.object(observed), completed:completed,
                 document:try Recipes.object(doc), recipe:recipe, verification:verificationEvidence, request:args, compoundId:compoundId, workingRef:ref)
+            if let before = report["scopedBefore"], let after = report["scopedObserved"] {
+                var bundle = report["resultBundle"] as! [String:Any]
+                bundle["scopedNative"] = ["before":before,"observed":after,"diff":CompoundResultBundle.changes(before as! [String:Any],after as! [String:Any])]
+                var coverage = bundle["coverage"] as! [String:Any]
+                coverage["colorEditorElements"] = "compared-image-scope"
+                coverage["nativeLensAndVariantSettings"] = "lens-compared-variant-not-compared"
+                bundle["coverage"] = coverage
+                report["resultBundle"] = bundle
+            }
             report["status"] = "succeeded"; report["observed"] = try Recipes.object(observed); report["activeStep"] = NSNull(); try Recipes.write(report,to:path)
             if verify {
-                try Recipes.write(["recipeId":id,"build":doc.appVersion,"status":"verified","compoundId":compoundId,"reportHash":try Recipes.digest(report),"coverage":Recipes.oracleFields,"maskPixels":"excluded","visualReview":"required"],to:Recipes.file(doc,"verified-recipes",id))
+                try Recipes.write(["recipeId":id,"build":doc.appVersion,"status":"verified","compoundId":compoundId,"reportHash":try Recipes.digest(report),"coverage":Recipes.oracleFields,"scopedCoverage":scoped ? ["camera","lens","basicColor","advancedColor"] : [],"maskPixels":"excluded","visualReview":"required"],to:Recipes.file(doc,"verified-recipes",id))
             }
             return report
         } catch {

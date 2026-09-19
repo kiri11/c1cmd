@@ -1,7 +1,7 @@
 # Qualifying new Capture One builds
 
 Qualification is exact-build and machine-sensitive. The
-[release validation report](RELEASE_VALIDATION.md) records current evidence and
+[release validation guide](RELEASE_VALIDATION.md) defines current support and
 limits; adding a version string alone does not qualify a build.
 
 ## Compatibility and feature gates
@@ -63,7 +63,7 @@ make qualify-extended EVIDENCE_DIR=/absolute/path/to/new-feature-evidence
 ```
 
 This builds release, checks the package with build-tree resource fallback hidden,
-and runs `cli mcp geometry lens perspective keystone catalog existing inventory`
+and runs `cli mcp geometry lens perspective keystone catalog existing inventory native recipes`
 sequentially. Existing-variant cases include metadata writes in both Session and
 referenced-original Catalog fixtures.
 
@@ -75,8 +75,7 @@ lens-profile limits; a single RAW does not establish broad camera/lens coverage.
 
 For ordinary development on an already qualified build, `make qualify` defaults
 to `cli mcp existing`. Select only affected suites with `QUALIFY_SUITES`, or use
-`make qualify-extended` for all ten. See each retained feature report for native
-probes and detailed coverage.
+`make qualify-extended` for all eleven. Feature guides describe the corresponding native tests and limits.
 
 ## Qualify recovery separately
 
@@ -87,6 +86,14 @@ built above and a new evidence directory:
 make qualify-recovery RECOVERY_CASES=all \
   C1_RECOVERY_SHUTDOWN_MODE=sigterm \
   EVIDENCE_DIR=/absolute/path/to/new-recovery-evidence
+```
+
+Run dedicated recipe recovery when qualifying a new build as well:
+
+```sh
+make qualify-recipes-recovery RECIPE_RECOVERY_CASES=all \
+  C1_RECOVERY_SHUTDOWN_MODE=sigterm \
+  EVIDENCE_DIR=/absolute/path/to/new-recipe-recovery-evidence
 ```
 
 `sigterm` explicitly tests process-termination recovery after closing the owned
@@ -112,12 +119,13 @@ alone does not require another fault campaign.
 
 Retain the candidate source revision, any source patch, archive/executable/handler
 and harness hashes, app/OS/toolchain identity, selected/skipped suites, fixture
-checksums, results, failures, and recovery journals. Curate evidence that supports
-the claims; do not commit RAWs, previews, disposable databases, or scratch copies.
+checksums, results, failures, and recovery journals. Keep generated diagnostics in ignored `.build` directories or external artifact
+storage; do not commit them, RAWs, previews or disposable databases. Record concise
+historical outcomes and limitations in `CHANGELOG.md`.
 
 Update the tested-build registry and relevant feature gates only for demonstrated
 support, together with their tests and capability declarations. Update the
-[release validation report](RELEASE_VALIDATION.md) and support documentation with
+[release validation guide](RELEASE_VALIDATION.md) and support documentation with
 scope and remaining gaps. Rerun affected offline checks after final edits; if the
 runtime payload changes, validate affected native paths on the final archive.
 

@@ -14,7 +14,7 @@ Single-variant stored inspection is `c1 get <numeric-variant-id> --database /abs
 
 ## Data and identity
 
-Reader version 1 compares complete DDL against retained schema manifests, allowing ASCII whitespace differences outside quoted strings/identifiers and the standard SQLite `sqlite_stat1`/`sqlite_stat4` table definitions. It requires document type 1 and an exact version history for the matching schema, ordered by `Z_PK`. The original manifest requires one row with format `16.8.5.30 Pro Mac` and compatibility/version 160800. The separately qualified [upgraded Catalog manifest](qualification/catalog-reader/upgraded.md) retains its specific column order and four historical version tuples ending in that same build. Histories cannot be mixed between manifests; no maximum-version or latest-row heuristic is used. Types, constraints, indexes, column order, quoted text, token boundaries and unknown objects must match a retained manifest; comments are not normalized. The manifests are bundled beside the executables in `c1_CaptureOneCore.bundle`. Unrecognized schemas and histories fail closed. This is a reverse-engineered, fixture-qualified stored-data interface. The reported `schemaFingerprint` remains the exact raw schema hash, so compatible databases can report different fingerprints.
+Reader version 1 compares complete DDL against retained schema manifests, allowing ASCII whitespace differences outside quoted strings/identifiers and the standard SQLite `sqlite_stat1`/`sqlite_stat4` table definitions. It requires document type 1 and an exact version history for the matching schema, ordered by `Z_PK`. The original manifest requires one row with format `16.8.5.30 Pro Mac` and compatibility/version 160800. The separately qualified upgraded Catalog manifest (`catalog-schema-upgraded-16.8.5.json`) retains its specific column order and four historical version tuples ending in that same build. Histories cannot be mixed between manifests; no maximum-version or latest-row heuristic is used. Types, constraints, indexes, column order, quoted text, token boundaries and unknown objects must match a retained manifest; comments are not normalized. The manifests are bundled beside the executables in `c1_CaptureOneCore.bundle`. Unrecognized schemas and histories fail closed. This is a reverse-engineered, fixture-qualified stored-data interface. The reported `schemaFingerprint` remains the exact raw schema hash, so compatible databases can report different fingerprints.
 
 Every response includes the canonical database path, device/inode identity, stored document UUID, schema fingerprint, transaction start time, observation time, reader version, and `storedStateOnly: true`. These identify the observation, not a live mutation precondition. Distinct variants of an image remain distinct; `variantDatabaseID` and `variantUUID` are separate from `imageDatabaseID` and `imageUUID`. Do not treat database IDs as authorized native references, even when numeric IDs agree on a fixture.
 
@@ -30,25 +30,30 @@ Connections use `SQLITE_OPEN_READONLY`, `query_only`, ordinary locking, and WAL 
 
 Snapshots use incremental `sqlite3_backup` inside the validated source transaction, including committed WAL data. The destination must be a new absolute `.cocatalogdb` path outside Catalog packages; existing files and symlinks are rejected. Failed backups remove their newly reserved file. A snapshot contains database records, not original photos, previews, external mask files, or a complete native Catalog backup. Native Catalog backup and RAW backup remain separate workflows.
 
-## Performance and routing decision
+## Routing and validation
 
-The retained [benchmark](qualification/catalog-reader/benchmark.json) compares equivalent ID/name/path/rating/color-tag observations from the same open disposable three-variant Catalog. The initial debug measurement was approximately 29 ms per SQLite CLI call versus 975 ms for live AppleScript inventory (34×). Twelve SQL calls took 317 ms with one worker and 80 ms with four workers (4× throughput). Process startup is included. The [packaged benchmark](qualification/catalog-reader/benchmark-packaged.json) measured about 47× faster reads and 4.0× throughput with four SQL workers.
+SQLite serves explicit stored discovery. It does not establish equivalence for
+live selection, smart collections, arbitrary settings conversions or unsaved edits.
+Ordinary live commands use AppleScript; `--database` selects SQLite explicitly.
+An explicit database request never falls back to another document. On schema
+rejection, use native commands only after verifying the intended open document.
 
-This supports SQLite as the backend for explicit stored discovery. It does **not** establish equivalence for live selection, smart collections, arbitrary settings conversions, or unsaved edits. Ordinary live commands retain AppleScript; adding `--database` selects SQLite explicitly. The controlled workflow below separately enables automatic routing for participating browsing calls. There is no silent fallback from an explicit database path to the current document, which could be a different Catalog or Session. On a schema rejection, use native commands only after independently verifying that the intended document is open. Workflow results carry their own observation metadata and omit mutation tokens; explicit database requests never fall back to another document.
+Use `scripts/benchmark-catalog.py` and `scripts/qualify-catalog-reader.py` with a
+matching disposable Catalog for read-only comparisons. Native calls stay sequential.
+Keep generated results under `.build/qualification` or external artifact storage.
 
-Reproduce with `scripts/benchmark-catalog.py` and `scripts/qualify-catalog-reader.py`; both require the matching disposable Catalog already open and perform read-only native calls sequentially. The benchmark does not run competing AppleScript calls. This small-fixture measurement is not a large-Catalog scaling claim or a screen-lock/load matrix.
+`make check` covers schema/type/version rejection, both membership kinds, duplicate
+image variants, rating filters, path uncertainty, row limits, locking, concurrent
+reads, WAL visibility, backup integrity, overwrite/symlink protection and CLI/MCP
+parity. The upgraded schema has its own exact column order and version tuples.
 
-## Qualification and Session assessment
+Session databases remain rejected: similarly named tables do not establish
+complete folder discovery or settings-sidecar behavior. Stored reads never change
+mutation dispatch, journaling or reconciliation rules.
 
-Schema compatibility regression tests exercise reformatted DDL and SQLite statistics through CLI/MCP, preserve the raw fingerprint, and reject changed types, primary keys, unqualified column orders, indexes, comments, unknown objects, nonstandard statistics definitions and version histories. upgraded Catalog's reordered `ZVARIANTLAYER` and `ZRETOUCHINGLAYER` columns and four `ZVERSIONINFO` rows have separate [stored-reader qualification](qualification/catalog-reader/upgraded.md), including synthetic sentinel values and packaged reads from the actual database. Native mutation and recovery suites are not required for this comparison-only change.
+## Measuring freshness
 
-`make check` includes synthetic records built from the real schema, preserving duplicate image variants, both membership kinds, rating filters, path uncertainty, changed-schema/type rejection, row limits, lock failure, concurrent reads, committed/uncommitted WAL visibility, backup integrity, overwrite/symlink protection, and CLI/MCP parity. The read-only [native comparison](qualification/catalog-reader/native-comparison.json) checks the local Catalog's combined exposure/contrast/saturation, an explicit image collection, and an archive read while the original document remains open. Its fixture values and omitted scopes are recorded in the evidence.
-
-A local 16.8.5.30 Session database has similarly named tables and stored image/variant/layer rows. That does not qualify Session completeness: Session folder discovery and settings-sidecar behavior need separate native comparisons. Session paths and Session document types remain rejected. No mutation dispatch, journaling, restart, or reconciliation behavior changed; live recovery fault suites are not applicable to this reader work.
-
-## Measuring freshness before automatic routing
-
-The initial read-only benchmark established speed and agreement on unchanged data. It did not establish read-after-write consistency. `scripts/probe-catalog-freshness.py` tests that separately using a **new disposable Catalog and copied RAW**, with zero documents required at startup:
+Read-only agreement does not establish read-after-write consistency. `scripts/probe-catalog-freshness.py` tests freshness using a **new disposable Catalog and copied RAW**, with zero documents required at startup:
 
 ```sh
 python3 scripts/probe-catalog-freshness.py \
@@ -60,9 +65,10 @@ python3 scripts/probe-catalog-freshness.py \
 
 The probe confirms doctor/build/document/original identity, makes a native backup, prepares an existing editing reference, and performs sequential guarded rating/tag and nonzero tonal writes. After each successful native acknowledgement it polls an independent SQLite connection every 20 ms, using a fresh read transaction each time. It records the first observation, changes, the last observation, poll counts, elapsed time, and an independent native `get` afterward. A separate autocommit SQLite connection observes `PRAGMA data_version`; the database mtime is recorded as well. Success restores the saved native values and closes only the owned fixture. Any failed or uncertain native operation stops with the fixture retained; there is no automatic retry or exception-path restore. Capture One is never quit.
 
-Local Capture One **16.8.5.30** experiments found stale committed data **after successful native acknowledgement**. The short experiment saw six initial mismatches in six writes; five did not converge within its five-second window. The longer experiment also observed a rating/tag update still missing at 30 seconds. See the retained [short-run summary](qualification/catalog-reader/freshness-short-summary.json), [long-run summary](qualification/catalog-reader/freshness-long-summary.json), and [long-run observations](qualification/catalog-reader/freshness-long-events.json). The evidence uses the Catalog's existing `delete` journal mode; the probe never changes it. Non-convergence means a lower bound on lag, not that the write was lost.
-
-This is not an old SQLite read snapshot: every sample opens a new connection. [SQLite only exposes committed writes to independent connections](https://www.sqlite.org/isolation.html). [Its `data_version` counter](https://www.sqlite.org/pragma.html#pragma_data_version) detects commits by other connections when compared on the same observing connection. It does not report edits still buffered by Capture One. A stable mtime or change counter therefore cannot establish equality with native state. The installed scripting dictionary exposes no explicit save/flush or document dirty/revision property suitable as a supported freshness barrier. Forcing a WAL checkpoint would not commit application-buffered edits either.
+Committed SQLite data can lag successful native acknowledgements. Neither
+`PRAGMA data_version` nor database mtime is a native synchronization barrier.
+Use native reads and mutation tokens for edits; do not treat an unchanged database
+as proof that the application's current settings are unchanged.
 
 ## Controlled browsing workflow
 
@@ -90,10 +96,8 @@ Active-document workflow calls still serialize and perform native document ident
 
 ### Capture One Sessions
 
-Sessions use the same controlled native cache and journal updates, but **do not route to Catalog SQL**. The live Session fixture returned no stored `ZVARIANT` rows while a native variant was visible and editable; closing the Session populated a row and left a `CaptureOne/Settings1680/*.cos` sidecar. A Session database alone is consequently not a complete live discovery/settings source. Offline Session folder/sidecar discovery needs a separate reader and is not implemented here.
+Sessions use the same controlled native cache and journal updates, but **do not route to Catalog SQL**. Session discovery and `CaptureOne/Settings1680/*.cos` sidecars are not fully represented by the live Session database. That database alone is not a complete discovery/settings source. Offline Session folder/sidecar discovery needs a separate reader and is not implemented here.
 
 ### Workflow validation
 
-`Tests/read_workflow_integration_test.py` creates disposable Session and Catalog fixtures from copied RAWs, requires zero open documents, and tests packaged CLI/MCP parity, caller isolation, native token bypass, metadata/tonal overlays, the 60-second comparison, handler traces, restoration, and closed-Catalog inspection. It never quits Capture One and retains failed fixtures without automatic retries or restoration. Run with `C1_TEST_BIN`, `C1_TEST_MCP_BIN`, `C1_TEST_RAW_FIXTURE`, and a new `C1_READ_WORKFLOW_EVIDENCE` directory. Retained results and small-fixture timings are in [workflow qualification](qualification/catalog-reader/read-workflow.json). These timings are not a large-Catalog scaling guarantee.
-
-Offline tests cover uncertainty, unsupported operations, restart invalidation, persistence across callers, rating inclusion, and token stripping. Mutation dispatch, durable journal writing, native locks, timeout handling, and reconciliation remain unchanged; this browsing-only work does not require the unrelated live recovery fault campaign.
+Offline tests cover uncertainty, unsupported operations, restart invalidation, persistence across callers, rating inclusion, and token stripping. Browsing does not bypass mutation dispatch, durable journals, native locks, timeout handling or reconciliation. Select recovery tests only when those behaviors change.

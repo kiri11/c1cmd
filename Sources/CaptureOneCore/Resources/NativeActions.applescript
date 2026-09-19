@@ -118,6 +118,31 @@ on nativeRecipeOracle(docName, variantId, expectedParent)
             set end of recipeCurvePoints to (amount of p as real)
         end repeat
         set end of observed to recipeCurvePoints
-        return observed & {film grain type of a as text, film grain impact of a as real, film grain granularity of a as real, vignetting method of a as text, vignetting amount of a as real}
+        return observed & {film grain type of a as text, film grain impact of a as real, film grain granularity of a as real, vignetting method of a as text, vignetting amount of a as real, color balance master hue of a as real, color balance master saturation of a as real, color balance shadow hue of a as real, color balance shadow saturation of a as real, color balance shadow lightness of a as real, color balance midtone hue of a as real, color balance midtone saturation of a as real, color balance midtone lightness of a as real, color balance highlight hue of a as real, color balance highlight saturation of a as real, color balance highlight lightness of a as real}
     end tell
 end nativeRecipeOracle
+
+-- Independent scoped reader; bulk color property records avoid indexed-object aliasing.
+on nativeRecipeScopesOracle(docName, variantId, expectedParent)
+    tell application "/Applications/Capture One.app"
+        set d to my checkedDocument(docName)
+        set v to variant id variantId of d
+        if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
+        set recipeCameraValues to {color profile of adjustments of v as text, film curve of adjustments of v as text}
+        set recipeLensRecord to properties of lens correction of v
+        set recipeLensValues to {(lens profile of recipeLensRecord as text), (chromatic aberration of recipeLensRecord as boolean), (custom chromatic aberration of recipeLensRecord as boolean), (diffraction correction of recipeLensRecord as boolean), (hide distorted areas of recipeLensRecord as boolean), (distortion of recipeLensRecord as real), (sharpness falloff of recipeLensRecord as real), (light falloff of recipeLensRecord as real), (focal length of recipeLensRecord as integer), (aperture of recipeLensRecord as real), (tilt of recipeLensRecord as real), (tilt direction of recipeLensRecord as real), (shift of recipeLensRecord as real), (shift direction of recipeLensRecord as real), (shift x of recipeLensRecord as integer), (shift y of recipeLensRecord as integer)}
+        if (count of basic color correction of color editor settings of adjustments of v) > 9 then error "Too many basic bands for scoped recipes."
+        if (count of advanced color correction of color editor settings of adjustments of v) > 64 then error "Too many advanced bands for scoped recipes."
+        set recipeBasicValues to {}
+        set recipeBasicRecords to properties of every basic color correction of color editor settings of adjustments of v
+        repeat with recipeRecord in recipeBasicRecords
+            set end of recipeBasicValues to {(name of recipeRecord as text), (hue change of recipeRecord as real), (saturation change of recipeRecord as real), (lightness change of recipeRecord as real)}
+        end repeat
+        set recipeAdvancedValues to {}
+        set recipeAdvancedRecords to properties of every advanced color correction of color editor settings of adjustments of v
+        repeat with recipeRecord in recipeAdvancedRecords
+            set end of recipeAdvancedValues to {(enabled of recipeRecord as boolean), (red of recipeRecord as integer), (green of recipeRecord as integer), (blue of recipeRecord as integer), (hue start of recipeRecord as real), (hue end of recipeRecord as real), (saturation start of recipeRecord as real), (saturation end of recipeRecord as real), (smoothness of recipeRecord as real), (hue change of recipeRecord as real), (saturation change of recipeRecord as real), (lightness change of recipeRecord as real)}
+        end repeat
+        return {recipeCameraValues:recipeCameraValues, recipeLensValues:recipeLensValues, recipeBasicValues:recipeBasicValues, recipeAdvancedValues:recipeAdvancedValues}
+    end tell
+end nativeRecipeScopesOracle

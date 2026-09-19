@@ -56,7 +56,7 @@ enum CompoundResultBundle {
         let preview = stepResults.first(where:{ $0.0 == "preview" })?.1
         var effectiveSettings = recipe["settings"] as? [String:Any] ?? [:]
         effectiveSettings.merge(request["overrides"] as? [String:Any] ?? [:]) { _,override in override }
-        let policies: [String:Any] = ["settings":effectiveSettings,
+        let policies: [String:Any] = ["settings":effectiveSettings,"scopes":recipe["scopes"] ?? [:],
             "exposure":request["exposure"] ?? recipe["exposure"]!,
             "whiteBalance":request["whiteBalance"] ?? recipe["whiteBalance"]!,
             "cropPolicy":recipe["cropPolicy"]!,"geometry":request["geometry"] ?? NSNull()]
@@ -77,7 +77,7 @@ enum CompoundResultBundle {
             "coverage":["geometry":geometryAvailable ? "compared" : "unavailable",
                 "nativeTarget":after["target"] ?? NSNull(),"nativeComparedFields":comparable.sorted(),
                 "nativeNotComparedFields":notCompared,"nativeUnavailableBefore":beforeUnavailable,"nativeUnavailableAfter":afterUnavailable,
-                "maskPixels":"unsupported","layerSettings":"not-compared","colorEditorElements":"not-compared",
+                "profileAssets":"names-only-bytes-not-captured","skinTone":"unsupported","maskPixels":"unsupported","layerSettings":"not-compared","colorEditorElements":"not-compared",
                 "nativeLensAndVariantSettings":"not-compared","atomicSnapshot":false]]
     }
 
@@ -99,13 +99,13 @@ enum CompoundResultBundle {
             "operations":["type":"array","items":ContractSchema.object(["step":string,"operationId":string],required:["step","operationId"])],
             "initialHashes":hashes,"finalHashes":hashes],required:["compoundId","document","sourceRef","nativeVariantId","parentImagePath","workingRef","recipeId","recipe","referenceId","verification","mode","effectivePolicy","operations","initialHashes","finalHashes"])
         var preview = existing["preview"] as! [String:Any]; preview["type"] = ["object","null"]
-        return ContractSchema.object(["version":["enum":[1]],"observed":existing["get"]!,"diff":ContractSchema.object(
+        return ContractSchema.object(["scopedNative":ContractSchema.object(["before":RecipeScopes.evidenceSchema,"observed":RecipeScopes.evidenceSchema,"diff":object],required:["before","observed","diff"]),"version":["enum":[1]],"observed":existing["get"]!,"diff":ContractSchema.object(
             ["adjustments":changes,"geometry":changes,"metadata":changes,"nativeAdjustments":changes],required:["adjustments","geometry","metadata","nativeAdjustments"]),
             "provenance":provenance,"preview":preview,"coverage":ContractSchema.object([
                 "geometry":["enum":["compared","unavailable"]],"nativeTarget":nullableObject,
                 "nativeComparedFields":strings,"nativeNotComparedFields":strings,"nativeUnavailableBefore":object,"nativeUnavailableAfter":object,
-                "maskPixels":["enum":["unsupported"]],"layerSettings":["enum":["not-compared"]],"colorEditorElements":["enum":["not-compared"]],
-                "nativeLensAndVariantSettings":["enum":["not-compared"]],"atomicSnapshot":["const":false]],
+                "profileAssets":["enum":["names-only-bytes-not-captured"]],"skinTone":["enum":["unsupported"]],"maskPixels":["enum":["unsupported"]],"layerSettings":["enum":["not-compared"]],"colorEditorElements":["enum":["not-compared","compared-image-scope"]],
+                "nativeLensAndVariantSettings":["enum":["not-compared","lens-compared-variant-not-compared"]],"atomicSnapshot":["const":false]],
                 required:["geometry","nativeTarget","nativeComparedFields","nativeNotComparedFields","nativeUnavailableBefore","nativeUnavailableAfter","maskPixels","layerSettings","colorEditorElements","nativeLensAndVariantSettings","atomicSnapshot"])],required:["version","observed","diff","provenance","preview","coverage"])
     }
 }
