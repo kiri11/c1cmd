@@ -188,6 +188,26 @@ struct CatalogEditingTests {
             let extra = package.appendingPathComponent("Ambiguous.cocatalogdb")
             try Data().write(to: extra)
             XCTAssertThrowsError(try enabled.cloneVariant(sourceRef: "1"))
+            XCTAssertThrowsError(try readOnly.getDocumentInfo(), "Package-only reads remain ambiguous")
+            fake.base.catalogID = db.path
+            let exact = core(db.path)
+            let exactDoc = try exact.getDocumentInfo()
+            XCTAssertTrue(exactDoc.writesEnabled)
+            let exactReadOnlyDoc = try readOnly.getDocumentInfo()
+            XCTAssertFalse(exactReadOnlyDoc.writesEnabled)
+            XCTAssertEqual(exactReadOnlyDoc.openToken, exactDoc.openToken)
+            XCTAssertNoThrow(try readOnly.get(ref: "1"))
+            let ambiguousAuthorization = try enabled.getDocumentInfo()
+            XCTAssertFalse(ambiguousAuthorization.writesEnabled, "Package opt-in cannot select among databases")
+            let wrongAuthorization = try core(extra.path).getDocumentInfo()
+            XCTAssertFalse(wrongAuthorization.writesEnabled, "Another database in the same package is not authorized")
+            let exactRef = try exact.cloneVariant(sourceRef: "1").workingRef
+            fake.base.catalogID = extra.path
+            XCTAssertThrowsError(try exact.get(ref: exactRef), "Switching databases inside one package invalidates references")
+            fake.base.catalogID = db.path
+            try Data("second replacement".utf8).write(to: db, options: .atomic)
+            XCTAssertThrowsError(try exact.get(ref: exactRef), "Exact database replacement invalidates references")
+            fake.base.catalogID = package.path
             try fm.removeItem(at: extra)
             try fm.removeItem(at: db)
             XCTAssertThrowsError(try enabled.getDocumentInfo())

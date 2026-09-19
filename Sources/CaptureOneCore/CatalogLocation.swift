@@ -14,13 +14,21 @@ struct CatalogLocation {
         guard package.pathExtension == "cocatalog" else {
             throw C1Error.identityAmbiguous("Cannot identify the Catalog package: \(nativeID)")
         }
-        let databases = try FileManager.default.contentsOfDirectory(at: package, includingPropertiesForKeys: [.isRegularFileKey])
-            .filter { $0.pathExtension == "cocatalogdb" }
-        guard databases.count == 1, let database = databases.first,
-              try database.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true,
-              database.resolvingSymlinksInPath().deletingLastPathComponent().path == package.path,
-              native.path == package.path || native.path == database.resolvingSymlinksInPath().path else {
-            throw C1Error.identityAmbiguous("Catalog must contain exactly one identifiable database file.")
+        let database: URL
+        if native.pathExtension == "cocatalogdb" {
+            // An exact native ID identifies the active database even when siblings exist.
+            database = native
+        } else {
+            let databases = try FileManager.default.contentsOfDirectory(at: package, includingPropertiesForKeys: [.isRegularFileKey])
+                .filter { $0.pathExtension == "cocatalogdb" }
+            guard databases.count == 1, let onlyDatabase = databases.first else {
+                throw C1Error.identityAmbiguous("Catalog package must contain exactly one identifiable database file when no exact database path is supplied.")
+            }
+            database = onlyDatabase
+        }
+        guard try database.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true,
+              database.resolvingSymlinksInPath().deletingLastPathComponent().path == package.path else {
+            throw C1Error.identityAmbiguous("Catalog database must be a regular file inside its Catalog package.")
         }
         self.package = package
         self.database = database.resolvingSymlinksInPath()
