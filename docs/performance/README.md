@@ -1,38 +1,32 @@
-# Read performance and optimization work
+# Read performance
 
-The first implementation from `suggestions.md` establishes reproducible read timings
-using local data. Historical wedding timings are motivation, not a baseline that
-can be reproduced without those files and application conditions.
+Use a persistent MCP process for sequential batch workflows. `get` accepts one or
+several native scopes through `nativeTargets`, sharing source validation across
+scopes. See [scoped reads](../native-editing/README.md#scoped-reads).
 
-## Opt-in internal timing
+## Internal timing
 
-Set `C1_PROFILE=1` on either CLI or MCP. JSON-lines diagnostics go to stderr;
-normal JSON and MCP stdout are unchanged. Version 1 records contain `type`,
-`version`, `pid`, `phase`, `handler`, `elapsedMs`, and `succeeded`. Arguments,
-property values, image paths, and mutation tokens are not logged. Timing uses a
-monotonic clock; disabled profiling invokes the original operation directly.
-Errors propagate unchanged and diagnostic write failures are ignored.
+Set `C1_PROFILE=1` on CLI or MCP. JSON-lines diagnostics go to stderr, and command
+results go to stdout. Version 1 timing records contain `type`, `version`, `pid`,
+`phase`, `handler`, `elapsedMs`, and `succeeded`. Timing uses a monotonic clock.
+Diagnostic write failures are ignored; operation errors propagate to the caller.
 
-Phases:
+| Phase | Measures |
+| --- | --- |
+| `script_compile` | Cache-miss compilation, separately for base/native scripts |
+| `script_lookup` | Cache lookup, resource loading and any required compilation |
+| `apple_event` | Synchronous handler execution and error mapping |
+| `handler_total` | Lookup, event construction and execution |
+| `descriptor_decode` | Conversion of a native result to typed Swift data |
 
-- `script_compile`: cache-miss compilation, separately for base/native scripts.
-- `script_lookup`: cache lookup, resource loading and compilation if needed.
-- `apple_event`: synchronous handler execution and error mapping.
-- `handler_total`: lookup, event construction and execution.
-- `descriptor_decode`: conversion of the native result to typed Swift data.
-
-Phases are nested: do not sum them as independent durations. `apple_event` includes
-all property reads performed by that handler, not individual native property
-latencies. File/journal scans, geometry calculations inside AppleScript, export
-polling and other controller work are not yet independently instrumented. This
-is deliberately a first measurement slice; it does not change dispatch, locking,
-timeouts, journaling, preconditions, or recovery.
+Phases are nested; interpret their durations separately. `apple_event` includes
+all property reads performed by its handler.
 
 ## Compare fresh CLI and persistent MCP
 
-Build both executables, open exactly one local disposable Session, and obtain a
-native variant ID with `c1 variants list`. Keep Capture One and the photo untouched
-until the comparison finishes. Use a small sample first:
+Build both executables, open exactly one disposable Session, and obtain a native
+variant ID with `c1 variants list`. Keep Capture One and the photo untouched
+until the comparison finishes:
 
 ```sh
 python3 scripts/benchmark-reads.py --ref 1 --samples 5 \
@@ -41,65 +35,69 @@ python3 scripts/benchmark-reads.py --ref 1 --samples 5 \
 ```
 
 Use `--cli .build/release/c1 --mcp .build/release/c1-mcp` after `make build` for
-release timings. Each pair performs the same `get` and adjustment-scope
-`native_get` through a fresh CLI process and one persistent MCP process. Calls
-are sequential. Order alternates; the first pair is recorded as warmup and
-excluded from medians. Every returned payload must match the first observation
-for that operation. Document information must match at the start and end.
-Changes, errors and timeouts stop the run, retain partial evidence, and yield a
-nonzero exit. No read is automatically retried. Output files cannot be overwritten.
+release timings. Each pair performs compact and adjustment-scope `get` calls
+through fresh CLI processes and one persistent MCP process. Calls are sequential.
+Order alternates; the first pair is recorded as warmup and excluded from medians.
 
-CLI elapsed time includes process startup; MCP elapsed time excludes server
-startup/initialization. This measures sustained batch use, not single-command
-latency. Profiling is enabled for both sides; stderr is drained to a temporary
-file for MCP to avoid pipe backpressure. The report includes raw samples and
-phase records (groupable by PID), build paths, fixture document, and supplied
-conditions. Record actual screen lock/application load conditions, rather than
-assuming locking caused historical slowdowns.
+Every returned payload must match the first observation for that operation.
+Document information must match at the start and end. Changes, errors and
+timeouts stop the run, preserve partial evidence, and produce a nonzero exit.
+Each run requires a new output file.
 
-The runner only invokes `doc_info`, `get`, and `native_get`; it does not export,
-prepare editing references, apply recipes or mutate variants. It closes only its
-own MCP child process and leaves Capture One open.
+CLI elapsed time includes process startup. MCP elapsed time starts after server
+initialization, measuring sustained batch use. Both sides enable profiling.
+MCP stderr goes to a temporary file to keep the diagnostic stream drained. The
+report records raw samples, phase records grouped by PID, executable paths,
+document identity and supplied conditions. Record screen lock and application
+load conditions for each run.
 
-## Next work
+The runner invokes `doc_info` and `get`, closes its MCP child process when finished,
+and leaves Capture One open.
 
-Use measured handler costs to prioritize bounded multi-scope reads and a shared
-validated context. Before direct palette writes, reproduce indexed-band reads
-against the independent bulk oracle on disposable local data. Catalog discovery
-requires local schema fixtures and SQL/native comparisons; do not infer schema
-support from the absent wedding archive. Compound mutations, recipe application,
-and preview caching need separate designs and affected live/recovery qualification.
+## Compare single-scope and combined reads
 
-## Local measurement: 2026-09-19
+Run both forms of `get` in the same persistent release MCP process:
 
-[Raw debug-run evidence](local-debug-reads.json) records Capture One 16.8.5.30,
-one disposable Session and a copied local `2U6A7257.CR3`. Five measured pairs
-followed one warmup pair. All returned read payloads stayed equal. Screen lock
-state was not observed; other application load was uncontrolled.
+```sh
+python3 scripts/benchmark-scoped-get.py --ref 1 --samples 5 \
+  --conditions 'local disposable RAW; screen unlocked; no competing exports; release build' \
+  --output /tmp/scoped-get-benchmark.json
+```
 
-| Read | Fresh debug CLI median | Persistent debug MCP median | Lower elapsed time |
-| --- | ---: | ---: | ---: |
-| `get` | 1,312 ms | 956 ms | 27% |
-| `native_get` adjustments | 4,113 ms | 3,656 ms | 11% |
+Both forms request adjustment, lens and variant scopes and return compact source
+fields. Native values and scope tokens must match across every observation.
+Order alternates; one warmup pair is excluded. The report includes the MCP binary
+SHA-256, document identity, native snapshot digest, phase timings and raw samples.
 
-Across the recorded events (including warmup), median `nativeRead` execution was
-2,435 ms, `getAdjustmentsBatch` 884 ms and `getAppAndDocInfo` 98 ms. Median base
-compilation was 66 ms; native compilation 86 ms. The persistent process compiled
-each script once; fresh CLI processes repeatedly compiled their required scripts.
-The total difference also includes process startup and varying application costs;
-it cannot all be attributed to compilation.
+## Local release measurements
 
-For batch consumers, reuse one MCP process and keep calls sequential. This is an
-existing execution-path optimization, not a new daemon or a claim that core
-native reads became faster. The data points toward reducing native property round
-trips next; it does not justify removing identity or state checks. These results
-are not release-build measurements, wedding-run reproduction, export measurements,
-or evidence of a whole-workflow speedup.
+[Recorded samples](local-release-scoped-get.json) use Capture One 16.8.5.30 and a
+disposable copy of local `2U6A7257.CR3`. Five measured pairs followed one warmup
+pair. All native values and tokens matched. Screen lock state was unobserved and
+other application load was uncontrolled.
 
-Validation: `make check` passed 965 Swift assertions, the shared CLI/MCP contract
-suite, generated native-resource checks, recovery-harness and release-runner
-checks, and two benchmark protocol/evidence tests. An additional enabled-profile
-run verified JSON stderr records for successful and failing closures and original
-error propagation. The live read comparison is the only live coverage in this
-slice. Mutation, export and recovery fault campaigns were omitted because this
-change adds timing/reporting only and leaves their behavior and assertions intact.
+| Read adjustment, lens and variant scopes | Median |
+| --- | ---: |
+| Three single-scope `get` calls | 4,082 ms |
+| One combined `get` call | 3,245 ms |
+
+The combined call took 21% less time in this local experiment. Measurements apply
+to this fixture, build and application state.
+
+## Validation
+
+[Native qualification evidence](scoped-get-native-qualification.json) records
+image and layer scope comparisons against separate reads, with matching values
+and state tokens. The packaged native suite exercises guarded editing, layer/mask
+actions, sibling preservation and preview export using a disposable RAW copy.
+
+`make check` passes 996 Swift assertions plus CLI/MCP contract, generated-resource,
+benchmark-runner and harness checks. [Recovery events](scoped-get-recovery-events.jsonl)
+record successful native property and layer-creation fault cases: real 120-second
+Apple Event timeouts, unresolved-write blocking, SIGTERM restart/reconciliation,
+stale-reference rejection and resumed writes through fresh references.
+
+Validation scope: the regular `native` suite and recovery cases `native` and
+`native-action`. Other regular and recovery matrices are outside this scoped-read
+qualification. Executable hashes identify the measured release binary and the
+separately signed packaged executables used for live qualification.

@@ -119,6 +119,8 @@ public struct DeleteResult: Codable, Equatable {
 }
 
 public struct GetResult: Codable, Equatable {
+    public var nativeSnapshots: [NativeSnapshot]? = nil
+    public var openToken: String? = nil
     public var metadataStateHash: String? = nil
     public var geometry: Geometry? = nil
     public var geometryStateHash: String? = nil
@@ -1435,7 +1437,11 @@ public final class SessionController {
     }
 
     // MARK: - Expanded native editing
-    public func nativeGet(ref: String, target: NativeTarget) throws -> NativeSnapshot {
+    private func nativeGet(ref: String, target: NativeTarget) throws -> NativeSnapshot {
+        try readNative(ref: ref, target: target).nativeSnapshots![0]
+    }
+
+    private func readNative(ref: String, target: NativeTarget) throws -> GetResult {
         try target.validate()
         return try lock.withLock {
             let doc = try getDocumentInfo()
@@ -1444,25 +1450,71 @@ public final class SessionController {
             let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
                 [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
             try checkedDocument(doc, writes: false)
-            var values: [String: NativeValue] = [:], unavailable: [String: String] = [:]
-            for row in wire.nativeRows {
-                if let error = row.unavailable { unavailable[row.fieldName] = error; continue }
-                if let flag = row.boolVal { values[row.fieldName] = .boolean(flag) }
-                else if let text = row.textVal { values[row.fieldName] = .text(text) }
-                else if let numbers = row.numbersVal {
-                    let field = NativeEditing.fields[target.scope]?.first { $0.name == row.fieldName }
-                    if field?.type == "curve" || field?.type == "RGB color" { values[row.fieldName] = .numbers(numbers) }
-                    else if numbers.count == 1 { values[row.fieldName] = .number(numbers[0]) }
-                    else { throw C1Error.invalidRequest("Malformed native field readback.") }
-                } else { values[row.fieldName] = .unset }
-            }
-            struct Token: Encodable { let document: String; let variant: String; let parent: String?; let target: NativeTarget; let values: [String:NativeValue]; let layers: [NativeLayer]; let tonal: String; let geometry: String?; let metadata: String?; let basicCount: Int; let advancedCount: Int; let journalRevision: String? }
             let revision = try OperationJournal(sessionDirectory: URL(fileURLWithPath:doc.documentPath)).validatedEntries().last(where: { $0.nativeVariantId == source.id })?.operationId
-            let token = try NativeEditing.hash(Token(document: doc.openToken, variant: source.id, parent: source.parentImagePath, target: target,
-                values: values, layers: wire.nativeLayers, tonal: source.stateHash, geometry: source.geometryStateHash, metadata: source.metadataStateHash, basicCount:wire.basicColorCount, advancedCount:wire.advancedColorCount, journalRevision:revision))
-            return NativeSnapshot(ref: ref, target: target, values: values, unavailable: unavailable, layers: wire.nativeLayers,
-                basicColorCount: wire.basicColorCount, advancedColorCount: wire.advancedColorCount, nativeStateHash: token)
+            var result = source
+            result.openToken = doc.openToken
+            result.nativeSnapshots = [try nativeSnapshot(ref: ref, target: target, doc: doc, source: source, wire: wire, revision: revision)]
+            return result
         }
+    }
+
+    /// Sequential observations under one application lock; never a multi-scope atomic snapshot.
+    public func get(ref: String, nativeTargets targets: [NativeTarget]) throws -> GetResult {
+        guard !ref.isEmpty, (1...16).contains(targets.count) else {
+            throw C1Error.invalidRequest("Provide a variant reference and 1...16 native targets.")
+        }
+        for target in targets { try target.validate() }
+        if targets.count == 1 { return try readNative(ref: ref, target: targets[0]) }
+        return try lock.withLock {
+            let doc = try getDocumentInfo()
+            guard doc.appVersion == Self.pinnedBuild else { throw C1Error.invalidRequest("Native editing requires Capture One " + Self.pinnedBuild) }
+            let source = try get(ref: ref)
+            try checkedDocument(doc, writes: false)
+            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            let revision = try journal.validatedEntries().last(where: { $0.nativeVariantId == source.id })?.operationId
+            var snapshots: [NativeSnapshot] = []
+            for target in targets {
+                if let prior = snapshots.first(where: { $0.target == target }) {
+                    snapshots.append(prior)
+                    continue
+                }
+                let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
+                    [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
+                snapshots.append(try nativeSnapshot(ref: ref, target: target, doc: doc, source: source, wire: wire, revision: revision))
+            }
+            // Reject observable source drift instead of returning a partial/mixed bundle.
+            let after = try get(ref: ref)
+            try checkedDocument(doc, writes: false)
+            guard source == after,
+                  revision == (try journal.validatedEntries()).last(where: { $0.nativeVariantId == source.id })?.operationId else {
+                throw C1Error.stateChanged("Variant changed during native reads; no bundle was returned.")
+            }
+            var result = source
+            result.openToken = doc.openToken
+            result.nativeSnapshots = snapshots
+            return result
+        }
+    }
+
+    private func nativeSnapshot(ref: String, target: NativeTarget, doc: DocumentInfo, source: GetResult,
+                                wire: NativeWireSnapshot, revision: String?) throws -> NativeSnapshot {
+        var values: [String: NativeValue] = [:], unavailable: [String: String] = [:]
+        for row in wire.nativeRows {
+            if let error = row.unavailable { unavailable[row.fieldName] = error; continue }
+            if let flag = row.boolVal { values[row.fieldName] = .boolean(flag) }
+            else if let text = row.textVal { values[row.fieldName] = .text(text) }
+            else if let numbers = row.numbersVal {
+                let field = NativeEditing.fields[target.scope]?.first { $0.name == row.fieldName }
+                if field?.type == "curve" || field?.type == "RGB color" { values[row.fieldName] = .numbers(numbers) }
+                else if numbers.count == 1 { values[row.fieldName] = .number(numbers[0]) }
+                else { throw C1Error.invalidRequest("Malformed native field readback.") }
+            } else { values[row.fieldName] = .unset }
+        }
+        struct Token: Encodable { let document: String; let variant: String; let parent: String?; let target: NativeTarget; let values: [String:NativeValue]; let layers: [NativeLayer]; let tonal: String; let geometry: String?; let metadata: String?; let basicCount: Int; let advancedCount: Int; let journalRevision: String? }
+        let token = try NativeEditing.hash(Token(document: doc.openToken, variant: source.id, parent: source.parentImagePath, target: target,
+            values: values, layers: wire.nativeLayers, tonal: source.stateHash, geometry: source.geometryStateHash, metadata: source.metadataStateHash, basicCount:wire.basicColorCount, advancedCount:wire.advancedColorCount, journalRevision:revision))
+        return NativeSnapshot(ref: ref, target: target, values: values, unavailable: unavailable, layers: wire.nativeLayers,
+            basicColorCount: wire.basicColorCount, advancedColorCount: wire.advancedColorCount, nativeStateHash: token)
     }
 
     public func nativeSet(workingRef: String, target: NativeTarget, ifNativeState: String,
@@ -1487,7 +1539,7 @@ public final class SessionController {
             let current = try get(ref: workingRef)
             try assertWritableImage(doc: doc, source: current)
             let before = try nativeGet(ref: workingRef, target: target)
-            guard before.nativeStateHash == expected else { throw C1Error.stateChanged("Native editing state changed. Read native_get again.") }
+            guard before.nativeStateHash == expected else { throw C1Error.stateChanged("Native editing state changed. Read get with nativeTargets again.") }
             for key in patch.keys where before.values[key] == nil { throw C1Error.invalidRequest("Native field unavailable on this target: " + key) }
             if target.layer > before.layers.count { throw C1Error.invalidRequest("Layer no longer exists.") }
             if (action?.hasPrefix("mask.") == true && action != "mask.people") || action == "layer.delete" {

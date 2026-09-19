@@ -1,13 +1,58 @@
 # Expanded native editing (experimental)
 
-`native_get`, `native_set`, and `native_action` expose the Capture One 16.8.5.30
-editing dictionary through both CLI and MCP. The original `get`, `set`, `add`,
-`reset`, geometry, and metadata tools keep their existing contracts.
+`get` with `nativeTargets`, `native_set`, and `native_action` expose the Capture One 16.8.5.30
+editing dictionary through both CLI and MCP. Omitting `nativeTargets` returns a
+compact read. Mutation and geometry/metadata preconditions use scope-specific tokens.
 
 This is an explicit generated allowlist, not an arbitrary AppleScript executor.
 `capabilities.nativeEditing` lists every field, native type, enumeration, and
 permitted target. The generated resource is checked against the retained SDEF in
 `make check`; regenerate with `python3 scripts/generate-native-editing.py`.
+
+## Scoped reads
+
+Use one public read operation for a single variant, with 1...16 optional native
+targets. Examples:
+
+```sh
+# Compact adjustments, metadata, geometry and state tokens:
+c1 get 123
+# Add full adjustment and lens snapshots:
+c1 get 123 --native-targets '[{"scope":"adjustments"},{"scope":"lens"}]'
+# Read layer attributes and that layer's adjustments:
+c1 get 123 --native-targets '[{"scope":"layer","layer":1},{"scope":"adjustments","layer":1}]'
+```
+
+Equivalent MCP `get` arguments:
+
+```json
+{"ref":"123","nativeTargets":[{"scope":"adjustments"},{"scope":"lens"}]}
+```
+
+The ordinary fields stay at the top level. Expanded responses additionally contain
+`openToken` and `nativeSnapshots` in requested order. A duplicate target repeats
+its first observed snapshot without another native read. Compact responses omit
+these optional fields. Human-readable CLI output includes the requested snapshots.
+
+One target uses the direct single-scope path. Multiple targets share one application
+lock, source read and journal revision; a final source/document/journal check
+rejects detected drift. Exceptions discard the entire response. These are
+sequential live observations, not an atomic snapshot of every setting: do not edit
+in the UI or switch documents during a read. Native-only changes between scopes
+are not guaranteed to be detected by the final compact-state comparison. The
+bounded batch completes once dispatched; inventory-specific cancellation and
+deadline controls do not apply. A stalled Apple Event retains normal timeout
+behavior. No retries are automatic.
+
+Use each snapshot's `target` and `nativeStateHash` for its corresponding native
+mutation, with a fresh read before the next write. One scope's token cannot
+validate another; a write may invalidate other snapshots. The same tokens work
+for existing editing references and managed clones. Reading a bare variant ID
+does not authorize a write.
+
+Reads use Capture One's AppleScript interface to observe live application state.
+Verify indexed color-band targets against an independent bulk oracle before
+using them for palette transfer.
 
 ## Targets and coverage
 
@@ -27,7 +72,7 @@ all RGB/channel levels, five curve channels, HDR, clarity, structure, dehaze,
 vignetting, sharpening, noise reduction, grain, and moire.
 
 `layer: 0` means the image adjustments; other layer and color-element indices
-are **1-based**, obtained from `native_get.layers`, `basicColorCount`, and
+are **1-based**, obtained from each `get.nativeSnapshots` entry's `layers`, `basicColorCount`, and
 `advancedColorCount`. These are inspected positions, not persistent native IDs.
 Always read again after layer or color-element creation/deletion.
 
@@ -44,7 +89,7 @@ Prepare the existing variant with `variant_edit` using the normal document and
 state tokens. Then inspect the expanded state and write against its own token:
 
 ```sh
-c1 native get c1_edit_... --scope adjustments
+c1 get c1_edit_... --native-targets '[{"scope":"adjustments"}]'
 c1 native set c1_edit_... --if-native-state HASH \
   --json '{"highlight adjustment":20,"clarity amount":10,"noise reduction luminance":30}'
 c1 native set c1_edit_... --if-native-state FRESH_HASH \
@@ -55,7 +100,7 @@ c1 preview c1_edit_...
 Equivalent MCP requests:
 
 ```json
-{"ref":"c1_edit_...","target":{"scope":"adjustments"}}
+{"ref":"c1_edit_...","nativeTargets":[{"scope":"adjustments"}]}
 ```
 
 ```json

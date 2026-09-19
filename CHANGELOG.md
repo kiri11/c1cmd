@@ -5,7 +5,15 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Unified scoped reads
+
+- Make `get` the read interface for compact data and 1...16 optional native targets; return native snapshots alongside metadata, geometry and scope-specific state tokens.
+- Remove MCP `native_get` and CLI `native get` in contract 2.0.0. Single-target reads keep a direct path; multiple scopes share validation under one lock and reject detected source/document drift without partial output.
+- Retain live AppleScript state semantics. See [scoped reads](docs/native-editing/README.md#scoped-reads).
+
 ## Read performance diagnostics
+
+- Initial contract 1.10.0 local debug measurements found medians of 1,312/956 ms for CLI/persistent MCP `get`, and 4,113/3,656 ms for the former `native_get`. The original evidence is retained in profiling commit `84073e1`; current performance documentation describes the scoped `get` interface.
 
 - Add opt-in `C1_PROFILE=1` JSON timing on stderr for script compilation/cache lookup, Apple Event execution and descriptor decoding, without changing CLI/MCP response schemas.
 - Add a sequential local-fixture benchmark comparing fresh CLI reads with persistent MCP reads, with warmup separation, alternating order, state-drift rejection and retained partial evidence.

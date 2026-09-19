@@ -1,0 +1,102 @@
+{
+  "captureOneBuild": "16.8.5.30",
+  "contractVersion": "2.0.0",
+  "suite": "native",
+  "command": "make qualify QUALIFY_SUITES=native",
+  "retainedSummaryOf": ".build/scoped-get-qualification/native/results.json",
+  "fullResultsSHA256": "9ff95c7e4d7d9df9dc4e67fb2e54cdd22badb0c0e66a96efb60c8711caeaee84",
+  "eventCount": 102,
+  "scopeComparisons": [
+    {
+      "targets": [
+        {
+          "element": 0,
+          "layer": 0,
+          "scope": "adjustments"
+        },
+        {
+          "element": 0,
+          "layer": 0,
+          "scope": "lens"
+        },
+        {
+          "element": 0,
+          "layer": 0,
+          "scope": "variant"
+        },
+        {
+          "element": 0,
+          "layer": 0,
+          "scope": "adjustments"
+        }
+      ],
+      "nativeStateHashes": [
+        "4949c51b36b12553538b8339130913517209a2452b8e61dbbe8920475905f68e",
+        "f048136b72955c8dae85e51c0b9df9b52aeafd49258e81eb3755f8d6715e8d43",
+        "f927954e9a13381146c56b9550e8c81a703114a943e7b9f915413882ffd3c394",
+        "4949c51b36b12553538b8339130913517209a2452b8e61dbbe8920475905f68e"
+      ],
+      "matchedIndependentSingleScopeReads": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "id": "1",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+      "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59"
+    },
+    {
+      "targets": [
+        {
+          "element": 0,
+          "layer": 2,
+          "scope": "adjustments"
+        },
+        {
+          "element": 0,
+          "layer": 2,
+          "scope": "layer"
+        },
+        {
+          "element": 0,
+          "layer": 2,
+          "scope": "luma"
+        }
+      ],
+      "nativeStateHashes": [
+        "6ebac632c375f1cefdb54ff8071df3fcabd681ea752044cacd811c3cce510cbe",
+        "4fe653c319892615a69085d7833cd010f028d9400b4ef8720ed6534a908f8b0e",
+        "4a8fc041d3f9ae8409eee23a38ce81c0d2598b9d9e1cd7db61155c43c9f54cdf"
+      ],
+      "matchedIndependentSingleScopeReads": [
+        true,
+        true,
+        true
+      ],
+      "id": "1",
+      "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+      "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+      "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59"
+    }
+  ],
+  "passed": {
+    "group": "all",
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "session": "/Users/kiri11/projects/c1cmd/.build/c1-native-digf63ua/native",
+    "cliSHA256": "587429a843a802383935d59995322e16ce410e3c14c2ee412afacb25355f09f4",
+    "mcpSHA256": "3ada9f7ca70f24c3baa37a83d61c758673c8cc6f35a9ec94e56d6e7f05ef027f"
+  },
+  "recovery": {
+    "fullEventsSHA256": "d08bb93ed8f383dd683b36048fa8ee33bae2bca2a60a730d39468a6f473848ad",
+    "retainedEvents": 22,
+    "fullEventCount": 81,
+    "selected": [
+      "native",
+      "native-action"
+    ],
+    "shutdownMode": "sigterm",
+    "artifact": "scoped-get-recovery-events.jsonl"
+  }
+}

@@ -120,15 +120,15 @@ Do not run live faults for unrelated features, documentation, build/CI changes, 
 
 ## Expanded native editing
 
-Use `native_get` / `c1 native get` to inspect all exposed adjustment properties,
-curves, lens corrections, layers, luma range and color-editor objects. Use the
-returned `nativeStateHash` as `ifNativeState` / `--if-native-state` for
+Use `get` with `nativeTargets` / `c1 get --native-targets` to inspect all exposed adjustment properties,
+curves, lens corrections, layers, luma range and color-editor objects. Use each requested `nativeSnapshots` entry's
+`nativeStateHash` as `ifNativeState` / `--if-native-state` for
 `native_set` or `native_action`. These require an existing `c1_edit_` reference
 or managed clone and all normal document/image/build guards. Property names,
 types and enumerations are listed in `capabilities.nativeEditing`.
 
 Inspect fresh previews and journal `beforeNative`/`afterNative` snapshots.
-Legacy `get`/`diff`/`reset` and editing baselines do not cover all native fields.
+Compact `get`, `diff`, `reset`, and editing baselines do not cover all native fields.
 Restore reviewed native property values with an explicit patch and fresh token.
 Mask pixels cannot be read, hashed or restored from native property snapshots;
 layer/mask deletion and destructive mask commands require photographer judgment.

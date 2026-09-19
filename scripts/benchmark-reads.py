@@ -113,8 +113,8 @@ def main():
             report['document'] = document
             baseline = {}
             commands = [('get', ['get', args.ref], {'ref': args.ref}),
-                        ('native_get', ['native', 'get', args.ref, '--scope', 'adjustments'],
-                         {'ref': args.ref, 'target': {'scope': 'adjustments'}})]
+                        ('get_native', ['get', args.ref, '--native-targets', '[{"scope":"adjustments"}]'],
+                         {'ref': args.ref, 'nativeTargets': [{'scope': 'adjustments'}]})]
             for iteration in range(args.samples + 1):
                 # Alternate order to reduce systematic warm-cache/application-load bias.
                 modes = ['cli', 'mcp'] if iteration % 2 == 0 else ['mcp', 'cli']
@@ -129,7 +129,7 @@ def main():
                                 raise RuntimeError(result.stdout + result.stderr)
                             value = json.loads(result.stdout)
                         else:
-                            value = client.call(name, arguments)
+                            value = client.call('get', arguments)
                         elapsed = (time.monotonic() - start) * 1000
                         if name not in baseline:
                             baseline[name] = value

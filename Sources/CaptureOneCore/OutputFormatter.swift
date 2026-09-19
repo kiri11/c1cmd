@@ -148,6 +148,10 @@ public struct OutputFormatter {
             lines.append("  state       : \(res.geometryStateHash ?? "unavailable")")
         }
         if let reason = res.geometryUnavailableReason { lines.append("Geometry writes: \(reason)") }
+        if let snapshots = res.nativeSnapshots {
+            lines.append("\nNative snapshots:")
+            lines.append(formatJson(snapshots))
+        }
         return lines.joined(separator: "\n")
     }
 

@@ -12,6 +12,8 @@ FAKE = '''#!/usr/bin/env python3
 import json, os, sys
 value = {"stateHash": "stable"}
 if len(sys.argv) > 1:
+    if "--native-targets" in sys.argv:
+        value = {"openToken":"document", "nativeSnapshots":[value] * len(json.loads(sys.argv[sys.argv.index("--native-targets")+1]))}
     print(json.dumps(value))
 else:
     for line in sys.stdin:
@@ -21,6 +23,7 @@ else:
         else:
             name = req["params"]["name"]
             payload = {"openToken":"document"} if name == "doc_info" else value
+            if name == "get" and "nativeTargets" in req["params"]["arguments"]: payload = {"openToken":"document", "nativeSnapshots":[value] * len(req["params"]["arguments"]["nativeTargets"])}
             if os.environ.get("BENCHMARK_DRIFT") and name == "get": payload = {"stateHash":"changed"}
             result = {"content":[{"type":"text","text":json.dumps(payload)}]}
         print(json.dumps({"jsonrpc":"2.0","id":req["id"],"result":result}),flush=True)
@@ -56,6 +59,23 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(len(report['samples']), 12)
         self.assertEqual(sum(row['warmup'] for row in report['samples']), 4)
         self.assertEqual(len(report['summary']), 4)
+
+    def test_scoped_get_comparison(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            fake = base / 'fake'
+            fake.write_text(FAKE)
+            fake.chmod(0o755)
+            output = base / 'result.json'
+            run = subprocess.run(['python3', str(ROOT/'scripts/benchmark-scoped-get.py'),
+                '--mcp', str(fake), '--ref', '1', '--samples', '2', '--conditions', 'offline fake',
+                '--output', str(output)], capture_output=True, text=True, timeout=20)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            report = json.loads(output.read_text())
+            self.assertTrue(report['completed'])
+            self.assertEqual(len(report['samples']), 6)
+            self.assertEqual(len(report['summary']), 2)
+            self.assertEqual(len(report['snapshotSHA256']), 64)
 
     def test_drift_stops_and_preserves_partial_evidence(self):
         run, report = self.run_fixture(drift=True)

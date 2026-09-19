@@ -325,9 +325,16 @@ struct GetCommand: ParsableCommand {
     @Argument(help: "Native variant ID or working reference.")
     var ref: String
 
+    @Option(help: "Optional JSON array of native scopes, e.g. [{\"scope\":\"adjustments\"},{\"scope\":\"lens\"}].")
+    var nativeTargets: String?
+
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat, progressMode: globals.quiet ? "quiet" : globals.progress) {
-            let res = try SessionController.shared.get(ref: ref)
+            let res: GetResult
+            if let nativeTargets {
+                let value = try JSONSerialization.jsonObject(with: Data(nativeTargets.utf8))
+                res = try SessionController.shared.get(ref: ref, nativeTargets: NativeEditing.parseTargets(value, ref: ref))
+            } else { res = try SessionController.shared.get(ref: ref) }
             print(OutputFormatter.renderGetResult(res, format: globals.outputFormat))
         }
         if code != .success { throw ExitCode(code.rawValue) }
@@ -700,24 +707,13 @@ struct MetadataSetCommand: ParsableCommand {
 
 // MARK: - Native editing
 struct NativeCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "native", abstract: "Typed native adjustments, curves, layers, and masks.", subcommands: [NativeGetCommand.self, NativeSetCommand.self, NativeActionCommand.self])
+    static let configuration = CommandConfiguration(commandName: "native", abstract: "Typed native adjustments, curves, layers, and masks.", subcommands: [NativeSetCommand.self, NativeActionCommand.self])
 }
 struct NativeTargetOptions: ParsableArguments {
     @Option(help: "adjustments, lens, layer, luma, basicColor, advancedColor, or variant.") var scope: String = "adjustments"
     @Option(help: "1-based layer index; 0 means image adjustments.") var layer: Int = 0
     @Option(help: "1-based color-editor element index.") var element: Int = 0
     var target: NativeTarget { NativeTarget(scope:scope, layer:layer, element:element) }
-}
-struct NativeGetCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName:"get")
-    @OptionGroup var globals: GlobalOptions
-    @OptionGroup var target: NativeTargetOptions
-    @Argument var ref: String
-    mutating func run() throws {
-        let code = handleExecution(format:globals.outputFormat) {
-            print(OutputFormatter.formatJson(try SessionController.shared.nativeGet(ref:ref, target:target.target)))
-        }; if code != .success { throw code }
-    }
 }
 struct NativeSetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName:"set")

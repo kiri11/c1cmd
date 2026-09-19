@@ -43,7 +43,7 @@ def main():
         source = cli('get',variants[0]['id']); doc = cli('doc','info')
         ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
         sibling = cli('variant','clone',source['id'])
-        sibling_before = cli('native','get',sibling['workingRef'])
+        sibling_before = cli('get',sibling['workingRef'],'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
         client = Client(MCP, timeout=180)
         def tool(name, args):
             r = client.tool(name,args)
@@ -53,7 +53,7 @@ def main():
             validate_response(value, schema['responses'][name])
             return value
         def get(scope='adjustments',layer=0,element=0):
-            return tool('native_get',dict(ref=ref,target=dict(scope=scope,layer=layer,element=element)))
+            return tool('get',dict(ref=ref,nativeTargets=[dict(scope=scope,layer=layer,element=element)]))['nativeSnapshots'][0]
         def patch(values,scope='adjustments',layer=0,element=0):
             state = get(scope,layer,element)
             result = tool('native_set',dict(workingRef=ref,target=state['target'],ifNativeState=state['nativeStateHash'],patch=values))
@@ -61,6 +61,15 @@ def main():
         def action(name,args=None,scope='adjustments',layer=0,element=0):
             state = get(scope,layer,element)
             return tool('native_action',dict(workingRef=ref,target=state['target'],ifNativeState=state['nativeStateHash'],action=name,arguments=args or {}))
+        targets = [dict(scope=scope) for scope in ['adjustments', 'lens', 'variant']]
+        singles = [get(scope=t['scope']) for t in targets]
+        bundle = tool('get', dict(ref=ref, nativeTargets=targets + [targets[0]]))
+        assert bundle['nativeSnapshots'] == singles + [singles[0]]
+        assert bundle['id'] == source['id'] and bundle['openToken'] == doc['openToken']
+        assert cli('get', ref, '--native-targets', json.dumps(targets))['nativeSnapshots'] == singles
+        tool('native_set', dict(workingRef=ref, target=bundle['nativeSnapshots'][0]['target'],
+             ifNativeState=bundle['nativeSnapshots'][0]['nativeStateHash'], patch={'clarity amount':3}))
+        patch({'clarity amount':singles[0]['values']['clarity amount']})
         initial = get()
         dry = tool('native_set',dict(workingRef=ref,target=initial['target'],ifNativeState=initial['nativeStateHash'],patch={'clarity amount':5},dryRun=True))
         assert dry['after'] == initial
@@ -82,6 +91,9 @@ def main():
             patch({'chromatic aberration':lens['values']['chromatic aberration']},'lens')
         action('layer.create',{'name':'Native qualification','kind':'filled'})
         layers = get()['layers']; index = len(layers)
+        layer_targets = [dict(scope=scope, layer=index) for scope in ['adjustments', 'layer', 'luma']]
+        layer_singles = [get(scope=t['scope'], layer=index) for t in layer_targets]
+        assert tool('get', dict(ref=ref, nativeTargets=layer_targets))['nativeSnapshots'] == layer_singles
         patch({'opacity':63,'name':'Native tested'},'layer',index)
         patch({'exposure':.35,'clarity amount':7},layer=index)
         luma = get('luma',index)
@@ -109,7 +121,7 @@ def main():
         action('layer.delete',scope='layer',layer=index)
         stale = client.tool('native_set',dict(workingRef=ref,target=initial['target'],ifNativeState=initial['nativeStateHash'],patch={'clarity amount':5}))
         assert stale.get('isError') and json.loads(stale['content'][0]['text'])['error']['code'] == 'state-changed'
-        sibling_after = cli('native','get',sibling['workingRef'])
+        sibling_after = cli('get',sibling['workingRef'],'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
         assert sibling_before == sibling_after, 'Native writes changed the untouched sibling'
         assert len(cli('variants','list')) == 2
         cli('variant','delete',sibling['workingRef'])

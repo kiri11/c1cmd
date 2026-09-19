@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "1.10.0"
+    public static let version = "2.0.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = ["native_get", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = [ "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var writableMetadataSchema: [String: Any] {
         object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
                 "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
@@ -61,7 +61,8 @@ public enum ContractSchema {
             var result = object(props, required: ["workingRef", "ifMetadataState"])
             result["anyOf"] = ["rating", "colorTag"].map { ["required": [$0]] }
             return result
-        case "get": return object(["ref": string], required: ["ref"])
+        case "get": return object(["ref": string, "nativeTargets": ["type": "array", "items": NativeEditing.targetSchema,
+            "minItems": 1, "maxItems": 16]], required: ["ref"])
         case "set", "add":
             let adj = adjustments(delta: name == "add", aliases: true)
             var props = adj["properties"] as! [String: Any]
@@ -99,6 +100,9 @@ public enum ContractSchema {
         guard names.contains(tool) else { throw C1Error.invalidRequest("Unknown tool: \(tool)") }
         if tool.hasPrefix("native_") { try NativeEditing.validateRequest(tool, arguments); return }
         try validateValue(arguments, schema: input(tool), path: tool)
+        if tool == "get", let targets = arguments["nativeTargets"] {
+            _ = try NativeEditing.parseTargets(targets, ref: arguments["ref"] as! String)
+        }
         if tool == "variants_list", arguments["rating"] != nil, arguments["minRating"] != nil {
             throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
         }
@@ -164,7 +168,7 @@ public enum ContractSchema {
         let diffs: [String: Any] = ["type": "object", "additionalProperties": diff]
         let adj = adjustments()
         let metadata: [String: Any] = ["type": "object", "properties": Dictionary(uniqueKeysWithValues: ["camera", "lens", "iso", "shutterSpeed", "asShotWB", "captureDate"].map { ($0, string) }).merging(["rating": ["type": "integer"], "colorTag": ["type": "integer"]]) { _, b in b }]
-        let get = object(["id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "metadataStateHash": string, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
+        let get = object(["nativeSnapshots": ["type": "array", "items": NativeEditing.snapshotSchema, "minItems": 1, "maxItems": 16], "openToken": string, "id": string, "workingRef": string, "parentImagePath": string, "adjustments": adj, "metadata": metadata, "metadataStateHash": string, "stateHash": string, "geometry":geometrySchema, "geometryStateHash":string, "geometryUsableBounds":cropSchema, "geometryUnavailableReason":string], required: ["id", "adjustments", "metadata", "stateHash"])
         let mutation = object(["operationId": string, "workingRef": string, "before": adj, "after": adj, "diff": diffs, "stateHash": string, "isDryRun": boolean], required: ["operationId", "workingRef", "before", "after", "diff", "stateHash", "isDryRun"])
         let clone = object(["workingRef": string, "cloneVariantId": string, "sourceVariantId": string, "documentPath": string, "baselineStateHash": string], required: ["workingRef", "cloneVariantId", "sourceVariantId", "documentPath", "baselineStateHash"])
         let variantProps: [String: Any] = ["id": string, "name": ["type": "string"], "parentImagePath": ["type": "string"], "isSelected": boolean, "rating": ["type": "integer"], "colorTag": ["type": "integer"], "isManagedWorkingClone": boolean, "workingRef": string]
@@ -195,7 +199,6 @@ public enum ContractSchema {
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
             "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
-        responses["native_get"] = NativeEditing.snapshotSchema
         responses["native_set"] = NativeEditing.mutationSchema
         responses["native_action"] = NativeEditing.mutationSchema
         responses["geometry_restore"] = responses["geometry_set"]

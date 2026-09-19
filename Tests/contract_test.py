@@ -75,7 +75,13 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 24
+        assert len(tools) == 23
+        assert "native_get" not in cli_schema["requests"]
+        removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
+        assert removed.get('isError'), removed
+        removed_cli = subprocess.run([str(cli), 'native', 'get', 'x'], capture_output=True, text=True, timeout=15)
+        assert removed_cli.returncode != 0
+
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
         metadata_tool = next(t for t in tools if t['name'] == 'metadata_set')
@@ -115,12 +121,16 @@ def run(cli, mcp):
         assert native_props['clarity amount']['type'] == 'number'
         assert native_props['enabled']['type'] == 'boolean'
         assert 'shift x' in native_props and 'range low' in native_props
+        many_tool = next(t for t in tools if t['name'] == 'get')
+        assert many_tool['annotations']['readOnlyHint'] is True
+        assert many_tool['inputSchema']['properties']['nativeTargets']['maxItems'] == 16
         native_args = {'workingRef':'x','ifNativeState':'h','target':{'scope':'adjustments'}}
         for name, args in [
             *[('native_set', dict(native_args, patch=p)) for p in [None, 1, 'bad', [], {}, {'clarity amount':True}, {'rgb curve':[True,False]}, {'clarity amount':{}}, {'unknown':1}, {'flip':'horizontal'}]],
             *[('native_action', dict(native_args, action='layer.create', arguments=p)) for p in [None, 1, [], {}, {'name':'x','kind':'background'}]],
-            ('native_get', {'ref':'x','target':{'scope':'adjustments','layer':True}}),
-            ('native_get', {'ref':'x','target':{'scope':'bad'}}),
+            *[('get', {'ref':'x','nativeTargets':targets}) for targets in
+              [None, {}, [], [{'scope':'adjustments'}] * 17, [{'scope':'adjustments','layer':True}],
+               [{'scope':'bad'}], [{'scope':'adjustments','unknown':1}], [{'scope':'lens','layer':1}]]],
             ('metadata_set', metadata_args),
             ('metadata_set', {'workingRef': 'x', 'rating': 5}),
             ('metadata_set', dict(metadata_args, unexpected=1, rating=5)),
@@ -189,7 +199,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 24 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 23 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:

@@ -148,7 +148,13 @@ public enum NativeEditing {
         ContractSchema.object(["scope": ["type":"string", "enum":fields.keys.sorted()], "layer":["type":"integer", "minimum":0, "maximum":10000], "element":["type":"integer", "minimum":0, "maximum":10000]], required:["scope"])
     }
     public static func target(_ value: Any?) throws -> NativeTarget {
-        guard let d = value as? [String: Any] else { throw C1Error.invalidRequest("Provide a native target object.") }
+        guard let d = value as? [String: Any], Set(d.keys).isSubset(of: ["scope", "layer", "element"]) else {
+            throw C1Error.invalidRequest("Provide a native target object with scope and optional layer/element indices.")
+        }
+        for key in ["layer", "element"] where d[key] != nil {
+            guard let n = d[key] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID(), n.doubleValue >= 0,
+                  n.doubleValue <= 10000, n.doubleValue.rounded() == n.doubleValue else { throw C1Error.invalidRequest("Invalid target index.") }
+        }
         let result = NativeTarget(scope: d["scope"] as? String ?? "", layer: d["layer"] as? Int ?? 0, element: d["element"] as? Int ?? 0)
         try result.validate(); return result
     }
@@ -197,7 +203,6 @@ extension NativeEditing {
     public static func input(_ tool: String) -> [String: Any] {
         let string: [String:Any] = ["type":"string"]
         var props: [String:Any] = ["target":targetSchema]
-        if tool == "native_get" { props["ref"] = string; return ContractSchema.object(props, required:["ref","target"]) }
         props["workingRef"] = string; props["ifNativeState"] = string; props["dryRun"] = ["type":"boolean"]
         var required = ["workingRef","ifNativeState","target"]
         if tool == "native_set" {
@@ -208,6 +213,13 @@ extension NativeEditing {
         }
         return ContractSchema.object(props, required:required)
     }
+    public static func parseTargets(_ value: Any, ref: String) throws -> [NativeTarget] {
+        guard let targets = value as? [[String: Any]], (1...16).contains(targets.count) else {
+            throw C1Error.invalidRequest("Provide 1...16 native targets.")
+        }
+        guard !ref.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw C1Error.invalidRequest("Invalid ref") }
+        return try targets.map { try target($0) }
+    }
     public static func validateRequest(_ tool: String, _ args: [String:Any]) throws {
         let schema = input(tool), properties = schema["properties"] as! [String:Any]
         guard Set(args.keys).isSubset(of: Set(properties.keys)), (schema["required"] as! [String]).allSatisfy({ args[$0] != nil }) else {
@@ -215,11 +227,6 @@ extension NativeEditing {
         }
         for key in ["ref","workingRef","ifNativeState","action"] where args[key] != nil {
             guard let s = args[key] as? String, !s.isEmpty else { throw C1Error.invalidRequest("Invalid " + key) }
-        }
-        guard let targetObject = args["target"] as? [String:Any], Set(targetObject.keys).isSubset(of:["scope","layer","element"]) else { throw C1Error.invalidRequest("Invalid native target.") }
-        for key in ["layer","element"] where targetObject[key] != nil {
-            guard let n = targetObject[key] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID(), n.doubleValue >= 0,
-                  n.doubleValue <= 10000, n.doubleValue.rounded() == n.doubleValue else { throw C1Error.invalidRequest("Invalid target index.") }
         }
         let t = try target(args["target"])
         if let dry = args["dryRun"] { guard let n = dry as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { throw C1Error.invalidRequest("dryRun must be boolean.") } }

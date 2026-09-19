@@ -317,7 +317,7 @@ class Run:
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
         if label.startswith('native-'):
-            native_current = self.cli('native', 'get', fresh['workingRef'])
+            native_current = self.cli('get', fresh['workingRef'], '--native-targets', '[{"scope":"adjustments"}]')['nativeSnapshots'][0]
             if label == 'native-property-timeout':
                 resumed = self.cli('native', 'set', fresh['workingRef'], '--if-native-state', native_current['nativeStateHash'], '--json', '{"clarity amount":5}')
                 assert resumed['after']['values']['clarity amount'] == 5
@@ -366,8 +366,8 @@ set keystone horizontal of adjustments of v to -5
         if corrected or perspective:
             assert geometry
             current = self.enable_lens_correction(clone, perspective=perspective)
-        native_state = self.cli('native', 'get', clone['workingRef']) if native or native_action else None
-        native_source = self.cli('native', 'get', self.source) if native or native_action else None
+        native_state = self.cli('get', clone['workingRef'], '--native-targets', '[{"scope":"adjustments"}]')['nativeSnapshots'][0] if native or native_action else None
+        native_source = self.cli('get', self.source, '--native-targets', '[{"scope":"adjustments"}]')['nativeSnapshots'][0] if native or native_action else None
         known = {r['operationId'] for r in self.records()}
         pid = self.pid()
         # Watchdog is independent of this controller. Never leave the GUI suspended.
@@ -415,10 +415,10 @@ set keystone horizontal of adjustments of v to -5
         if native or native_action:
             observed = self.cli('operation', 'status', pending['operationId'])
             assert observed.get('beforeNative') and observed.get('afterNative'), observed
-            source_after = self.cli('native', 'get', self.source)
+            source_after = self.cli('get', self.source, '--native-targets', '[{"scope":"adjustments"}]')['nativeSnapshots'][0]
             assert source_after['values'] == native_source['values'], 'Native fault changed the original adjustments'
             assert source_after['layers'] == native_source['layers'], 'Native fault changed the original layers'
-            expired = self.cli('native', 'get', clone['workingRef'], ok=False)
+            expired = self.cli('get', clone['workingRef'], '--native-targets', '[{"scope":"adjustments"}]', ok=False)
             assert expired['error']['code'] == 'document-changed', expired
 
     def preview_timeout(self):

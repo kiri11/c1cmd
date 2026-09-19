@@ -72,8 +72,7 @@ struct C1MCPServer {
         )
         
         let definitions: [(String, String, Bool)] = [
-            ("native_get", "Read typed native editing properties, curves, layer inventory and color-element counts. Use a target scope, optional 1-based layer and color element. Returns nativeStateHash. Mask pixels are not exposed by Capture One.", true),
-            ("native_set", "Set typed native editing properties using exact dictionary field names and ifNativeState from native_get. Curves use flat x,y pairs in 0...100. Saves before-state in the operation journal. Geometry guards still apply.", false),
+            ("native_set", "Set typed native editing properties using exact dictionary field names and ifNativeState from get.nativeSnapshots. Curves use flat x,y pairs in 0...100. Saves before-state in the operation journal. Geometry guards still apply.", false),
             ("native_action", "Run an allowlisted layer, mask, color-editor, style or dehaze operation with a fresh nativeStateHash. Mask pixels cannot be captured or restored from property snapshots. Inspect a preview after commands.", false),
             ("doctor", "Check environment, app status, exact build, document readiness, and unresolved operations.", true),
             ("doc_info", "Show current open document info, folders, and open token.", true),
@@ -85,7 +84,7 @@ struct C1MCPServer {
             ("variant_clone", "Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Use variant_edit to edit existing variants.", false),
             ("variant_delete", "Delete a c1-managed working clone. (Originals cannot be deleted).", false),
             ("variant_baseline", "Create a managed default-settings baseline variant using native New Variant behavior.", false),
-            ("get", "Get adjustments and metadata for a variant or working reference, including current stateHash.", true),
+            ("get", "Read a variant: adjustments, metadata, geometry and their state tokens. Optionally include 1...16 nativeTargets for curves, lens or layer properties in nativeSnapshots, with shared validation and independent nativeStateHash tokens. Live AppleScript observations; not SQLite or an atomic multi-scope snapshot.", true),
             ("set", "Set absolute adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             ("add", "Apply relative delta adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             ("metadata_set", "Set rating (0–5) and/or colorTag (0–7; 0 clears) on an editing reference or managed clone. Requires ifMetadataState from get. Preserves omitted fields and image adjustments. dryRun returns the current metadata token.", false),
@@ -221,9 +220,6 @@ struct C1MCPServer {
                                 let json = OutputFormatter.formatJson(res)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
                         
-                            case "native_get":
-                                let result = try SessionController.shared.nativeGet(ref: args["ref"] as! String, target: NativeEditing.target(args["target"]))
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
                             case "native_set", "native_action":
                                 let target = try NativeEditing.target(args["target"])
                                 let core = SessionController.shared
@@ -241,7 +237,10 @@ struct C1MCPServer {
                                 guard let ref = extractString(from: params.arguments, key: "ref") else {
                                     throw C1Error.invalidRequest("Missing required argument: 'ref'")
                                 }
-                                let res = try SessionController.shared.get(ref: ref)
+                                let res: GetResult
+                                if let targets = args["nativeTargets"] {
+                                    res = try SessionController.shared.get(ref: ref, nativeTargets: NativeEditing.parseTargets(targets, ref: ref))
+                                } else { res = try SessionController.shared.get(ref: ref) }
                                 let json = OutputFormatter.formatJson(res)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
                         

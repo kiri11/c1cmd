@@ -61,7 +61,12 @@ macOS Automation permission must allow the launching application to control Capt
 
 No network server, API key, or listening port is required. Diagnostics go to stderr; stdout is reserved for MCP transport. Client configuration locations differ; consult your client's documentation. Start with `doctor`, `doc_info`, and `variants_list`, and check `allChecksPassed`, `writesEnabled`, and `exactBuildMatched` before editing. `isSession` identifies the document type; it is not an editing permission.
 
-The default server exposes 24 tools: `native_get`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
+Use `get` for both compact and expanded reads. Optional `nativeTargets` returns one
+or several native scopes in `nativeSnapshots` alongside adjustments, metadata and
+geometry. Each snapshot carries its own `nativeStateHash`. The single-scope path
+uses direct validation. See [scoped reads](docs/native-editing/README.md#scoped-reads).
+
+The default server exposes 23 tools: `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
 
@@ -284,7 +289,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `1.9.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.0.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
@@ -321,7 +326,7 @@ Live suites copy the fixture and create disposable Sessions/Catalogs under `/pri
 
 `make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory native`. `make qualify-extended` runs all ten regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
 
-The retained [metadata qualification log](docs/metadata/16.8.5.30/qualification.log) recorded about 28.5 minutes across all nine live suites; the three default suites accounted for about 6 minutes (79% less live-suite time on that run). This is a historical comparison, not a new runtime measurement. Local qualification also avoids a separate debug build. CI runs debug offline checks; the publication workflow builds release once and checks its unit tests, harnesses, and packaged CLI/MCP before publishing. Release packaging is therefore checked on main rather than on every pull request.
+CI runs debug offline checks; the publication workflow builds release once and checks its unit tests, harnesses, and packaged CLI/MCP before publishing. Release packaging is therefore checked on main rather than on every pull request.
 
 Run relevant live recovery cases when changes affect dispatch, journaling, locking, timeouts, restart/reconciliation, stale references, or the fault harness's behavior. No separate user request is needed. `make qualify-recovery RECOVERY_CASES="..."` reuses a current candidate archive and runs only selected cases: `tonal geometry lens perspective keystone preview mcp-death clone-readback`; the default `all` retains the full campaign. Shared recovery changes need every affected path; use `all` when impact cannot be narrowed. Skip live faults for unrelated features, documentation, build/CI, or test-selection/reporting changes; use offline checks for those. Release checkpoints alone do not require rerunning faults. See the [recovery test selection guide](docs/RELEASE_VALIDATION.md#recovery-test-selection). Report actual coverage separately from omitted suites.
 
