@@ -1566,7 +1566,7 @@ public final class SessionController {
                 preconditionStateHash: expected, beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
             entry.beforeNative = before; entry.nativePatch = action == nil ? patch : arguments; entry.nativeAction = action
             try journal.append(entry: entry)
-            let fields = before.values.keys.sorted(), keys = (action == nil ? patch : arguments).keys.sorted()
+            let fields = before.values.keys.sorted(), keys = action == nil ? NativeEditing.orderedPatchKeys(patch, target: target) : arguments.keys.sorted()
             var args = [NSAppleEventDescriptor(string: doc.documentId), .init(string: current.id)] + target.descriptors + [
                 .init(string: current.parentImagePath ?? ""), .init(list: fields.map { .init(string: $0) }),
                 .init(list: fields.map { before.values[$0]!.descriptor }), .init(list: before.layers.map { .init(list:[.init(string:$0.nativeName), .init(string:$0.nativeKind), .init(int32:Int32($0.nativeOpacity)), .init(boolean:$0.nativeEnabled)]) })]
@@ -1586,8 +1586,7 @@ public final class SessionController {
                     if action == "color.create", after.advancedColorCount != before.advancedColorCount + 1 { throw C1Error.readbackMismatch("Color correction creation readback differs.") }
                 }
                 for (key, value) in patch {
-                    let tolerance = key == "temperature" ? 0.1 : key == "tint" ? 0.01 : 0.0001
-                    guard let actual = after.values[key], value.matches(actual, tolerance: tolerance) else {
+                    guard let actual = after.values[key], NativeEditing.matchesReadback(field: key, expected: value, actual: actual) else {
                         entry.status = "partial-failure"; entry.error = "Native readback mismatch: " + key
                         try journal.append(entry: entry)
                         throw C1Error.readbackMismatch(entry.error!)

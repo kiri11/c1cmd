@@ -94,6 +94,39 @@ def main():
         layer_targets = [dict(scope=scope, layer=index) for scope in ['adjustments', 'layer', 'luma']]
         layer_singles = [get(scope=t['scope'], layer=index) for t in layer_targets]
         assert tool('get', dict(ref=ref, nativeTargets=layer_targets))['nativeSnapshots'] == layer_singles
+        # Independent direct-property oracle bypasses nativeRead/nativeWriteField.
+        balance_fields = [f['name'] for f in json.loads(
+            (ROOT / 'Sources/CaptureOneCore/Resources/NativeEditing.json').read_text())['adjustments']
+            if f['name'].startswith('color balance ')]
+        def balance_oracle(layer):
+            context = 'adjustments of v' if layer == 0 else f'adjustments of layer {layer} of v'
+            body = f'''if (count of documents) is not 1 then error "Document changed"
+set d to current document
+if (id of d as text) is not {json.dumps(doc['documentId'])} then error "Document changed"
+set v to variant id {json.dumps(source['id'])} of d
+return {{{', '.join(f'({field} of {context})' for field in balance_fields)}}}'''
+            values = dict(zip(balance_fields, json.loads(apple(body).replace('{', '[').replace('}', ']'))))
+            log('balance-oracle', dict(layer=layer, values=values))
+            return values
+        def balance_equal(field, actual, expected):
+            distance = abs(actual - expected)
+            if field.endswith(' hue'):
+                distance = min(distance, abs(360 - distance))
+            return distance <= .0001
+        for balance_layer in [0, index]:
+            baseline = balance_oracle(balance_layer)
+            for band in ['master', 'shadow', 'midtone', 'highlight']:
+                hue, sat = [f'color balance {band} {field}' for field in ['hue', 'saturation']]
+                for values in [{hue:237, sat:.2}, {sat:.3}, {hue:123},
+                               {hue:baseline[hue], sat:baseline[sat]}]:
+                    before_balance = balance_oracle(balance_layer)
+                    patch(values, layer=balance_layer)
+                    observed = balance_oracle(balance_layer)
+                    expected_balance = dict(before_balance, **values)
+                    for field, expected_value in expected_balance.items():
+                        assert balance_equal(field, observed[field], expected_value), (field, observed, expected_balance)
+            for field, value in balance_oracle(balance_layer).items():
+                assert balance_equal(field, value, baseline[field])
         patch({'opacity':63,'name':'Native tested'},'layer',index)
         patch({'exposure':.35,'clarity amount':7},layer=index)
         luma = get('luma',index)

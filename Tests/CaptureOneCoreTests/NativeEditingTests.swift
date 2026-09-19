@@ -37,6 +37,16 @@ struct NativeEditingTests {
         XCTAssertThrowsError(try NativeEditing.validateAction("mask.clear", target:target, arguments:[:]))
         XCTAssertThrowsError(try NativeEditing.validateAction("layer.create", target:target, arguments:["name":.text("x"),"kind":.text("background")]))
         XCTAssertThrowsError(try ContractSchema.validate(tool:"get", arguments:["ref":"1","nativeTargets":[["scope":"adjustments","layer":true]]]))
+        for band in ["master", "shadow", "midtone", "highlight"] {
+            let hue = "color balance \(band) hue", saturation = "color balance \(band) saturation"
+            XCTAssertEqual(NativeEditing.orderedPatchKeys([hue:.number(237), saturation:.number(0.2)], target:target), [saturation, hue])
+            XCTAssertTrue(NativeEditing.matchesReadback(field:hue, expected:.number(0), actual:.number(360)))
+            XCTAssertTrue(NativeEditing.matchesReadback(field:hue, expected:.number(360), actual:.number(0)))
+            XCTAssertFalse(NativeEditing.matchesReadback(field:hue, expected:.number(237), actual:.number(237.14285)))
+            XCTAssertFalse(NativeEditing.matchesReadback(field:saturation, expected:.number(0), actual:.number(360)))
+            XCTAssertEqual(NativeEditing.orderedPatchKeys([hue:.number(237)], target:target), [hue])
+            XCTAssertEqual(NativeEditing.orderedPatchKeys([saturation:.number(0.2)], target:target), [saturation])
+        }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }

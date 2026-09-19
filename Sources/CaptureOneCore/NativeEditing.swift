@@ -108,6 +108,32 @@ public enum NativeEditing {
         try validate(patch, target: target)
         return patch
     }
+    /// Native color wheels quantize hue at the current saturation. Establish a
+    /// requested saturation first; never synthesize writes to omitted controls.
+    public static func orderedPatchKeys(_ patch: [String: NativeValue], target: NativeTarget) -> [String] {
+        var keys = patch.keys.sorted()
+        guard target.scope == "adjustments" else { return keys }
+        for band in ["master", "shadow", "midtone", "highlight"] {
+            let hue = "color balance \(band) hue", saturation = "color balance \(band) saturation"
+            if let h = keys.firstIndex(of: hue), let s = keys.firstIndex(of: saturation), h < s {
+                keys.remove(at: s)
+                keys.insert(saturation, at: h)
+            }
+        }
+        return keys
+    }
+
+    public static func matchesReadback(field: String, expected: NativeValue, actual: NativeValue) -> Bool {
+        let tolerance = field == "temperature" ? 0.1 : field == "tint" ? 0.01 : 0.0001
+        if ["master", "shadow", "midtone", "highlight"].contains(where: { field == "color balance \($0) hue" }),
+           case .number(let wanted) = expected, case .number(let observed) = actual,
+           (0...360).contains(wanted), (0...360).contains(observed) {
+            let distance = abs(wanted - observed)
+            return min(distance, 360 - distance) <= tolerance
+        }
+        return expected.matches(actual, tolerance: tolerance)
+    }
+
     public static func validate(_ patch: [String: NativeValue], target: NativeTarget) throws {
         try target.validate()
         guard !patch.isEmpty else { throw C1Error.invalidRequest("Native patch must not be empty.") }

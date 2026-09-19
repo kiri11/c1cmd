@@ -63,7 +63,7 @@ and interpretation limits. A pass applies only to its recorded scope.
 
 | Area | Retained result and limits |
 |---|---|
-| [Native editing, 2026-09-18](native-editing/16.8.5.30/README.md) | Contract 1.10.0; focused CLI/MCP/native coverage, 40 native operations, and two native SIGTERM recovery cases. Dictionary availability is distinguished from tested runtime behavior; mask pixels remain unavailable. |
+| [Native editing](native-editing/16.8.5.30/README.md) | CLI/MCP coverage for scoped reads, native properties/actions, color-editor targeting, and coupled color-balance writes. Select native property/action recovery by changed behavior. Dictionary availability does not establish exhaustive runtime support; mask pixels remain unavailable. |
 | [Metadata, 2026-09-17](metadata/16.8.5.30/README.md) | Contract 1.9.0; all nine regular suites. Every rating/tag value, clearing, omitted fields, stale tokens, and restore passed. No new live fault campaign. |
 | [Keystone, 2026-09-17](geometry/16.8.5.30/keystone/README.md) | Contract 1.8.0; nine regular suites, 13 control cases and two lens combinations. Native export variance required a pixel-error assertion instead of exact hashes. Tonal/standard-geometry faults passed; interrupted lens work was reconciled without retry. Remaining faults were not run. |
 | [Perspective and movements, 2026-09-17](geometry/16.8.5.30/perspective/README.md) | Contract 1.7.0; eight perspective/movement cases and all regular suites passed. Three timeout recoveries passed; the combined-correction campaign was stopped. Native lens-profile fixtures do not establish optical accuracy or real tilt/shift capture coverage. |

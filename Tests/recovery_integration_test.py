@@ -378,7 +378,7 @@ set keystone horizontal of adjustments of v to -5
                         current['geometryStateHash'], '--rotation', '3', '--aspect-ratio', '1.5'] if geometry else
                        [str(self.c1), 'set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.625'])
             if native:
-                command = [str(self.c1), 'native', 'set', clone['workingRef'], '--if-native-state', native_state['nativeStateHash'], '--json', '{"clarity amount":12}']
+                command = [str(self.c1), 'native', 'set', clone['workingRef'], '--if-native-state', native_state['nativeStateHash'], '--json', '{"clarity amount":12,"color balance shadow hue":237,"color balance shadow saturation":0.2}']
             if native_action:
                 command = [str(self.c1), 'native', 'action', clone['workingRef'], 'layer.create', '--if-native-state', native_state['nativeStateHash'], '--json', '{"name":"Recovery layer","kind":"filled"}']
             if keystone:

@@ -5,6 +5,18 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Coupled color-balance writes
+
+- Write requested saturation before its paired hue on all four image/layer color wheels, preserving omitted controls. On Capture One 16.8.5.30, a neutral-wheel request for hue 237 and saturation 0.2 previously returned approximately 237.14285 with hue-first ordering; saturation-first returned approximately 237.00004.
+- Compare color-balance hue readback as a circular angle, treating 0 and 360 degrees as equivalent without widening the 0.0001 tolerance. Near-zero saturation remains subject to native hue quantization.
+- Validation on 2026-09-19 passed 1,102 offline assertions, CLI/MCP contracts, the full packaged native suite, and native-property timeout/restart recovery. Added 32 paired/single-control/restoration writes and 68 independent observations across image and layer adjustments, including omitted-control, sibling-variant and RAW preservation checks. Recovery used a coupled color-balance fault payload; unrelated suites and the unchanged native-action path were omitted.
+- Keep native-editing documentation focused on current behavior, coverage, limits, and validation commands; remove run narratives and assertion-count snapshots from the documentation.
+
+## Native color-editor targeting
+
+- Preserve unevaluated indexed AppleScript references so basic-color targets address the requested band. Evaluated element references could alias an indexed band to `all`.
+- Qualification on 2026-09-19 compared all nine basic bands and three advanced elements against independent bulk records at image and layer scope, including changes, restoration, sibling preservation and middle-element deletion. The packaged native suite and native property/action SIGTERM recovery cases passed.
+
 ## Doctor diagnostics
 
 - Report unknown journal status without fabricating an unresolved-operation count; preserve the original diagnostic error in CLI/MCP and human output (contract 2.1.0).
