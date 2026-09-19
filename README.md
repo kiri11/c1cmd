@@ -327,6 +327,8 @@ Run relevant live recovery cases when changes affect dispatch, journaling, locki
 
 Recovery Sessions default to `.build/recovery-fixtures`; `C1_RECOVERY_FIXTURE_PARENT` accepts an absolute path outside `/tmp` without symlink aliases. `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default; explicit `sigterm` selects the qualified process-termination path, with no automatic fallback. Recovery verifies that Capture One is stopped before launching a fresh process. See [recovery qualification](docs/RELEASE_VALIDATION.md#reproduce-packaged-live-recovery-qualification) for scope and evidence. Real fault tests retain the actual 120-second Apple Event timeout because shortening or mocking it would prove something different. Live suites remain sequential. Rerun affected checks for harness/documentation changes and verify executable/resource hashes when reusing prior runtime results.
 
+For read latency investigations, see [performance profiling and local CLI/MCP benchmarks](docs/performance/README.md). Set `C1_PROFILE=1` for internal timing on stderr.
+
 Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript executor → bundled handlers → Capture One. The executor is injectable for deterministic fault tests. Style learning and photographer-review policy belong in a separate repository consuming this public interface, not reading internal `.c1` files.
 
 [MIT License](LICENSE).

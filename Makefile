@@ -47,6 +47,7 @@ check-built-core:
 	$(MAKE) check-python
 
 check-python:
+	python3 -B Tests/benchmark_reads_test.py
 	python3 -B scripts/generate-native-editing.py --check
 	python3 -B Tests/recovery_harness_test.py
 	python3 -B Tests/release_runner_test.py

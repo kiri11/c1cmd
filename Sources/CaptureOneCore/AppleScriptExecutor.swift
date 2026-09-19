@@ -120,18 +120,28 @@ public final class AppleScriptExecutor: ScriptExecuting {
             throw C1Error.scriptError("Failed to initialize NSAppleScript from source.", code: nil)
         }
         var errorDict: NSDictionary?
-        script.compileAndReturnError(&errorDict)
-        if let err = errorDict {
-            let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown compile error"
-            let num = err[NSAppleScript.errorNumber] as? Int
-            throw C1Error.scriptError("Failed to compile Handlers.applescript: \(msg)", code: num)
+        try PerformanceTrace.measure("script_compile", handler: includeNative ? "native" : "base") {
+            script.compileAndReturnError(&errorDict)
+            if let err = errorDict {
+                let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown compile error"
+                let num = err[NSAppleScript.errorNumber] as? Int
+                throw C1Error.scriptError("Failed to compile Handlers.applescript: \(msg)", code: num)
+            }
         }
         if includeNative { self.compiledNativeScript = script } else { self.compiledScript = script }
         return script
     }
 
     public func executeHandler(name: String, args: [NSAppleEventDescriptor]) throws -> NSAppleEventDescriptor {
-        let script = try getCompiledScript(includeNative: name.hasPrefix("native"))
+        try PerformanceTrace.measure("handler_total", handler: name) {
+            try executeHandlerUnprofiled(name: name, args: args)
+        }
+    }
+
+    private func executeHandlerUnprofiled(name: String, args: [NSAppleEventDescriptor]) throws -> NSAppleEventDescriptor {
+        let script = try PerformanceTrace.measure("script_lookup", handler: name) {
+            try getCompiledScript(includeNative: name.hasPrefix("native"))
+        }
 
         let parameters = NSAppleEventDescriptor(list: args)
         var psn = ProcessSerialNumber(highLongOfPSN: UInt32(0), lowLongOfPSN: UInt32(kCurrentProcess))
@@ -155,34 +165,38 @@ public final class AppleScriptExecutor: ScriptExecuting {
         var errorDict: NSDictionary?
         RequestContext.current?.appleEvent(name, waiting: true)
         defer { RequestContext.current?.appleEvent(nil, waiting: false) }
-        let result = script.executeAppleEvent(event, error: &errorDict)
+        return try PerformanceTrace.measure("apple_event", handler: name) {
+            let result = script.executeAppleEvent(event, error: &errorDict)
 
-        if let err = errorDict {
-            let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown execution error"
-            let num = err[NSAppleScript.errorNumber] as? Int
-            if num == -27001 { throw C1Error.documentChanged(msg) }
-            if num == -27002 { throw C1Error.stateChanged(msg) }
-            if num == -27003 { throw C1Error.identityAmbiguous(msg) }
-            if num == -1712 {
-                throw C1Error.timeout("Capture One Apple Event timed out (-1712): \(msg)")
+            if let err = errorDict {
+                let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown execution error"
+                let num = err[NSAppleScript.errorNumber] as? Int
+                if num == -27001 { throw C1Error.documentChanged(msg) }
+                if num == -27002 { throw C1Error.stateChanged(msg) }
+                if num == -27003 { throw C1Error.identityAmbiguous(msg) }
+                if num == -1712 {
+                    throw C1Error.timeout("Capture One Apple Event timed out (-1712): \(msg)")
+                }
+                if num == -1743 || num == -1744 {
+                    throw C1Error.permissionDenied("Automation permission denied (-1743): \(msg)")
+                }
+                if num == -600 || num == -609 {
+                    throw C1Error.appNotRunning("Capture One is not running (\(num ?? 0)): \(msg)")
+                }
+                throw C1Error.scriptError(msg, code: num)
             }
-            if num == -1743 || num == -1744 {
-                throw C1Error.permissionDenied("Automation permission denied (-1743): \(msg)")
-            }
-            if num == -600 || num == -609 {
-                throw C1Error.appNotRunning("Capture One is not running (\(num ?? 0)): \(msg)")
-            }
-            throw C1Error.scriptError(msg, code: num)
+
+            return result
         }
-
-        return result
     }
 
     public func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
         let descriptor = try executeHandler(name: handler, args: args)
         let decoder = DescriptorDecoder()
         do {
-            return try decoder.decode(T.self, from: descriptor)
+            return try PerformanceTrace.measure("descriptor_decode", handler: handler) {
+                try decoder.decode(T.self, from: descriptor)
+            }
         } catch {
             throw C1Error.scriptError("Failed to decode handler '\(handler)' result: \(error.localizedDescription) (Descriptor: \(descriptor.description))", code: nil)
         }

@@ -2,6 +2,7 @@ import Foundation
 
 print("=== Starting CaptureOneCore Unit Test Suite ===")
 
+PerformanceTraceTests.run()
 FieldSpecTests.run()
 StateHashTests.run()
 WorkingReferenceTests.run()

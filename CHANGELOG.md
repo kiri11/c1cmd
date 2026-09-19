@@ -5,6 +5,12 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Read performance diagnostics
+
+- Add opt-in `C1_PROFILE=1` JSON timing on stderr for script compilation/cache lookup, Apple Event execution and descriptor decoding, without changing CLI/MCP response schemas.
+- Add a sequential local-fixture benchmark comparing fresh CLI reads with persistent MCP reads, with warmup separation, alternating order, state-drift rejection and retained partial evidence.
+- Document measured coverage and the remaining optimization work in [performance notes](docs/performance/README.md).
+
 ## Expanded native editing
 
 - Add `native_get`, `native_set`, and `native_action` to CLI/MCP (contract 1.10.0): 127 writable properties covering curves, levels, HDR, clarity, sharpening, noise reduction, color balance/editors, lens corrections and layer/luma settings.

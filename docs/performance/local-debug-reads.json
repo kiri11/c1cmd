@@ -1,0 +1,3490 @@
+{
+  "version": 1,
+  "conditions": "Disposable Session with copy of local 2U6A7257.CR3; debug build; screen lock state not observed; no agent exports or mutations; other application load uncontrolled",
+  "ref": "1",
+  "cli": "/Users/kiri11/projects/c1cmd/.build/arm64-apple-macosx/debug/c1",
+  "mcp": "/Users/kiri11/projects/c1cmd/.build/arm64-apple-macosx/debug/c1-mcp",
+  "startedAt": "2026-09-19T12:45:50Z",
+  "samples": [
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 0,
+      "warmup": true,
+      "elapsedMs": 1273.8878749951255
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 0,
+      "warmup": true,
+      "elapsedMs": 1118.0641669925535
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 0,
+      "warmup": true,
+      "elapsedMs": 6986.558625008911
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 0,
+      "warmup": true,
+      "elapsedMs": 3946.804291990702
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 1,
+      "warmup": false,
+      "elapsedMs": 918.6408750101691
+    },
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 1,
+      "warmup": false,
+      "elapsedMs": 1323.7660829909146
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 1,
+      "warmup": false,
+      "elapsedMs": 3604.643375001615
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 1,
+      "warmup": false,
+      "elapsedMs": 4077.6905420061667
+    },
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 2,
+      "warmup": false,
+      "elapsedMs": 1252.4498749990016
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 2,
+      "warmup": false,
+      "elapsedMs": 955.9810840000864
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 2,
+      "warmup": false,
+      "elapsedMs": 4033.7987079983577
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 2,
+      "warmup": false,
+      "elapsedMs": 3655.592999988585
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 3,
+      "warmup": false,
+      "elapsedMs": 946.7519579920918
+    },
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 3,
+      "warmup": false,
+      "elapsedMs": 1311.5499999985332
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 3,
+      "warmup": false,
+      "elapsedMs": 3549.3352500052424
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 3,
+      "warmup": false,
+      "elapsedMs": 4112.748957995791
+    },
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 4,
+      "warmup": false,
+      "elapsedMs": 1300.9395409899298
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 4,
+      "warmup": false,
+      "elapsedMs": 976.5517499909038
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 4,
+      "warmup": false,
+      "elapsedMs": 4194.4081249966985
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 4,
+      "warmup": false,
+      "elapsedMs": 3666.6912920045434
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "iteration": 5,
+      "warmup": false,
+      "elapsedMs": 1022.8371249977499
+    },
+    {
+      "mode": "cli",
+      "operation": "get",
+      "iteration": 5,
+      "warmup": false,
+      "elapsedMs": 1321.4210410078522
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "iteration": 5,
+      "warmup": false,
+      "elapsedMs": 3719.8492500028806
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "iteration": 5,
+      "warmup": false,
+      "elapsedMs": 4139.320750007755
+    }
+  ],
+  "profiles": [
+    {
+      "elapsedMs": 64.776208,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 68.004459,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 154.361458,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 222.639792,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.239709,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001583,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 882.495375,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 882.7395,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.637916,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30687,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 63.725167,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 64.188959,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 165.168792,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 229.611625,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.171084,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001041,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 82.3885,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 82.545833,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0675,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000791,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 898.870917,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 899.063833,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.479958,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.667917,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 87.267541,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 5411.187542,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 5499.025792,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 3.952,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003333,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 92.510709,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 92.869041,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.253542,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30697,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.605083,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 72.619459,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 182.607542,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 255.451375,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.149208,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000667,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.39025,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.836167,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.029125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30705,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 67.293833,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 67.762708,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 165.177292,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 233.294542,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.322042,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002125,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 79.397583,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 79.544042,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.090666,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000916,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 903.904167,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 904.435375,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.482917,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 86.063125,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 86.304542,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2405.544167,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2492.351209,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.634625,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003375,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 139.753625,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 140.177959,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.378125,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30706,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 70.41475,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 73.588625,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 159.5965,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 233.375458,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.163625,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000625,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 834.898208,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 835.4165,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.518041,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30708,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 65.528084,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 65.977458,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 165.19525,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 231.485625,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.350417,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002291,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.289041,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.410042,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.087917,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001084,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 916.8985,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 917.544958,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.376417,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.741417,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.970917,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2398.395792,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2484.672292,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 3.371167,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003666,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 107.007583,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 107.301417,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.189584,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30714,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 66.444167,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.577833,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 170.575042,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 240.496291,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.345459,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002042,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.190917,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.502125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.796958,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30721,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 64.653667,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 65.102083,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 165.674459,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 231.101459,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.364834,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00475,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.186542,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.323125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.099666,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001083,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1000.45475,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1001.124375,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.129083,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.940833,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 86.184083,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2395.020291,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2481.736541,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.933542,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.004917,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 93.92775,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 94.271,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.250833,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30722,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 66.851709,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 70.146584,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 177.157458,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 247.609167,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.340833,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 866.218625,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 866.772333,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.389833,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30723,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 64.486625,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 64.926833,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 178.909625,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 244.162417,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.348583,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002542,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.51425,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.68975,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.114625,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001083,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 909.691791,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 909.904375,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.418792,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.847625,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 86.086167,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2604.646209,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2691.065916,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2.546208,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 77.068208,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 77.301875,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.126,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30724,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.722708,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 74.28025,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 175.174125,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 249.802,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.335333,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001291,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 882.627291,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.141792,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.747291,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30729,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 64.8285,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 65.301458,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 188.685417,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 254.349125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.3885,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0025,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 79.995041,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.14075,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.112291,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0015,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 933.755417,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 934.259583,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.456208,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.764292,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 85.992959,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2507.396042,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2594.054292,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.899584,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003417,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 62.816791,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 63.194666,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.274875,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30757,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 62.828292,
+      "handler": "base",
+      "phase": "script_compile",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 63.259417,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 159.500292,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 223.112667,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.380042,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00425,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 71.188542,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 71.387791,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.074584,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000542,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.650334,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 883.935875,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.850792,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002542,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 116.97775,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 117.828084,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.335959,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00175,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 87.15875,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 87.860458,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.460209,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1032.211083,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1033.195542,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.973,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 108.647583,
+      "handler": "native",
+      "phase": "script_compile",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 109.259792,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2446.645459,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2556.749042,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.296459,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003208,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 107.179125,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 107.817125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.311042,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0015,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.542042,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.7405,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.050792,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000416,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 818.233833,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 818.993584,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.977208,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00075,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 78.383833,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 78.512458,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.068083,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0005,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 89.271125,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 89.404833,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0765,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00075,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 910.569541,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 911.448458,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.93775,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003667,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2410.380208,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2411.208833,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.246959,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0035,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 71.309458,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 71.868416,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.310833,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000791,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.673083,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.976125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.052833,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000458,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 867.742792,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 868.113,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.501208,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002125,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 69.800166,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 70.067625,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.130541,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001041,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 133.390541,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 134.023833,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.317208,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001291,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 856.627125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 857.632834,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.916333,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.004625,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2443.045125,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2443.87975,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.058833,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003833,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 115.286375,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 115.818083,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.215792,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001667,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 59.946625,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 60.570375,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.27525,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002084,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 864.119125,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 865.224375,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.944,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.00075,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 101.747667,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 101.911125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.080833,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000792,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 101.564042,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 101.72225,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.104792,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 864.333208,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 865.147417,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.953917,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.003375,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2376.307417,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2377.23175,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.521167,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002334,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 70.634041,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 71.132209,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.262083,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000625,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 60.611625,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 60.736791,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.060875,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000416,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 885.107625,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 885.785708,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.202417,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001709,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 121.914459,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 122.592375,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.346459,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.004417,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 79.213,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 80.2885,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.706375,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.004417,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 912.594625,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 913.71975,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.117458,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002959,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2426.2955,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2427.298583,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 4.374875,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002667,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 72.716208,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 73.261125,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.2835,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0015,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 117.2245,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 117.904667,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.325625,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001416,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 881.641042,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 882.490834,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.956541,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000792,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 72.757042,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 72.872708,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.062,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0005,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 82.550416,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 82.690375,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.0815,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000625,
+      "handler": "getAdjustmentsBatch",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 901.550917,
+      "handler": "getAdjustmentsBatch",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 901.90275,
+      "handler": "getAdjustmentsBatch",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.765458,
+      "handler": "getAdjustmentsBatch",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.001166,
+      "handler": "nativeRead",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2524.842667,
+      "handler": "nativeRead",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 2525.05625,
+      "handler": "nativeRead",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 1.557542,
+      "handler": "nativeRead",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.000916,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 115.635417,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 115.8465,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.144209,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.002,
+      "handler": "getAppAndDocInfo",
+      "phase": "script_lookup",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 122.38075,
+      "handler": "getAppAndDocInfo",
+      "phase": "apple_event",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 123.105042,
+      "handler": "getAppAndDocInfo",
+      "phase": "handler_total",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    },
+    {
+      "elapsedMs": 0.352834,
+      "handler": "getAppAndDocInfo",
+      "phase": "descriptor_decode",
+      "pid": 30686,
+      "succeeded": true,
+      "type": "c1-profile",
+      "version": 1
+    }
+  ],
+  "completed": true,
+  "document": {
+    "appVersion": "16.8.5.30",
+    "captureFolder": "/Users/kiri11/projects/c1cmd/.build/read-benchmark-hjnmsopv/session/Capture",
+    "documentId": "/Users/kiri11/projects/c1cmd/.build/read-benchmark-hjnmsopv/session",
+    "documentName": "session.cosessiondb",
+    "documentPath": "/Users/kiri11/projects/c1cmd/.build/read-benchmark-hjnmsopv/session",
+    "isSession": true,
+    "openToken": "23565:1789697413.935587|/Users/kiri11/projects/c1cmd/.build/read-benchmark-hjnmsopv/session/session.cosessiondb|16777232|4548852|1789821863.398907",
+    "outputFolder": "/Users/kiri11/projects/c1cmd/.build/read-benchmark-hjnmsopv/session/Output",
+    "writesEnabled": true
+  },
+  "summary": [
+    {
+      "mode": "cli",
+      "operation": "get",
+      "medianMs": 1311.5499999985332
+    },
+    {
+      "mode": "cli",
+      "operation": "native_get",
+      "medianMs": 4112.748957995791
+    },
+    {
+      "mode": "mcp",
+      "operation": "get",
+      "medianMs": 955.9810840000864
+    },
+    {
+      "mode": "mcp",
+      "operation": "native_get",
+      "medianMs": 3655.592999988585
+    }
+  ]
+}
