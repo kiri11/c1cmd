@@ -94,6 +94,42 @@ struct GeometryTests {
             let cloned = try core.cloneVariant(sourceRef:"1")
             let initial = try core.get(ref:cloned.workingRef)
             let g = initial.geometry!
+            // A readable stored crop is not proof that an explicit rewrite is contained.
+            var offCenter = g
+            offCenter.lensGeometry[0] = 100
+            offCenter.maximumCrop = CropRect(centerX:3000,centerY:2000,width:5000,height:3400)
+            offCenter.crop = CropRect(centerX:3400,centerY:2200,width:5400,height:3600)
+            XCTAssertTrue(offCenter.unsupportedReason == nil)
+            XCTAssertThrowsError(try offCenter.target(crop:offCenter.crop,rotation:nil,aspectRatio:nil))
+            let fit = try offCenter.target(crop:nil,rotation:nil,aspectRatio:offCenter.crop.aspectRatio)
+            XCTAssertEqual(fit.lensGeometry,offCenter.lensGeometry)
+            XCTAssertTrue(fit.crop != offCenter.crop)
+            var fractional = offCenter
+            fractional.maximumCrop = CropRect(centerX:3000.1,centerY:2000.3,width:5000.1,height:3400.7)
+            let singleton = CropRect(centerX:3000.1,centerY:2000.3,width:5004.1,height:3404.7)
+            XCTAssertNoThrowBlock { _ = try fractional.target(crop:singleton,rotation:nil,aspectRatio:nil) }
+            var emptyInterval = singleton
+            emptyInterval.width += 0.000001
+            XCTAssertThrowsError(try fractional.target(crop:emptyInterval,rotation:nil,aspectRatio:nil))
+            emptyInterval = singleton
+            emptyInterval.height += 0.000001
+            XCTAssertThrowsError(try fractional.target(crop:emptyInterval,rotation:nil,aspectRatio:nil))
+            // Test both center intervals at the existing two-pixel tolerance.
+            // Use a clear subpixel step as well as adjacent representable values.
+            for axis in [0, 1] {
+                for side in [-1.0, 1.0] {
+                    let boundary = (axis == 0 ? 3000.0 : 2000.0) + side * 2
+                    func candidate(_ center: Double) -> CropRect {
+                        CropRect(centerX:axis == 0 ? center : 3000,
+                                 centerY:axis == 1 ? center : 2000,width:6000,height:4000)
+                    }
+                    XCTAssertNoThrowBlock { _ = try g.target(crop:candidate(boundary),rotation:nil,aspectRatio:nil) }
+                    XCTAssertNoThrowBlock { _ = try g.target(crop:candidate(boundary-side*0.000001),rotation:nil,aspectRatio:nil) }
+                    XCTAssertThrowsError(try g.target(crop:candidate(boundary+side*0.000001),rotation:nil,aspectRatio:nil))
+                    let adjacent = side < 0 ? boundary.nextDown : boundary.nextUp
+                    XCTAssertThrowsError(try g.target(crop:candidate(adjacent),rotation:nil,aspectRatio:nil))
+                }
+            }
             XCTAssertTrue(initial.geometryStateHash!.hasPrefix("geometry-v1:"))
             let record = try ProvenanceStore(sessionDirectory:directory).validatedRecords()[cloned.workingRef]!
             XCTAssertEqual(record.baselineGeometry, g)

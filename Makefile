@@ -48,6 +48,7 @@ check-built-core:
 	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" C1_TEST_MCP_BIN="$(abspath $(TEST_BUILD_DIR))/c1-mcp" python3 -B Tests/catalog_reader_test.py
 
 check-python:
+	python3 -B Tests/contained_crop_test.py
 	python3 -B Tests/catalog_freshness_probe_test.py
 	python3 -B Tests/benchmark_reads_test.py
 	python3 -B scripts/generate-native-editing.py --check

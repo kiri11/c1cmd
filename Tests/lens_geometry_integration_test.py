@@ -5,6 +5,7 @@ Requires zero open documents, C1_TEST_RAW_FIXTURE and optional C1_LENS_EVIDENCE.
 Native fixture writes are journaled; any failure stops without automatic retry.
 """
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -168,6 +169,31 @@ set orientation of adjustments of v to {orientation}
 set rotation of adjustments of v to 0
 set crop of v to (maximum crop v apply false)''')
         before = cli('get', vid)
+        if index == 0:
+            # Deliberately request an off-center full-size stored crop on the
+            # owned clone. Observe native normalization; never alter lens context
+            # to make an otherwise rejected explicit rectangle pass.
+            baseline = before
+            rect = dict(before['geometry']['crop'])
+            rect['centerX'] += rect['width'] * .05
+            fixture_write('set crop of v to {' + ','.join(str(rect[k]) for k in
+                          ['centerX', 'centerY', 'width', 'height']) + '}')
+            stored = cli('get', vid)
+            for key in ['lensGeometry', 'lensProfile', 'hideDistortedAreas', 'keystone', 'orientation', 'rotation']:
+                assert stored['geometry'][key] == baseline['geometry'][key], key
+            spec = importlib.util.spec_from_file_location('contained_crop', ROOT / 'scripts/propose-contained-crop.py')
+            planner = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(planner)
+            proposal = planner.propose(stored['geometry']['crop'], stored['geometryUsableBounds'])
+            log('stored-off-center-probe', requested=rect, observed=stored, proposal=proposal,
+                nativeNormalized=rect != stored['geometry']['crop'])
+            # This is fixture setup restoration after a completed read, not an
+            # automatic retry/undo of an uncertain c1 operation.
+            original_crop = baseline['geometry']['crop']
+            fixture_write('set crop of v to {' + ','.join(str(original_crop[k]) for k in
+                          ['centerX', 'centerY', 'width', 'height']) + '}')
+            before = cli('get', vid)
+            assert before['geometry'] == baseline['geometry']
         assert not before.get('geometryUnavailableReason'), before
         assert before['geometryUsableBounds'] == before['geometry']['maximumCrop']
         edit = tool('variant_edit', {'sourceRef': vid, 'ifDocument': document['openToken'],

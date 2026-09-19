@@ -216,6 +216,8 @@ The geometry-only `C1_MCP_PROFILE=composition` hides and rejects `metadata_set`.
 
 ### Crop and rotation
 
+For stored crops that overhang reported bounds, see the [bounds investigation and read-only proportional proposal tool](docs/crop-bounds-investigation.md). Proposals report explicit deltas and preserve containment; native normalization is not an exact copy.
+
 `c1 geometry set` / MCP `geometry_set` applies absolute crop, rotation, and keystone corrections to an existing editing reference or optional managed clone. It requires **`geometryStateHash` from `get`**, passed as `--if-geometry-state` / `ifGeometryState`. This versioned token includes geometry and the tonal hash; the existing `stateHash` and tonal commands are unchanged. `get`, `dump`, and `diff` now include geometry; editing references and newly cloned variants retain a geometry baseline. Older provenance records remain readable but lack that baseline.
 
 ```sh
