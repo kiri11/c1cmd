@@ -52,20 +52,94 @@ public final class CatalogReader {
         try execute("BEGIN")
         do { try validateSchema() } catch { endObservation(); throw error }
     }
+    // Preserve quoted text and token boundaries; normalize only ASCII whitespace
+    // and spacing around unambiguous DDL separators. Comments fail closed.
+    private static func ddlTokens(_ sql: String) -> [String]? {
+        let chars = Array(sql)
+        var tokens: [String] = []
+        var i = 0
+        func whitespace(_ c: Character) -> Bool {
+            c == " " || c == "\t" || c == "\r" || c == "\n" || c == "\r\n" || c == "\u{000B}" || c == "\u{000C}"
+        }
+        while i < chars.count {
+            if whitespace(chars[i]) {
+                let start = i
+                while i < chars.count, whitespace(chars[i]) { i += 1 }
+                // Preserve separation next to quotes too (e.g. X'AB' is a blob
+                // literal whereas X 'AB' is two tokens).
+                if start > 0, i < chars.count,
+                   !"(),".contains(chars[start - 1]), !"(),".contains(chars[i]) { tokens.append(" ") }
+                continue
+            }
+            let start = i
+            let c = chars[i]
+            if c == "'" || c == "\"" || c == "`" || c == "[" {
+                let end: Character = c == "[" ? "]" : c
+                i += 1
+                var closed = false
+                while i < chars.count {
+                    if chars[i] == end {
+                        i += 1
+                        if c != "[", i < chars.count, chars[i] == end { i += 1; continue }
+                        closed = true; break
+                    }
+                    i += 1
+                }
+                guard closed else { return nil }
+            } else if "(),".contains(c) {
+                i += 1
+            } else {
+                while i < chars.count, !whitespace(chars[i]), !"(),'\"`[".contains(chars[i]) {
+                    if i + 1 < chars.count,
+                       (chars[i] == "-" && chars[i + 1] == "-") || (chars[i] == "/" && chars[i + 1] == "*") { return nil }
+                    i += 1
+                }
+            }
+            tokens.append(String(chars[start..<i]))
+        }
+        return tokens
+    }
+    private static func compatibleSchema(_ schema: [[String: Any]], retained: String) -> Bool {
+        var expected: [String: [String]] = [:]
+        for line in retained.split(separator: "\n") {
+            let parts = line.split(separator: "|", maxSplits: 3).map(String.init)
+            guard parts.count == 4, let tokens = ddlTokens(parts[3]) else { return false }
+            expected[parts[0...2].joined(separator: "|")] = tokens
+        }
+        let statistics = ["sqlite_stat1": "CREATE TABLE sqlite_stat1(tbl,idx,stat)",
+                          "sqlite_stat4": "CREATE TABLE sqlite_stat4(tbl,idx,neq,nlt,ndlt,sample)"]
+        for row in schema {
+            guard let type = row["type"] as? String, let name = row["name"] as? String,
+                  let table = row["tbl_name"] as? String, let sql = row["sql"] as? String,
+                  let tokens = ddlTokens(sql) else { return false }
+            // Exempt only these exact SQLite-owned statistics definitions.
+            if type == "table", table == name, let definition = statistics[name],
+               tokens == ddlTokens(definition) { continue }
+            guard expected.removeValue(forKey: [type, name, table].joined(separator: "|")) == tokens else { return false }
+        }
+        return expected.isEmpty
+    }
     private func validateSchema() throws {
         let schema = try rows("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name")
         let canonical = schema.map { row in ["type", "name", "tbl_name", "sql"].map { row[$0] as! String }.joined(separator: "|") }.joined(separator: "\n")
         fingerprint = SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
-        guard let resource = Bundle.module.url(forResource: "catalog-schema-16.8.5", withExtension: "json"),
-              let supported = try JSONSerialization.jsonObject(with: Data(contentsOf: resource)) as? [String: Any] else {
-            throw C1Error.invalidRequest("The packaged Catalog schema manifest is unavailable.")
+        var matchingHistories: [[[String: Any]]] = []
+        for name in ["catalog-schema-16.8.5", "catalog-schema-upgraded-16.8.5"] {
+            guard let resource = Bundle.module.url(forResource: name, withExtension: "json"),
+                  let supported = try JSONSerialization.jsonObject(with: Data(contentsOf: resource)) as? [String: Any],
+                  let retained = supported["schema"] as? String,
+                  let history = supported["versionHistory"] as? [[String: Any]], !history.isEmpty else {
+                throw C1Error.invalidRequest("The packaged Catalog schema manifest is unavailable or invalid.")
+            }
+            if Self.compatibleSchema(schema, retained: retained) { matchingHistories.append(history) }
         }
-        let versions = try rows("SELECT ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT FROM ZVERSIONINFO")
-        guard fingerprint == supported["fingerprint"] as? String, versions.count == 1,
-              let version = versions.first,
-              version["ZFORMAT"] as? String == "16.8.5.30 Pro Mac",
-              version["ZVERSION"] as? Int64 == 160800,
-              version["ZCOMPATIBLEVERSION"] as? Int64 == 160800,
+        guard !matchingHistories.isEmpty else {
+            throw C1Error.invalidRequest("Unsupported Catalog schema: \(fingerprint).")
+        }
+        // Qualify the entire ordered history for the matching schema. Never select
+        // MAX(version), ignore older rows, or mix a history with another manifest.
+        let versions = try rows("SELECT ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT FROM ZVERSIONINFO ORDER BY Z_PK")
+        guard matchingHistories.contains(where: { NSArray(array: versions).isEqual(to: $0) }),
               try rows("SELECT ZDOCUMENTTYPE FROM ZDOCUMENTCONTENT").first?["ZDOCUMENTTYPE"] as? Int64 == 1 else {
             throw C1Error.invalidRequest("Unsupported Catalog schema: \(fingerprint).")
         }

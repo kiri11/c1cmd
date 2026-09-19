@@ -15,15 +15,21 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN', ROOT / '.build/debug/c1-mcp'))
 SCHEMA = json.loads((ROOT / 'Sources/CaptureOneCore/Resources/catalog-schema-16.8.5.json').read_text())
+UPGRADED_SCHEMA = json.loads((ROOT / 'Sources/CaptureOneCore/Resources/catalog-schema-upgraded-16.8.5.json').read_text())
 
 class CatalogReaderTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / 'fixture.cocatalogdb'
+        self.create_fixture(SCHEMA)
+
+    def create_fixture(self, manifest):
         self.db = sqlite3.connect(self.path)
-        for line in sorted(SCHEMA['schema'].splitlines(), key=lambda line: not line.startswith('table|')):
+        for line in sorted(manifest['schema'].splitlines(), key=lambda line: not line.startswith('table|')):
             self.db.execute(line.split('|', 3)[3])
-        self.db.execute("INSERT INTO ZVERSIONINFO(Z_PK,ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT) VALUES(1,160800,160800,'16.8.5.30 Pro Mac')")
+        for pk, version in enumerate(manifest['versionHistory'], 1):
+            self.db.execute('INSERT INTO ZVERSIONINFO(Z_PK,ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT) VALUES(?,?,?,?)',
+                            (pk, version['ZVERSION'], version['ZCOMPATIBLEVERSION'], version['ZFORMAT']))
         self.db.execute("INSERT INTO ZDOCUMENTCONTENT(Z_PK,ZDOCUMENTTYPE,ZDOCUMENTUUID) VALUES(1,1,'fixture-uuid')")
         self.db.execute("INSERT INTO ZPATHLOCATION(Z_PK,ZMACROOT,ZRELATIVEPATH,ZISRELATIVE) VALUES(1,'/','photos',0)")
         self.db.execute("INSERT INTO ZIMAGE(Z_PK,ZIMAGEUUID,ZIMAGEFILENAME,ZIMAGELOCATION,ZISINSIDECATALOG,ZDISPLAYNAME) VALUES(1,'image-uuid','a.CR3',1,0,'a')")
@@ -93,6 +99,132 @@ class CatalogReaderTests(unittest.TestCase):
     def test_schema_and_session_rejection(self):
         self.db.execute('ALTER TABLE ZIMAGE ADD COLUMN FUTURE INTEGER'); self.db.commit()
         self.assertIn('Unsupported Catalog schema',self.cli(error=True))
+
+    def rewrite_ddl(self, name, transform):
+        # Synthetic fixture only: exercise schema comparison independently of SQLite's
+        # own CREATE statement formatting. New CLI connections reparse this schema.
+        sql = self.db.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]
+        self.db.execute('PRAGMA writable_schema=ON')
+        self.db.execute('UPDATE sqlite_master SET sql=? WHERE name=?', (transform(sql), name))
+        self.db.execute('PRAGMA writable_schema=OFF')
+        self.db.commit()
+
+    def test_whitespace_and_statistics_are_compatible(self):
+        self.db.execute('ANALYZE'); self.db.commit()
+        for name in ('ZRETOUCHINGLAYER', 'ZRETOUCHINGLAYER_VARIANT_INDEX', 'ZVARIANTLAYER'):
+            self.rewrite_ddl(name, lambda sql: sql.replace(' ', '\t\r\n \n\v\f').replace(',', ' , ').replace('(', ' ( '))
+        before = self.path.read_bytes()
+        result = self.cli()
+        self.assertEqual([r['rating'] for r in result['variants']], [1, 2, 3])
+        self.assertNotEqual(result['schemaFingerprint'], SCHEMA['fingerprint'])
+        client = Client(MCP)
+        try:
+            response = client.tool('catalog_variants', {'database': str(self.path)})
+            self.assertFalse(response.get('isError'), response)
+            self.assertEqual(json.loads(response['content'][0]['text'])['schemaFingerprint'], result['schemaFingerprint'])
+        finally:
+            client.close()
+            for stream in (client.process.stdin, client.process.stdout, client.process.stderr): stream.close()
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_meaningful_ddl_changes_rejected(self):
+        cases = [
+            ('ZIMAGE', lambda s: s.replace('Z_PK INTEGER', 'Z_PK TEXT')),
+            ('ZIMAGE', lambda s: s.replace('PRIMARY KEY', 'PRIMARY KEY DESC')),
+            ('ZIMAGE', lambda s: s.replace('Z_PK', '"Z_ PK"')),
+            ('ZIMAGE', lambda s: s.replace('Z_ENT INTEGER, Z_PK INTEGER PRIMARY KEY', 'Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER')),
+            ('ZIMAGE', lambda s: s.replace('Z_PK INTEGER PRIMARY KEY', 'Z_PK INTEGER PRIMARY KEY /* future */')),
+            ('ZRETOUCHINGLAYER_VARIANT_INDEX', lambda s: s.replace('(ZVARIANT)', '(Z_PK)')),
+            ('ZRETOUCHINGLAYER_VARIANT_INDEX', lambda s: s.replace('CREATE INDEX', 'CREATE UNIQUE INDEX')),
+        ]
+        for name, transform in cases:
+            original = self.db.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]
+            with self.subTest(name=name, transformed=transform(original)):
+                self.assertNotEqual(original, transform(original))
+                self.rewrite_ddl(name, transform)
+                self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+                self.rewrite_ddl(name, lambda _: original)
+
+    def test_unknown_objects_and_missing_index_rejected(self):
+        self.db.execute('CREATE TABLE FUTURE(x INTEGER)'); self.db.commit()
+        self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+        self.db.execute('DROP TABLE FUTURE')
+        self.db.execute('DROP INDEX ZRETOUCHINGLAYER_VARIANT_INDEX'); self.db.commit()
+        self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+
+    def test_version_guards_with_compatible_whitespace(self):
+        self.rewrite_ddl('ZIMAGE', lambda s: s.replace(' ', '  '))
+        for column, value in [('ZVERSION', 160900), ('ZCOMPATIBLEVERSION', 160900), ('ZFORMAT', '16.9 Pro Mac')]:
+            with self.subTest(column=column):
+                self.db.execute(f'UPDATE ZVERSIONINFO SET {column}=?', (value,)); self.db.commit()
+                self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+                self.db.execute("UPDATE ZVERSIONINFO SET ZVERSION=160800,ZCOMPATIBLEVERSION=160800,ZFORMAT='16.8.5.30 Pro Mac'")
+                self.db.commit()
+
+    def test_version_history_still_requires_qualification(self):
+        self.db.execute("INSERT INTO ZVERSIONINFO(Z_PK,ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT) VALUES(2,160611,160611,'16.7.1.11 Pro Mac')")
+        self.db.commit()
+        self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+
+    def upgraded_fixture(self):
+        self.db.close()
+        self.path.unlink()
+        self.create_fixture(UPGRADED_SCHEMA)
+
+    def test_upgraded_named_values_and_snapshot(self):
+        self.upgraded_fixture()
+        self.db.execute('UPDATE ZVARIANTLAYER SET ZRETOUCHINGOPACITY=17.5,ZRETOUCHINGTEETHWHITENINGBRIGHTNESS=42.25,ZRETOUCHINGBLEMISHPROTECTIONMASKUUID=? WHERE Z_PK=1', ('mask-sentinel',))
+        self.db.execute('INSERT INTO ZRETOUCHINGLAYER(Z_PK,ZVARIANT,ZOPACITY,ZTEETHWHITENINGBRIGHTNESS) VALUES(1,1,23.5,61.25)')
+        self.db.commit()
+        before = self.path.read_bytes()
+        result = self.cli('inspect')
+        self.assertEqual(result['schemaFingerprint'], UPGRADED_SCHEMA['fingerprint'])
+        self.assertEqual(result['storedSettings'][0]['ZRETOUCHINGOPACITY'], 17.5)
+        self.assertEqual(result['storedSettings'][0]['ZRETOUCHINGTEETHWHITENINGBRIGHTNESS'], 42.25)
+        self.assertEqual(result['storedSettings'][0]['ZRETOUCHINGBLEMISHPROTECTIONMASKUUID'], 'mask-sentinel')
+        self.assertEqual(result['storedRetouching'][0]['ZOPACITY'], 23.5)
+        self.assertEqual(result['storedRetouching'][0]['ZTEETHWHITENINGBRIGHTNESS'], 61.25)
+        self.test_single_variant_cli_mcp()
+        self.assertEqual(self.path.read_bytes(), before)
+        self.test_wal_parallel_snapshot_and_no_overwrite()
+        # The snapshot test intentionally modifies the fixture; reads before it did not.
+        self.assertEqual(len(result['version']), 4)
+
+    def test_upgraded_whitespace_and_statistics(self):
+        self.upgraded_fixture()
+        self.test_whitespace_and_statistics_are_compatible()
+
+    def test_upgraded_history_is_exact_and_schema_specific(self):
+        self.upgraded_fixture()
+        self.cli()
+        originals = self.db.execute('SELECT * FROM ZVERSIONINFO').fetchall()
+        mutations = [
+            'DELETE FROM ZVERSIONINFO WHERE Z_PK=1',
+            "UPDATE ZVERSIONINFO SET ZFORMAT='16.8.5.30 Pro Mac' WHERE Z_PK=1",
+            'UPDATE ZVERSIONINFO SET ZCOMPATIBLEVERSION=160900 WHERE Z_PK=4',
+            'UPDATE ZVERSIONINFO SET ZVERSION=160900 WHERE Z_PK=4',
+            'UPDATE ZVERSIONINFO SET Z_PK=5 WHERE Z_PK=1',
+            "INSERT INTO ZVERSIONINFO(Z_PK,ZVERSION,ZCOMPATIBLEVERSION,ZFORMAT) VALUES(5,160800,160800,'16.8.5.30 Pro Mac')",
+        ]
+        for sql in mutations:
+            with self.subTest(sql=sql):
+                self.db.execute(sql); self.db.commit()
+                self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+                self.db.execute('DELETE FROM ZVERSIONINFO')
+                self.db.executemany('INSERT INTO ZVERSIONINFO VALUES('+','.join('?' for _ in originals[0])+')', originals)
+                self.db.commit()
+        self.test_meaningful_ddl_changes_rejected()
+        # Swapping the exact upgraded Catalog history into the original schema is not qualified.
+        self.db.close(); self.path.unlink(); self.create_fixture(SCHEMA)
+        self.db.execute('DELETE FROM ZVERSIONINFO')
+        self.db.executemany('INSERT INTO ZVERSIONINFO VALUES('+','.join('?' for _ in originals[0])+')', originals)
+        self.db.commit()
+        self.assertIn('Unsupported Catalog schema', self.cli(error=True))
+
+    def test_statistics_exemption_is_narrow(self):
+        self.db.execute('ANALYZE'); self.db.commit()
+        self.rewrite_ddl('sqlite_stat1', lambda s: s.replace('stat)', 'stat,unexpected)'))
+        self.assertIn('Unsupported Catalog schema', self.cli(error=True))
 
     def test_document_type_rejection(self):
         self.db.execute('UPDATE ZDOCUMENTCONTENT SET ZDOCUMENTTYPE=0'); self.db.commit()
