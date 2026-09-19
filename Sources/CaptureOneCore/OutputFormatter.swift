@@ -52,7 +52,9 @@ public struct OutputFormatter {
             lines.append("Document Path       : \(p)")
         }
         lines.append("Advisory Lock       : \(r.lockAcquired ? "Available (OK)" : "Contended / Failed (FAIL)")")
-        lines.append("Unresolved Ops      : \(r.unresolvedOperationsCount == 0 ? "0 (Clean)" : "\(r.unresolvedOperationsCount) (Warning: pending/failed ops in journal)")")
+        let journalStatus = r.unresolvedOperationsCount.map { $0 == 0 ? "0 (Clean)" : "\($0) (Warning: pending/failed ops in journal)" } ?? "Unknown (journal not inspected successfully)"
+        lines.append("Unresolved Ops      : \(journalStatus)")
+        if let error = r.diagnosticError { lines.append("Diagnostic Error    : \(error)") }
         if let w = r.warning {
             lines.append("Warning             : \(w)")
         }

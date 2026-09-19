@@ -26,7 +26,8 @@ public struct DoctorReport: Codable, Equatable {
     public let isSession: Bool
     public var writesEnabled: Bool = false
     public let lockAcquired: Bool
-    public let unresolvedOperationsCount: Int
+    public let unresolvedOperationsCount: Int?
+    public var diagnosticError: C1Error? = nil
     public let allChecksPassed: Bool
     public let warning: String?
 
@@ -41,7 +42,7 @@ public struct DoctorReport: Codable, Equatable {
         docPath: String?,
         isSession: Bool,
         lockAcquired: Bool,
-        unresolvedOperationsCount: Int,
+        unresolvedOperationsCount: Int?,
         allChecksPassed: Bool,
         warning: String? = nil
     ) {
@@ -256,6 +257,7 @@ public final class SessionController {
         return VersionCompatibility(isTestedMatch: false, isAllowed: false, warning: nil)
     }
 
+    private let isAppRunning: () -> Bool
     private let nativeInventoryEnabled: Bool
     private let executor: ScriptExecuting
     private let appInstance: () throws -> String
@@ -271,7 +273,9 @@ public final class SessionController {
                 databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
                 catalogWritePath: String? = ProcessInfo.processInfo.environment["C1_CATALOG_WRITE_PATH"],
                 imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read,
-                nativeInventoryEnabled: Bool = ProcessInfo.processInfo.environment["C1_INVENTORY_STRATEGY"] != "scan") {
+                nativeInventoryEnabled: Bool = ProcessInfo.processInfo.environment["C1_INVENTORY_STRATEGY"] != "scan",
+                isAppRunning: @escaping () -> Bool = { !NSRunningApplication.runningApplications(withBundleIdentifier: "com.captureone.captureone16").isEmpty }) {
+        self.isAppRunning = isAppRunning
         self.nativeInventoryEnabled = nativeInventoryEnabled
         self.executor = executor
         self.appInstance = appInstance
@@ -320,8 +324,9 @@ public final class SessionController {
 
     // MARK: - Doctor
     public func doctor() throws -> DoctorReport {
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.captureone.captureone16")
-        let appRunning = !apps.isEmpty
+        let appRunning = isAppRunning()
+        var observedInfo: AppAndDocInfoResult?
+        var diagnosticError: C1Error?
 
         var appVersion = "unknown"
         var hasDoc = false
@@ -336,6 +341,7 @@ public final class SessionController {
                     handler: "getAppAndDocInfo",
                     args: []
                 )
+                observedInfo = info
                 appVersion = info.appVersion
                 hasDoc = info.hasDocument
                 docName = info.docName
@@ -344,6 +350,7 @@ public final class SessionController {
                 documentCount = info.documentCount ?? 0
             } catch {
                 appVersion = "error"
+                diagnosticError = (error as? C1Error) ?? .invalidRequest(String(describing: error))
             }
         }
 
@@ -359,18 +366,20 @@ public final class SessionController {
             lockOk = false
         }
 
-        var unresolvedCount = 0
+        var unresolvedCount: Int?
         var writesEnabled = false
         var identityOK = false
-        if hasDoc {
+        if hasDoc, let observedInfo {
             do {
-                let doc = try getDocumentInfo()
+                let doc = try documentInfo(from: observedInfo)
                 identityOK = true
                 docPath = doc.documentPath
                 writesEnabled = doc.writesEnabled
                 let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
                 unresolvedCount = try journal.validatedEntries().filter(OperationJournal.isUnresolved).count
-            } catch { unresolvedCount = 1 }
+            } catch {
+                diagnosticError = (error as? C1Error) ?? .invalidRequest(String(describing: error))
+            }
         }
 
         let allPassed = appRunning && compat.isAllowed && hasDoc && identityOK && documentCount == 1 && lockOk && (unresolvedCount == 0)
@@ -390,6 +399,7 @@ public final class SessionController {
             allChecksPassed: allPassed,
             warning: compat.warning
         )
+        report.diagnosticError = diagnosticError
         report.writesEnabled = writesEnabled && allPassed
         return report
     }
@@ -400,6 +410,10 @@ public final class SessionController {
             handler: "getAppAndDocInfo",
             args: []
         )
+        return try documentInfo(from: info, allowUntestedBuild: allowUntestedBuild)
+    }
+
+    private func documentInfo(from info: AppAndDocInfoResult, allowUntestedBuild: Bool = false) throws -> DocumentInfo {
         guard info.hasDocument, let name = info.docName, let path = info.docPath else {
             throw C1Error.noDocument("No document is currently open in Capture One.")
         }

@@ -66,6 +66,8 @@ or several native scopes in `nativeSnapshots` alongside adjustments, metadata an
 geometry. Each snapshot carries its own `nativeStateHash`. The single-scope path
 uses direct validation. See [scoped reads](docs/native-editing/README.md#scoped-reads).
 
+`doctor` reports `unresolvedOperationsCount` only after successfully inspecting the journal. An absent count means unknown; `diagnosticError` preserves an inspection failure and `allChecksPassed` remains false.
+
 The default server exposes 23 tools: `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`.
 
 `preview` creates files and configures the reserved `c1-preview` recipe, so it is declared a mutating tool. Its response includes JPEG image content plus JSON metadata. Other tool results are JSON text content.
@@ -289,7 +291,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.0.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.1.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards

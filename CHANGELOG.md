@@ -5,6 +5,12 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Doctor diagnostics
+
+- Report unknown journal status without fabricating an unresolved-operation count; preserve the original diagnostic error in CLI/MCP and human output (contract 2.1.0).
+- Reuse the doctor discovery response for document inspection, eliminating its redundant application query.
+- Reduce suggestions.md to remaining locally reproducible engineering work.
+
 ## Unified scoped reads
 
 - Make `get` the read interface for compact data and 1...16 optional native targets; return native snapshots alongside metadata, geometry and scope-specific state tokens.

@@ -93,13 +93,15 @@ struct DoctorCommand: ParsableCommand {
             let output = OutputFormatter.renderDoctorReport(report, format: globals.outputFormat)
             print(output)
             if !report.allChecksPassed {
-                if !report.appRunning {
+                if let error = report.diagnosticError {
+                    throw error
+                } else if !report.appRunning {
                     throw C1Error.appNotRunning("Capture One is not running.")
                 } else if !report.hasDocument {
                     throw C1Error.noDocument("No document is currently open in Capture One.")
                 } else if !report.lockAcquired {
                     throw C1Error.captureOneBusy("Capture One application lock could not be acquired.")
-                } else if report.unresolvedOperationsCount > 0 {
+                } else if (report.unresolvedOperationsCount ?? 0) > 0 {
                     throw C1Error.invalidRequest("Doctor diagnostic detected unresolved operations.")
                 } else if SessionController.evaluateVersionCompatibility(report.appVersion).isAllowed {
                     throw C1Error.documentChanged("Exactly one open document is required.")

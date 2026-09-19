@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "2.0.0"
+    public static let version = "2.1.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -183,7 +183,7 @@ public enum ContractSchema {
             requestStatusProperties[name] = ["type": "integer"]
         }
         var responses: [String: Any] = [
-            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer"], "allChecksPassed": boolean, "warning": string]),
+            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),
             "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
             "request_status": object(requestStatusProperties, required: ["requestId", "tool", "phase", "status", "elapsedMs", "processAlive", "stale"]),
             "capabilities": ["type": "object"], "schema": ["type": "object"],
