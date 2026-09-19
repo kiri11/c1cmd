@@ -26,6 +26,7 @@ InventoryTests.run()
 ReadWorkflowTests.run()
 RequestContextTests.run()
 GeometryTests.run()
+RecipeTests.run()
 
 print("\n=== Test Results ===")
 print("Total Assertions : \(totalTestCount)")

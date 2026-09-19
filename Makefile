@@ -53,6 +53,7 @@ check-python:
 	python3 -B Tests/benchmark_reads_test.py
 	python3 -B scripts/generate-native-editing.py --check
 	python3 -B Tests/recovery_harness_test.py
+	python3 -B Tests/recipe_harness_test.py
 	python3 -B Tests/release_runner_test.py
 
 # Normal qualification excludes deliberate timeout/process-death injection.
@@ -105,3 +106,12 @@ clean:
 .PHONY: archive
 archive: build
 	./scripts/package-release.sh v0.1.0 $(BUILD_DIR) dist
+
+# Dedicated compound paths; uses the normal recovery fixture/ownership guards.
+.PHONY: qualify-recipes-recovery
+RECIPE_RECOVERY_CASES ?= native tonal geometry preview mcp-death
+qualify-recipes-recovery:
+	@test -f "$(C1_TEST_RAW_FIXTURE)" || { echo 'Set C1_TEST_RAW_FIXTURE to an existing RAW file.' >&2; exit 1; }
+	@test -f "$(ARCHIVE)" || { echo 'Build an archive first with make archive or make qualify.' >&2; exit 1; }
+	@test -n "$(EVIDENCE_DIR)" && test ! -e "$(EVIDENCE_DIR)" || { echo 'Set EVIDENCE_DIR to a new directory.' >&2; exit 1; }
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recipe_recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))" --cases $(RECIPE_RECOVERY_CASES)

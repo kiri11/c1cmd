@@ -75,7 +75,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 30
+        assert len(tools) == 35
         assert "native_get" not in cli_schema["requests"]
         removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
         assert removed.get('isError'), removed
@@ -173,6 +173,22 @@ def run(cli, mcp):
             result = client.tool(name, args)
             assert result.get('isError'), (name, args, result)
             assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
+        bad_recipe = dict(version=1, referenceId='a'*64, settings={'clarity amount':5},
+                          exposure={'mode':'magic'}, whiteBalance={'mode':'preserve'}, cropPolicy='preserve')
+        for name, args in [('recipe_register', {'recipe':bad_recipe}),
+                           ('reference_capture', {'ref':'1'}),
+                           ('edit_status', {'compoundId':'../escape'}),
+                           ('edit_apply', {'recipeId':'a'*64,'sourceRef':'1','ifState':'s','ifDocument':'d',
+                                           'geometry':{'rotation':1}})]:
+            result = client.tool(name,args)
+            assert result.get('isError'), result
+            assert_error_payload(json.loads(result['content'][0]['text']),cli_schema)
+        with tempfile.TemporaryDirectory() as directory:
+            request = Path(directory)/'invalid-recipe.json'
+            request.write_text(json.dumps({'recipe':bad_recipe}))
+            result = subprocess.run([str(cli),'recipe','register','--file',str(request),'--format','json'],capture_output=True,text=True,timeout=15)
+            assert result.returncode != 0
+            assert_error_payload(json.loads(result.stderr),cli_schema)
         for payload in ['{"exposure": 1, "unknown": 2}', '{"exposure": true}', '{"exposure": "bad", "contrast": 1}', '{}']:
             result = subprocess.run([str(cli), 'set', 'x', '--if-state', 'h', '--json', payload], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
@@ -199,7 +215,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 30 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 35 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:

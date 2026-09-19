@@ -44,11 +44,20 @@ public struct OperationFailure: Error, CustomStringConvertible {
     public var description: String { "Operation \(operationId): \(cause). Inspect operation status; do not retry the write." }
 }
 
+public struct CompoundFailure: Error, CustomStringConvertible {
+    public let compoundId: String
+    public let cause: Error
+    public let persistenceError: String
+    public var description: String { "Compound \(compoundId): \(cause). Report persistence failed: \(persistenceError). Inspect edit_status and linked child operations; do not retry." }
+}
+
 public enum ErrorResponse {
     public static func payload(_ error: Error) -> [String: Any] {
-        let failure = error as? OperationFailure
-        let cause = failure?.cause ?? error
+        let compound = error as? CompoundFailure
+        let failure = (compound?.cause ?? error) as? OperationFailure
+        let cause = failure?.cause ?? compound?.cause ?? error
         var body: [String: Any] = ["code": (cause as? C1Error)?.errorCode ?? "unexpected-error", "message": String(describing: error)]
+        if let compound { body["compoundId"] = compound.compoundId }
         if let failure = failure { body["operationId"] = failure.operationId; body["outcome"] = "inspect-operation" }
         return ["error": body]
     }

@@ -118,7 +118,7 @@ Inventory listing filters before full metadata reads and uses sequential bounded
 
 ## Validation workflow
 
-Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`. Use `make qualify-extended` for all ten regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
+Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`. Use `make qualify-extended` for all eleven regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
 
 Run relevant recovery tests when a change can affect recovery behavior; a separate explicit user request is not required. Changes to mutation dispatch, durable journaling, unresolved-write blocking, lock ownership, timeout handling, application lifetime, restart/reconciliation, or stale-reference invalidation require affected live fault cases as well as offline safeguards. Use `make qualify-recovery RECOVERY_CASES="..."` against an archive rebuilt from the candidate. Select `tonal`, `geometry`, `lens`, `perspective`, or `keystone` for those mutation paths, `preview` for export timeout/completion, `mcp-death` for MCP cancellation/process lifetime, and `clone-readback` for clone-ID readback. Shared recovery changes need all affected fault paths; use `RECOVERY_CASES=all` when impact cannot be narrowed. Changes to the recovery harness's pause, dispatch detection, shutdown, identity checks, or reconciliation assertions require the cases they affect.
 
@@ -144,3 +144,36 @@ its existing guards. See [native editing](docs/native-editing/README.md).
 
 Select `QUALIFY_SUITES=native` for regular native editing validation and
 `RECOVERY_CASES="native native-action"` for its affected fault paths.
+
+
+## Reference recipes and compound edits
+
+Use `reference_capture`, `recipe_register`, `recipe_verify`, `edit_apply` and
+`edit_status` (CLI `recipe capture/register/verify/apply/status --file REQUEST`).
+Requests share the published JSON schema. Capture records a preview and explicit
+coverage limits; reference hashes are evidence, never mutation permission.
+
+Registration does not authorize reuse. Verify each exact payload on an explicitly
+created disposable managed clone; inspect its preview. Only verified payloads can
+be applied, and changed payloads need new verification. Recipes currently support
+fourteen global numeric settings and explicit exposure/white-balance policies;
+mask/layer reconstruction, curves, indexed color fields and camera/lens profiles
+are excluded from recipe transfer.
+
+`edit_apply` prepares one existing variant and retains fresh per-step native
+preconditions, before-state, readback and child operation IDs. Exposure/WB policies
+are mandatory in recipes; per-photo overrides are explicit. Crop policy preserves
+geometry unless `per-photo` is selected and explicit geometry with the inspected
+`ifGeometryState` is supplied. Do not infer a crop from reference coordinates.
+
+Inspect the returned completion report and final observations. On failure, stop:
+never automatically retry, resume or undo a compound edit. Use `edit_status` with
+the parent `compoundId`; use `operation_status` with uncertain child operation IDs
+for normal restart/reconciliation. Interrupted parent reports do not become
+successful when a child is reconciled. Production commands never quit Capture One.
+
+Select `QUALIFY_SUITES=recipes` for the regular suite. Use
+`make qualify-recipes-recovery RECIPE_RECOVERY_CASES="native tonal geometry preview mcp-death"`
+for affected compound fault paths against the candidate archive. Keep offline tests
+and live suites sequential because both use the application lock. See
+[recipe workflow](docs/recipes/README.md) for the full bounded contract.

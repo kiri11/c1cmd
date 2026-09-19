@@ -138,6 +138,11 @@ public final class RequestContext: @unchecked Sendable {
         mutex.lock(); let stop = cancelled && state.tool == "variants_list"; mutex.unlock()
         if stop { throw C1Error.requestCancelled("Inventory cancelled between Apple Events; no partial inventory was returned.") }
     }
+    /// Compound workflows stop only after the current guarded operation has returned.
+    public func checkCompoundCancellation() throws {
+        mutex.lock(); let stop = cancelled; mutex.unlock()
+        if stop { throw C1Error.requestCancelled("Compound edit cancelled between steps; inspect its completion report.") }
+    }
     public func finish(error: Error? = nil) {
         timer?.cancel(); timer = nil
         mutex.lock()

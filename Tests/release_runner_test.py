@@ -17,7 +17,7 @@ class ReleaseRunnerTests(unittest.TestCase):
         self.assertEqual(tuple(runner.parse_args(['archive']).suites), ('cli', 'mcp', 'existing'))
         self.assertEqual(runner.parse_args(['archive', '--suites', 'all']).suites, list(runner.SUITES))
         self.assertEqual(runner.parse_args(['archive', '--suites', 'lens', 'geometry']).suites, ['lens', 'geometry'])
-        self.assertEqual(len(runner.SUITES), 10)
+        self.assertEqual(len(runner.SUITES), 11)
         self.assertFalse(any('recovery' in script for script, _ in runner.SUITES.values()))
 
     def test_invalid_selection_has_no_side_effects(self):

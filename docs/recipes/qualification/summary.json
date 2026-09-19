@@ -1,0 +1,58 @@
+{
+  "build": "16.8.5.30",
+  "archiveSHA256": "c97e0e6d7accb7525cbdb5bc19de63cc9cf29a14a827645bfff72d0b09dd5785",
+  "cliSHA256": "3c2dddf75d5beb23a056c99658fb90d37a23233d920fdb45a567bb3cf17616e8",
+  "mcpSHA256": "a4ade45dde253b1cac7237685ea51731fdb79bb0611530528a2ccebd62fb0378",
+  "regular": {
+    "rawSHA256": "2505287a24868a162c94bc879303a76f1e76b7ccb2bba4cacfdfeb4a33c4b868",
+    "cliSHA256": "3c2dddf75d5beb23a056c99658fb90d37a23233d920fdb45a567bb3cf17616e8",
+    "mcpSHA256": "a4ade45dde253b1cac7237685ea51731fdb79bb0611530528a2ccebd62fb0378",
+    "session": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-mcq3gvxd/recipes"
+  },
+  "recovery": [
+    {
+      "case": "tonal",
+      "pauseToReplySeconds": 120.042731,
+      "compoundId": "e134399286e44ce17d50e9ce10e41e7ba65e4349eafd29a10afa4c63e4ce0081",
+      "childOperationId": "7067fb90-170c-4202-8d3a-4f076145b51a",
+      "childReconciled": true,
+      "parentStatus": "outcome-unknown"
+    },
+    {
+      "case": "native",
+      "pauseToReplySeconds": 120.043974,
+      "compoundId": "05f74a341dffe069e73ddcffe1394bdf3c6c86744dd28e0f2be26a3a253c95bf",
+      "childOperationId": "43be0f21-107c-4043-b127-526d0f061f2b",
+      "childReconciled": true,
+      "parentStatus": "outcome-unknown"
+    },
+    {
+      "case": "geometry",
+      "pauseToReplySeconds": 120.052344,
+      "compoundId": "f40527dfbfc89d8bbf60430dcd3c10b7a04216abf82fcff2854549a793be3174",
+      "childOperationId": "8bf1978e-d792-4653-a4ee-1cfecb592c3c",
+      "childReconciled": true,
+      "parentStatus": "outcome-unknown"
+    },
+    {
+      "case": "preview",
+      "pauseToReplySeconds": 120.057828,
+      "compoundId": "fa0eabcaeee0abc8c8133d258c99bc7243d3422fc2a4869d8ce24b7d330c1714",
+      "childOperationId": "49fca650-837b-40f9-b9c4-e42ff8df5261",
+      "childReconciled": true,
+      "parentStatus": "outcome-unknown"
+    }
+  ],
+  "callerDeath": {
+    "compoundId": "73eee06c427ff8c18c8fdb01c4ed87f6b7f52a0064bfcf4ebef707494e5c4f62",
+    "status": "interrupted",
+    "completedChildren": 1
+  },
+  "cleanup": {
+    "time": "2026-09-19T18:31:51.514512+00:00",
+    "event": "cleanup",
+    "openDocuments": 0,
+    "retainedSession": "/Users/kiri11/projects/c1cmd/.build/recovery-fixtures/c1-recovery-16qxomcl/recovery"
+  },
+  "scope": "Session fixture; no Catalog, mask/layer/curve recipe transfer, unrelated live matrices or full fault campaign claim"
+}

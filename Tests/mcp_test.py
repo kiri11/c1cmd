@@ -229,7 +229,7 @@ def main():
         }
         missing = expected_tools - tool_names
         assert not missing, f"Missing required tools in tools/list: {missing}"
-        assert len(tools) == 23, f"Expected 23 tools, found {len(tools)}"
+        assert len(tools) == 35, f"Expected 35 tools, found {len(tools)}"
         for t in tools:
             assert "description" in t and t["description"], f"Tool {t['name']} missing description"
             assert "inputSchema" in t and isinstance(t["inputSchema"], dict), f"Tool {t['name']} invalid schema"

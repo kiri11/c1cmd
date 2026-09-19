@@ -18,6 +18,7 @@ public struct DoubleDiff: Codable, Equatable {
 
 public struct OperationRecord: Codable, Equatable {
     public let operationId: String
+    public var compoundId: String?
     public var appInstance: String?
     public var documentIdentity: String?
     public var nativeVariantId: String?

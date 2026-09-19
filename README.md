@@ -349,3 +349,7 @@ Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed Apple
 ### Read-only Catalog discovery and archives
 
 Use `c1 variants list --database /absolute/path/Library.cocatalog/Library.cocatalogdb` for concurrent SQLite stored discovery, `c1 catalog inspect` for raw stored settings and membership, and `c1 catalog snapshot` for a SQLite backup to a new file. Each response reports database provenance and observation time. Stored observations may lag Capture One and never authorize writes. See [the supported schema, commands, performance evidence, and limits](docs/catalog-reader.md).
+
+### Reference recipes and compound edits
+
+[Reference recipes](docs/recipes/README.md) provide content-addressed reference bundles, independently verified global-setting payloads, and a shared single-photo CLI/MCP operation for preparation, overrides, optional geometry and preview. Compound reports retain partial completion and child operation IDs; unknown outcomes are never retried.

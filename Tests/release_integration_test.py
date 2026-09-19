@@ -27,6 +27,7 @@ SUITES = {
     'existing': ('existing_variant_integration_test.py', 600),
     'inventory': ('inventory_integration_test.py', 600),
     'native': ('native_editing_integration_test.py', 1800),
+    'recipes': ('recipe_integration_test.py', 1200),
 }
 DEFAULT_SUITES = ('cli', 'mcp', 'existing')
 

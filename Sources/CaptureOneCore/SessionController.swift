@@ -315,6 +315,7 @@ public final class SessionController {
     private func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
         try assertWritableImage(doc: doc, source: source)
         var result = entry
+        result.compoundId = Thread.current.threadDictionary["c1.compoundId"] as? String
         result.appInstance = try appInstance()
         result.documentIdentity = try databaseIdentity(databasePath(doc))
         result.nativeVariantId = source?.id
@@ -1599,6 +1600,18 @@ public final class SessionController {
                 if entry.status == "pending" { entry.status = "outcome-unknown"; entry.error = error.localizedDescription; try? journal.append(entry: entry) }
                 throw OperationFailure(operationId: entry.operationId, cause: error)
             }
+        }
+    }
+
+    /// Independent direct-property reader: does not call nativeRead/nativeReadField.
+    func recipeOracle(ref: String) throws -> [String:Double] {
+        try lock.withLock {
+            let doc = try getDocumentInfo(), source = try get(ref:ref)
+            try checkedDocument(doc, writes:false)
+            let values: [Double] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+            guard values.count == Recipes.oracleFields.count, values.allSatisfy({ $0.isFinite }) else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
+            try checkedDocument(doc,writes:false)
+            return Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
         }
     }
 

@@ -80,7 +80,7 @@ and interpretation limits. A pass applies only to its recorded scope.
 
 Choose tests by changed behavior. `make check` is the offline development loop.
 `make qualify` runs packaged CLI, MCP, and existing-variant workflows;
-`QUALIFY_SUITES` selects affected matrices and `make qualify-extended` runs all ten, including `native`.
+`QUALIFY_SUITES` selects affected matrices and `make qualify-extended` runs all eleven, including `native` and `recipes`.
 Documentation-only changes need syntax/link checks. Live suites remain sequential.
 
 Run affected live faults when production recovery or fault-harness behavior
@@ -152,3 +152,17 @@ roadmap were removed from the working tree. They remain in Git history at
 recovery suites under `Tests/` are the development entry points; the retained
 geometry probes investigate native behavior. Style learning remains a separate
 consumer of the public interface, as described in the README.
+
+
+## Compound recipe qualification
+
+Contract 2.4.0 adds the bounded [recipe workflow](recipes/README.md). Its regular
+suite is `QUALIFY_SUITES=recipes`; dedicated fault cases use
+`make qualify-recipes-recovery` and `RECIPE_RECOVERY_CASES`. They exercise compound
+paths and do not replace unrelated native-action, lens/perspective, Catalog or
+metadata qualification. Keep `make check` sequential with live qualification:
+offline fake-executor tests also acquire the application lock.
+
+The [2026-09-19 recipe report](recipes/qualification/README.md) records the packaged
+recipe suite, five compound fault cases and final offline pass. It does not imply
+coverage of the excluded transfer types or unrelated recovery paths.

@@ -1,0 +1,99 @@
+{
+  "images": [
+    {
+      "Z_PK": 1,
+      "ZIMAGEUUID": "4299084E-B5AF-4567-8DB5-766B51CD0ECA",
+      "ZIMAGELOCATION": 1,
+      "ZIMAGEFILENAME": "fixture.CR3"
+    },
+    {
+      "Z_PK": 2,
+      "ZIMAGEUUID": "27E8F157-834A-4B98-820D-AD118E26F58A",
+      "ZIMAGELOCATION": 6,
+      "ZIMAGEFILENAME": "preview.jpg"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGEUUID": "7DE5D841-86C2-4E63-B7CA-9E1276DE18EF",
+      "ZIMAGELOCATION": 7,
+      "ZIMAGEFILENAME": "preview.jpg"
+    }
+  ],
+  "paths": [
+    {
+      "Z_PK": 1,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Capture",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 2,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Selects",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 3,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 4,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Trash",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 5,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output/c1-previews",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 6,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output/c1-previews/5b762281-c792-4d4b-8e49-75967fd4def2",
+      "ZISRELATIVE": 1
+    },
+    {
+      "Z_PK": 7,
+      "ZMACROOT": "",
+      "ZRELATIVEPATH": "Output/c1-previews/389f63bf-1b60-4ccd-867c-d7e02d0bdc49",
+      "ZISRELATIVE": 1
+    }
+  ],
+  "variants": [
+    {
+      "Z_PK": 1,
+      "ZIMAGE": 1,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "EAA3F698-5566-4DC3-AEF6-A47B8A464E65"
+    },
+    {
+      "Z_PK": 3,
+      "ZIMAGE": 1,
+      "ZINDEX": 255,
+      "ZVARIANTUUID": "B72385D3-C5DA-4C4C-8403-57A95882D7B2"
+    },
+    {
+      "Z_PK": 4,
+      "ZIMAGE": 2,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "A9984555-BB26-4EBB-A341-0797BA8A7D28"
+    },
+    {
+      "Z_PK": 5,
+      "ZIMAGE": 3,
+      "ZINDEX": 127,
+      "ZVARIANTUUID": "168BF990-65A0-429A-862B-57E334C0BADB"
+    },
+    {
+      "Z_PK": 8,
+      "ZIMAGE": 1,
+      "ZINDEX": 383,
+      "ZVARIANTUUID": "D4E3393B-99F2-41C8-9C54-18C7EB40EB41"
+    }
+  ],
+  "quickCheck": "ok"
+}

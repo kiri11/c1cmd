@@ -5,6 +5,14 @@ Entries describe changes at their recorded contract version. See the [README](RE
 for current behavior and [release validation](docs/RELEASE_VALIDATION.md) for current
 support limits and test-selection policy.
 
+## Reference recipes and compound edits
+
+- Add shared CLI/MCP reference capture, content-addressed recipe registration, managed-clone verification, single-photo compound application and durable status inspection (contract 2.4.0).
+- Require explicit exposure, paired white-balance and crop policies. The initial recipe allowlist covers fourteen global numeric controls plus exposure/white balance; masks, layer reconstruction, curves, indexed color controls and camera/lens profiles remain excluded from recipe transfer.
+- Independently verify registered payloads before reuse and bind evidence to the payload/build/report hashes. Exported reference bundles identify uncaptured and unsupported state.
+- Preserve per-step before-state, fresh tokens, child operation IDs/readback and partial completion. Return final observed settings and optional preview; interrupted or uncertain compounds never resume automatically.
+- See [recipe workflow and validation](docs/recipes/README.md) for commands and current qualification scope.
+
 ## Coupled color-balance writes
 
 - Write requested saturation before its paired hue on all four image/layer color wheels, preserving omitted controls. On Capture One 16.8.5.30, a neutral-wheel request for hue 237 and saturation 0.2 previously returned approximately 237.14285 with hue-first ordering; saturation-first returned approximately 237.00004.

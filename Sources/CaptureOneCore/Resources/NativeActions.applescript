@@ -77,3 +77,16 @@ on nativeArgument(argName, argNames, argValues, defaultValue)
     end repeat
     return defaultValue
 end nativeArgument
+
+-- Intentionally separate from generated nativeReadField and nativeApply.
+-- Keep this explicit order matched to Recipes.oracleFields; live tests compare
+-- every supported field against both paths before registering a payload.
+on nativeRecipeOracle(docName, variantId, expectedParent)
+    tell application "/Applications/Capture One.app"
+        set d to my checkedDocument(docName)
+        set v to variant id variantId of d
+        if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
+        set a to adjustments of v
+        return {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real}
+    end tell
+end nativeRecipeOracle

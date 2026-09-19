@@ -71,7 +71,7 @@ struct C1MCPServer {
             )
         )
         
-        let definitions: [(String, String, Bool)] = [
+        let definitions: [(String, String, Bool)] = Recipes.tools.map { ($0, "Versioned reference recipes and bounded compound edits. Verification requires a managed clone. Inspect status and child operation IDs after failure; never retry automatically.", $0 == "edit_status") } + [
             ("read_session_begin", "Begin exclusive c1 browsing with a native scope baseline. No UI changes until read_session_end. Auto-routed browse results omit mutation tokens; use live:true before edits.", false),
             ("read_session_end", "End accelerated browsing before returning control to the photographer.", false),
             ("read_session_status", "Inspect read workflow state and process new journal observations.", true),
@@ -104,7 +104,7 @@ struct C1MCPServer {
             ("operation_status", "Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),
         ]
         let compositionOnly = ProcessInfo.processInfo.environment["C1_MCP_PROFILE"] == "composition"
-        let excluded: Set<String> = ["native_set", "native_action", "set", "add", "reset", "variant_baseline", "metadata_set"]
+        let excluded: Set<String> = Set(Recipes.tools.filter { $0 != "edit_status" }).union(["native_set", "native_action", "set", "add", "reset", "variant_baseline", "metadata_set"])
         let enabled = definitions.filter { !compositionOnly || !excluded.contains($0.0) }
         let enabledNames = Set(enabled.map { $0.0 })
         let tools: [Tool] = try enabled.map { name, description, readOnly in
@@ -253,6 +253,9 @@ struct C1MCPServer {
                                 let json = OutputFormatter.formatJson(res)
                                 return CallTool.Result(content: [textContent(json)], isError: false)
                         
+                            case "reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status":
+                                let result = try RecipeWorkflow().run(params.name,arguments:args)
+                                return CallTool.Result(content:[textContent(try ReadWorkflow.json(result))],isError:["failed","outcome-unknown","interrupted"].contains(result["status"] as? String ?? ""))
                             case "native_set", "native_action":
                                 let target = try NativeEditing.target(args["target"])
                                 let core = SessionController.shared

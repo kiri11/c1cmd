@@ -1,0 +1,1118 @@
+[
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "variants",
+        "list"
+      ],
+      "code": 0,
+      "result": [
+        {
+          "colorTag": 0,
+          "id": "1",
+          "isManagedWorkingClone": false,
+          "isSelected": false,
+          "name": "2U6A7257",
+          "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture/2U6A7257.CR3",
+          "rating": 0
+        }
+      ]
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "doctor"
+      ],
+      "code": 0,
+      "result": {
+        "allChecksPassed": true,
+        "appRunning": true,
+        "appVersion": "16.8.5.30",
+        "docName": "recipes.cosessiondb",
+        "docPath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+        "exactBuildMatched": true,
+        "hasDocument": true,
+        "isSession": true,
+        "lockAcquired": true,
+        "pinnedBuild": "16.8.5.30",
+        "testedBuilds": [
+          "16.8.5.30"
+        ],
+        "unresolvedOperationsCount": 0,
+        "writesEnabled": true
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "get",
+        "1"
+      ],
+      "code": 0,
+      "result": {
+        "adjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "geometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "geometryUsableBounds": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "id": "1",
+        "metadata": {
+          "asShotWB": "Manual",
+          "camera": "Canon EOS R6m2",
+          "colorTag": 0,
+          "iso": "ISO 2500",
+          "lens": "Canon EF 35mm f/1.4L II USM",
+          "rating": 0,
+          "shutterSpeed": "1/800 s"
+        },
+        "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+        "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture/2U6A7257.CR3",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a"
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "doc",
+        "info"
+      ],
+      "code": 0,
+      "result": {
+        "appVersion": "16.8.5.30",
+        "captureFolder": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture",
+        "documentId": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+        "documentName": "recipes.cosessiondb",
+        "documentPath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+        "isSession": true,
+        "openToken": "49743:1789839329.898252|/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/recipes.cosessiondb|16777232|4650118|1789841423.0776346",
+        "outputFolder": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Output",
+        "writesEnabled": true
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "recipe",
+        "capture",
+        "--file",
+        "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/request-4.json"
+      ],
+      "code": 0,
+      "result": {
+        "bundle": {
+          "coverage": {
+            "atomicSnapshot": false,
+            "capturedScopes": [
+              "adjustments",
+              "lens",
+              "variant"
+            ],
+            "colorEditorElements": "not-captured",
+            "layerSettings": "not-captured",
+            "maskPixels": "unsupported",
+            "rawBytes": "not-included",
+            "skinTone": "unsupported"
+          },
+          "createdAt": "2026-09-19T18:10:45Z",
+          "document": {
+            "appVersion": "16.8.5.30",
+            "captureFolder": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture",
+            "documentId": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+            "documentName": "recipes.cosessiondb",
+            "documentPath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+            "isSession": true,
+            "openToken": "49743:1789839329.898252|/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/recipes.cosessiondb|16777232|4650118|1789841423.0776346",
+            "outputFolder": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Output",
+            "writesEnabled": true
+          },
+          "observed": {
+            "adjustments": {
+              "contrast": 0,
+              "exposure": 0,
+              "saturation": 0,
+              "temperature": 3200.113037109375,
+              "tint": 0.006856377236545086
+            },
+            "geometry": {
+              "crop": {
+                "centerX": 3000,
+                "centerY": 2000,
+                "height": 4000,
+                "width": 6000
+              },
+              "cropOutsideImage": false,
+              "flip": "none",
+              "hideDistortedAreas": true,
+              "imageHeight": 4000,
+              "imageWidth": 6000,
+              "keystone": [
+                100,
+                0,
+                0,
+                0,
+                0
+              ],
+              "lensGeometry": [
+                0,
+                35,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "lensProfile": "Canon EF 35mm f/1.4L II USM",
+              "maximumCrop": {
+                "centerX": 2999,
+                "centerY": 2000,
+                "height": 3999,
+                "width": 5999
+              },
+              "orientation": 0,
+              "rotation": 0
+            },
+            "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+            "geometryUsableBounds": {
+              "centerX": 3000,
+              "centerY": 2000,
+              "height": 4000,
+              "width": 6000
+            },
+            "id": "1",
+            "metadata": {
+              "asShotWB": "Manual",
+              "camera": "Canon EOS R6m2",
+              "colorTag": 0,
+              "iso": "ISO 2500",
+              "lens": "Canon EF 35mm f/1.4L II USM",
+              "rating": 0,
+              "shutterSpeed": "1/800 s"
+            },
+            "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+            "nativeSnapshots": [
+              {
+                "advancedColorCount": 0,
+                "basicColorCount": 9,
+                "layers": [
+                  {
+                    "nativeEnabled": true,
+                    "nativeKind": "background",
+                    "nativeName": "Background",
+                    "nativeOpacity": 100
+                  }
+                ],
+                "nativeStateHash": "9620ae1f582e55a53ca32e78864e41fb2ed728a24da494e84ead373b62d5f634",
+                "ref": "1",
+                "target": {
+                  "element": 0,
+                  "layer": 0,
+                  "scope": "adjustments"
+                },
+                "unavailable": {},
+                "values": {
+                  "black and white": false,
+                  "black and white blue sensitivity": 0,
+                  "black and white cyan sensitivity": 0,
+                  "black and white green sensitivity": 0,
+                  "black and white magenta sensitivity": 0,
+                  "black and white red sensitivity": 0,
+                  "black and white split highlight hue": 0,
+                  "black and white split highlight saturation": 0,
+                  "black and white split shadow hue": 0,
+                  "black and white split shadow saturation": 0,
+                  "black and white yellow sensitivity": 0,
+                  "black recovery": 0,
+                  "blue curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "brightness": 0,
+                  "clarity amount": 0,
+                  "clarity method": "natural",
+                  "clarity structure": 0,
+                  "color balance highlight hue": 0,
+                  "color balance highlight lightness": 0,
+                  "color balance highlight saturation": 0,
+                  "color balance master hue": 0,
+                  "color balance master saturation": 0,
+                  "color balance midtone hue": 0,
+                  "color balance midtone lightness": 0,
+                  "color balance midtone saturation": 0,
+                  "color balance shadow hue": 0,
+                  "color balance shadow lightness": 0,
+                  "color balance shadow saturation": 0,
+                  "color profile": "Canon EOS R6 Mark II ProStandard",
+                  "contrast": 0,
+                  "dehaze amount": 0,
+                  "dehaze color": [
+                    264,
+                    2366,
+                    878
+                  ],
+                  "exposure": 0,
+                  "film curve": "Auto",
+                  "film grain granularity": 50,
+                  "film grain impact": 0,
+                  "film grain type": "fine",
+                  "flip": "none",
+                  "green curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "highlight adjustment": 0,
+                  "highlight recovery": 0,
+                  "keystone amount": 100,
+                  "keystone aspect": 0,
+                  "keystone horizontal": 0,
+                  "keystone skew": 0,
+                  "keystone vertical": 0,
+                  "level highlight blue": 255,
+                  "level highlight green": 255,
+                  "level highlight red": 255,
+                  "level highlight rgb": 255,
+                  "level midtone blue": 0,
+                  "level midtone green": 0,
+                  "level midtone red": 0,
+                  "level midtone rgb": 0,
+                  "level shadow blue": 0,
+                  "level shadow green": 0,
+                  "level shadow red": 0,
+                  "level shadow rgb": 0,
+                  "level target highlight blue": 255,
+                  "level target highlight green": 255,
+                  "level target highlight red": 255,
+                  "level target highlight rgb": 255,
+                  "level target shadow blue": 0,
+                  "level target shadow green": 0,
+                  "level target shadow red": 0,
+                  "level target shadow rgb": 0,
+                  "luma curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "moire amount": 0,
+                  "moire pattern": 8,
+                  "noise reduction color": 50,
+                  "noise reduction details": 50,
+                  "noise reduction luminance": 50,
+                  "noise reduction single pixel": 0,
+                  "orientation": 0,
+                  "red curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rgb curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rotation": 0,
+                  "saturation": 0,
+                  "shadow recovery": 0,
+                  "sharpening amount": 180,
+                  "sharpening halo suppression": 0,
+                  "sharpening radius": 0.800000011920929,
+                  "sharpening threshold": 1,
+                  "temperature": 3200.113037109375,
+                  "tint": 0.006856377236545086,
+                  "vignetting amount": 0,
+                  "vignetting method": "elliptic on crop",
+                  "white balance preset": "Tungsten",
+                  "white recovery": 0
+                }
+              },
+              {
+                "advancedColorCount": 0,
+                "basicColorCount": 0,
+                "layers": [
+                  {
+                    "nativeEnabled": true,
+                    "nativeKind": "background",
+                    "nativeName": "Background",
+                    "nativeOpacity": 100
+                  }
+                ],
+                "nativeStateHash": "966998e63426e11a187450e940224e674fd5d07034f22e1cfa37e9e95986c20c",
+                "ref": "1",
+                "target": {
+                  "element": 0,
+                  "layer": 0,
+                  "scope": "lens"
+                },
+                "unavailable": {},
+                "values": {
+                  "aperture": 1.399999976158142,
+                  "chromatic aberration": true,
+                  "custom chromatic aberration": false,
+                  "diffraction correction": false,
+                  "distortion": 0,
+                  "focal length": 35,
+                  "hide distorted areas": true,
+                  "lens profile": "Canon EF 35mm f/1.4L II USM",
+                  "light falloff": 0,
+                  "sharpness falloff": 0,
+                  "shift": 0,
+                  "shift direction": 0,
+                  "shift x": 0,
+                  "shift y": 0,
+                  "tilt": 0,
+                  "tilt direction": 0
+                }
+              },
+              {
+                "advancedColorCount": 0,
+                "basicColorCount": 0,
+                "layers": [
+                  {
+                    "nativeEnabled": true,
+                    "nativeKind": "background",
+                    "nativeName": "Background",
+                    "nativeOpacity": 100
+                  }
+                ],
+                "nativeStateHash": "c362c8dcc7ea2b5f9db391f2b6e7c63b1b2cab5a35b384f441fd2fd678a54324",
+                "ref": "1",
+                "target": {
+                  "element": 0,
+                  "layer": 0,
+                  "scope": "variant"
+                },
+                "unavailable": {},
+                "values": {
+                  "LCC color cast": false,
+                  "LCC dust removal": false,
+                  "LCC uniform light": false,
+                  "LCC uniform light amount": 0,
+                  "processing mode": "photography"
+                }
+              }
+            ],
+            "openToken": "49743:1789839329.898252|/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/recipes.cosessiondb|16777232|4650118|1789841423.0776346",
+            "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture/2U6A7257.CR3",
+            "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a"
+          },
+          "preview": {
+            "fileSizeBytes": 160797,
+            "geometry": {
+              "crop": {
+                "centerX": 3000,
+                "centerY": 2000,
+                "height": 4000,
+                "width": 6000
+              },
+              "cropOutsideImage": false,
+              "flip": "none",
+              "hideDistortedAreas": true,
+              "imageHeight": 4000,
+              "imageWidth": 6000,
+              "keystone": [
+                100,
+                0,
+                0,
+                0,
+                0
+              ],
+              "lensGeometry": [
+                0,
+                35,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "lensProfile": "Canon EF 35mm f/1.4L II USM",
+              "maximumCrop": {
+                "centerX": 2999,
+                "centerY": 2000,
+                "height": 3999,
+                "width": 5999
+              },
+              "orientation": 0,
+              "rotation": 0
+            },
+            "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+            "height": 1000,
+            "nativeVariantId": "1",
+            "operationId": "1c753d45-8f47-4a7c-9a19-6f0e7b68d0bd",
+            "outputPath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Output/c1-previews/1c753d45-8f47-4a7c-9a19-6f0e7b68d0bd/preview.jpg",
+            "pixelSha256": "9070e0f1e860fa18dd1f193e2089cc4338a9126061fd61115a7945657fb6c8d5",
+            "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+            "width": 1500
+          },
+          "previewFileSha256": "3401983299efcff2867c6479f07342c5ea5c445261055fdc834dbe135ad59840",
+          "version": 1
+        },
+        "referenceId": "9bc44f9d959024624c6ba7227476340bcb08656c8ee63e75b38a0bd95057a85c"
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "recipe",
+        "register",
+        "--file",
+        "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/request-5.json"
+      ],
+      "code": 0,
+      "result": {
+        "recipe": {
+          "cropPolicy": "per-photo",
+          "exposure": {
+            "mode": "relative",
+            "value": 0.125
+          },
+          "referenceId": "9bc44f9d959024624c6ba7227476340bcb08656c8ee63e75b38a0bd95057a85c",
+          "settings": {
+            "black recovery": 3,
+            "brightness": 4,
+            "clarity amount": 5,
+            "clarity structure": 2,
+            "contrast": 3,
+            "highlight adjustment": 5,
+            "noise reduction color": 40,
+            "noise reduction luminance": 35,
+            "saturation": 2,
+            "shadow recovery": 6,
+            "sharpening amount": 170,
+            "sharpening radius": 0.8,
+            "sharpening threshold": 1,
+            "white recovery": 4
+          },
+          "version": 1,
+          "whiteBalance": {
+            "mode": "preserve"
+          }
+        },
+        "recipeId": "ecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a",
+        "status": "unverified"
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "recipe",
+        "apply",
+        "--file",
+        "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/request-6.json"
+      ],
+      "code": 1,
+      "result": {
+        "error": {
+          "code": "unexpected-error",
+          "elapsedMs": 256,
+          "message": "Error Domain=NSCocoaErrorDomain Code=260 \"The file \u201cecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a.json\u201d couldn\u2019t be opened because there is no such file.\" UserInfo={NSFilePath=/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/.c1/verified-recipes/ecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a.json, NSURL=file:///Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/.c1/verified-recipes/ecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a.json, NSUnderlyingError=0x9c70d6d90 {Error Domain=NSPOSIXErrorDomain Code=2 \"No such file or directory\"}}",
+          "phase": "lock-acquired",
+          "requestId": "req-ede7848d-1550-4601-9fee-cede360a0de3"
+        }
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "variant",
+        "clone",
+        "1"
+      ],
+      "code": 0,
+      "result": {
+        "baselineStateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "cloneVariantId": "2",
+        "documentPath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes",
+        "sourceVariantId": "1",
+        "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "get",
+        "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+      ],
+      "code": 0,
+      "result": {
+        "adjustments": {
+          "contrast": 0,
+          "exposure": 0,
+          "saturation": 0,
+          "temperature": 3200.113037109375,
+          "tint": 0.006856377236545086
+        },
+        "geometry": {
+          "crop": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "cropOutsideImage": false,
+          "flip": "none",
+          "hideDistortedAreas": true,
+          "imageHeight": 4000,
+          "imageWidth": 6000,
+          "keystone": [
+            100,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensGeometry": [
+            0,
+            35,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lensProfile": "Canon EF 35mm f/1.4L II USM",
+          "maximumCrop": {
+            "centerX": 2999,
+            "centerY": 2000,
+            "height": 3999,
+            "width": 5999
+          },
+          "orientation": 0,
+          "rotation": 0
+        },
+        "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+        "geometryUsableBounds": {
+          "centerX": 3000,
+          "centerY": 2000,
+          "height": 4000,
+          "width": 6000
+        },
+        "id": "2",
+        "metadata": {
+          "asShotWB": "Manual",
+          "camera": "Canon EOS R6m2",
+          "colorTag": 0,
+          "iso": "ISO 2500",
+          "lens": "Canon EF 35mm f/1.4L II USM",
+          "rating": 0,
+          "shutterSpeed": "1/800 s"
+        },
+        "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+        "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture/2U6A7257.CR3",
+        "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+        "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+      }
+    }
+  },
+  {
+    "event": "cli",
+    "value": {
+      "args": [
+        "recipe",
+        "verify",
+        "--file",
+        "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/request-9.json"
+      ],
+      "code": 1,
+      "result": {
+        "activeStep": "verify",
+        "completed": [
+          {
+            "result": {
+              "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+            },
+            "step": "prepare"
+          },
+          {
+            "result": {
+              "after": {
+                "advancedColorCount": 0,
+                "basicColorCount": 9,
+                "layers": [
+                  {
+                    "nativeEnabled": true,
+                    "nativeKind": "background",
+                    "nativeName": "Background",
+                    "nativeOpacity": 100
+                  }
+                ],
+                "nativeStateHash": "50cb4b2cd57ca2e0803f3375094e91389623fa4b9ce89f6e280f19a8999ac023",
+                "ref": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9",
+                "target": {
+                  "element": 0,
+                  "layer": 0,
+                  "scope": "adjustments"
+                },
+                "unavailable": {},
+                "values": {
+                  "black and white": false,
+                  "black and white blue sensitivity": 0,
+                  "black and white cyan sensitivity": 0,
+                  "black and white green sensitivity": 0,
+                  "black and white magenta sensitivity": 0,
+                  "black and white red sensitivity": 0,
+                  "black and white split highlight hue": 0,
+                  "black and white split highlight saturation": 0,
+                  "black and white split shadow hue": 0,
+                  "black and white split shadow saturation": 0,
+                  "black and white yellow sensitivity": 0,
+                  "black recovery": 3,
+                  "blue curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "brightness": 4,
+                  "clarity amount": 5,
+                  "clarity method": "natural",
+                  "clarity structure": 2,
+                  "color balance highlight hue": 0,
+                  "color balance highlight lightness": 0,
+                  "color balance highlight saturation": 0,
+                  "color balance master hue": 0,
+                  "color balance master saturation": 0,
+                  "color balance midtone hue": 0,
+                  "color balance midtone lightness": 0,
+                  "color balance midtone saturation": 0,
+                  "color balance shadow hue": 0,
+                  "color balance shadow lightness": 0,
+                  "color balance shadow saturation": 0,
+                  "color profile": "Canon EOS R6 Mark II ProStandard",
+                  "contrast": 3,
+                  "dehaze amount": 0,
+                  "dehaze color": [
+                    264,
+                    2366,
+                    878
+                  ],
+                  "exposure": 0,
+                  "film curve": "Auto",
+                  "film grain granularity": 50,
+                  "film grain impact": 0,
+                  "film grain type": "fine",
+                  "flip": "none",
+                  "green curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "highlight adjustment": 5,
+                  "highlight recovery": -5,
+                  "keystone amount": 100,
+                  "keystone aspect": 0,
+                  "keystone horizontal": 0,
+                  "keystone skew": 0,
+                  "keystone vertical": 0,
+                  "level highlight blue": 255,
+                  "level highlight green": 255,
+                  "level highlight red": 255,
+                  "level highlight rgb": 255,
+                  "level midtone blue": 0,
+                  "level midtone green": 0,
+                  "level midtone red": 0,
+                  "level midtone rgb": 0,
+                  "level shadow blue": 0,
+                  "level shadow green": 0,
+                  "level shadow red": 0,
+                  "level shadow rgb": 0,
+                  "level target highlight blue": 255,
+                  "level target highlight green": 255,
+                  "level target highlight red": 255,
+                  "level target highlight rgb": 255,
+                  "level target shadow blue": 0,
+                  "level target shadow green": 0,
+                  "level target shadow red": 0,
+                  "level target shadow rgb": 0,
+                  "luma curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "moire amount": 0,
+                  "moire pattern": 8,
+                  "noise reduction color": 40,
+                  "noise reduction details": 50,
+                  "noise reduction luminance": 35,
+                  "noise reduction single pixel": 0,
+                  "orientation": 0,
+                  "red curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rgb curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rotation": 0,
+                  "saturation": 2,
+                  "shadow recovery": 6,
+                  "sharpening amount": 170,
+                  "sharpening halo suppression": 0,
+                  "sharpening radius": 0.800000011920929,
+                  "sharpening threshold": 1,
+                  "temperature": 3200.113037109375,
+                  "tint": 0.006856377236545086,
+                  "vignetting amount": 0,
+                  "vignetting method": "elliptic on crop",
+                  "white balance preset": "Tungsten",
+                  "white recovery": 4
+                }
+              },
+              "before": {
+                "advancedColorCount": 0,
+                "basicColorCount": 9,
+                "layers": [
+                  {
+                    "nativeEnabled": true,
+                    "nativeKind": "background",
+                    "nativeName": "Background",
+                    "nativeOpacity": 100
+                  }
+                ],
+                "nativeStateHash": "dd038cad0dc7f2ecda84e4f18483cb78bd33687ab12dc513141d9983261da3d5",
+                "ref": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9",
+                "target": {
+                  "element": 0,
+                  "layer": 0,
+                  "scope": "adjustments"
+                },
+                "unavailable": {},
+                "values": {
+                  "black and white": false,
+                  "black and white blue sensitivity": 0,
+                  "black and white cyan sensitivity": 0,
+                  "black and white green sensitivity": 0,
+                  "black and white magenta sensitivity": 0,
+                  "black and white red sensitivity": 0,
+                  "black and white split highlight hue": 0,
+                  "black and white split highlight saturation": 0,
+                  "black and white split shadow hue": 0,
+                  "black and white split shadow saturation": 0,
+                  "black and white yellow sensitivity": 0,
+                  "black recovery": 0,
+                  "blue curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "brightness": 0,
+                  "clarity amount": 0,
+                  "clarity method": "natural",
+                  "clarity structure": 0,
+                  "color balance highlight hue": 0,
+                  "color balance highlight lightness": 0,
+                  "color balance highlight saturation": 0,
+                  "color balance master hue": 0,
+                  "color balance master saturation": 0,
+                  "color balance midtone hue": 0,
+                  "color balance midtone lightness": 0,
+                  "color balance midtone saturation": 0,
+                  "color balance shadow hue": 0,
+                  "color balance shadow lightness": 0,
+                  "color balance shadow saturation": 0,
+                  "color profile": "Canon EOS R6 Mark II ProStandard",
+                  "contrast": 0,
+                  "dehaze amount": 0,
+                  "dehaze color": [
+                    264,
+                    2366,
+                    878
+                  ],
+                  "exposure": 0,
+                  "film curve": "Auto",
+                  "film grain granularity": 50,
+                  "film grain impact": 0,
+                  "film grain type": "fine",
+                  "flip": "none",
+                  "green curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "highlight adjustment": 0,
+                  "highlight recovery": 0,
+                  "keystone amount": 100,
+                  "keystone aspect": 0,
+                  "keystone horizontal": 0,
+                  "keystone skew": 0,
+                  "keystone vertical": 0,
+                  "level highlight blue": 255,
+                  "level highlight green": 255,
+                  "level highlight red": 255,
+                  "level highlight rgb": 255,
+                  "level midtone blue": 0,
+                  "level midtone green": 0,
+                  "level midtone red": 0,
+                  "level midtone rgb": 0,
+                  "level shadow blue": 0,
+                  "level shadow green": 0,
+                  "level shadow red": 0,
+                  "level shadow rgb": 0,
+                  "level target highlight blue": 255,
+                  "level target highlight green": 255,
+                  "level target highlight red": 255,
+                  "level target highlight rgb": 255,
+                  "level target shadow blue": 0,
+                  "level target shadow green": 0,
+                  "level target shadow red": 0,
+                  "level target shadow rgb": 0,
+                  "luma curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "moire amount": 0,
+                  "moire pattern": 8,
+                  "noise reduction color": 50,
+                  "noise reduction details": 50,
+                  "noise reduction luminance": 50,
+                  "noise reduction single pixel": 0,
+                  "orientation": 0,
+                  "red curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rgb curve": [
+                    0,
+                    0,
+                    100,
+                    100
+                  ],
+                  "rotation": 0,
+                  "saturation": 0,
+                  "shadow recovery": 0,
+                  "sharpening amount": 180,
+                  "sharpening halo suppression": 0,
+                  "sharpening radius": 0.800000011920929,
+                  "sharpening threshold": 1,
+                  "temperature": 3200.113037109375,
+                  "tint": 0.006856377236545086,
+                  "vignetting amount": 0,
+                  "vignetting method": "elliptic on crop",
+                  "white balance preset": "Tungsten",
+                  "white recovery": 0
+                }
+              },
+              "dryRun": false,
+              "operationId": "8eeddd07-14f2-4e19-9a81-1b04c78b77e1"
+            },
+            "step": "settings"
+          },
+          {
+            "result": {
+              "after": {
+                "contrast": 3,
+                "exposure": 0.125,
+                "saturation": 2,
+                "temperature": 3200.113037109375,
+                "tint": 0.006856377236545086
+              },
+              "before": {
+                "contrast": 3,
+                "exposure": 0,
+                "saturation": 2,
+                "temperature": 3200.113037109375,
+                "tint": 0.006856377236545086
+              },
+              "diff": {
+                "exposure": {
+                  "after": 0.125,
+                  "before": 0,
+                  "delta": 0.125
+                }
+              },
+              "isDryRun": false,
+              "operationId": "e0792e01-6b43-4d71-a45a-eb9d466720d2",
+              "stateHash": "2c3e2b8e892950388cae3a9f1b412c0dc5eeac1efffabcca8045ba275ce19f16",
+              "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+            },
+            "step": "tonal"
+          }
+        ],
+        "compoundId": "ecbb4b5471ed9c2e8d8e6dfedf50e310b6d421f78b6ee62cade7b34e6f70832e",
+        "documentToken": "49743:1789839329.898252|/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/recipes.cosessiondb|16777232|4650118|1789841423.0776346",
+        "error": {
+          "code": "readback-mismatch",
+          "message": "readback-mismatch: Recipe changed omitted field: highlight recovery"
+        },
+        "initial": {
+          "adjustments": {
+            "contrast": 0,
+            "exposure": 0,
+            "saturation": 0,
+            "temperature": 3200.113037109375,
+            "tint": 0.006856377236545086
+          },
+          "geometry": {
+            "crop": {
+              "centerX": 3000,
+              "centerY": 2000,
+              "height": 4000,
+              "width": 6000
+            },
+            "cropOutsideImage": false,
+            "flip": "none",
+            "hideDistortedAreas": true,
+            "imageHeight": 4000,
+            "imageWidth": 6000,
+            "keystone": [
+              100,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lensGeometry": [
+              0,
+              35,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lensProfile": "Canon EF 35mm f/1.4L II USM",
+            "maximumCrop": {
+              "centerX": 2999,
+              "centerY": 2000,
+              "height": 3999,
+              "width": 5999
+            },
+            "orientation": 0,
+            "rotation": 0
+          },
+          "geometryStateHash": "geometry-v1:858f164c91c36ee8b1c3136a1d6029ffa7c92c10d3446cfd11f3e1ba937ccc59",
+          "geometryUsableBounds": {
+            "centerX": 3000,
+            "centerY": 2000,
+            "height": 4000,
+            "width": 6000
+          },
+          "id": "2",
+          "metadata": {
+            "asShotWB": "Manual",
+            "camera": "Canon EOS R6m2",
+            "colorTag": 0,
+            "iso": "ISO 2500",
+            "lens": "Canon EF 35mm f/1.4L II USM",
+            "rating": 0,
+            "shutterSpeed": "1/800 s"
+          },
+          "metadataStateHash": "metadata-v1:a0ea7427f4630daa75a0973470930036a9aec88e18185b266f808ac759b81201",
+          "parentImagePath": "/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/Capture/2U6A7257.CR3",
+          "stateHash": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+          "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+        },
+        "journalOffset": 2,
+        "plan": [
+          "prepare",
+          "settings",
+          "tonal",
+          "verify",
+          "preview",
+          "observe"
+        ],
+        "recipeId": "ecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a",
+        "request": {
+          "ifDocument": "49743:1789839329.898252|/Users/kiri11/projects/c1cmd/.build/c1-recipes-1m4k6hmw/recipes/recipes.cosessiondb|16777232|4650118|1789841423.0776346",
+          "ifState": "b4d3341df1269899df9da612af84a10cc01b30df29d8be173d6e8e773aa3408a",
+          "recipeId": "ecec15a5359bbdf05042973afee5fcce130d4d35ddbb51e20a8cd17297935c1a",
+          "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+        },
+        "sourceRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9",
+        "status": "failed",
+        "unattempted": [
+          "preview",
+          "observe"
+        ],
+        "workingRef": "c1_wrk_3013774a-712d-427b-bf37-a8f161f310c9"
+      }
+    }
+  }
+]

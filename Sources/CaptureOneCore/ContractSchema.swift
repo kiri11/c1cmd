@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "2.3.0"
+    public static let version = "2.4.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static var writableMetadataSchema: [String: Any] {
         object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
                 "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
@@ -39,6 +39,7 @@ public enum ContractSchema {
     }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     public static func input(_ name: String) -> [String: Any] {
+        if Recipes.tools.contains(name) { return Recipes.input(name) }
         if name.hasPrefix("native_") { return NativeEditing.input(name) }
         switch name {
         case "read_session_end", "read_session_status": return object(["readWorkflow": string], required: ["readWorkflow"])
@@ -104,6 +105,7 @@ public enum ContractSchema {
 
     public static func validate(tool: String, arguments: [String: Any]) throws {
         guard names.contains(tool) else { throw C1Error.invalidRequest("Unknown tool: \(tool)") }
+        if Recipes.tools.contains(tool) { try Recipes.validate(tool,arguments); return }
         if tool.hasPrefix("native_") { try NativeEditing.validateRequest(tool, arguments); return }
         try validateValue(arguments, schema: input(tool), path: tool)
         if tool == "get", let targets = arguments["nativeTargets"] {
@@ -230,8 +232,9 @@ public enum ContractSchema {
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
-            "operation_status": object(["operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
+            "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
+        for (name,schema) in Recipes.responses(responses) { responses[name] = schema }
         responses["native_set"] = NativeEditing.mutationSchema
         responses["native_action"] = NativeEditing.mutationSchema
         responses["geometry_restore"] = responses["geometry_set"]
@@ -240,6 +243,6 @@ public enum ContractSchema {
             "baselineGeometryStateHash": string, "baselineMetadata": writableMetadataSchema, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses,
-                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string], required: ["code", "message"])], required: ["error"])]]
+                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "compoundId":string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string], required: ["code", "message"])], required: ["error"])]]
     }
 }

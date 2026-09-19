@@ -78,6 +78,7 @@ struct C1: ParsableCommand {
             AddCommand.self,
             ResetCommand.self,
             GeometryCommand.self,
+            RecipeCommand.self,
             MetadataCommand.self,
             DiffCommand.self,
             DumpCommand.self,
@@ -875,5 +876,25 @@ struct ReadSessionStatus: ParsableCommand {
     mutating func run() throws {
         let code = handleExecution(format: globals.outputFormat) { print(try ReadWorkflow.json(ReadWorkflow.shared.status(workflowID: globals.readWorkflowID))) }
         if code != .success { throw code }
+    }
+}
+
+
+struct RecipeCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName:"recipe", abstract:"Reference capture, registration, verification and single-photo compound editing.")
+    @Argument(help:"capture, register, verify, apply, or status") var action: String
+    @Option(help:"JSON request file using the shared MCP schema.") var file: String
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws {
+        var failed = false
+        let code = handleExecution(format:globals.outputFormat) {
+            let names = ["capture":"reference_capture","register":"recipe_register","verify":"recipe_verify","apply":"edit_apply","status":"edit_status"]
+            guard let tool = names[action], let args = try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:file))) as? [String:Any] else { throw C1Error.invalidRequest("Expected recipe action and JSON object request.") }
+            let result = try RecipeWorkflow().run(tool,arguments:args)
+            print(try ReadWorkflow.json(result))
+            failed = ["failed","outcome-unknown","interrupted"].contains(result["status"] as? String ?? "")
+        }
+        if code != .success { throw code }
+        if failed { throw ExitCode.failure }
     }
 }
