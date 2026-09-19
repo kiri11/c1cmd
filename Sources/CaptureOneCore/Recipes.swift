@@ -202,7 +202,13 @@ public final class RecipeWorkflow {
         let journalOffset = try journal.validatedEntries().count
         let compoundId = try Recipes.digest(["nonce":UUID().uuidString])
         let path = Recipes.file(doc,"compounds",compoundId)
-        let plan = ["prepare"] + (patch.isEmpty ? [] : ["settings"]) + (tonal.isEmpty ? [] : ["tonal"]) + (args["geometry"] == nil ? [] : ["geometry"]) + (verify ? ["verify"] : []) + (verify || args["preview"] as? Bool == true ? ["preview"] : []) + ["observe"]
+        var plan: [String] = ["prepare"]
+        if !patch.isEmpty { plan.append("settings") }
+        if !tonal.isEmpty { plan.append("tonal") }
+        if args["geometry"] != nil { plan.append("geometry") }
+        if verify { plan.append("verify") }
+        if verify || args["preview"] as? Bool == true { plan.append("preview") }
+        plan.append("observe")
         var report: [String:Any] = ["compoundId":compoundId,"recipeId":id,"status":"running","documentToken":doc.openToken,"sourceRef":sourceRef,"journalOffset":journalOffset,"plan":plan,"completed":[],"request":args,"initial":try Recipes.object(initial)]
         var completed: [[String:Any]] = [], ref = sourceRef, step = "prepare"
         try Recipes.write(report,to:path)

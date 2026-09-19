@@ -17,7 +17,7 @@ jobs:
 
       - name: Show Swift version and environment
         run: |
-          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
           swift --version
           xcode-select -p
           xcodebuild -version
