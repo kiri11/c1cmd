@@ -213,6 +213,32 @@ struct CatalogEditingTests {
             XCTAssertThrowsError(try enabled.getDocumentInfo())
             try fm.createSymbolicLink(at: db, withDestinationURL: other.appendingPathComponent("Other.cocatalogdb"))
             XCTAssertThrowsError(try enabled.getDocumentInfo(), "Database symlink outside catalog fails closed")
+
+            let plain = root.appendingPathComponent("Unpackaged")
+            try fm.createDirectory(at: plain, withIntermediateDirectories: true)
+            let plainDB = plain.appendingPathComponent("Catalog2.cocatalogdb")
+            try Data("plain database".utf8).write(to: plainDB)
+            fake.base.catalogID = plain.path
+            let plainDoc = try readOnly.getDocumentInfo()
+            XCTAssertTrue(plainDoc.openToken.contains(plainDB.path))
+            XCTAssertFalse(plainDoc.writesEnabled)
+            XCTAssertNoThrow(try readOnly.get(ref: "1"))
+            for optIn in [plain.path, plainDB.path] {
+                let plainCore = core(optIn)
+                let plainEnabled = try plainCore.getDocumentInfo().writesEnabled
+                XCTAssertFalse(plainEnabled, "Unpackaged catalogs remain read-only even with opt-in")
+                XCTAssertThrowsError(try plainCore.cloneVariant(sourceRef: "1"))
+                XCTAssertThrowsError(try plainCore.preview(ref: "1"))
+            }
+            let plainExtra = plain.appendingPathComponent("Other.cocatalogdb")
+            try Data().write(to: plainExtra)
+            XCTAssertThrowsError(try readOnly.getDocumentInfo(), "Ambiguous unpackaged directories fail closed")
+            fake.base.catalogID = plainDB.path
+            let exactPlainDoc = try readOnly.getDocumentInfo()
+            XCTAssertEqual(exactPlainDoc.openToken, plainDoc.openToken)
+            try Data("replacement".utf8).write(to: plainDB, options: .atomic)
+            let replacedPlainDoc = try readOnly.getDocumentInfo()
+            XCTAssertTrue(replacedPlainDoc.openToken != plainDoc.openToken)
         }
     }
 }

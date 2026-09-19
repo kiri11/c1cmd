@@ -420,7 +420,7 @@ public final class SessionController {
             captureDir = (docDir as NSString).appendingPathComponent("Capture")
             outputDir = (docDir as NSString).appendingPathComponent("Output")
         } else {
-            let location = try CatalogLocation(nativeID: info.docId ?? path)
+            let location = try CatalogLocation(nativeID: info.docId ?? path, readOnly: true)
             docDir = location.package.path
             outputDir = location.package.deletingLastPathComponent()
                 .appendingPathComponent(location.package.lastPathComponent + ".c1-output").path
@@ -431,7 +431,7 @@ public final class SessionController {
         if info.isSession {
             database = nativeId.hasSuffix(".cosessiondb") ? nativeId : URL(fileURLWithPath: docDir).appendingPathComponent(name).path
         } else {
-            database = try CatalogLocation(nativeID: nativeId).database.path
+            database = try CatalogLocation(nativeID: nativeId, readOnly: true).database.path
         }
         let openToken = try "\(appInstance())|\(databaseIdentity(database))"
 

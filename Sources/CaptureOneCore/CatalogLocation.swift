@@ -5,13 +5,13 @@ struct CatalogLocation {
     let package: URL
     let database: URL
 
-    init(nativeID: String) throws {
+    init(nativeID: String, readOnly: Bool = false) throws {
         guard nativeID.hasPrefix("/") else {
             throw C1Error.identityAmbiguous("Catalog ID must be an absolute path.")
         }
         let native = URL(fileURLWithPath: nativeID).resolvingSymlinksInPath()
         let package = native.pathExtension == "cocatalogdb" ? native.deletingLastPathComponent() : native
-        guard package.pathExtension == "cocatalog" else {
+        guard readOnly || package.pathExtension == "cocatalog" else {
             throw C1Error.identityAmbiguous("Cannot identify the Catalog package: \(nativeID)")
         }
         let database: URL
