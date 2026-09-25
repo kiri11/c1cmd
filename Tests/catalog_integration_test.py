@@ -38,7 +38,9 @@ def main():
     assert apple('return count of documents') == '0', 'Close documents before catalog qualification'
     assert json.loads(apple('return version')) == '16.8.5.30'
     base = Path(tempfile.mkdtemp(prefix='c1-catalog-live-', dir='/private/tmp'))
-    catalog = base / 'qualification.cocatalog'
+    layout = os.environ.get('C1_TEST_CATALOG_LAYOUT', 'package')
+    assert layout in ['package', 'unpackaged']
+    catalog = base / ('qualification.cocatalog' if layout == 'package' else 'qualification')
     evidence = Path(os.environ.get('C1_CATALOG_EVIDENCE', str(base / 'evidence')))
     evidence.mkdir(parents=True, exist_ok=True)
     events = []
@@ -77,6 +79,15 @@ def main():
 
     try:
         apple(f'make new document with properties {{name:"qualification", kind:catalog, path:"{base}"}}')
+        if layout == 'unpackaged':
+            # Change only our newly created, empty fixture before acquiring any c1 references.
+            packaged = base / 'qualification.cocatalog'
+            apple(f'if (id of current document as text) is not "{packaged}" then error "Unexpected document"\nclose current document')
+            packaged.rename(catalog)
+            databases = list(catalog.glob('*.cocatalogdb'))
+            assert len(databases) == 1
+            environment['C1_CATALOG_WRITE_PATH'] = str(databases[0])
+            apple(f'open POSIX file "{databases[0]}"')
         fixture_paths = []
         # Both catalog storage modes: external reference and managed original inside package.
         storage = os.environ.get('C1_TEST_CATALOG_STORAGE', 'referenced')
@@ -126,7 +137,11 @@ def main():
         for env in [denied_env, dict(environment, C1_CATALOG_WRITE_PATH=str(base / 'wrong.cocatalog'))]:
             cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=env)
             cli('preview', variants[0]['id'], error='invalid-request', env=env)
-        log('default-and-wrong-path-denied')
+        if layout == 'unpackaged':
+            directory_env = dict(environment, C1_CATALOG_WRITE_PATH=str(catalog))
+            assert not cli('doc', 'info', env=directory_env)['writesEnabled']
+            cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=directory_env)
+        log('default-and-wrong-path-denied', layout=layout)
         client = Client(MCP, env=environment, timeout=150)
         for source in originals.values():
             clone, _ = tool('variant_clone', {'sourceRef': source['id']})
@@ -144,10 +159,10 @@ def main():
             tool('geometry_set', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash'], 'rotation': 1}, error='state-changed')
             preview, image = tool('preview', {'ref': ref})
             assert any(block['type'] == 'image' for block in image['content'])
-            assert Path(preview['outputPath']).resolve().is_relative_to(base / 'qualification.cocatalog.c1-output/c1-previews')
+            assert Path(preview['outputPath']).resolve().is_relative_to(base / (catalog.name + '.c1-output/c1-previews'))
             assert abs(preview['width'] / preview['height'] - 1.5) < .003
             initialized_output = json.loads(apple('return POSIX path of (output of current document as alias)'))
-            assert Path(initialized_output).resolve() == (base / 'qualification.cocatalog.c1-output').resolve()
+            assert Path(initialized_output).resolve() == (base / (catalog.name + '.c1-output')).resolve()
             existing_output = base / 'existing-output'
             existing_output.mkdir(exist_ok=True)
             log('default-output-fixture', path=str(existing_output))
@@ -166,7 +181,27 @@ def main():
             tool('variant_delete', {'workingRef': baseline['workingRef']})
             after = cli('get', source['id'])
             assert after['stateHash'] == source['stateHash'] and after['geometryStateHash'] == source['geometryStateHash']
-            log('clone-edit-preview-diff-delete', sourceID=source['id'], imagePath=source['parentImagePath'], preview=preview)
+            retained_preview = evidence / (source['id'] + '-preview.jpg')
+            shutil.copy2(preview['outputPath'], retained_preview)
+            log('clone-edit-preview-diff-delete', sourceID=source['id'], imagePath=source['parentImagePath'], preview=preview, retainedPreview=str(retained_preview))
+        # Existing-variant ratings use fresh metadata tokens and preserve the photo's look.
+        source = cli('get', variants[0]['id'])
+        edit, _ = tool('variant_edit', {'sourceRef': source['id'], 'ifState': source['stateHash'],
+                                       'ifDocument': doc['openToken']})
+        current = cli('get', edit['workingRef'])
+        _, _ = tool('metadata_set', {'workingRef': edit['workingRef'],
+                         'ifMetadataState': current['metadataStateHash'], 'rating': 5})
+        observed = cli('get', edit['workingRef'])
+        assert observed['metadata']['rating'] == 5
+        assert observed['stateHash'] == source['stateHash']
+        assert observed['geometryStateHash'] == source['geometryStateHash']
+        assert observed['metadata']['colorTag'] == source['metadata']['colorTag']
+        assert len(cli('variants', 'list')) == len(originals)
+        tool('metadata_set', {'workingRef': edit['workingRef'],
+             'ifMetadataState': observed['metadataStateHash'], 'rating': source['metadata']['rating']})
+        restored = cli('get', edit['workingRef'])
+        assert restored['metadataStateHash'] == source['metadataStateHash']
+        log('existing-variant-rating-restored', layout=layout)
         # Composition MCP profile also supports the exact-path opt-in.
         client.close()
         client = Client(MCP, env=dict(environment, C1_MCP_PROFILE='composition'), timeout=150)

@@ -226,9 +226,12 @@ struct CatalogEditingTests {
             for optIn in [plain.path, plainDB.path] {
                 let plainCore = core(optIn)
                 let plainEnabled = try plainCore.getDocumentInfo().writesEnabled
-                XCTAssertFalse(plainEnabled, "Unpackaged catalogs remain read-only even with opt-in")
-                XCTAssertThrowsError(try plainCore.cloneVariant(sourceRef: "1"))
-                XCTAssertThrowsError(try plainCore.preview(ref: "1"))
+                XCTAssertEqual(plainEnabled, optIn == plainDB.path)
+                if optIn == plain.path {
+                    XCTAssertThrowsError(try plainCore.cloneVariant(sourceRef: "1"))
+                    XCTAssertThrowsError(try plainCore.preview(ref: "1"))
+                }
+
             }
             let plainExtra = plain.appendingPathComponent("Other.cocatalogdb")
             try Data().write(to: plainExtra)
@@ -236,7 +239,26 @@ struct CatalogEditingTests {
             fake.base.catalogID = plainDB.path
             let exactPlainDoc = try readOnly.getDocumentInfo()
             XCTAssertEqual(exactPlainDoc.openToken, plainDoc.openToken)
+            let plainWriter = core(plainDB.path)
+            let plainWritable = try plainWriter.getDocumentInfo().writesEnabled
+            let wrongPlainWritable = try core(plainExtra.path).getDocumentInfo().writesEnabled
+            XCTAssertTrue(plainWritable)
+            XCTAssertFalse(wrongPlainWritable)
+            let plainSource = try plainWriter.get(ref: "1")
+            let plainRef = try plainWriter.cloneVariant(sourceRef: "1").workingRef
+            let plainCurrent = try plainWriter.get(ref: plainRef)
+            _ = try plainWriter.mutate(workingRefString: plainRef, ifState: plainCurrent.stateHash,
+                                      setAdjustments: Adjustments(exposure: 0.7), addAdjustments: nil)
+            XCTAssertThrowsError(try plainWriter.mutate(workingRefString: plainRef, ifState: plainCurrent.stateHash,
+                                                       setAdjustments: Adjustments(exposure: 1), addAdjustments: nil))
+            let unchangedPlainSource = try plainWriter.get(ref: "1")
+            XCTAssertEqual(unchangedPlainSource.stateHash, plainSource.stateHash)
+            XCTAssertTrue(fm.fileExists(atPath: plain.appendingPathComponent(".c1").path))
+            fake.base.catalogID = plainExtra.path
+            XCTAssertThrowsError(try plainWriter.get(ref: plainRef))
+            fake.base.catalogID = plainDB.path
             try Data("replacement".utf8).write(to: plainDB, options: .atomic)
+            XCTAssertThrowsError(try plainWriter.get(ref: plainRef))
             let replacedPlainDoc = try readOnly.getDocumentInfo()
             XCTAssertTrue(replacedPlainDoc.openToken != plainDoc.openToken)
         }

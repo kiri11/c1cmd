@@ -16,8 +16,10 @@ Sessions support tonal editing, crop/rotation, keystone, ratings, color tags,
 [expanded native editing](native-editing/README.md) and
 [reference recipes](recipes/README.md). Catalogs are read-only by default;
 exact-path opt-in enables experimental editing of online referenced originals
-outside the Catalog package. Catalog-stored originals and Catalog fault recovery
-remain unqualified.
+outside the Catalog directory. Both `.cocatalog` packages and unpackaged directories
+have regular CLI/MCP coverage; unpackaged writes require the exact `.cocatalogdb`
+opt-in. The latest unpackaged run passed; the package regression run stopped at
+an uncertain native default-baseline creation (variant-ID readback error). Catalog-stored originals and Catalog fault recovery remain unqualified.
 
 Other limits:
 
@@ -59,6 +61,10 @@ with live suites: both acquire the application lock. Keep native calls sequentia
 | `make qualify-recovery RECOVERY_CASES="..."` | Selected real faults using an already-built current archive |
 | `make qualify-recipes-recovery RECIPE_RECOVERY_CASES="..."` | Selected compound-edit faults using the current archive |
 | `make qualify-full` | All regular suites plus the generic recovery campaign; select recipe recovery separately when affected |
+
+For the regular catalog suite, set `C1_TEST_CATALOG_LAYOUT=unpackaged` to exercise
+an unpackaged disposable catalog; the default is `package`. Both layouts include
+existing-variant rating/readback/restoration. These runs do not inject faults.
 
 Regular selections are `cli mcp geometry lens perspective keystone catalog existing
 inventory native recipes`. Set `C1_TEST_RAW_FIXTURE` to a preserved RAW outside the

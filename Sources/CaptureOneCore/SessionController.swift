@@ -437,7 +437,7 @@ public final class SessionController {
             captureDir = (docDir as NSString).appendingPathComponent("Capture")
             outputDir = (docDir as NSString).appendingPathComponent("Output")
         } else {
-            let location = try CatalogLocation(nativeID: info.docId ?? path, readOnly: true)
+            let location = try CatalogLocation(nativeID: info.docId ?? path)
             docDir = location.package.path
             outputDir = location.package.deletingLastPathComponent()
                 .appendingPathComponent(location.package.lastPathComponent + ".c1-output").path
@@ -448,7 +448,7 @@ public final class SessionController {
         if info.isSession {
             database = nativeId.hasSuffix(".cosessiondb") ? nativeId : URL(fileURLWithPath: docDir).appendingPathComponent(name).path
         } else {
-            database = try CatalogLocation(nativeID: nativeId, readOnly: true).database.path
+            database = try CatalogLocation(nativeID: nativeId).database.path
         }
         let openToken = try "\(appInstance())|\(databaseIdentity(database))"
 
@@ -478,7 +478,7 @@ public final class SessionController {
         if !docInfo.isSession {
             guard let location = try? CatalogLocation(nativeID: docInfo.documentId),
                   location.isAuthorized(by: catalogWritePath) else {
-                throw C1Error.invalidRequest("Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package. Operation '\(operation)' is blocked for '\(docInfo.documentName)'.")
+                throw C1Error.invalidRequest("Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package or database (unpackaged catalogs require the database path). Operation '\(operation)' is blocked for '\(docInfo.documentName)'.")
             }
             guard docInfo.appVersion == Self.pinnedBuild else {
                 throw C1Error.unsupportedVersion("Catalog writes require Capture One \(Self.pinnedBuild); the untested-build override does not enable Catalog writes.")
