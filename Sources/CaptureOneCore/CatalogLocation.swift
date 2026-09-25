@@ -5,15 +5,12 @@ struct CatalogLocation {
     let package: URL
     let database: URL
 
-    init(nativeID: String, readOnly: Bool = false) throws {
+    init(nativeID: String) throws {
         guard nativeID.hasPrefix("/") else {
             throw C1Error.identityAmbiguous("Catalog ID must be an absolute path.")
         }
         let native = URL(fileURLWithPath: nativeID).resolvingSymlinksInPath()
         let package = native.pathExtension == "cocatalogdb" ? native.deletingLastPathComponent() : native
-        guard readOnly || package.pathExtension == "cocatalog" else {
-            throw C1Error.identityAmbiguous("Cannot identify the Catalog package: \(nativeID)")
-        }
         let database: URL
         if native.pathExtension == "cocatalogdb" {
             // An exact native ID identifies the active database even when siblings exist.
@@ -37,6 +34,11 @@ struct CatalogLocation {
     func isAuthorized(by configuredPath: String?) -> Bool {
         guard let configuredPath, configuredPath.hasPrefix("/"),
               let configured = try? CatalogLocation(nativeID: configuredPath) else { return false }
+        // Ordinary directories require an exact database opt-in, never a broad folder opt-in.
+        if package.pathExtension != "cocatalog" {
+            let configuredURL = URL(fileURLWithPath: configuredPath).resolvingSymlinksInPath()
+            guard configuredURL.pathExtension == "cocatalogdb" else { return false }
+        }
         return configured.package.path == package.path && configured.database.path == database.path
     }
 }

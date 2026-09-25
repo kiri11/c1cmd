@@ -184,7 +184,7 @@ public final class ReadWorkflow {
     }
     private func reconcileSQL(_ state: inout State) throws {
         guard state.sqlite else { return }
-        let location = try CatalogLocation(nativeID: state.document.documentId, readOnly: true)
+        let location = try CatalogLocation(nativeID: state.document.documentId)
         let records = try CatalogReader(database: location.database.path).readProjection()
         let byID = Dictionary(uniqueKeysWithValues: records.map { (String($0.id), $0) })
         for index in state.items.indices {
