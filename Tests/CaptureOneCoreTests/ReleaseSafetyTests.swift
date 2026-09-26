@@ -112,6 +112,11 @@ final class FakeScript: ScriptExecuting {
             let responseIDs = ratingResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
             result = responseIDs.map { ["variantId": $0, "starRating": ratings[$0] ?? 0,
                 "parentImagePath": parentOverride ?? parent, "inSelection": !args[2].booleanValue || selectedIDs.contains($0)] as [String: Any] }
+        case "lookupVariantIdentities":
+            result = ids(from: args[1]).map { id -> [String: Any] in
+                values[id] == nil ? ["variantId": id, "isPresent": false, "parentImagePath": ""]
+                    : ["variantId": id, "isPresent": true, "parentImagePath": parentOverride ?? parent]
+            }
         case "readVariantRatings":
             beforeReadRatings?()
             documentDrift?()
@@ -297,6 +302,71 @@ struct ReleaseSafetyTests {
             XCTAssertEqual(observations.afterAdjustments?.exposure, 2)
             XCTAssertEqual(observations.status, "reconciled")
             XCTAssertThrowsError(try core.get(ref: clone.workingRef), "Recovery must not silently rebind old references")
+        }
+        // Known-ID recovery resolves only the recorded target: present, absent,
+        // parent changed and lookup failed, without any whole-document inventory.
+        XCTAssertNoThrowBlock {
+            try? FileManager.default.removeItem(at: journal.journalFile)
+            let inventoryHandlers: Set = ["listVariants", "discoverVariantIDs", "discoverFilteredVariantIDs", "readVariantRatings", "readVariantSummaries"]
+            func uncertainWrite() throws -> (operationId: String, variantId: String) {
+                let clone = try core.cloneVariant(sourceRef: "1")
+                let current = try core.get(ref: clone.workingRef)
+                fake.fail = "applyAdjustments"
+                defer { fake.fail = nil }
+                do {
+                    _ = try core.mutate(workingRefString: clone.workingRef, ifState: current.stateHash,
+                                        setAdjustments: Adjustments(exposure: 1), addAdjustments: nil)
+                } catch let failure as OperationFailure { return (failure.operationId, clone.cloneVariantId) }
+                throw C1Error.invalidRequest("Expected injected timeout")
+            }
+            func reconcile(_ operationId: String) throws -> OperationRecord {
+                let start = fake.calls.count
+                defer { XCTAssertTrue(inventoryHandlers.isDisjoint(with: fake.calls.dropFirst(start)), "Known-ID recovery must not enumerate the document") }
+                return try core.operationStatus(operationId: operationId)
+            }
+
+            let present = try uncertainWrite()
+            fake.values[present.variantId]![0] = 1 // Capture One finishes after the caller timed out.
+            fake.generation += "-present"
+            let observed = try reconcile(present.operationId)
+            XCTAssertEqual(observed.status, "reconciled")
+            XCTAssertEqual(observed.afterAdjustments?.exposure, 1)
+            XCTAssertFalse(observed.error?.contains("absent") ?? true)
+
+            let absent = try uncertainWrite()
+            fake.values.removeValue(forKey: absent.variantId)
+            fake.generation += "-absent"
+            let missing = try reconcile(absent.operationId)
+            XCTAssertEqual(missing.status, "reconciled")
+            XCTAssertTrue(missing.error?.contains("target variant is absent") ?? false)
+            XCTAssertNil(missing.afterAdjustments)
+
+            let moved = try uncertainWrite()
+            fake.generation += "-moved"
+            fake.parentOverride = "/elsewhere/other.CR3"
+            do {
+                _ = try reconcile(moved.operationId)
+                XCTFail("A changed parent must not reconcile")
+            } catch let error as C1Error { XCTAssertEqual(error.errorCode, "identity-ambiguous") }
+            XCTAssertEqual(journal.unresolvedEntries().map(\.operationId), [moved.operationId], "Parent change leaves the write blocked")
+            fake.parentOverride = nil
+            let movedBack = try reconcile(moved.operationId)
+            XCTAssertEqual(movedBack.status, "reconciled")
+
+            let failed = try uncertainWrite()
+            fake.generation += "-lookup-failed"
+            fake.fail = "lookupVariantIdentities"
+            XCTAssertThrowsError(try reconcile(failed.operationId), "A failed lookup is not an absence")
+            fake.fail = nil
+            let blocked = journal.unresolvedEntries()
+            XCTAssertEqual(blocked.map(\.operationId), [failed.operationId])
+            XCTAssertEqual(blocked.first?.status, "outcome-unknown")
+            let history = try journal.validatedEntries()
+            XCTAssertFalse(history.contains { $0.operationId == failed.operationId && ($0.error ?? "").contains("absent") })
+            let retried = try reconcile(failed.operationId)
+            XCTAssertEqual(retried.status, "reconciled")
+            XCTAssertNoThrow(try journal.assertReady())
+            try? FileManager.default.removeItem(at: journal.journalFile)
         }
         // Same-path database replacement changes identity even if contents are identical.
         XCTAssertNoThrowBlock {

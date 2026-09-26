@@ -1504,19 +1504,27 @@ public final class SessionController {
             guard entry.documentIdentity == (try databaseIdentity(databasePath(doc))) else {
                 throw C1Error.documentChanged("Cannot reconcile against a replaced database.")
             }
-            let variants = try listVariants()
             if ["clone", "baseline"].contains(entry.operationType) {
                 guard let before = entry.variantIdsBefore, let parent = entry.parentImagePath else {
                     throw C1Error.identityAmbiguous("Creation lacks recovery identity evidence.")
                 }
-                entry.observedVariantIds = variants.filter { $0.parentImagePath == parent && !before.contains($0.id) }.map { $0.id }
+                entry.observedVariantIds = try listVariants().filter { $0.parentImagePath == parent && !before.contains($0.id) }.map { $0.id }
                 // Other photographer-created variants are indistinguishable; do not adopt or delete them.
                 entry.status = "reconciled"
                 entry.error = "Previous app instance ended. Review observedVariantIds manually; no variants were adopted, deleted, or recreated."
             } else if let id = entry.nativeVariantId {
-                if let variant = variants.first(where: { $0.id == id }) {
-                    guard variant.parentImagePath == entry.parentImagePath else { throw C1Error.identityAmbiguous("Recovery variant parent changed.") }
+                guard let parent = entry.parentImagePath else {
+                    throw C1Error.identityAmbiguous("Operation lacks a recorded parent image for its native variant.")
+                }
+                // Resolve only the recorded ID; a lookup error propagates and leaves the operation unresolved.
+                let outcome = try VariantLookup(executor: executor).resolve(id, expectedParent: parent, in: doc)
+                try checkedDocument(doc, writes: false)
+                switch outcome {
+                case .parentChanged(let observed):
+                    throw C1Error.identityAmbiguous("Recovery variant parent changed: recorded '\(parent)', observed '\(observed)'.")
+                case .present:
                     let current = try get(ref: id)
+                    guard current.parentImagePath == parent else { throw C1Error.identityAmbiguous("Recovery variant parent changed.") }
                     entry.afterAdjustments = current.adjustments
                     entry.afterGeometry = current.geometry
                     entry.afterMetadata = VariantMetadata.from(current.metadata)
@@ -1526,7 +1534,7 @@ public final class SessionController {
                     }
                     entry.status = "reconciled"
                     entry.error = "Previous app instance ended. Observed current adjustments, geometry, and metadata are recorded; they do not prove historical completion. Review before creating a fresh editing reference."
-                } else {
+                case .absent:
                     entry.status = "reconciled"
                     entry.error = "Previous app instance ended; the target variant is absent. No retry was performed."
                 }

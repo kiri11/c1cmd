@@ -511,3 +511,29 @@ on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
         return results
     end tell
 end readVariantSubset
+
+-- Known-ID lookup without enumerating the document. Only Capture One's
+-- no-such-object reply (-1728) for the exact ID reports absence; every other
+-- error propagates so callers cannot mistake a failed lookup for an absent variant.
+on lookupVariantIdentities(docName, variantIDs)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        set results to {}
+        repeat with requestedID in variantIDs
+            set isPresent to true
+            try
+                set foundID to (id of variant id (requestedID as text) of d) as text
+            on error errorMessage number errorNumber
+                if errorNumber is not -1728 then error errorMessage number errorNumber
+                set isPresent to false
+            end try
+            if isPresent then
+                set parentPath to POSIX path of (path of parent image of variant id foundID of d as text)
+                set end of results to {variantId:foundID, isPresent:true, parentImagePath:parentPath}
+            else
+                set end of results to {variantId:(requestedID as text), isPresent:false, parentImagePath:""}
+            end if
+        end repeat
+        return results
+    end tell
+end lookupVariantIdentities
