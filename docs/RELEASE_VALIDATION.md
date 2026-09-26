@@ -93,6 +93,7 @@ unchanged candidate from `make qualify`.
 | Changed behavior | Relevant `RECOVERY_CASES` |
 |---|---|
 | Tonal dispatch or timeout | `tonal` |
+| Rating/color tag dispatch or timeout | `metadata` |
 | Expanded native properties/actions | `native native-action` |
 | Crop/rotation dispatch or partial writes | `geometry`; add corrected-image paths when affected |
 | Lens, perspective/movements or keystone | `lens`, `perspective`, `keystone` as affected |

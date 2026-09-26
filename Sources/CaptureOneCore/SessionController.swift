@@ -259,12 +259,12 @@ public final class SessionController {
 
     private let isAppRunning: () -> Bool
     private let nativeInventoryEnabled: Bool
-    private let executor: ScriptExecuting
+    let executor: ScriptExecuting
     private let appInstance: () throws -> String
     private let databaseIdentity: (String) throws -> String
     private let catalogWritePath: String?
     private let imageDimensions: (String) -> [Double]?
-    private let lock = CaptureOneLock.shared
+    let lock = CaptureOneLock.shared
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
 
@@ -291,7 +291,7 @@ public final class SessionController {
             : doc.documentId
     }
 
-    private func checkedDocument(_ expected: DocumentInfo, writes: Bool = true) throws {
+    func checkedDocument(_ expected: DocumentInfo, writes: Bool = true) throws {
         let actual = try getDocumentInfo()
         guard expected.documentId == actual.documentId, expected.openToken == actual.openToken else {
             throw C1Error.documentChanged("Active database changed before dispatch.")
@@ -299,7 +299,7 @@ public final class SessionController {
         if writes { try OperationJournal(sessionDirectory: URL(fileURLWithPath: actual.documentPath)).assertReady() }
     }
 
-    private func assertWritableImage(doc: DocumentInfo, source: GetResult?) throws {
+    func assertWritableImage(doc: DocumentInfo, source: GetResult?) throws {
         if !doc.isSession {
             guard let path = source?.parentImagePath, FileManager.default.isReadableFile(atPath: path) else {
                 throw C1Error.invalidRequest("Catalog writes require the original image to be online and readable.")
@@ -312,7 +312,7 @@ public final class SessionController {
         }
     }
 
-    private func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
+    func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
         try assertWritableImage(doc: doc, source: source)
         var result = entry
         result.compoundId = Thread.current.threadDictionary["c1.compoundId"] as? String
@@ -889,7 +889,7 @@ public final class SessionController {
         )
     }
 
-    private func adjustmentTarget(_ ref: String, document: DocumentInfo) throws -> (workingRef: String, variantId: String, baselineAdjustments: Adjustments) {
+    func adjustmentTarget(_ ref: String, document: DocumentInfo) throws -> (workingRef: String, variantId: String, baselineAdjustments: Adjustments) {
         if EditingRecord.isEditingReference(ref) {
             let record = try EditingStore(document: document).resolve(ref, document: document)
             return (record.workingRef, record.variantId, record.baselineAdjustments)
@@ -1436,60 +1436,11 @@ public final class SessionController {
         if let rating { arguments["rating"] = rating }
         if let colorTag { arguments["colorTag"] = colorTag }
         try ContractSchema.validate(tool: "metadata_set", arguments: arguments)
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "metadata_set")
-            guard doc.appVersion == Self.pinnedBuild else { throw C1Error.unsupportedVersion("Metadata writes require Capture One \(Self.pinnedBuild).") }
-            try checkedDocument(doc, writes: !dryRun)
-            let target = try adjustmentTarget(workingRef, document: doc)
-            let current = try get(ref: workingRef)
-            try assertWritableImage(doc: doc, source: current)
-            guard let before = VariantMetadata.from(current.metadata), before.stateHash == ifMetadataState else {
-                throw C1Error.stateChanged("Rating or color tag changed or is unavailable; read get again.")
-            }
-            let intended = VariantMetadata(rating: rating ?? before.rating, colorTag: colorTag ?? before.colorTag)
-            if dryRun {
-                return MetadataMutationResult(operationId: "dry-run", workingRef: workingRef, before: before,
-                    after: intended, diff: intended.changes(from: before), metadataStateHash: before.stateHash, isDryRun: true)
-            }
-            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
-            var entry = try prepare(OperationRecord(operationType: "metadata_set", workingRef: workingRef,
-                documentPath: doc.documentPath, preconditionStateHash: ifMetadataState,
-                beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
-            entry.beforeMetadata = before
-            entry.intendedMetadata = intended
-            try journal.append(entry: entry)
-            do {
-                struct NativeResult: Decodable { let variantId: String; let ratingVal: Int; let colorTagVal: Int }
-                let native: NativeResult = try executor.executeAndDecode(handler: "applyMetadata", args: [
-                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: target.variantId),
-                    rating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
-                    colorTag.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
-                    NSAppleEventDescriptor(int32: Int32(before.rating)), NSAppleEventDescriptor(int32: Int32(before.colorTag)),
-                    NSAppleEventDescriptor(string: current.parentImagePath ?? "")])
-                try checkedDocument(doc, writes: false)
-                let readback = try get(ref: workingRef)
-                let after = VariantMetadata.from(readback.metadata)
-                entry.afterMetadata = after
-                entry.afterAdjustments = readback.adjustments
-                entry.afterGeometry = readback.geometry
-                guard native.variantId == target.variantId, readback.id == target.variantId,
-                      native.ratingVal == intended.rating, native.colorTagVal == intended.colorTag, after == intended,
-                      readback.stateHash == current.stateHash, readback.geometryStateHash == current.geometryStateHash else {
-                    throw C1Error.readbackMismatch("Metadata readback did not match, or tone/geometry changed during the operation.")
-                }
-                entry.diff = intended.changes(from: before)
-                entry.status = "succeeded"
-                try journal.append(entry: entry)
-                return MetadataMutationResult(operationId: entry.operationId, workingRef: workingRef, before: before,
-                    after: intended, diff: intended.changes(from: before), metadataStateHash: intended.stateHash, isDryRun: false)
-            } catch {
-                entry.status = "outcome-unknown"
-                entry.error = error.localizedDescription
-                try? journal.append(entry: entry)
-                throw OperationFailure(operationId: entry.operationId, cause: error)
-            }
-        }
+        let outcome = try write(MetadataWrite(rating: rating, colorTag: colorTag), workingRef: workingRef,
+                                precondition: ifMetadataState, dryRun: dryRun)
+        return MetadataMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: outcome.before,
+            after: outcome.intended, diff: outcome.intended.changes(from: outcome.before),
+            metadataStateHash: (outcome.isDryRun ? outcome.before : outcome.intended).stateHash, isDryRun: outcome.isDryRun)
     }
 
     // MARK: - Operation Status & Reconciliation

@@ -28,7 +28,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
-RECOVERY_CASES = ('clone-readback', 'tonal', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
+RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
 
 
 def selected_cases(cases):
@@ -302,12 +302,18 @@ class Run:
             # Observations only: an external pause can land between setters.
             for index, requested in enumerate([before_geometry['keystone'][0], 12, -7, before_geometry['keystone'][3], before_geometry['keystone'][4]]):
                 assert after_geometry['keystone'][index] in (before_geometry['keystone'][index], requested)
+        if label == 'metadata-apple-event-timeout':
+            assert reconciled.get('beforeMetadata') and reconciled.get('intendedMetadata') and reconciled.get('afterMetadata'), reconciled
+            # Observations only: an external pause can land between the rating and color tag setters.
+            for field in ('rating', 'colorTag'):
+                assert reconciled['afterMetadata'][field] in (reconciled['beforeMetadata'][field], reconciled['intendedMetadata'][field])
         stale = self.cli('get', clone['workingRef'], ok=False)
         assert stale['error']['code'] == 'document-changed', stale
         assert self.identities() == before, 'Recovery must not create/adopt/delete variants'
         original_now = self.cli('get', self.source)
         assert original_now['stateHash'] == self.original['stateHash']
         assert original_now.get('geometry') == self.original.get('geometry')
+        assert original_now.get('metadataStateHash') == self.original.get('metadataStateHash')
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
@@ -316,6 +322,10 @@ class Run:
                 self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
+        if label == 'metadata-apple-event-timeout':
+            token = self.cli('get', fresh['workingRef'])['metadataStateHash']
+            rated = self.cli('metadata', 'set', fresh['workingRef'], '--if-metadata-state', token, '--rating', '2')
+            assert rated['after']['rating'] == 2, rated
         if label.startswith('native-'):
             native_current = self.cli('get', fresh['workingRef'], '--native-targets', '[{"scope":"adjustments"}]')['nativeSnapshots'][0]
             if label == 'native-property-timeout':
@@ -361,7 +371,7 @@ set keystone horizontal of adjustments of v to -5
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False, metadata=False):
         clone, current = self.clone()
         if corrected or perspective:
             assert geometry
@@ -379,6 +389,9 @@ set keystone horizontal of adjustments of v to -5
                        [str(self.c1), 'set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.625'])
             if native:
                 command = [str(self.c1), 'native', 'set', clone['workingRef'], '--if-native-state', native_state['nativeStateHash'], '--json', '{"clarity amount":12,"color balance shadow hue":237,"color balance shadow saturation":0.2}']
+            if metadata:
+                command = [str(self.c1), 'metadata', 'set', clone['workingRef'], '--if-metadata-state', current['metadataStateHash'],
+                           '--rating', str((current['metadata']['rating'] + 1) % 6), '--color-tag', str((current['metadata']['colorTag'] + 1) % 8)]
             if native_action:
                 command = [str(self.c1), 'native', 'action', clone['workingRef'], 'layer.create', '--if-native-state', native_state['nativeStateHash'], '--json', '{"name":"Recovery layer","kind":"filled"}']
             if keystone:
@@ -411,6 +424,7 @@ set keystone horizontal of adjustments of v to -5
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
         label = 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
         if native or native_action: label = 'native-action-timeout' if native_action else 'native-property-timeout'
+        if metadata: label = 'metadata-apple-event-timeout'
         self.recovery(pending['operationId'], clone, label)
         if native or native_action:
             observed = self.cli('operation', 'status', pending['operationId'])
@@ -539,6 +553,8 @@ set keystone horizontal of adjustments of v to -5
                 self.log('clone-readback-regression-passed', cycles=10)
             elif case == 'tonal':
                 self.apple_event_timeout()
+            elif case == 'metadata':
+                self.apple_event_timeout(metadata=True)
             elif case in ('native', 'native-action'):
                 self.apple_event_timeout(**{'native_action' if case == 'native-action' else 'native': True})
             elif case in ('geometry', 'lens', 'perspective', 'keystone'):

@@ -82,7 +82,8 @@ struct MetadataTests {
             XCTAssertEqual(observed.afterMetadata, VariantMetadata(rating: 0, colorTag: 1))
             XCTAssertThrowsError(try core.get(ref: ref))
             // Mock partial writes and unexpected readback, with no real fault injection.
-            for fault in ["partial", "mismatch", "tone"] {
+            // A lost reply leaves the outcome unknown; an observed readback that differs is a partial failure.
+            for (fault, status) in [("partial", "outcome-unknown"), ("mismatch", "partial-failure"), ("tone", "partial-failure")] {
                 let doc = try core.getDocumentInfo(), source = try core.get(ref: "1")
                 let edit = try core.editVariant(sourceRef: "1", ifState: source.stateHash, ifDocument: doc.openToken)
                 fake.metadataFault = fault
@@ -90,7 +91,7 @@ struct MetadataTests {
                 do { _ = try core.metadataSet(workingRef: edit.workingRef, ifMetadataState: source.metadataStateHash!, rating: 4, colorTag: 7) }
                 catch let failure as OperationFailure { id = failure.operationId }
                 XCTAssertFalse(id.isEmpty)
-                XCTAssertTrue(OperationJournal.isUnresolved(journal.find(operationId: id)!))
+                XCTAssertEqual(journal.find(operationId: id)?.status, status, fault)
                 XCTAssertEqual(journal.find(operationId: id)?.beforeMetadata, VariantMetadata.from(source.metadata))
                 fake.metadataFault = nil
                 fake.generation += "-next"
