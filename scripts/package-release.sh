@@ -12,7 +12,7 @@ trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$NAME/bin"
 cp "$BUILD_DIR/c1" "$BUILD_DIR/c1-mcp" "$STAGE/$NAME/bin/"
 cp -R "$BUILD_DIR/c1_CaptureOneCore.bundle" "$STAGE/$NAME/bin/"
-cp README.md LICENSE AGENTS.md CHANGELOG.md "$STAGE/$NAME/"
+cp README.md LICENSE AGENTS.md "$STAGE/$NAME/"
 cp -R docs "$STAGE/$NAME/"
 mkdir -p "$STAGE/$NAME/examples"
 cp examples/crop-proposals.py examples/grade-folder.py "$STAGE/$NAME/examples/"

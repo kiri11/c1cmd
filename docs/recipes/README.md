@@ -316,4 +316,4 @@ These live checks include sequential native reads/writes, independent verificati
 and preview exports. They are intentionally separate from the fast offline loop.
 Recovery retains actual 120-second Apple Event timeouts. Save generated results
 and journals under `.build/qualification` or external artifact storage, not docs;
-record historical validation summaries in `CHANGELOG.md`.
+record validation summaries in the commit message or issue.

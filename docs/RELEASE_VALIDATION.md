@@ -3,7 +3,7 @@
 This guide defines current support limits and test selection. Usage is in the
 [README](../README.md); new application builds follow the
 [qualification guide](QUALIFYING_NEW_BUILDS.md). Historical validation summaries
-belong in [CHANGELOG.md](../CHANGELOG.md), not in the usage documentation.
+belong in commit messages and issue comments, not in the usage documentation.
 
 ## Current scope and remaining gates
 
@@ -157,5 +157,5 @@ source RAWs outside disposable directories and remove only owned, closed fixture
 
 For release review, record the source revision, archive/executable/resource hashes,
 application/OS/toolchain identity, selected/skipped suites, fixture checksum and
-outcome. Put a concise historical summary and material limitations in `CHANGELOG.md`.
+outcome. Put a concise summary and material limitations in the commit message or issue.
 Maintained tests, scripts, examples and the exact-build SDEF remain in source control.

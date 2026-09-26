@@ -121,7 +121,7 @@ Retain the candidate source revision, any source patch, archive/executable/handl
 and harness hashes, app/OS/toolchain identity, selected/skipped suites, fixture
 checksums, results, failures, and recovery journals. Keep generated diagnostics in ignored `.build` directories or external artifact
 storage; do not commit them, RAWs, previews or disposable databases. Record concise
-historical outcomes and limitations in `CHANGELOG.md`.
+outcomes and limitations in the commit message or issue.
 
 Update the tested-build registry and relevant feature gates only for demonstrated
 support, together with their tests and capability declarations. Update the
