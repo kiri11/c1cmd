@@ -27,4 +27,24 @@ struct VariantLookup {
         }
         return row.parentImagePath == expectedParent ? .present : .parentChanged(observed: row.parentImagePath)
     }
+
+    /// Every variant ID of `parent`, found through one of its known variants.
+    func siblings(of anchor: String, parent: String, in document: DocumentInfo) throws -> [String] {
+        let ids: [String] = try executor.executeAndDecode(handler: "readParentSiblings", args: [
+            NSAppleEventDescriptor(string: document.documentId), NSAppleEventDescriptor(string: anchor),
+            NSAppleEventDescriptor(string: parent)])
+        guard ids.contains(anchor), Set(ids).count == ids.count, ids.allSatisfy({ !$0.isEmpty }) else {
+            throw C1Error.identityAmbiguous("Sibling query for '\(anchor)' returned empty, duplicate or foreign variant IDs.")
+        }
+        return ids
+    }
+
+    /// Siblings found through the first candidate that still belongs to `parent`,
+    /// or nil when no candidate does. Lookup errors propagate.
+    func siblings(anchoredBy candidates: [String], parent: String, in document: DocumentInfo) throws -> [String]? {
+        for anchor in candidates where try resolve(anchor, expectedParent: parent, in: document) == .present {
+            return try siblings(of: anchor, parent: parent, in: document)
+        }
+        return nil
+    }
 }

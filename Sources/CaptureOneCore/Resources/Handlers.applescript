@@ -537,3 +537,20 @@ on lookupVariantIdentities(docName, variantIDs)
         return results
     end tell
 end lookupVariantIdentities
+
+-- Every variant ID of one known variant's parent image, without enumerating
+-- the document. The anchor's parent must still be the expected image.
+on readParentSiblings(docName, anchorID, expectedPath)
+    set d to my checkedDocument(docName)
+    tell application "/Applications/Capture One.app"
+        set v to variant id (anchorID as text) of d
+        my assertParent(v, expectedPath)
+        -- One bulk property read; per-variant reads cost an Apple Event each.
+        set rawIDs to id of every variant of (parent image of v)
+        set siblingIDs to {}
+        repeat with siblingID in rawIDs
+            set end of siblingIDs to (siblingID as text)
+        end repeat
+        return siblingIDs
+    end tell
+end readParentSiblings

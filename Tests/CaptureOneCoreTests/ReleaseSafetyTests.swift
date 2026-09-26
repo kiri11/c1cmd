@@ -19,6 +19,8 @@ final class FakeScript: ScriptExecuting {
     var fail: String?
     var mutatePatch: [Bool] = []
     var parentOverride: String?
+    var parents: [String: String] = [:]
+    var createdIDOverride: String?
     var generation = "app-1"
     var beforeApply: (() -> Void)?
     // Inventory test controls. These hooks let the offline suite model a
@@ -49,9 +51,10 @@ final class FakeScript: ScriptExecuting {
     }
     init(directory: URL) { self.directory = directory }
     var parent: String { (isSession ? directory : directory.deletingLastPathComponent()).appendingPathComponent("fixture.CR3").path }
+    func parentOf(_ id: String) -> String { parentOverride ?? parents[id] ?? parent }
     func item(_ id: String) -> [String: Any] {
         let a = values[id]!
-        return ["variantId": id, "parentImagePath": parentOverride ?? parent,
+        return ["variantId": id, "parentImagePath": parentOf(id),
                 "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4], "starRating": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0]
     }
     private func ids(from descriptor: NSAppleEventDescriptor?) -> [String] {
@@ -65,7 +68,7 @@ final class FakeScript: ScriptExecuting {
     }
     private func summary(_ id: String) -> [String: Any] {
         let a = values[id] ?? [0, 0, 0, 5000, 0]
-        return ["variantId": id, "variantName": "fixture", "parentImagePath": parentOverride ?? parent,
+        return ["variantId": id, "variantName": "fixture", "parentImagePath": parentOf(id),
                 "isSelected": selectedIDs.contains(id), "starRating": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0,
                 "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4]]
     }
@@ -85,7 +88,7 @@ final class FakeScript: ScriptExecuting {
         case "listVariants":
             listArguments = args
             result = values.keys.sorted().filter { !args[2].booleanValue || selectedIDs.contains($0) }.map {
-                ["variantId": $0, "variantName": "fixture", "parentImagePath": parent, "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": colorTags[$0] ?? 0] as [String: Any]
+                ["variantId": $0, "variantName": "fixture", "parentImagePath": parentOf($0), "isSelected": selectedIDs.contains($0), "starRating": ratings[$0] ?? 0, "colorTagVal": colorTags[$0] ?? 0] as [String: Any]
             }
         case "discoverVariantIDs":
             beforeDiscover?()
@@ -115,8 +118,13 @@ final class FakeScript: ScriptExecuting {
         case "lookupVariantIdentities":
             result = ids(from: args[1]).map { id -> [String: Any] in
                 values[id] == nil ? ["variantId": id, "isPresent": false, "parentImagePath": ""]
-                    : ["variantId": id, "isPresent": true, "parentImagePath": parentOverride ?? parent]
+                    : ["variantId": id, "isPresent": true, "parentImagePath": parentOf(id)]
             }
+        case "readParentSiblings":
+            let anchor = args[1].stringValue!
+            guard values[anchor] != nil else { throw C1Error.scriptError("Can't get variant id \(anchor).", code: -1728) }
+            guard parentOf(anchor) == args[2].stringValue else { throw C1Error.identityAmbiguous("Variant parent image changed.") }
+            result = values.keys.sorted().filter { parentOf($0) == parentOf(anchor) }
         case "readVariantRatings":
             beforeReadRatings?()
             documentDrift?()
@@ -136,7 +144,7 @@ final class FakeScript: ScriptExecuting {
             guard let id = args[1].atIndex(1)?.stringValue, values[id] != nil else { throw C1Error.variantNotFound("missing") }
             result = [item(id)]
         case "cloneVariant", "createBaselineVariant":
-            let id = "\((values.keys.compactMap(Int.init).max() ?? 0) + 1)"
+            let id = createdIDOverride ?? "\((values.keys.compactMap(Int.init).max() ?? 0) + 1)"
             values[id] = handler == "cloneVariant" ? values[args[1].stringValue!] : [0, 0, 0, 5000, 0]
             result = [handler == "cloneVariant" ? "cloneId" : "baselineId": id]
         case "deleteVariant": values.removeValue(forKey: args[1].stringValue!); result = ["deleted": true, "existsNow": false]
@@ -365,6 +373,58 @@ struct ReleaseSafetyTests {
             XCTAssertFalse(history.contains { $0.operationId == failed.operationId && ($0.error ?? "").contains("absent") })
             let retried = try reconcile(failed.operationId)
             XCTAssertEqual(retried.status, "reconciled")
+            XCTAssertNoThrow(try journal.assertReady())
+            try? FileManager.default.removeItem(at: journal.journalFile)
+        }
+        // Creation and its recovery find siblings through the parent image, not a document inventory.
+        XCTAssertNoThrowBlock {
+            try? FileManager.default.removeItem(at: journal.journalFile)
+            let inventoryHandlers: Set = ["listVariants", "discoverVariantIDs", "discoverFilteredVariantIDs", "readVariantRatings", "readVariantSummaries"]
+            fake.parents["99"] = "/elsewhere/other.CR3"
+            fake.values["99"] = [0, 0, 0, 5000, 0]
+            var start = fake.calls.count
+            let clone = try core.cloneVariant(sourceRef: "1")
+            XCTAssertTrue(inventoryHandlers.isDisjoint(with: fake.calls.dropFirst(start)), "Creation must not enumerate the document")
+            XCTAssertEqual(fake.calls.dropFirst(start).filter { $0 == "readParentSiblings" }.count, 2, "Siblings are read before and after creation")
+            let created = try journal.validatedEntries().last { $0.workingRef == clone.workingRef }
+            XCTAssertFalse(created?.variantIdsBefore?.contains("99") ?? true, "Another image's variants are not siblings")
+            XCTAssertFalse(created?.variantIdsBefore?.contains(clone.cloneVariantId) ?? true)
+
+            for (label, arrange) in [("existing", { fake.createdIDOverride = "1" }),
+                                     ("wrong-parent", { fake.createdIDOverride = "98"; fake.parents["98"] = "/elsewhere/other.CR3" })] {
+                arrange()
+                defer { fake.createdIDOverride = nil }
+                do {
+                    _ = try core.cloneVariant(sourceRef: "1")
+                    XCTFail("\(label): creation must be rejected")
+                } catch let failure as OperationFailure {
+                    XCTAssertEqual((failure.cause as? C1Error)?.errorCode, "identity-ambiguous", label)
+                    fake.createdIDOverride = nil
+                    fake.generation += "-\(label)"
+                    start = fake.calls.count
+                    let recovered = try core.operationStatus(operationId: failure.operationId)
+                    XCTAssertTrue(inventoryHandlers.isDisjoint(with: fake.calls.dropFirst(start)), "\(label): creation recovery must not enumerate the document")
+                    XCTAssertEqual(recovered.status, "reconciled")
+                    XCTAssertEqual(recovered.observedVariantIds, [], "\(label): pre-existing and foreign variants are never observed as created")
+                }
+            }
+
+            // With every known sibling gone, recovery still reconciles by the last-resort inventory.
+            fake.fail = "cloneVariant"
+            var lostId = ""
+            do { _ = try core.cloneVariant(sourceRef: "1"); XCTFail("Expected injected timeout") }
+            catch let failure as OperationFailure { lostId = failure.operationId }
+            fake.fail = nil
+            let before = try journal.validatedEntries().first { $0.operationId == lostId }?.variantIdsBefore ?? []
+            let saved = fake.values
+            for id in before { fake.values.removeValue(forKey: id) }
+            fake.values["50"] = [0, 0, 0, 5000, 0]
+            fake.generation += "-orphaned"
+            let orphaned = try core.operationStatus(operationId: lostId)
+            XCTAssertEqual(orphaned.status, "reconciled")
+            XCTAssertEqual(orphaned.observedVariantIds, ["50"])
+            fake.values = saved
+            fake.parents = [:]
             XCTAssertNoThrow(try journal.assertReady())
             try? FileManager.default.removeItem(at: journal.journalFile)
         }

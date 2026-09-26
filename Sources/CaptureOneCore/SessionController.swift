@@ -736,7 +736,8 @@ public final class SessionController {
             let ref = WorkingRef().rawValue
             var entry = try prepare(OperationRecord(operationType: operation, workingRef: ref,
                 documentPath: doc.documentPath, beforeAdjustments: source.adjustments), doc: doc, source: source)
-            entry.variantIdsBefore = try listVariants().filter { $0.parentImagePath == parent }.map { $0.id }
+            let lookup = VariantLookup(executor: executor)
+            entry.variantIdsBefore = try lookup.siblings(of: source.id, parent: parent, in: doc)
             try journal.append(entry: entry)
             do {
                 let args = [NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: source.id)]
@@ -753,6 +754,9 @@ public final class SessionController {
                 }
                 let created = try get(ref: id)
                 guard created.parentImagePath == parent else { throw C1Error.identityAmbiguous("Created variant has the wrong parent image.") }
+                guard try lookup.siblings(of: source.id, parent: parent, in: doc).contains(id) else {
+                    throw C1Error.identityAmbiguous("Created variant is not a sibling of its source.")
+                }
                 try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
                     cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
                     parentImagePath: parent, creationOperationId: entry.operationId,
@@ -1508,7 +1512,13 @@ public final class SessionController {
                 guard let before = entry.variantIdsBefore, let parent = entry.parentImagePath else {
                     throw C1Error.identityAmbiguous("Creation lacks recovery identity evidence.")
                 }
-                entry.observedVariantIds = try listVariants().filter { $0.parentImagePath == parent && !before.contains($0.id) }.map { $0.id }
+                // Any still-present known sibling finds the parent image; a whole-document
+                // inventory remains only for when every known sibling is gone.
+                let anchors = [entry.nativeVariantId].compactMap { $0 } + before
+                let siblings = try VariantLookup(executor: executor).siblings(anchoredBy: anchors, parent: parent, in: doc)
+                    ?? listVariants().filter { $0.parentImagePath == parent }.map(\.id)
+                try checkedDocument(doc, writes: false)
+                entry.observedVariantIds = siblings.filter { !before.contains($0) }
                 // Other photographer-created variants are indistinguishable; do not adopt or delete them.
                 entry.status = "reconciled"
                 entry.error = "Previous app instance ended. Review observedVariantIds manually; no variants were adopted, deleted, or recreated."
