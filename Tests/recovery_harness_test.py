@@ -47,18 +47,40 @@ class HarnessTests(unittest.TestCase):
 
     def test_full_case_dispatch_preserves_original_campaign(self):
         calls = []
-        self.run.clone = Mock(return_value=({'workingRef': 'clone'}, {}))
+        self.run.clone = Mock(return_value=({'workingRef': 'clone', 'cloneVariantId': '2'}, {}))
         self.run.cli = Mock(return_value=[{'id': '1'}])
+        self.run.source = '1'
+        self.run.lookup_identities = Mock(return_value=[
+            {'variantId': '2', 'isPresent': False, 'parentImagePath': ''},
+            {'variantId': '1', 'isPresent': True, 'parentImagePath': str(self.run.raw)}])
         self.run.apple_event_timeout = lambda **kw: calls.append(('timeout', kw))
         self.run.preview_timeout = lambda: calls.append(('preview', {}))
         self.run.mcp_death = lambda: calls.append(('mcp-death', {}))
         self.run.run_cases(['all'])
         self.assertEqual(self.run.clone.call_count, 10)
+        self.run.lookup_identities.assert_called_once_with(['2', '1'])
         self.assertEqual(calls, [('timeout', {}), ('timeout', {'metadata': True}), ('timeout', {'native': True}), ('timeout', {'native_action': True}), ('timeout', {'geometry': True}),
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),
                                ('preview', {}), ('mcp-death', {})])
+
+    def test_known_id_lookup_reports_absence_and_fails_on_other_errors(self):
+        self.run.handlers = self.root / 'Handlers.applescript'
+        self.run.handlers.write_text('on lookupVariantIdentities(docName, variantIDs)\nend lookupVariantIdentities\n')
+        present = subprocess.CompletedProcess([], 0, f'2\tfalse\t\n1\ttrue\t{self.run.raw}\n', '')
+        with patch.object(harness, 'ae', self.ae), patch.object(harness.subprocess, 'run', return_value=present) as run:
+            rows = self.run.lookup_identities(['2', '1'])
+        script = self.root / 'lookup-identities.applescript'
+        self.assertEqual(run.call_args.args[0], ['osascript', str(script), str(self.run.session), '2', '1'])
+        self.assertIn('on run argv', script.read_text())
+        self.assertEqual(rows, [{'variantId': '2', 'isPresent': False, 'parentImagePath': ''},
+                                {'variantId': '1', 'isPresent': True, 'parentImagePath': str(self.run.raw)}])
+        # A coercion error (-1700) is a failed lookup, never absence.
+        failed = subprocess.CompletedProcess([], 1, '', "Can't make id of variant id \"2\" into type text. (-1700)")
+        with patch.object(harness, 'ae', self.ae), patch.object(harness.subprocess, 'run', return_value=failed):
+            with self.assertRaises(AssertionError):
+                self.run.lookup_identities(['2', '1'])
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

@@ -30,6 +30,18 @@ from contract_test import complete
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
+LOOKUP_DRIVER = '''
+
+on run argv
+    set rows to my lookupVariantIdentities(item 1 of argv, rest of argv)
+    set output to {}
+    repeat with r in rows
+        set end of output to (variantId of r) & tab & ((isPresent of r) as text) & tab & (parentImagePath of r)
+    end repeat
+    set AppleScript's text item delimiters to linefeed
+    return output as text
+end run
+'''
 RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
 
 
@@ -486,6 +498,19 @@ set keystone horizontal of adjustments of v to -5
                  limitation='File creation proves dispatch, not that rendering was still outstanding at SIGKILL.')
         self.recovery(pending['operationId'], clone, 'mcp-death-after-export-dispatch')
 
+    def lookup_identities(self, ids):
+        # Drives the packaged known-ID lookup handler directly; recovery reaches it
+        # only after a restart, and absence must be reported, never raised.
+        script = self.evidence / 'lookup-identities.applescript'
+        script.write_text(self.handlers.read_text() + LOOKUP_DRIVER)
+        document = ae('return id of first document')
+        result = subprocess.run(['osascript', str(script), document, *ids],
+                                capture_output=True, text=True, timeout=60)
+        self.log('known-id-lookup', ids=ids, code=result.returncode, stdout=result.stdout, stderr=result.stderr)
+        assert result.returncode == 0, result.stderr
+        rows = [line.split('\t') for line in result.stdout.rstrip('\n').split('\n')]
+        return [dict(variantId=row[0], isPresent=row[1] == 'true', parentImagePath=row[2]) for row in rows]
+
     def select_cases(self, cases):
         return selected_cases(cases)
 
@@ -504,6 +529,7 @@ set keystone horizontal of adjustments of v to -5
             tf.extractall(unpack)
         package, = unpack.iterdir()
         self.c1, self.mcp = package / 'bin/c1', package / 'bin/c1-mcp'
+        self.handlers = next(package.rglob('Handlers.applescript'))
         bundle = ROOT / '.build/release/c1_CaptureOneCore.bundle'
         if bundle.exists():
             hidden = bundle.with_name('c1_CaptureOneCore.bundle.recovery-hidden')
@@ -515,7 +541,7 @@ set keystone horizontal of adjustments of v to -5
         assert ae('return version') == '16.8.5.30'
         self.log('environment', archive=self.archive.name, archiveSHA256=digest,
                  cliSHA256=sha(self.c1), mcpSHA256=sha(self.mcp),
-                 handlersSHA256=sha(next(package.rglob('Handlers.applescript'))),
+                 handlersSHA256=sha(self.handlers),
                  commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                  sourcePatchSHA256=sha(self.evidence / 'source.patch'),
                  harnessSHA256=sha(__file__), macOS=subprocess.check_output(['sw_vers'], text=True),
@@ -553,7 +579,13 @@ set keystone horizontal of adjustments of v to -5
                     clone, _ = self.clone()
                     self.cli('variant', 'delete', clone['workingRef'])
                 assert len(self.cli('variants', 'list')) == 1
-                self.log('clone-readback-regression-passed', cycles=10)
+                # A deleted clone's native ID is a real, now-absent identity.
+                deleted = clone['cloneVariantId']
+                assert deleted != self.source
+                rows = self.lookup_identities([deleted, self.source])
+                assert rows == [dict(variantId=deleted, isPresent=False, parentImagePath=''),
+                                dict(variantId=self.source, isPresent=True, parentImagePath=str(self.raw))], rows
+                self.log('clone-readback-regression-passed', cycles=10, absentLookup=rows)
             elif case == 'tonal':
                 self.apple_event_timeout()
             elif case == 'metadata':

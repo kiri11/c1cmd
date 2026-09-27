@@ -546,8 +546,9 @@ on lookupVariantIdentities(docName, variantIDs)
         set results to {}
         repeat with requestedID in variantIDs
             set isPresent to true
+            -- An explicit get is required: coercing an unresolved reference reports -1700, not -1728.
             try
-                set foundID to (id of variant id (requestedID as text) of d) as text
+                set foundID to (get id of variant id (requestedID as text) of d) as text
             on error errorMessage number errorNumber
                 if errorNumber is not -1728 then error errorMessage number errorNumber
                 set isPresent to false
