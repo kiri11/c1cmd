@@ -101,7 +101,7 @@ def main():
         baseline = source['geometry']
         edit = cli('variant', 'edit', source['id'], '--if-state', source['stateHash'], '--if-document', doc['openToken'])
         ref = edit['workingRef']
-        client = Client(MCP, env=dict(os.environ, C1_MCP_PROFILE='composition'), timeout=150)
+        client = Client(MCP, env=dict(os.environ, C1_TOOL_PROFILE='composition'), timeout=150)
         log('environment', session=str(base / 'keystone'), source=source, rawSHA256=source_sha, cliSHA256=sha(CLI), mcpSHA256=sha(MCP), contract=contract['version'])
         tool('geometry_set', {'workingRef':ref, 'ifGeometryState':source['geometryStateHash'], 'keystone':{'vertical':10}, 'dryRun':True}, error='invalid-request')
         # Each control's boundaries are exercised independently, so combined extreme

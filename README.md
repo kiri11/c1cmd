@@ -94,7 +94,7 @@ For MCP, add this to the server's `env` and restart the server:
 }
 ```
 
-The default profile permits all supported tonal, geometry, rating, and color-tag changes. Optionally add `C1_MCP_PROFILE=composition` to restrict an agent to crop/rotation/keystone. An absolute `.cocatalogdb` path inside the package is also accepted. When Capture One reports an exact database path, sibling `.cocatalogdb` files are allowed; write authorization must resolve to that same database. With multiple databases, set the variable to the exact database path, not the package. When Capture One reports only a package path, exactly one database is required, including for read-only access. Read-only inspection does not require the variable. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
+The default profile permits all supported tonal, geometry, rating, and color-tag changes. Optionally add `C1_TOOL_PROFILE=composition` to restrict an agent to crop/rotation/keystone. An absolute `.cocatalogdb` path inside the package is also accepted. When Capture One reports an exact database path, sibling `.cocatalogdb` files are allowed; write authorization must resolve to that same database. With multiple databases, set the variable to the exact database path, not the package. When Capture One reports only a package path, exactly one database is required, including for read-only access. Read-only inspection does not require the variable. Other catalogs remain read-only; there is no global enable-all switch. Check `doctor.allChecksPassed`, `doctor.writesEnabled`, and `exactBuildMatched` before editing. Unset `C1_CATALOG_WRITE_PATH` to disable catalog writes; existing proposals remain available for inspection.
 
 Unpackaged catalog directories are also supported. A directory must contain exactly one `.cocatalogdb`, or Capture One must report the exact database path. Writes and preview export require `C1_CATALOG_WRITE_PATH` to name the exact `.cocatalogdb` file; an ordinary directory opt-in is rejected. Database identity, build, original-image, concurrency, and recovery guards are unchanged. The unpackaged layout passed regular CLI/MCP qualification on Capture One 16.8.5.30. See [validation limits](docs/RELEASE_VALIDATION.md#current-scope-and-remaining-gates); Catalog fault recovery remains unqualified.
 
@@ -225,7 +225,7 @@ c1 metadata set <working-ref> --if-metadata-state <metadataStateHash> --rating 5
 
 New editing references and clones retain `baselineMetadata`; `diff` includes `metadataBefore`, `metadataAfter`, and `metadataDiff`. Restore a saved rating/tag by explicitly setting those values with a fresh token. Older records remain readable but have no metadata baseline. Tonal `reset` does not reset ratings or tags. Each mutation journals its before, intended, and observed values. A partial write or uncertain reply blocks further writes until normal restart/reconciliation; never retry automatically.
 
-The geometry-only `C1_MCP_PROFILE=composition` hides and rejects `metadata_set`. Use the default profile for culling edits. Other metadata remains read-only.
+The geometry-only `C1_TOOL_PROFILE=composition` hides and rejects `metadata_set`. Use the default profile for culling edits. Other metadata remains read-only.
 
 ### Crop and rotation
 
@@ -284,7 +284,7 @@ Equivalent MCP arguments:
 
 Keystone setters run before rotation and crop fitting. Bounds are queried after those transforms. Without a requested crop or ratio, Capture One's resulting crop is retained. Render a fresh preview before selecting precise crop coordinates. Keystone changes reject `dryRun` because their resulting bounds and crop cannot be predicted offline. `geometry_restore` restores the saved crop, rotation, and all keystone controls; its dry run reports that saved target. Native setters are sequential: a failure can leave a partial correction, so inspect the journal and use normal restart/reconciliation without retrying. `diff.geometryDiff` and mutation diffs use `keystone.amount`, `keystone.vertical`, `keystone.horizontal`, `keystone.skew`, and `keystone.aspect`. Response `geometry.keystone` retains its existing array order `[amount, vertical, horizontal, skew, aspect]`.
 
-For a composition-only MCP agent, set `C1_MCP_PROFILE=composition` in the server environment. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; existing-variant preparation, crop/rotation/keystone/restore, inspection, optional cloning, clone deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It defaults to existing variants; pass `--clone` for separate proposals. `grade-folder.py` has the same default and option. Neither example infers aesthetic quality or acceptance.
+For a composition-only agent, set `C1_TOOL_PROFILE=composition` in the MCP server or CLI environment; both transports enforce it identically. The older name `C1_MCP_PROFILE` is still accepted. An unknown value, or two names that disagree, rejects every request. This hides and rejects `set`, `add`, `reset`, and `variant_baseline`; existing-variant preparation, crop/rotation/keystone/restore, inspection, optional cloning, clone deletion, preview, and recovery remain available. The caller supplies visual judgment. [crop-proposals.py](examples/crop-proposals.py) demonstrates applying explicit proposals with source preconditions and before/after previews, retaining `unreviewed` sidecars for photographer decisions. It defaults to existing variants; pass `--clone` for separate proposals. `grade-folder.py` has the same default and option. Neither example infers aesthetic quality or acceptance.
 
 ### Preview files
 
@@ -310,7 +310,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Every CLI command except `version` maps its flags to that tool's arguments object and enters the same core dispatcher as the MCP call, so both transports accept and reject identically. Contract version is currently `2.7.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Every CLI command except `version` maps its flags to that tool's arguments object and enters the same core dispatcher as the MCP call, so both transports accept and reject identically. The MCP server is a thin adapter: it registers tools from the contract, forwards arguments unchanged, reports progress and cancellation, and attaches preview images. It stays a long-lived process so compiled AppleScript handlers are reused across calls. Contract version is currently `2.7.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
@@ -332,7 +332,7 @@ make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1
 
 # Individual live suites during development:
 python3 Tests/integration_test.py       # disposable Session; requires Capture One
-python3 Tests/mcp_test.py               # run sequentially, never alongside CLI suite
+python3 Tests/mcp_test.py               # MCP adapter smoke test; run sequentially, never alongside CLI suite
 python3 Tests/geometry_integration_test.py # zero open documents; crop/rotation + review workflow
 python3 Tests/keystone_integration_test.py # zero open documents; control ranges, crop fitting, restore
 python3 Tests/catalog_integration_test.py # zero open documents; optional clone catalog workflow

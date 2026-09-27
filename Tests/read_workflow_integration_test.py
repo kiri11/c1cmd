@@ -34,7 +34,7 @@ def main():
     for kind in ('session', 'catalog'):
         base = Path(tempfile.mkdtemp(prefix='c1-read-workflow-', dir='/private/tmp'))
         env = dict(os.environ)
-        for key in ('C1_READ_WORKFLOW', 'C1_PROFILE', 'C1_MCP_PROFILE', 'C1_CATALOG_WRITE_PATH'):
+        for key in ('C1_READ_WORKFLOW', 'C1_PROFILE', 'C1_MCP_PROFILE', 'C1_TOOL_PROFILE', 'C1_CATALOG_WRITE_PATH'):
             env.pop(key, None)
         if kind == 'catalog': env['C1_CATALOG_WRITE_PATH'] = str(base/'reads.cocatalog')
         def cli(*args):

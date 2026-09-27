@@ -42,7 +42,12 @@ public struct ToolRequest {
         let rating: Int?, minRating: Int?, batchSize: Int, deadlineSeconds: Double?
     }
 
-    public init(tool: String, arguments a: [String: Any]) throws {
+    /// `profile` defaults to the configured `ToolProfile`; a disabled tool is rejected before validation.
+    public init(tool: String, arguments a: [String: Any], profile: ToolProfile? = nil) throws {
+        let profile = try profile ?? .configured()
+        guard profile.allows(tool) else {
+            throw C1Error.invalidRequest("Tool is not enabled in the \(profile.rawValue) profile: \(tool)")
+        }
         try ContractSchema.validate(tool: tool, arguments: a)
         self.tool = tool
         self.arguments = a

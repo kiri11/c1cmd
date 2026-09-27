@@ -248,21 +248,41 @@ def run(cli, mcp):
             print('PASS: local request status, CLI quiet/JSON progress, stable stdout')
         finally:
             local.close()
-    composition = Client(mcp, env=dict(os.environ, C1_MCP_PROFILE='composition'))
-    try:
-        names = {t['name'] for t in composition.request('tools/list', {})['tools']}
-        assert {'geometry_set','variant_edit','geometry_restore'} <= names
-        assert 'variants_list' in names
-        result = composition.tool('variants_list', {'rating': 6})
-        assert result['isError']; assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
-        assert not names.intersection({'set','add','reset','variant_baseline','metadata_set','native_set','native_action'})
-        result = composition.tool('set', {'workingRef':'x','ifState':'h','exposure':1})
-        assert result['isError'] and 'not enabled' in result['content'][0]['text']
-        result = composition.tool('metadata_set', {'workingRef':'x','ifMetadataState':'h','rating':5})
-        assert result['isError'] and 'not enabled' in result['content'][0]['text']
-        print('PASS: composition profile hides and rejects tonal and metadata mutation tools')
-    finally:
-        composition.close()
+    # C1_MCP_PROFILE remains an alias of the transport-neutral C1_TOOL_PROFILE.
+    for variable in ['C1_TOOL_PROFILE', 'C1_MCP_PROFILE']:
+        env = {k: v for k, v in os.environ.items() if k not in ('C1_TOOL_PROFILE', 'C1_MCP_PROFILE')}
+        env[variable] = 'composition'
+        composition = Client(mcp, env=env)
+        try:
+            names = {t['name'] for t in composition.request('tools/list', {})['tools']}
+            assert {'geometry_set','variant_edit','geometry_restore'} <= names
+            assert 'variants_list' in names
+            result = composition.tool('variants_list', {'rating': 6})
+            assert result['isError']; assert_error_payload(json.loads(result['content'][0]['text']), cli_schema)
+            assert not names.intersection({'set','add','reset','variant_baseline','metadata_set','native_set','native_action'})
+            for tool, argv, args in [('set', ['set', 'x', '--if-state', 'h', 'exposure=1'], {'workingRef':'x','ifState':'h','exposure':1}),
+                                     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '5'],
+                                      {'workingRef':'x','ifMetadataState':'h','rating':5})]:
+                result = composition.tool(tool, args)
+                assert result['isError']
+                error = json.loads(result['content'][0]['text'])
+                assert_error_payload(error, cli_schema)
+                assert error['error']['message'].endswith(f'Tool is not enabled in the composition profile: {tool}'), error
+                command = subprocess.run([str(cli), *argv, '--format', 'json'], capture_output=True, text=True, env=env, timeout=15)
+                assert command.returncode != 0, command.stdout
+                cli_error = json.loads(command.stderr)['error']
+                assert (cli_error['code'], cli_error['message']) == (error['error']['code'], error['error']['message']), command.stderr
+        finally:
+            composition.close()
+    for profile in [{'C1_TOOL_PROFILE': 'Composition'}, {'C1_TOOL_PROFILE': 'default', 'C1_MCP_PROFILE': 'composition'}]:
+        env = {k: v for k, v in os.environ.items() if k not in ('C1_TOOL_PROFILE', 'C1_MCP_PROFILE')}
+        env.update(profile)
+        server = subprocess.run([str(mcp)], input='', capture_output=True, text=True, env=env, timeout=15)
+        assert server.returncode != 0 and 'profile' in server.stderr and not server.stdout, (profile, server)
+        command = subprocess.run([str(cli), 'doc', 'info', '--format', 'json'], capture_output=True, text=True, env=env, timeout=15)
+        assert command.returncode != 0, (profile, command.stdout)
+        assert_error_payload(json.loads(command.stderr), cli_schema)
+    print('PASS: CLI and MCP share the composition profile; unknown or conflicting profiles fail closed')
 
 # Each case: tool, CLI arguments, MCP arguments. Accepted cases name the arguments
 # object the CLI flags must produce; rejected cases must fail identically.
@@ -369,18 +389,23 @@ ARGUMENT_FREE = {'doctor', 'doc_info', 'capabilities', 'schema'}
 
 
 def run_parity(cli, mcp):
-    """Proves per tool that CLI flags map to the MCP arguments object and are
-    accepted or rejected identically. Needs a debug build: C1_CONTRACT_ECHO
+    """Proves per tool that CLI flags map to the arguments object the MCP server
+    forwards verbatim, and that both transports accept or reject it identically,
+    including under the composition profile. Needs a debug build: C1_CONTRACT_ECHO
     returns each decoded request instead of executing it, so nothing reaches Capture One."""
     with tempfile.TemporaryDirectory(prefix='c1-contract-parity-') as directory:
-        env = {k: v for k, v in os.environ.items() if k != 'C1_READ_WORKFLOW'}
+        env = {k: v for k, v in os.environ.items() if k not in ('C1_READ_WORKFLOW', 'C1_TOOL_PROFILE', 'C1_MCP_PROFILE')}
         env.update(C1_CONTRACT_ECHO='1', C1_REQUEST_DIR=directory, C1_PROGRESS='quiet')
-        def cli_call(tool, argv, args):
+        def cli_call(tool, argv, args, env=env):
             if argv[0] == 'recipe':
                 request = Path(directory) / f'{tool}.json'
                 request.write_text(json.dumps(args))
                 argv = argv + ['--file', str(request)]
             return subprocess.run([str(cli), *argv, '--format', 'json'], capture_output=True, text=True, env=env, timeout=15)
+        def same_error(command, result):
+            cli_error = json.loads(command.stderr)['error']
+            mcp_error = json.loads(result['content'][0]['text'])['error']
+            return (cli_error['code'], cli_error['message']) == (mcp_error['code'], mcp_error['message'])
         client = Client(mcp, env=env)
         try:
             tools = {t['name'] for t in client.request('tools/list', {})['tools']}
@@ -399,12 +424,21 @@ def run_parity(cli, mcp):
                 assert command.returncode != 0, (tool, argv, command.stdout)
                 result = client.tool(tool, args)
                 assert result.get('isError'), (tool, args, result)
-                cli_error = json.loads(command.stderr)['error']
-                mcp_error = json.loads(result['content'][0]['text'])['error']
-                assert (cli_error['code'], cli_error['message']) == (mcp_error['code'], mcp_error['message']), (tool, cli_error, mcp_error)
+                assert same_error(command, result), (tool, command.stderr, result)
         finally:
             client.close()
-    print(f'PASS: CLI/MCP parity for {len(ACCEPTED)} accepted and {len(REJECTED)} rejected requests across every tool')
+        composition_env = dict(env, C1_TOOL_PROFILE='composition')
+        client = Client(mcp, env=composition_env)
+        try:
+            allowed = {t['name'] for t in client.request('tools/list', {})['tools']}
+            for tool, argv, args in ACCEPTED:
+                command = cli_call(tool, argv, args, composition_env)
+                result = client.tool(tool, args)
+                assert (command.returncode == 0) == (not result.get('isError')) == (tool in allowed), (tool, command.stderr, result)
+                if tool not in allowed: assert same_error(command, result), (tool, command.stderr, result)
+        finally:
+            client.close()
+    print(f'PASS: CLI/MCP parity for {len(ACCEPTED)} accepted and {len(REJECTED)} rejected requests across every tool, and under the composition profile')
 
 
 if __name__ == '__main__':

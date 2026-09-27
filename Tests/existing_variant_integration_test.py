@@ -41,6 +41,7 @@ def main():
         succeeded = False
         environment = dict(os.environ)
         environment.pop('C1_MCP_PROFILE', None)
+        environment.pop('C1_TOOL_PROFILE', None)
         environment.pop('C1_CATALOG_WRITE_PATH', None)
         package = base / 'existing.cocatalog'
         if kind == 'catalog':

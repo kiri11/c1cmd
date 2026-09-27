@@ -64,7 +64,7 @@ Existing lens distortion correction in 0...100 is preserved and supported using 
 
 Keystone corrections use `geometry_set.keystone: {amount, vertical, horizontal, skew, aspect}` or CLI `geometry set --keystone-<control>`. Values are absolute; omit controls to preserve them. Amount is an integer 10–120, vertical/horizontal are −75–75, skew is −45–45, and aspect is −50–100. Keystone aspect changes image proportions; crop `aspectRatio` is separate. Apply corrections plus a ratio, then inspect a fresh preview before choosing an explicit crop. Keystone changes reject dry runs. `geometry_restore` restores baseline crop, rotation, and all keystone controls with a fresh token and unchanged lens/orientation context. Partial native writes follow normal recovery; never retry or undo automatically.
 
-The default profile permits all supported adjustments on existing editing references. Only use `C1_MCP_PROFILE=composition` when a geometry-only restriction is wanted; that profile hides tonal mutation tools and native default-baseline creation, and allows crop, rotation, and keystone corrections.
+The default profile permits all supported adjustments on existing editing references. Only use `C1_TOOL_PROFILE=composition` (CLI and MCP; `C1_MCP_PROFILE` is an older alias) when a geometry-only restriction is wanted; that profile hides tonal mutation tools and native default-baseline creation, and allows crop, rotation, and keystone corrections.
 
 ## 3. Supported Adjustment Fields & Valid Ranges
 

@@ -35,7 +35,10 @@ not run. Do not claim a focused pass covers the full campaign.
 | `make qualify-full` | All regular suites plus the generic recovery campaign; select recipe recovery separately when affected |
 
 Regular suites are `cli mcp geometry lens perspective keystone catalog existing
-inventory native recipes`. They do not inject faults.
+inventory native recipes`. They do not inject faults. `mcp` is a smoke test of the
+MCP adapter (registration, error results, preview image content, one compile of
+each AppleScript handler script per server process); the CLI suites cover tool
+behaviour through the same dispatcher.
 
 ### Recovery case selection
 

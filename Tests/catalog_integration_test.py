@@ -202,9 +202,9 @@ def main():
         restored = cli('get', edit['workingRef'])
         assert restored['metadataStateHash'] == source['metadataStateHash']
         log('existing-variant-rating-restored', layout=layout)
-        # Composition MCP profile also supports the exact-path opt-in.
+        # Composition tool profile also supports the exact-path opt-in.
         client.close()
-        client = Client(MCP, env=dict(environment, C1_MCP_PROFILE='composition'), timeout=150)
+        client = Client(MCP, env=dict(environment, C1_TOOL_PROFILE='composition'), timeout=150)
         names = [entry['name'] for entry in client.request('tools/list', {})['tools']]
         assert 'geometry_set' in names and 'set' not in names and 'variant_baseline' not in names
         clone, _ = tool('variant_clone', {'sourceRef': variants[0]['id']})

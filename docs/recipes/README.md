@@ -53,7 +53,7 @@ is exactly the corresponding MCP argument object:
 | `apply` | `edit_apply` | Prepare and edit one existing photo, returning observed results |
 | `status` | `edit_status` | Inspect the durable compound report and interrupted child operations |
 
-Use `c1 schema` for exact request and response schemas. The composition MCP
+Use `c1 schema` for exact request and response schemas. The composition tool
 profile excludes capture, registration, verification and compound application;
 status inspection remains available.
 

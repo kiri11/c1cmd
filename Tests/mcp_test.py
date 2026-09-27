@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""mcp_test.py: Automated integration test suite for c1-mcp stdio Model Context Protocol server."""
+"""mcp_test.py: live smoke test for the c1-mcp stdio adapter.
+
+Tool behaviour is covered by the CLI suites through the same core dispatcher. This
+suite checks only what the MCP server adds: tool registration, JSON-RPC results and
+errors, preview image content, and that one server process compiles the AppleScript
+handlers once and reuses them for every later call."""
 
 import base64
 import json
@@ -19,8 +24,6 @@ MCP_BIN = Path(os.environ.get("C1_TEST_MCP_BIN", str(ROOT / ".build" / "debug" /
 TEST_ROOT = Path(tempfile.mkdtemp(prefix="c1-mcp-e2e-", dir="/private/tmp"))
 SESSION_DIR = TEST_ROOT / "c1-mcp-e2e"
 SESSION_NAME = "c1-mcp-e2e.cosessiondb"
-DISPOSABLE_CAT_NAME = "c1-cat-guard-test"
-DISPOSABLE_CAT_DIR = TEST_ROOT / f"{DISPOSABLE_CAT_NAME}.cocatalog"
 
 raw_fixture_env = os.environ.get("C1_TEST_RAW_FIXTURE")
 SOURCE_CR3 = Path(raw_fixture_env) if raw_fixture_env else None
@@ -36,12 +39,13 @@ def run_applescript(script: str) -> str:
     return res.stdout.strip()
 
 class MCPClient:
-    def __init__(self, bin_path: Path):
+    def __init__(self, bin_path: Path, env=None, stderr=subprocess.PIPE):
         self.proc = subprocess.Popen(
             [str(bin_path)],
+            env=env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=stderr,
             text=True,
             bufsize=0
         )
@@ -64,7 +68,7 @@ class MCPClient:
         
         resp_line = self.proc.stdout.readline()
         if not resp_line:
-            stderr_out = self.proc.stderr.read()
+            stderr_out = self.proc.stderr.read() if self.proc.stderr else "(redirected to a file)"
             raise RuntimeError(f"Server closed connection unexpectedly. Stderr: {stderr_out}")
         
         return json.loads(resp_line.strip())
@@ -118,7 +122,7 @@ def find_image_content(content_items: list[dict]) -> dict | None:
     return None
 
 def main():
-    print("=== c1-mcp Stdio Server Comprehensive Test Suite ===")
+    print("=== c1-mcp stdio smoke test ===")
     assert MCP_BIN.exists(), f"Binary {MCP_BIN} does not exist. Run 'swift build' first."
     if SOURCE_CR3 is None or not SOURCE_CR3.exists():
         print("\n[ERROR] C1_TEST_RAW_FIXTURE environment variable not set or file not found.")
@@ -193,315 +197,109 @@ def main():
             break
         time.sleep(0.5)
 
-    client = MCPClient(MCP_BIN)
-    passed_tests = 0
-    total_tests = 0
+    # C1_PROFILE traces each compile and Apple Event on stderr, without arguments or paths.
+    environment = {k: v for k, v in os.environ.items() if k not in ("C1_TOOL_PROFILE", "C1_MCP_PROFILE", "C1_READ_WORKFLOW")}
+    environment["C1_PROFILE"] = "1"
+    trace_path = TEST_ROOT / "mcp-trace.jsonl"
+    trace = open(trace_path, "w")
+    client = MCPClient(MCP_BIN, env=environment, stderr=trace)
 
     try:
-        # 1. Initialize Handshake
-        print("\n[Step 1] Testing MCP initialization handshake...")
-        total_tests += 1
+        print("\n[Step 1] Handshake and tool registration...")
         init_resp = client.send_request("initialize", {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {"name": "c1-mcp-test", "version": "1.0.0"}
         })
         assert "result" in init_resp, f"Initialize failed: {init_resp}"
-        result = init_resp["result"]
-        server_info = result.get("serverInfo", {})
-        assert server_info.get("name") == "c1-mcp", f"Unexpected server name: {server_info}"
-        assert server_info.get("version") == "0.1.0", f"Unexpected server version: {server_info}"
-        assert "tools" in result.get("capabilities", {}), "Missing tools capability"
+        server_info = init_resp["result"].get("serverInfo", {})
+        assert server_info.get("name") == "c1-mcp" and server_info.get("version") == "0.1.0", server_info
+        assert "tools" in init_resp["result"].get("capabilities", {}), "Missing tools capability"
         client.send_notification("notifications/initialized")
-        print("  ✓ Handshake successful: c1-mcp v0.1.0 ready")
-        passed_tests += 1
-
-        # 2. Tools List & Schema Verification
-        print("\n[Step 2] Testing tools/list and schema inspection...")
-        total_tests += 1
-        tools_resp = client.send_request("tools/list", {})
-        tools = tools_resp.get("result", {}).get("tools", [])
-        tool_names = {t["name"] for t in tools}
-        expected_tools = {
-            "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema",
-            "variants_list", "variant_edit", "geometry_restore", "variant_clone", "variant_delete", "variant_baseline",
-            "get", "metadata_set", "set", "add", "reset", "diff", "dump", "preview", "operation_status", "request_status", "geometry_set"
-        }
-        missing = expected_tools - tool_names
-        assert not missing, f"Missing required tools in tools/list: {missing}"
-        assert len(tools) == 35, f"Expected 35 tools, found {len(tools)}"
+        tools = client.send_request("tools/list", {}).get("result", {}).get("tools", [])
+        schema = parse_text_content(client.call_tool("schema").get("content", []))
+        client.contract = schema
+        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 35, [t["name"] for t in tools]
         for t in tools:
-            assert "description" in t and t["description"], f"Tool {t['name']} missing description"
-            assert "inputSchema" in t and isinstance(t["inputSchema"], dict), f"Tool {t['name']} invalid schema"
-        print(f"  ✓ All 23 tools discovered with complete schemas: {sorted(list(tool_names))}")
-        passed_tests += 1
+            assert t.get("description"), f"Tool {t['name']} missing description"
+            assert t["inputSchema"] == schema["requests"][t["name"]], t["name"]
+        print(f"  ✓ {len(tools)} tools registered from the contract schema")
 
-        # 3. Read-Only Tools (capabilities, schema, doc_info)
-        print("\n[Step 3] Testing read-only metadata tools...")
-        total_tests += 1
-        caps_res = client.call_tool("capabilities")
-        caps_data = parse_text_content(caps_res.get("content", []))
-        assert "pinnedBuild" in caps_data and "supportedFields" in caps_data, f"Invalid capabilities output: {caps_data}"
-
-        schema_res = client.call_tool("schema")
-        schema_data = parse_text_content(schema_res.get("content", []))
-        client.contract = schema_data
-        assert schema_data.get("title") == "c1-contract-schema", f"Invalid schema title: {schema_data}"
-
-        doc_res = client.call_tool("doc_info")
-        doc_data = parse_text_content(doc_res.get("content", []))
-        assert "documentName" in doc_data and "openToken" in doc_data, f"Invalid doc_info: {doc_data}"
-        assert doc_data.get("isSession") is True
-        print(f"  ✓ Metadata tools verified. Active Session: '{doc_data['documentName']}' (token: {doc_data['openToken']})")
-        passed_tests += 1
-
-        # 4. Doctor Tool
-        print("\n[Step 4] Testing doctor tool...")
-        total_tests += 1
-        doc_report_res = client.call_tool("doctor")
-        doc_report = parse_text_content(doc_report_res.get("content", []))
-        assert doc_report.get("appRunning") is True, f"Doctor failed: {doc_report}"
-        assert doc_report.get("hasDocument") is True, f"Doctor failed: {doc_report}"
-        assert doc_report.get("allChecksPassed") is True, f"Doctor failed: {doc_report}"
-        print(f"  ✓ Doctor diagnostic passed. Build: {doc_report.get('appVersion')} (matched: {doc_report.get('exactBuildMatched')})")
-        passed_tests += 1
-
-        # 5. Variants List & Dump Tools
-        print("\n[Step 5] Testing variants_list and dump tools...")
-        total_tests += 1
+        print("\n[Step 2] Doctor, document and read tools...")
+        doctor = parse_text_content(client.call_tool("doctor").get("content", []))
+        assert doctor.get("allChecksPassed") is True, f"Doctor failed: {doctor}"
+        doc_data = parse_text_content(client.call_tool("doc_info").get("content", []))
+        assert doc_data.get("isSession") is True and doc_data.get("openToken"), doc_data
         variants = []
         for _ in range(12):
-            list_res = client.call_tool("variants_list")
-            variants = parse_text_content(list_res.get("content", []))
-            if isinstance(variants, list) and len(variants) > 0:
+            variants = parse_text_content(client.call_tool("variants_list").get("content", []))
+            if isinstance(variants, list) and variants:
                 break
             time.sleep(0.5)
-        assert isinstance(variants, list) and len(variants) > 0, f"Expected variants list, got: {variants}"
-        source_variant = variants[0]
-        source_id = source_variant["id"]
-        print(f"  ✓ Listed {len(variants)} variant(s). Source ID '{source_id}', Name '{source_variant.get('name')}'")
+        assert isinstance(variants, list) and variants, f"Expected variants list, got: {variants}"
+        source_id = variants[0]["id"]
+        source = parse_text_content(client.call_tool("get", {"ref": source_id}).get("content", []))
+        assert len(source.get("stateHash", "")) == 64, source
+        for _ in range(2):
+            native = parse_text_content(client.call_tool("get", {"ref": source_id, "nativeTargets": [{"scope": "adjustments"}]}).get("content", []))
+            assert native["nativeSnapshots"][0]["nativeStateHash"], native
+        print(f"  ✓ Doctor passed on build {doctor.get('appVersion')}; read source variant {source_id}")
 
-        dump_res = client.call_tool("dump", {"batchSize": 5})
-        dump_records = parse_text_content(dump_res.get("content", []))
-        assert isinstance(dump_records, list) and len(dump_records) > 0, f"Dump failed: {dump_records}"
-        assert "adjustments" in dump_records[0] and "metadata" in dump_records[0], "Dump record missing adjustments/metadata"
-        print(f"  ✓ Dump returned {len(dump_records)} comprehensive record(s)")
-        passed_tests += 1
-
-        # 6. Safety & Guard Verification (Mutating unmanaged variant must fail closed)
-        print("\n[Step 6] Testing safety guard: rejecting mutation on unmanaged variant...")
-        total_tests += 1
-        err_res = client.call_tool("set", {
-            "workingRef": source_id,
-            "ifState": "dummyhash",
-            "adjustments": {"exposure": 0.5}
-        })
-        assert err_res.get("isError") is True, f"Expected isError=True on unmanaged variant, got: {err_res}"
+        print("\n[Step 3] Guard errors come back as tool results...")
+        err_res = client.call_tool("set", {"workingRef": source_id, "ifState": source["stateHash"], "adjustments": {"exposure": 0.5}})
         err_payload = parse_text_content(err_res.get("content", []))
-        assert isinstance(err_payload, dict) and err_payload.get("error", {}).get("code") == "unmanaged-variant", (
-            f"Expected error code 'unmanaged-variant', got: {err_payload}"
-        )
-        print(f"  ✓ Unmanaged variant mutation blocked: [{err_payload['error']['code']}] {err_payload['error']['message']}")
-        passed_tests += 1
+        assert err_res.get("isError") is True and err_payload["error"]["code"] == "unmanaged-variant", err_res
+        print(f"  ✓ Unmanaged variant mutation blocked: [{err_payload['error']['code']}]")
 
-        # 7. Working Variant Clone & Baseline Creation
-        print("\n[Step 7] Testing variant_clone, variant_baseline, and get tools...")
-        total_tests += 1
-        # Test clone
+        print("\n[Step 4] Preview image content on a managed clone...")
         clone_res = client.call_tool("variant_clone", {"sourceRef": source_id})
         assert clone_res.get("isError") is not True, f"Clone failed: {clone_res}"
         clone_data = parse_text_content(clone_res.get("content", []))
-        working_ref = clone_data.get("workingRef")
-        baseline_hash = clone_data.get("baselineStateHash")
-        assert working_ref and working_ref.startswith("c1_wrk_"), f"Invalid workingRef: {clone_data}"
-        assert baseline_hash and len(baseline_hash) == 64, f"Invalid baseline hash: {clone_data}"
-        print(f"  ✓ Created working clone: {working_ref} (baseline hash: {baseline_hash[:12]}...)")
-
-        # Test baseline variant
-        base_res = client.call_tool("variant_baseline", {"sourceRef": source_id})
-        assert base_res.get("isError") is not True, f"Baseline failed: {base_res}"
-        base_data = parse_text_content(base_res.get("content", []))
-        base_ref = base_data.get("workingRef")
-        print(f"  ✓ Created managed baseline variant: {base_ref}")
-
-        # Test get
-        get_res = client.call_tool("get", {"ref": working_ref})
-        get_data = parse_text_content(get_res.get("content", []))
-        assert get_data.get("workingRef") == working_ref, f"Mismatched workingRef: {get_data}"
-        assert get_data.get("stateHash") == baseline_hash, f"Initial stateHash != baseline: {get_data}"
-        passed_tests += 1
-
-        # 8. Mutation (Set, Add, Diff, Reset)
-        print("\n[Step 8] Testing set, add, diff, and reset tools on working clone...")
-        total_tests += 1
-        # Set mutation
-        set_res = client.call_tool("set", {
-            "workingRef": working_ref,
-            "ifState": baseline_hash,
-            "adjustments": {
-                "exposure": 0.35,
-                "contrast": 8.0,
-                "saturation": -5.0
-            }
-        })
-        assert set_res.get("isError") is not True, f"Set failed: {set_res}"
-        set_data = parse_text_content(set_res.get("content", []))
-        after_hash = set_data.get("stateHash")
-        assert after_hash != baseline_hash, f"State hash did not change after set: {set_data}"
-        assert abs(set_data.get("diff", {}).get("exposure", {}).get("after", 0) - 0.35) < 1e-4, f"Unexpected exposure diff: {set_data.get('diff')}"
-        print(f"  ✓ 'set' applied successfully. New stateHash: {after_hash[:12]}...")
-
-        # Diff against baseline
-        diff_res = client.call_tool("diff", {"ref1": working_ref})
-        diff_data = parse_text_content(diff_res.get("content", []))
-        assert "exposure" in diff_data.get("diff", {}), f"Diff missing exposure change: {diff_data}"
-        print("  ✓ 'diff' against baseline confirmed changed adjustments")
-
-        # Add relative delta
-        add_res = client.call_tool("add", {
-            "workingRef": working_ref,
-            "ifState": after_hash,
-            "adjustments": {
-                "exposure": -0.10
-            }
-        })
-        assert add_res.get("isError") is not True, f"Add failed: {add_res}"
-        add_data = parse_text_content(add_res.get("content", []))
-        final_hash = add_data.get("stateHash")
-        assert final_hash != after_hash, f"State hash did not change after add: {add_data}"
-        current_exp = add_data.get("after", {}).get("exposure")
-        assert current_exp is not None and abs(current_exp - 0.25) < 1e-4, f"Expected exposure 0.25, got {current_exp}"
-        print(f"  ✓ 'add' delta applied (-0.10 EV -> {current_exp} EV)")
-
-        # Reset mutation
-        reset_res = client.call_tool("reset", {
-            "workingRef": working_ref,
-            "ifState": final_hash
-        })
-        assert reset_res.get("isError") is not True, f"Reset failed: {reset_res}"
-        reset_data = parse_text_content(reset_res.get("content", []))
-        assert reset_data.get("stateHash") == baseline_hash, f"Reset hash != baseline: {reset_data}"
-        print(f"  ✓ 'reset' restored adjustments to baseline stateHash: {reset_data.get('stateHash')[:12]}...")
-        passed_tests += 1
-
-        # 9. Preview (with Image Block) & Variant Delete
-        print("\n[Step 9] Testing preview (with MCP image block) and variant_delete...")
-        total_tests += 1
-        custom_preview_dir = SESSION_DIR / "custom-preview"
-        custom_preview_dir.mkdir()
-        (custom_preview_dir / "stale.jpg").write_bytes(b"not the requested image")
-        preview_res = client.call_tool("preview", {
-            "ref": working_ref,
-            "outputDir": str(custom_preview_dir),
-            "timeout": 35.0
-        })
+        working_ref = clone_data["workingRef"]
+        assert working_ref.startswith("c1_wrk_"), clone_data
+        preview_res = client.call_tool("preview", {"ref": working_ref, "timeout": 35.0})
         assert preview_res.get("isError") is not True, f"Preview failed: {preview_res}"
         content_items = preview_res.get("content", [])
-        
-        # Verify JSON metadata text block
         preview_data = parse_text_content(content_items)
-        assert Path(preview_data["outputPath"]).is_relative_to(custom_preview_dir / "c1-previews")
-        assert preview_data["nativeVariantId"] == clone_data["cloneVariantId"]
-        assert preview_data["stateHash"] == reset_data["stateHash"]
-        assert "outputPath" in preview_data and "pixelSha256" in preview_data, f"Invalid preview metadata: {preview_data}"
-        assert preview_data.get("width", 0) > 0 and preview_data.get("height", 0) > 0
-        print(f"  ✓ Preview metadata: {preview_data['width']}x{preview_data['height']} ({preview_data['fileSizeBytes']} bytes), SHA-256: {preview_data['pixelSha256'][:12]}...")
-
-        # Verify binary JPEG Image content block
+        assert preview_data["nativeVariantId"] == clone_data["cloneVariantId"], preview_data
         img_block = find_image_content(content_items)
-        assert img_block is not None, f"Missing image content block in preview response: {content_items}"
-        assert img_block.get("mimeType") == "image/jpeg", f"Expected mimeType 'image/jpeg', got {img_block.get('mimeType')}"
-        img_b64 = img_block.get("data", "")
-        raw_bytes = base64.b64decode(img_b64)
-        assert len(raw_bytes) == preview_data["fileSizeBytes"], f"Decoded image size {len(raw_bytes)} != file size {preview_data['fileSizeBytes']}"
-        assert raw_bytes[:3] == b"\xff\xd8\xff", "Image content block lacks valid JPEG magic header (FF D8 FF)"
-        print(f"  ✓ Image content block validated: {len(raw_bytes)} bytes base64-decoded, valid JPEG header confirmed")
-
-        # Delete working clone
-        del_res = client.call_tool("variant_delete", {"workingRef": working_ref})
-        assert del_res.get("isError") is not True, f"Delete failed: {del_res}"
-        del_data = parse_text_content(del_res.get("content", []))
-        assert del_data.get("deleted") is True, f"Delete returned false: {del_data}"
-        print(f"  ✓ Cleaned up working clone {working_ref}")
-
-        # Delete baseline clone
-        del_base_res = client.call_tool("variant_delete", {"workingRef": base_ref})
-        assert del_base_res.get("isError") is not True, f"Baseline delete failed: {del_base_res}"
-        print(f"  ✓ Cleaned up baseline variant {base_ref}")
-        passed_tests += 1
+        assert img_block is not None and img_block.get("mimeType") == "image/jpeg", content_items
+        raw_bytes = base64.b64decode(img_block.get("data", ""))
+        assert len(raw_bytes) == preview_data["fileSizeBytes"], (len(raw_bytes), preview_data["fileSizeBytes"])
+        assert raw_bytes[:3] == b"\xff\xd8\xff", "Image content block lacks a JPEG header"
+        del_data = parse_text_content(client.call_tool("variant_delete", {"workingRef": working_ref}).get("content", []))
+        assert del_data.get("deleted") is True, f"Delete failed: {del_data}"
+        print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content; clone deleted")
 
         client.close()
+        trace.close()
+        print("\n[Step 5] Compiled AppleScript reuse...")
+        records = [json.loads(line) for line in trace_path.read_text().splitlines() if line.startswith('{"')]
+        records = [r for r in records if r.get("type") == "c1-profile"]
+        compiles = [r for r in records if r["phase"] == "script_compile"]
+        events = [r for r in records if r["phase"] == "apple_event"]
+        assert len({r["pid"] for r in records}) == 1, "Every call must run in one server process"
+        # Base and native handlers are separate scripts; each compiles on first use only.
+        assert sorted(r["handler"] for r in compiles) == ["base", "native"], compiles
+        assert len(events) >= 8, f"Expected Apple Events for every Capture One call, saw {len(events)}"
+        print(f"  ✓ Handlers compiled once and reused for {len(events)} Apple Events")
 
-        # 10. Catalog Read-Only Guard Verification over MCP
-        print("\n[Step 10] Testing Catalog fail-closed mutation guard over MCP...")
-        total_tests += 1
-        # Close test session and create disposable test Catalog
-        if DISPOSABLE_CAT_DIR.exists():
-            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
-        run_applescript(f'''
-            try
-                close document "{SESSION_NAME}" without saving
-            end try
-            make new document with properties {{name:"{DISPOSABLE_CAT_NAME}", kind:catalog, path:"{TEST_ROOT}"}}
-        ''')
-        time.sleep(1.5)
-
-        # Launch fresh MCP client on Catalog
-        cat_client = MCPClient(MCP_BIN)
-        try:
-            cat_client.send_request("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "c1-mcp-cat-test", "version": "1.0.0"}
-            })
-            cat_client.send_notification("notifications/initialized")
-
-            cat_doc = cat_client.call_tool("doc_info")
-            cat_doc_data = parse_text_content(cat_doc.get("content", []))
-            assert cat_doc_data.get("isSession") is False, f"Expected Catalog, got session: {cat_doc_data}"
-            print(f"  ✓ Open document is Catalog: '{cat_doc_data['documentName']}'")
-
-            # Try mutating a Catalog variant -> must be rejected by session writable guard
-            cat_err = cat_client.call_tool("variant_clone", {"sourceRef": "1"})
-            assert cat_err.get("isError") is True, f"Expected mutation on Catalog to fail, got: {cat_err}"
-            cat_err_data = parse_text_content(cat_err.get("content", []))
-            assert "Catalogs are strictly read-only" in cat_err_data.get("error", {}).get("message", ""), (
-                f"Expected 'Catalogs are strictly read-only' error message, got: {cat_err_data}"
-            )
-            print(f"  ✓ Catalog mutation guard verified over MCP: {cat_err_data['error']['message']}")
-            geometry_err = cat_client.call_tool("geometry_set", {"workingRef":"1", "ifGeometryState":"dummy", "rotation":1})
-            assert geometry_err.get("isError")
-            assert "Catalogs are strictly read-only" in parse_text_content(geometry_err['content'])['error']['message']
-            passed_tests += 1
-        finally:
-            cat_client.close()
-
-        print("\n=======================================================")
-        print("ALL c1-mcp INTEGRATION TESTS PASSED SUCCESSFULLY!")
-        print(f"Total Test Steps : {total_tests}")
-        print(f"Passed           : {passed_tests}")
-        print("=======================================================")
+        print("\nALL c1-mcp SMOKE TESTS PASSED SUCCESSFULLY!")
 
     finally:
+        client.close()
+        trace.close()
         try:
             run_applescript(f'''
                 try
                     close document "{SESSION_NAME}" without saving
                 end try
-                if exists document "{DISPOSABLE_CAT_NAME}" then
-                    close document "{DISPOSABLE_CAT_NAME}" without saving
-                end if
             ''')
             if initial_doc_path and os.path.exists(initial_doc_path):
                 run_applescript(f'open POSIX file "{initial_doc_path}"')
         except Exception:
             pass
         time.sleep(1.0)
-        if SESSION_DIR.exists():
-            shutil.rmtree(SESSION_DIR, ignore_errors=True)
-        if DISPOSABLE_CAT_DIR.exists():
-            shutil.rmtree(DISPOSABLE_CAT_DIR, ignore_errors=True)
-
         shutil.rmtree(TEST_ROOT, ignore_errors=True)
 
 if __name__ == "__main__":

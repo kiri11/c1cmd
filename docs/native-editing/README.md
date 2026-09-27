@@ -181,7 +181,7 @@ failure, timeout, or missing readback, stop: inspect the operation, restart and
 reopen the same database, reconcile observations, and create a fresh editing
 reference. Never blindly retry or automatically undo.
 
-`C1_MCP_PROFILE=composition` hides and rejects `native_set` and `native_action`.
+`C1_TOOL_PROFILE=composition` hides and rejects `native_set` and `native_action`.
 The read-only native inspection tool remains available.
 
 ## Validation
