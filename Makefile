@@ -64,7 +64,7 @@ qualify:
 	$(MAKE) archive
 	$(MAKE) check-built-core TEST_BUILD_DIR=.build/release
 	mkdir -p "$(EVIDENCE_DIR)"
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES)
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES)
 
 # All regular live matrices, without deliberate fault injection.
 qualify-extended:

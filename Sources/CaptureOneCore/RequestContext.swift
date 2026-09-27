@@ -175,9 +175,11 @@ public final class RequestContext: @unchecked Sendable {
         case "permission-denied": error["recoveryAction"] = "Enable Capture One Automation permission for the host application."
         case "app-not-running": error["recoveryAction"] = "Launch Capture One and open the intended document."
         case "no-document": error["recoveryAction"] = "Open the intended Session or Catalog."
+        // A definite refusal: its operation resolved as failed and blocks nothing.
+        case "no-people-detected": error["recoveryAction"] = "Nothing was changed; choose another mask for this photo."
         default: break
         }
-        if error["operationId"] != nil { error["recoveryAction"] = "Inspect operation status; do not retry the mutation." }
+        if error["operationId"] != nil && error["code"] as? String != "no-people-detected" { error["recoveryAction"] = "Inspect operation status; do not retry the mutation." }
         payload["error"] = error
         return payload
     }

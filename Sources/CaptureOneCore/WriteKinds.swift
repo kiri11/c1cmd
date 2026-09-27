@@ -348,6 +348,15 @@ struct NativeWrite: WriteKind {
             if action == "layer.delete", change != -1 { return "Layer deletion did not remove exactly one layer." }
             if action == "color.create", after.advancedColorCount != before.advancedColorCount + 1 { return "Color correction creation readback differs." }
             if action == "color.delete", after.advancedColorCount != before.advancedColorCount - 1 { return "Color correction deletion readback differs." }
+            if action == "mask.people" {
+                // Qualified on 16.8.5.30: existing layers stay; one adjustment layer is appended,
+                // or up to one per area with separate layers (an unmatched area may add none).
+                var limit = 1
+                if arguments["separateLayers"] == .boolean(true), case .texts(let areas)? = arguments["areas"] { limit = max(1, areas.count) }
+                let added = after.layers.dropFirst(before.layers.count)
+                guard Array(after.layers.prefix(before.layers.count)) == before.layers, (1...limit).contains(added.count),
+                      added.allSatisfy({ $0.nativeKind == "adjustment" }) else { return "People mask did not append its mask layers." }
+            }
         }
         for (key, value) in patch.sorted(by: { $0.key < $1.key }) {
             guard let actual = after.values[key], NativeEditing.matchesReadback(field: key, expected: value, actual: actual) else {
@@ -355,6 +364,22 @@ struct NativeWrite: WriteKind {
             }
         }
         return nil
+    }
+
+    /// Qualified on 16.8.5.30: without people in the photo, Capture One raises -1728
+    /// and leaves native values, layers and existing mask pixels unchanged.
+    func refusal(_ error: Error) -> C1Error? {
+        guard action == "mask.people", case .scriptError(let message, -1728)? = error as? C1Error,
+              message.contains("No people detected") else { return nil }
+        return .noPeopleDetected("Capture One detected no people in this photo; nothing was changed.")
+    }
+
+    // The native token also covers the journal revision, which the pending entry changes.
+    func unchanged(before: Observed<NativeSnapshot>, after: Observed<NativeSnapshot>) -> Bool {
+        let b = before.state, a = after.state, bo = before.observation, ao = after.observation
+        return a.target == b.target && a.values == b.values && a.unavailable == b.unavailable && a.layers == b.layers
+            && a.basicColorCount == b.basicColorCount && a.advancedColorCount == b.advancedColorCount
+            && ao.stateHash == bo.stateHash && ao.geometryStateHash == bo.geometryStateHash && ao.metadataStateHash == bo.metadataStateHash
     }
 
     func record(_ entry: inout OperationRecord, before: NativeSnapshot, intended: [String: NativeValue], reply: Bool?, after: NativeSnapshot?) {

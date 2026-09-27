@@ -30,6 +30,11 @@ protocol WriteKind {
     func verify(before: Observed<State>, intended: Intended, reply: Reply, after: Observed<State>) -> String?
     /// Kind-specific journal fields. `reply` and `after` are nil until observed.
     func record(_ entry: inout OperationRecord, before: State, intended: Intended, reply: Reply?, after: State?)
+    /// The definite error for a dispatch error Capture One is qualified to raise
+    /// without changing the target; nil keeps the outcome unknown.
+    func refusal(_ error: Error) -> C1Error?
+    /// Pure: true when a readback after a refusal shows the target exactly as before.
+    func unchanged(before: Observed<State>, after: Observed<State>) -> Bool
 }
 
 extension WriteKind {
@@ -38,6 +43,8 @@ extension WriteKind {
         try core.get(ref: ref)
     }
     func unavailable(_ observation: GetResult) -> C1Error { .stateChanged(staleMessage) }
+    func refusal(_ error: Error) -> C1Error? { nil }
+    func unchanged(before: Observed<State>, after: Observed<State>) -> Bool { false }
 }
 
 struct Observed<State> {
@@ -77,6 +84,8 @@ enum Readback<Value> {
 struct PendingWrite {
     enum Ending: String {
         case succeeded
+        /// Capture One refused the write and the readback showed no change.
+        case failed
         /// The readback was observed and differs from the intended write.
         case partialFailure = "partial-failure"
         /// Dispatch or its readback did not complete, so the native outcome is unknown.
@@ -121,10 +130,15 @@ extension SessionController {
     /// Dispatches one write under a durable pending journal entry and classifies it.
     /// A throw from dispatch, the document re-check or the readback leaves the outcome
     /// unknown; an observed difference is a partial failure. Both block writes until
-    /// reconciled after a restart; nothing is retried or undone.
+    /// reconciled after a restart; nothing is retried or undone. The one exception is
+    /// a qualified refusal: when `refusal` recognises the dispatch error, the document
+    /// is re-checked and `unchanged` must confirm from a fresh readback that nothing
+    /// changed; the operation then resolves as failed. Other errors add no Apple Event.
     func journaled<Reply, Value>(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult,
                                  dispatch: () throws -> Reply,
-                                 readback: (inout PendingWrite, Reply) throws -> Readback<Value>) throws -> (operationId: String, value: Value) {
+                                 readback: (inout PendingWrite, Reply) throws -> Readback<Value>,
+                                 refusal: (Error) -> C1Error? = { _ in nil },
+                                 unchanged: (inout PendingWrite) throws -> Bool = { _ in false }) throws -> (operationId: String, value: Value) {
         var prepared = entry
         prepared.compoundId = compoundId
         prepared.appInstance = try appInstance()
@@ -139,6 +153,10 @@ extension SessionController {
             try checkedDocument(doc, writes: false)
             result = try readback(&pending, reply)
         } catch {
+            if let definite = refusal(error), (try? { try checkedDocument(doc, writes: false); return try unchanged(&pending) }()) == true {
+                do { try pending.end(.failed, error: String(describing: error)) } catch { throw OperationFailure(operationId: operationId, cause: error) }
+                throw definite
+            }
             try? pending.end(.outcomeUnknown, error: String(describing: error))
             throw OperationFailure(operationId: operationId, cause: error)
         }
@@ -179,25 +197,34 @@ extension SessionController {
                 documentPath: doc.documentPath, preconditionStateHash: precondition,
                 beforeAdjustments: current.adjustments, beforeGeometry: current.geometry)
             kind.record(&entry, before: state, intended: intended, reply: nil, after: nil)
+            /// The fresh post-dispatch observation, recorded in the pending entry; nil when unavailable.
+            func observeAfter(_ pending: inout PendingWrite, reply: Kind.Reply?) throws -> Observed<Kind.State>? {
+                let readback = try kind.observe(workingRef, afterDispatch: true, with: self)
+                let after = kind.read(readback)
+                pending.update {
+                    $0.afterAdjustments = readback.adjustments
+                    $0.afterGeometry = readback.geometry
+                    kind.record(&$0, before: state, intended: intended, reply: reply, after: after)
+                }
+                guard readback.id == resolved.variantId, let after else { return nil }
+                return Observed(observation: readback, state: after)
+            }
             let (operationId, after) = try journaled(entry, doc: doc, source: current,
                 dispatch: { try kind.dispatch(intended, before: before, to: target) },
                 readback: { (pending: inout PendingWrite, reply: Kind.Reply) -> Readback<Observed<Kind.State>> in
                     pending.update { kind.record(&$0, before: state, intended: intended, reply: reply, after: nil) }
-                    let readback = try kind.observe(workingRef, afterDispatch: true, with: self)
-                    let after = kind.read(readback)
-                    pending.update {
-                        $0.afterAdjustments = readback.adjustments
-                        $0.afterGeometry = readback.geometry
-                        kind.record(&$0, before: state, intended: intended, reply: reply, after: after)
-                    }
-                    guard readback.id == resolved.variantId, let after else {
+                    guard let observed = try observeAfter(&pending, reply: reply) else {
                         return .mismatch(.readbackMismatch("The \(kind.operationType) readback is unavailable after the write."))
                     }
-                    let observed = Observed(observation: readback, state: after)
                     if let mismatch = kind.verify(before: before, intended: intended, reply: reply, after: observed) {
                         return .mismatch(.readbackMismatch(mismatch))
                     }
                     return .confirmed(observed)
+                },
+                refusal: kind.refusal,
+                unchanged: { (pending: inout PendingWrite) -> Bool in
+                    guard let observed = try observeAfter(&pending, reply: nil) else { return false }
+                    return kind.unchanged(before: before, after: observed)
                 })
             return WriteOutcome(operationId: operationId, workingRef: resolved.workingRef, before: before, intended: intended, after: after)
         }

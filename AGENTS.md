@@ -113,6 +113,7 @@ Inventory listing filters before full metadata reads and uses sequential bounded
 - `unmanaged-variant`: Attempted write without editing permission, or attempted deletion of an existing variant. Use `variant_edit` before adjustment/geometry writes; deletion remains clone-only.
 - `request-cancelled`: Inventory stopped at a safe boundary (no partial inventory is returned), a compound edit stopped between steps (inspect its report; never resume it automatically), or a queued MCP request was cancelled before dispatch.
 - `deadline-exceeded`: Inventory exceeded its read deadline at a boundary; an outstanding Apple Event cannot be interrupted.
+- `no-people-detected`: A people mask found no people and a readback confirmed nothing changed. The operation resolved as `failed` and blocks nothing; choose another mask instead of retrying.
 - `capture-one-busy`: Cross-process advisory lock timed out; wait or check for hung processes.
 - `document-changed`: Document count, exact identity, or application lifetime no longer matches. Same-file reopening in one app launch is not reliably detected.
 - `state-changed`: Optimistic concurrency check failed (`--if-state` mismatch).
@@ -146,7 +147,7 @@ Take turns with the photographer and never retry an uncertain native operation.
 The composition profile excludes native mutations; geometry remains governed by
 its existing guards. See [native editing](docs/native-editing/README.md).
 
-Select `QUALIFY_SUITES=native` for regular native editing validation and
+Select `QUALIFY_SUITES=native` (with `C1_TEST_PEOPLE_FIXTURE`, a RAW with people) for regular native editing validation and
 `RECOVERY_CASES="native native-action"` for its affected fault paths.
 
 

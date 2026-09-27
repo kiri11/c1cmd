@@ -9,6 +9,11 @@ final class NativeFake: ScriptExecuting {
     var calls: [String] = []
     var onNativeRead: (() -> Void)?
     var layers: [[String:Any]] = []
+    /// Raised by the next native action; `changeBeforeError` also adds a layer first.
+    var actionError: C1Error?
+    var changeBeforeError = false
+    /// Layers a successful action appends.
+    var addedLayers = 1
     init(_ base: FakeScript) { self.base = base }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
         calls.append(handler)
@@ -21,9 +26,13 @@ final class NativeFake: ScriptExecuting {
             try base.intercept(handler)
             prepared = OperationJournal(sessionDirectory:base.directory).unresolvedEntries().contains { $0.beforeNative != nil && $0.nativePatch != nil }
             if fault { throw C1Error.timeout("native fault") }
+            if handler == "nativeAction", let actionError {
+                if changeBeforeError { layers.append(["nativeName":"partial", "nativeKind":"adjustment", "nativeOpacity":100, "nativeEnabled":true]) }
+                throw actionError
+            }
             if handler == "nativeAction" {
-                // Only layer.create is modelled: a misapplied action adds nothing.
-                if !base.misapply { layers.append(["nativeName":"fixture layer", "nativeKind":"adjustment", "nativeOpacity":100, "nativeEnabled":true]) }
+                // Actions append layers (layer.create, mask.people); a misapplied action adds nothing.
+                if !base.misapply { for _ in 0..<addedLayers { layers.append(["nativeName":"fixture layer", "nativeKind":"adjustment", "nativeOpacity":100, "nativeEnabled":true]) } }
             } else {
                 clarity = args[10].atIndex(1)!.doubleValue + (base.misapply ? 1 : 0)
             }
@@ -112,6 +121,84 @@ struct NativeEditingTests {
             XCTAssertTrue(recovered.afterNative != nil)
             XCTAssertThrowsError(try core.get(ref:edit.workingRef, nativeTargets:[target]).nativeSnapshots![0])
             XCTAssertEqual(fake.values.count,1)
+        }
+        peopleRefusals()
+        peopleSuccess()
+    }
+
+    /// A successful people mask keeps existing layers and appends one mask layer,
+    /// or up to one per area with separate layers; anything else is a readback mismatch.
+    static func peopleSuccess() {
+        for (separate, areas, added, misapply, succeeds) in [(false, 2, 1, false, true), (true, 3, 3, false, true), (true, 3, 2, false, true),
+                                                              (false, 2, 2, false, false), (true, 2, 3, false, false), (false, 1, 1, true, false)] {
+            let label = "separate \(separate), \(areas) areas, \(added) added, misapply \(misapply)"
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+            defer { try? FileManager.default.removeItem(at:directory) }
+            let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
+            let core = SessionController(executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+            bridge.layers = [["nativeName":"Background", "nativeKind":"background", "nativeOpacity":100, "nativeEnabled":true]]
+            XCTAssertNoThrowBlock {
+                let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+                let ref = try core.editVariant(sourceRef:"1", ifState:source.stateHash, ifDocument:doc.openToken).workingRef
+                let before = try core.get(ref:ref, nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                bridge.addedLayers = added; fake.misapply = misapply
+                let names = Array(["body skin", "face skin", "hair"].prefix(areas))
+                var operation: String?
+                do {
+                    operation = try core.nativeAction(workingRef:ref, target:NativeTarget(), ifNativeState:before.nativeStateHash, action:"mask.people",
+                                                      arguments:["areas":.texts(names), "separateLayers":.boolean(separate)]).operationId
+                } catch let failure as OperationFailure { XCTAssertEqual((failure.cause as? C1Error)?.errorCode, "readback-mismatch", label); operation = failure.operationId }
+                XCTAssertEqual(OperationJournal(sessionDirectory:directory).find(operationId:operation ?? "")?.status, succeeds ? "succeeded" : "partial-failure", label)
+            }
+        }
+    }
+
+    /// A people mask without people is a definite, non-blocking failure only when the
+    /// readback shows no change; anything else stays uncertain and blocks writes.
+    static func peopleRefusals() {
+        let noPeople = C1Error.scriptError("Capture One got an error: No people detected.", code: -1728)
+        let people: [String:NativeValue] = ["areas":.texts(["body skin", "face skin"]), "separateLayers":.boolean(false)]
+        for (name, error, changed) in [("unchanged", noPeople, false), ("changed", noPeople, true),
+                                       ("other error", C1Error.scriptError("Capture One got an error: Some object.", code: -1728), false)] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+            defer { try? FileManager.default.removeItem(at:directory) }
+            let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
+            let core = SessionController(executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+            let journal = OperationJournal(sessionDirectory:directory)
+            XCTAssertNoThrowBlock {
+                let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+                let ref = try core.editVariant(sourceRef:"1", ifState:source.stateHash, ifDocument:doc.openToken).workingRef
+                let before = try core.get(ref:ref, nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                bridge.actionError = error; bridge.changeBeforeError = changed
+                let context = RequestContext(tool:"native_action", progressMode:"quiet", directory:directory)
+                var thrown: Error?
+                do { _ = try context.withCurrent { try core.nativeAction(workingRef:ref, target:NativeTarget(), ifNativeState:before.nativeStateHash, action:"mask.people", arguments:people) } }
+                catch { thrown = error; context.finish(error:error) }
+                bridge.actionError = nil
+                let entry = journal.loadEntries().last
+                let payload = context.annotate(ErrorResponse.payload(thrown!))["error"] as! [String:Any]
+                if name == "unchanged" {
+                    XCTAssertEqual((thrown as? C1Error)?.errorCode, "no-people-detected", "An unchanged readback makes the refusal definite")
+                    XCTAssertEqual(entry?.status, "failed")
+                    XCTAssertEqual(entry?.afterNative?.layers, before.layers, "The refusal keeps its readback as evidence")
+                    XCTAssertTrue(journal.unresolvedEntries().isEmpty)
+                    XCTAssertEqual(context.snapshot.status, "failed")
+                    XCTAssertNil(payload["outcome"])
+                    XCTAssertEqual(payload["recoveryAction"] as? String, "Nothing was changed; choose another mask for this photo.")
+                    let fresh = try core.get(ref:ref, nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                    XCTAssertNoThrow(try core.nativeSet(workingRef:ref, target:NativeTarget(), ifNativeState:fresh.nativeStateHash, patch:["clarity amount":.number(5)]), "A definite refusal blocks nothing")
+                } else {
+                    XCTAssertTrue(thrown is OperationFailure, "\(name) stays uncertain")
+                    XCTAssertEqual(entry?.status, "outcome-unknown")
+                    XCTAssertEqual(context.snapshot.status, "outcome-unknown")
+                    XCTAssertEqual(payload["outcome"] as? String, "inspect-operation")
+                    let fresh = try core.get(ref:ref, nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                    XCTAssertThrowsError(try core.nativeSet(workingRef:ref, target:NativeTarget(), ifNativeState:fresh.nativeStateHash, patch:["clarity amount":.number(5)]), "\(name) blocks writes")
+                }
+                XCTAssertEqual(bridge.clarity, name == "unchanged" ? 5 : 0)
+            }
         }
     }
 }

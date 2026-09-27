@@ -150,7 +150,17 @@ remain failures rather than being swallowed as unavailable properties.
 
 People-mask areas are `body skin`, `face skin`, `eyebrows`, `lips`, `hair`,
 `iris and pupil`, `sclera`, and `clothes`. AI success depends on suitable image
-content and the installed application's capability.
+content and the installed application's capability. On success Capture One keeps
+the existing layers and appends one adjustment mask layer, or with `separateLayers`
+up to one per area; a readback that differs is an uncertain operation.
+
+On a photo without people, Capture One refuses the command ("No people detected",
+-1728). `c1` then reads the target again, and only when values, layer inventory and
+the tonal, geometry and metadata tokens are unchanged does it return the definite
+error `no-people-detected`. Its journal entry resolves as `failed` and blocks no
+later write. Any other error, or any observed change, stays an uncertain operation.
+Live qualification on 16.8.5.30 found no change in readable state or exported
+pixels across area and `separateLayers` combinations, with a filled-mask layer present.
 
 ## State, evidence, and recovery
 
@@ -192,7 +202,8 @@ write blocking, restart observations, and expired references.
 
 `Tests/native_editing_integration_test.py` exercises the packaged CLI/MCP surface
 in an owned disposable Session with a copied RAW. Select it using
-`make qualify QUALIFY_SUITES=native`. Relevant real fault cases are
+`make qualify QUALIFY_SUITES=native`; it also requires `C1_TEST_PEOPLE_FIXTURE`, a
+RAW with people, for a second Session covering the successful people mask. Relevant real fault cases are
 `make qualify-recovery RECOVERY_CASES="native native-action"` against the rebuilt
 archive. Qualification results and exclusions must be recorded separately from
 this implemented capability inventory.

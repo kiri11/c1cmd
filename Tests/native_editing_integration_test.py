@@ -204,8 +204,21 @@ return rows'''
         copy_index = len(get()['layers'])
         action('mask.copy',{'sourceLayer':index},scope='layer',layer=copy_index)
         action('layer.delete',scope='layer',layer=copy_index)
-        # AI can return no new layers when there is no matching person; retain observations.
-        action('mask.people',{'areas':['body skin','face skin'],'separateLayers':False})
+        # Capture One refuses a people mask without people; the readback proves nothing
+        # changed, so the failure is definite and blocks nothing. A photo with people succeeds.
+        state = get()
+        r = client.tool('native_action', complete_args('native_action', dict(workingRef=ref, target=state['target'],
+            ifNativeState=state['nativeStateHash'], action='mask.people', arguments={'areas':['body skin','face skin'],'separateLayers':False})))
+        people = json.loads(r['content'][0]['text']); log('mask.people', people)
+        if r.get('isError'):
+            error = people['error']
+            assert error['code'] == 'no-people-detected' and 'outcome' not in error, people
+            unchanged = lambda s: {k: v for k, v in s.items() if k != 'nativeStateHash'}
+            assert unchanged(get()) == unchanged(state), 'A definite refusal must leave the variant unchanged'
+            entry = tool('operation_status', {'operationId': error['operationId']})
+            assert entry['status'] == 'failed' and entry['nativeAction'] == 'mask.people', entry
+        else:
+            validate_response(people, schema['responses']['native_action'])
         # Native deletion is limited to the addressed layer, never the variant.
         action('layer.delete',scope='layer',layer=index)
         stale = client.tool('native_set',dict(workingRef=ref,target=initial['target'],ifNativeState=initial['nativeStateHash'],patch={'clarity amount':5}))
@@ -218,9 +231,47 @@ return rows'''
         assert sha(raw) == sha(fixture) == original
         preview = cli('preview',ref)
         log('preview',preview)
-        log('passed',dict(group=os.environ.get('C1_NATIVE_TEST_GROUP','all'),rawSHA256=original,session=str(base/'native'),cliSHA256=sha(CLI),mcpSHA256=sha(MCP)))
         apple('close current document')
+        people = people_success(cli, log)
+        log('passed',dict(group=os.environ.get('C1_NATIVE_TEST_GROUP','all'),rawSHA256=original,peopleRawSHA256=people,session=str(base/'native'),cliSHA256=sha(CLI),mcpSHA256=sha(MCP)))
     finally:
         if client: client.close()
+
+
+def people_success(cli, log):
+    """A people mask on a photo with people appends mask layers and keeps the existing ones."""
+    raw = Path(os.environ['C1_TEST_PEOPLE_FIXTURE']).resolve()
+    original = sha(raw)
+    assert apple('return count of documents') == '0'
+    base = Path(tempfile.mkdtemp(prefix='c1-native-people-', dir=str(ROOT / '.build')))
+    apple(f'make new document with properties {{name:"people", kind:session, path:{json.dumps(str(base))}}}')
+    try:
+        fixture = base / 'people/Capture' / raw.name
+        shutil.copy2(raw, fixture)
+        apple('set current collection of current document to collection "Capture" of current document')
+        for _ in range(40):
+            variants = cli('variants','list')
+            if variants: break
+            time.sleep(.5)
+        assert len(variants) == 1
+        source = cli('get',variants[0]['id']); doc = cli('doc','info')
+        ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
+        def layers():
+            return cli('get',ref,'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
+        for areas, separate in [(['body skin','face skin'], False), (['face skin','hair'], True)]:
+            before = layers()
+            result = cli('native','action',ref,'mask.people','--if-native-state',before['nativeStateHash'],
+                         '--json',json.dumps(dict(areas=areas,separateLayers=separate)))
+            log('people-mask', dict(areas=areas, separateLayers=separate, before=before['layers'], after=result['after']['layers']))
+            added = result['after']['layers'][len(before['layers']):]
+            assert result['after']['layers'][:len(before['layers'])] == before['layers'], 'Existing layers must be kept'
+            assert 1 <= len(added) <= (len(areas) if separate else 1) and all(l['nativeKind'] == 'adjustment' for l in added), added
+            assert result['after']['values'] == before['values']
+            assert cli('operation','status',result['operationId'])['status'] == 'succeeded'
+        assert sha(raw) == sha(fixture) == original
+        return original
+    finally:
+        if apple('return count of documents') == '1' and apple('return name of current document') == '"people.cosessiondb"':
+            apple('close current document')
 
 if __name__ == '__main__': main()

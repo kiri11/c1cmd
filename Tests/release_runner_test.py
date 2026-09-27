@@ -34,6 +34,13 @@ class ReleaseRunnerTests(unittest.TestCase):
                 runner.run('archive', ['cli'])
             extract.assert_not_called()
 
+    def test_native_requires_people_fixture_before_extraction(self):
+        with tempfile.NamedTemporaryFile(suffix='.CR3') as raw, patch.object(runner, 'extract_archive') as extract:
+            with patch.dict(os.environ, C1_TEST_RAW_FIXTURE=raw.name, C1_TEST_PEOPLE_FIXTURE=''):
+                with self.assertRaises(ValueError):
+                    runner.run('archive', ['native'])
+            extract.assert_not_called()
+
     def test_runner_cleanup_and_fail_fast(self):
         for failure in [None, 'package', 'suite', 'timeout']:
             for has_bundle in [False, True]:

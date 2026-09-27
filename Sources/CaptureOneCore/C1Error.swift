@@ -19,6 +19,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
     case timeout(String)
     case requestCancelled(String)
     case deadlineExceeded(String)
+    /// Capture One refused a people mask and a readback showed nothing changed.
+    case noPeopleDetected(String)
     case scriptError(String, code: Int?)
 
     public var errorCode: String {
@@ -41,13 +43,14 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .timeout: return "timeout"
         case .requestCancelled: return "request-cancelled"
         case .deadlineExceeded: return "deadline-exceeded"
+        case .noPeopleDetected: return "no-people-detected"
         case .scriptError: return "script-error"
         }
     }
 
     public var exitCode: Int32 {
         switch self {
-        case .invalidRequest, .unmanagedVariant, .variantNotFound, .unsupportedField, .scriptError, .identityAmbiguous:
+        case .invalidRequest, .unmanagedVariant, .variantNotFound, .unsupportedField, .scriptError, .identityAmbiguous, .noPeopleDetected:
             return 1
         case .captureOneBusy, .requestCancelled, .deadlineExceeded:
             return 2
@@ -80,6 +83,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .timeout(let msg): return "timeout: \(msg)"
         case .requestCancelled(let msg): return "request-cancelled: \(msg)"
         case .deadlineExceeded(let msg): return "deadline-exceeded: \(msg)"
+        case .noPeopleDetected(let msg): return "no-people-detected: \(msg)"
         case .scriptError(let msg, let code):
             if let c = code {
                 return "script-error (\(c)): \(msg)"
@@ -104,7 +108,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
              .unsupportedVersion(let msg), .unsupportedField(let msg), .invalidRequest(let msg),
              .captureOneBusy(let msg), .documentChanged(let msg), .stateChanged(let msg),
              .readbackMismatch(let msg), .partialFailure(let msg), .outcomeUnknown(let msg),
-             .timeout(let msg), .requestCancelled(let msg), .deadlineExceeded(let msg):
+             .timeout(let msg), .requestCancelled(let msg), .deadlineExceeded(let msg), .noPeopleDetected(let msg):
             try container.encode(msg, forKey: .message)
         case .scriptError(let msg, let code):
             try container.encode(msg, forKey: .message)
@@ -136,6 +140,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case "timeout": self = .timeout(msg)
         case "request-cancelled": self = .requestCancelled(msg)
         case "deadline-exceeded": self = .deadlineExceeded(msg)
+        case "no-people-detected": self = .noPeopleDetected(msg)
         case "script-error": self = .scriptError(msg, code: sCode)
         default: self = .invalidRequest(msg)
         }

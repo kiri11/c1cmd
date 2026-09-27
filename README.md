@@ -310,7 +310,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Every CLI command except `version` maps its flags to that tool's arguments object and enters the same core dispatcher as the MCP call, so both transports accept and reject identically. The MCP server is a thin adapter: it registers tools from the contract, forwards arguments unchanged, reports progress and cancellation, and attaches preview images. It stays a long-lived process so compiled AppleScript handlers are reused across calls. Contract version is currently `3.1.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Every CLI command except `version` maps its flags to that tool's arguments object and enters the same core dispatcher as the MCP call, so both transports accept and reject identically. The MCP server is a thin adapter: it registers tools from the contract, forwards arguments unchanged, reports progress and cancellation, and attaches preview images. It stays a long-lived process so compiled AppleScript handlers are reused across calls. Contract version is currently `3.2.0`; package version is `0.1.0`.
 
 Mutation, recipe and preview results (`set`, `add`, `reset`, `metadata_set`, `geometry_set`, `geometry_restore`, `native_set`, `native_action`, `preview` and the five recipe tools) are compact by default in both transports. A compact result keeps operation, compound, reference or recipe IDs, changed fields, the new state tokens, coverage and unavailable fields, completion status and the preview path. Its `evidencePath` names a JSON file under the document's `.c1/results` folder holding the complete result: before/after values, native snapshots, geometry and the full compound report. Pass `--full` (MCP `full: true`) for the complete result instead. Errors, uncertain outcomes and failed or interrupted compound edits are always returned in full, and so is any result whose evidence file cannot be written. `compactResponses` in the schema describes the compact shapes; `responses` still describes the complete ones. Evidence files are review aids; the journal remains the recovery record.
 
@@ -318,6 +318,7 @@ Mutation, recipe and preview results (`set`, `add`, `reset`, `metadata_set`, `ge
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
 make test                              # Swift assertions only (also available separately)
 export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
+export C1_TEST_PEOPLE_FIXTURE=/path/to/people.CR3  # native suite only: a RAW with people
 # Normal candidate validation: release build, offline, package, CLI/MCP and existing edits.
 # No deliberate timeout/process-death tests. Zero open documents; exclusive use.
 make qualify EVIDENCE_DIR=/private/tmp/c1-new-qualification

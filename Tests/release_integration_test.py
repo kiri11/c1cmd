@@ -56,6 +56,10 @@ def run(archive, suites):
     if not raw.is_file():
         raise ValueError('Set C1_TEST_RAW_FIXTURE to an existing RAW image')
     raw = raw.resolve()
+    # The native suite covers both people-mask outcomes: the standard fixture has no people.
+    people = Path(os.environ.get('C1_TEST_PEOPLE_FIXTURE', ''))
+    if 'native' in suites and not people.is_file():
+        raise ValueError('Set C1_TEST_PEOPLE_FIXTURE to an existing RAW image with people for the native suite')
     print('Selected live suites: ' + ', '.join(suites), flush=True)
     skipped = [name for name in SUITES if name not in suites]
     print('Skipped live suites: ' + (', '.join(skipped) or 'none'), flush=True)
@@ -64,6 +68,7 @@ def run(archive, suites):
     with tempfile.TemporaryDirectory(prefix='c1-release-live-', dir='/private/tmp') as tmp:
         root = extract_archive(archive, tmp)
         environment = dict(os.environ, C1_TEST_RAW_FIXTURE=str(raw),
+                           **({'C1_TEST_PEOPLE_FIXTURE': str(people.resolve())} if 'native' in suites else {}),
                            C1_TEST_BIN=str(root / 'bin/c1'), C1_TEST_MCP_BIN=str(root / 'bin/c1-mcp'),
                            C1_TEST_CROP_EXAMPLE=str(root / 'examples/crop-proposals.py'),
                            C1_TEST_GRADE_EXAMPLE=str(root / 'examples/grade-folder.py'),
