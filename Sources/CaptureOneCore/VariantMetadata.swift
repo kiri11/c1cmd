@@ -5,6 +5,10 @@ import CryptoKit
 public struct VariantMetadata: Codable, Equatable {
     public let rating: Int
     public let colorTag: Int
+    /// Star ratings; 0 means unrated.
+    public static let ratingRange = 0...5
+    /// Native color tag indices; 0 clears the tag.
+    public static let colorTagRange = 0...7
 
     public init(rating: Int, colorTag: Int) {
         self.rating = rating
@@ -13,7 +17,7 @@ public struct VariantMetadata: Codable, Equatable {
 
     public static func from(_ metadata: Metadata) -> VariantMetadata? {
         guard let rating = metadata.rating, let colorTag = metadata.colorTag,
-              (0...5).contains(rating), (0...7).contains(colorTag) else { return nil }
+              ratingRange.contains(rating), colorTagRange.contains(colorTag) else { return nil }
         return VariantMetadata(rating: rating, colorTag: colorTag)
     }
 

@@ -310,7 +310,7 @@ Keep `.c1` files for audit and recovery. Missing legacy identity evidence, a rep
 
 ## Contract and development
 
-`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Contract version is currently `2.7.0`; package version is `0.1.0`.
+`c1 schema` and the MCP `schema` tool return the same contract, including request schemas, response schemas, and the error envelope. MCP `tools/list` uses those same request definitions. Every CLI command except `version` maps its flags to that tool's arguments object and enters the same core dispatcher as the MCP call, so both transports accept and reject identically. Contract version is currently `2.7.0`; package version is `0.1.0`.
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards

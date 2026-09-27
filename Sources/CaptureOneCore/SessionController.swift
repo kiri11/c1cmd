@@ -543,7 +543,7 @@ public final class SessionController {
                         NSAppleEventDescriptor(boolean: selected),
                         NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
                     guard values.map(\.variantId) == batch,
-                          values.allSatisfy({ (0...5).contains($0.starRating) && $0.parentImagePath.hasPrefix("/") }) else {
+                          values.allSatisfy({ VariantMetadata.ratingRange.contains($0.starRating) && $0.parentImagePath.hasPrefix("/") }) else {
                         throw C1Error.stateChanged("Subset identity or metadata mismatch; no partial results returned.")
                     }
                     rows += values
@@ -643,7 +643,7 @@ public final class SessionController {
                     context?.update(phase: "metadata")
                     let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
                     guard summaries.map(\.variantId) == batch, summaries.allSatisfy({ item in
-                        (0...5).contains(item.starRating) &&
+                        VariantMetadata.ratingRange.contains(item.starRating) &&
                         (rating.map { item.starRating == $0 } ?? true) &&
                         (minRating.map { item.starRating >= $0 } ?? true) && (!selectedOnly || item.isSelected)
                     }) else {
@@ -657,7 +657,7 @@ public final class SessionController {
                 }
                 context?.update(phase: "ratings")
                 let ratings: [RatingRecord] = try executor.executeAndDecode(handler: "readVariantRatings", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
-                guard ratings.map(\.variantId) == batch, ratings.allSatisfy({ (0...5).contains($0.starRating) }) else {
+                guard ratings.map(\.variantId) == batch, ratings.allSatisfy({ VariantMetadata.ratingRange.contains($0.starRating) }) else {
                     throw C1Error.stateChanged("Inventory rating IDs or values changed; no partial inventory was returned.")
                 }
                 let matches = ratings.filter { item in
@@ -1356,7 +1356,7 @@ public final class SessionController {
             "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
                               "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
                               "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
-            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation", "keystone"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-45, 45], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": true, "keystoneChangeDryRun": false, "keystoneControls": ContractSchema.keystoneSchema],
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation", "keystone"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-Geometry.maximumRotation, Geometry.maximumRotation], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": true, "keystoneChangeDryRun": false, "keystoneControls": ContractSchema.keystoneSchema],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,
@@ -1369,7 +1369,7 @@ public final class SessionController {
                     "operations": spec.operations.map { $0.rawValue }
                 ]
             },
-            "writableMetadataFields": ["rating": ["type": "integer", "minimum": 0, "maximum": 5], "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]],
+            "writableMetadataFields": ContractSchema.writableMetadataSchema["properties"]!,
             "metadataWrites": ["tool": "metadata_set", "precondition": "metadataStateHash", "requiredBuild": Self.pinnedBuild],
             "readOnlyMetadataFields": registry.supportedMetadataFields.filter { !$0.operations.contains(.set) }.map { spec in
                 [

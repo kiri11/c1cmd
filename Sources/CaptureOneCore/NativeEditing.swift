@@ -160,8 +160,10 @@ public enum NativeEditing {
             guard valid else { throw C1Error.invalidRequest("Invalid value for native \(target.scope).\(name) (\(field.type)).") }
             // Use demonstrated bounds where retained. Unspecified native ranges are checked by readback.
             if case .number(let n) = value {
-                let ranges: [String: ClosedRange<Double>] = ["exposure": -4...4, "contrast": -50...50, "saturation": -100...100,
-                    "temperature": 800...14000, "tint": -50...50, "opacity": 1...100, "distortion": 0...100]
+                var ranges: [String: ClosedRange<Double>] = ["opacity": 1...100, "distortion": 0...100]
+                for field in FieldRegistry.shared.supportedAdjustmentFields {
+                    if let low = field.minValue, let high = field.maxValue { ranges[field.name] = low...high }
+                }
                 if let range = ranges[name], !range.contains(n) { throw C1Error.invalidRequest("Native \(name) outside \(range).") }
             }
         }

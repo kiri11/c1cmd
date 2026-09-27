@@ -264,6 +264,151 @@ def run(cli, mcp):
     finally:
         composition.close()
 
+# Each case: tool, CLI arguments, MCP arguments. Accepted cases name the arguments
+# object the CLI flags must produce; rejected cases must fail identically.
+RECIPE = dict(version=1, referenceId='a' * 64, settings={'clarity amount': 5},
+              exposure={'mode': 'preserve'}, whiteBalance={'mode': 'preserve'}, cropPolicy='preserve')
+HEX = 'b' * 64
+ACCEPTED = [
+    ('doctor', ['doctor'], {}),
+    ('doc_info', ['doc', 'info'], {}),
+    ('capabilities', ['capabilities'], {}),
+    ('schema', ['schema'], {}),
+    ('read_session_begin', ['read-session', 'begin', '--collection', 'Capture', '--selected'], {'collection': 'Capture', 'selected': True}),
+    ('read_session_end', ['read-session', 'end', '--read-workflow', 'w1'], {'readWorkflow': 'w1'}),
+    ('read_session_status', ['read-session', 'status', '--read-workflow', 'w1'], {'readWorkflow': 'w1'}),
+    ('catalog_get', ['get', '7', '--database', '/x/c.cocatalogdb'], {'database': '/x/c.cocatalogdb', 'variantID': 7}),
+    ('catalog_variants', ['catalog', 'variants', '--database', '/x/c.cocatalogdb', '--collection-id', '3', '--min-rating', '2'],
+     {'database': '/x/c.cocatalogdb', 'collectionID': 3, 'minRating': 2}),
+    ('catalog_variants', ['variants', 'list', '--database', '/x/c.cocatalogdb', '--rating', '5'], {'database': '/x/c.cocatalogdb', 'rating': 5}),
+    ('catalog_inspect', ['catalog', 'inspect', '--database', '/x/c.cocatalogdb'], {'database': '/x/c.cocatalogdb'}),
+    ('catalog_snapshot', ['catalog', 'snapshot', '--database', '/x/c.cocatalogdb', '--destination', '/x/s.db'],
+     {'database': '/x/c.cocatalogdb', 'destination': '/x/s.db'}),
+    ('native_set', ['native', 'set', 'x', '--if-native-state', 'h', '--json', '{"clarity amount": 5}', '--dry-run'],
+     {'workingRef': 'x', 'ifNativeState': 'h', 'target': {'scope': 'adjustments'}, 'patch': {'clarity amount': 5}, 'dryRun': True}),
+    ('native_action', ['native', 'action', 'x', 'layer.create', '--if-native-state', 'h', '--json', '{"name": "L", "kind": "adjustment"}'],
+     {'workingRef': 'x', 'ifNativeState': 'h', 'target': {'scope': 'adjustments'}, 'action': 'layer.create', 'arguments': {'name': 'L', 'kind': 'adjustment'}}),
+    ('native_action', ['native', 'action', 'x', 'mask.clear', '--if-native-state', 'h', '--scope', 'layer', '--layer', '2'],
+     {'workingRef': 'x', 'ifNativeState': 'h', 'target': {'scope': 'layer', 'layer': 2}, 'action': 'mask.clear'}),
+    ('variants_list', ['variants', 'list', '--rating', '5', '--batch-size', '64', '--selected', '--collection', 'C', '--deadline-seconds', '9'],
+     {'rating': 5, 'batchSize': 64, 'selected': True, 'collection': 'C', 'deadlineSeconds': 9}),
+    ('variants_list', ['variants', 'list', '--ids', '1,2', '--fields', 'summary', '--parent-path', '/a.CR3', '--live', '--read-workflow', 'w1'],
+     {'ids': ['1', '2'], 'fields': 'summary', 'parentPath': '/a.CR3', 'live': True, 'readWorkflow': 'w1'}),
+    ('variant_edit', ['variant', 'edit', '1', '--if-state', 's', '--if-document', 'd', '--if-geometry-state', 'g'],
+     {'sourceRef': '1', 'ifState': 's', 'ifDocument': 'd', 'ifGeometryState': 'g'}),
+    ('variant_clone', ['variant', 'clone', '1'], {'sourceRef': '1'}),
+    ('variant_delete', ['variant', 'delete', 'c1_wrk_x'], {'workingRef': 'c1_wrk_x'}),
+    ('variant_baseline', ['variant', 'baseline', '1'], {'sourceRef': '1'}),
+    ('get', ['get', '1', '--live', '--native-targets', '[{"scope": "lens"}]'], {'ref': '1', 'live': True, 'nativeTargets': [{'scope': 'lens'}]}),
+    ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '5', '--color-tag', '0', '--dry-run'],
+     {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 5, 'colorTag': 0, 'dryRun': True}),
+    ('set', ['set', 'x', '--if-state', 'h', 'exposure=0.5', 'kelvin=5400'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 0.5, 'kelvin': 5400}}),
+    ('add', ['add', 'x', '--if-state', 'h', '--json', '{"exp": -0.25}', '--dry-run'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exp': -0.25}, 'dryRun': True}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--crop', '10,20,30,40', '--rotation', '1.5', '--keystone-vertical', '10'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'crop': {'centerX': 10, 'centerY': 20, 'width': 30, 'height': 40}, 'rotation': 1.5, 'keystone': {'vertical': 10}}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--aspect-ratio', '1.5', '--dry-run'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'aspectRatio': 1.5, 'dryRun': True}),
+    ('geometry_restore', ['geometry', 'restore', 'x', '--if-geometry-state', 'h', '--dry-run'], {'workingRef': 'x', 'ifGeometryState': 'h', 'dryRun': True}),
+    ('reset', ['reset', 'x', '--if-state', 'h', 'exposure', 'contrast'], {'workingRef': 'x', 'ifState': 'h', 'fields': ['exposure', 'contrast']}),
+    ('diff', ['diff', 'a', 'b', '--live'], {'ref1': 'a', 'ref2': 'b', 'live': True}),
+    ('dump', ['dump', '--collection', 'C', '--batch-size', '50', '--selected'], {'collection': 'C', 'batchSize': 50, 'selected': True}),
+    ('preview', ['preview', 'x', '--timeout', '60', '--full-frame', '--output-dir', '/x/o'], {'ref': 'x', 'timeout': 60, 'fullFrame': True, 'outputDir': '/x/o'}),
+    ('operation_status', ['operation', 'status', 'op1'], {'operationId': 'op1'}),
+    ('request_status', ['request', 'status', 'req-1'], {'requestId': 'req-1'}),
+    ('reference_capture', ['recipe', 'capture'], {'ref': '1', 'ifDocument': 'd', 'ifState': 's'}),
+    ('recipe_register', ['recipe', 'register'], {'recipe': RECIPE}),
+    ('recipe_verify', ['recipe', 'verify'], {'recipeId': HEX, 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's'}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's'}),
+    ('edit_status', ['recipe', 'status'], {'compoundId': HEX}),
+]
+REJECTED = [
+    ('read_session_begin', ['read-session', 'begin', '--collection', ''], {'collection': ''}),
+    ('read_session_end', ['read-session', 'end'], {}),
+    ('read_session_status', ['read-session', 'status'], {}),
+    ('catalog_get', ['get', '7', '--database', ' '], {'database': ' ', 'variantID': 7}),
+    ('catalog_variants', ['catalog', 'variants', '--database', 'd', '--rating', '6'], {'database': 'd', 'rating': 6}),
+    ('catalog_inspect', ['catalog', 'inspect', '--database', ''], {'database': ''}),
+    ('catalog_snapshot', ['catalog', 'snapshot', '--database', 'd', '--destination', ''], {'database': 'd', 'destination': ''}),
+    ('native_set', ['native', 'set', 'x', '--if-native-state', 'h', '--json', '{"unknown": 1}'],
+     {'workingRef': 'x', 'ifNativeState': 'h', 'target': {'scope': 'adjustments'}, 'patch': {'unknown': 1}}),
+    ('native_action', ['native', 'action', 'x', 'layer.create', '--if-native-state', 'h', '--json', '{"name": "L", "kind": "background"}'],
+     {'workingRef': 'x', 'ifNativeState': 'h', 'target': {'scope': 'adjustments'}, 'action': 'layer.create', 'arguments': {'name': 'L', 'kind': 'background'}}),
+    ('variants_list', ['variants', 'list', '--rating', '5', '--min-rating', '4'], {'rating': 5, 'minRating': 4}),
+    ('variants_list', ['variants', 'list', '--ids', '1,1'], {'ids': ['1', '1']}),
+    ('variants_list', ['variants', 'list', '--batch-size', '257'], {'batchSize': 257}),
+    ('variant_edit', ['variant', 'edit', '1', '--if-state', '', '--if-document', 'd'], {'sourceRef': '1', 'ifState': '', 'ifDocument': 'd'}),
+    ('variant_clone', ['variant', 'clone', ''], {'sourceRef': ''}),
+    ('variant_delete', ['variant', 'delete', ' '], {'workingRef': ' '}),
+    ('variant_baseline', ['variant', 'baseline', ''], {'sourceRef': ''}),
+    ('get', ['get', '1', '--native-targets', '[]'], {'ref': '1', 'nativeTargets': []}),
+    ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '6'], {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 6}),
+    ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--color-tag', '8'], {'workingRef': 'x', 'ifMetadataState': 'h', 'colorTag': 8}),
+    ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h'], {'workingRef': 'x', 'ifMetadataState': 'h'}),
+    ('set', ['set', 'x', '--if-state', 'h', 'exposure=9'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 9}}),
+    ('set', ['set', 'x', '--if-state', 'h', 'bogus=1'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'bogus': 1}}),
+    ('add', ['add', 'x', '--if-state', 'h', 'exp=1', 'exposure=2'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exp': 1, 'exposure': 2}}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--rotation', '46'], {'workingRef': 'x', 'ifGeometryState': 'h', 'rotation': 46}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h'], {'workingRef': 'x', 'ifGeometryState': 'h'}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--keystone-amount', '9'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'keystone': {'amount': 9}}),
+    ('geometry_restore', ['geometry', 'restore', 'x', '--if-geometry-state', ''], {'workingRef': 'x', 'ifGeometryState': ''}),
+    ('reset', ['reset', 'x', '--if-state', 'h', 'bogus'], {'workingRef': 'x', 'ifState': 'h', 'fields': ['bogus']}),
+    ('diff', ['diff', ''], {'ref1': ''}),
+    ('dump', ['dump', '--batch-size', '0'], {'batchSize': 0}),
+    ('preview', ['preview', 'x', '--timeout', '301'], {'ref': 'x', 'timeout': 301}),
+    ('operation_status', ['operation', 'status', ''], {'operationId': ''}),
+    ('request_status', ['request', 'status', ''], {'requestId': ''}),
+    ('reference_capture', ['recipe', 'capture'], {'ref': '1'}),
+    ('recipe_register', ['recipe', 'register'], {'recipe': dict(RECIPE, exposure={'mode': 'magic'})}),
+    ('recipe_verify', ['recipe', 'verify'], {'recipeId': 'short', 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's'}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'geometry': {'rotation': 1}}),
+    ('edit_status', ['recipe', 'status'], {'compoundId': '../escape'}),
+]
+# Tools without arguments have no CLI-expressible invalid request.
+ARGUMENT_FREE = {'doctor', 'doc_info', 'capabilities', 'schema'}
+
+
+def run_parity(cli, mcp):
+    """Proves per tool that CLI flags map to the MCP arguments object and are
+    accepted or rejected identically. Needs a debug build: C1_CONTRACT_ECHO
+    returns each decoded request instead of executing it, so nothing reaches Capture One."""
+    with tempfile.TemporaryDirectory(prefix='c1-contract-parity-') as directory:
+        env = {k: v for k, v in os.environ.items() if k != 'C1_READ_WORKFLOW'}
+        env.update(C1_CONTRACT_ECHO='1', C1_REQUEST_DIR=directory, C1_PROGRESS='quiet')
+        def cli_call(tool, argv, args):
+            if argv[0] == 'recipe':
+                request = Path(directory) / f'{tool}.json'
+                request.write_text(json.dumps(args))
+                argv = argv + ['--file', str(request)]
+            return subprocess.run([str(cli), *argv, '--format', 'json'], capture_output=True, text=True, env=env, timeout=15)
+        client = Client(mcp, env=env)
+        try:
+            tools = {t['name'] for t in client.request('tools/list', {})['tools']}
+            assert {case[0] for case in ACCEPTED} == tools, tools ^ {case[0] for case in ACCEPTED}
+            assert {case[0] for case in REJECTED} == tools - ARGUMENT_FREE, (tools - ARGUMENT_FREE) ^ {case[0] for case in REJECTED}
+            for tool, argv, args in ACCEPTED:
+                command = cli_call(tool, argv, args)
+                assert command.returncode == 0, (tool, argv, command.stderr)
+                result = client.tool(tool, args)
+                assert not result.get('isError'), (tool, args, result)
+                expected = {'tool': tool, 'arguments': args}
+                assert json.loads(command.stdout) == expected, (tool, argv, command.stdout)
+                assert json.loads(result['content'][0]['text']) == expected, (tool, args, result)
+            for tool, argv, args in REJECTED:
+                command = cli_call(tool, argv, args)
+                assert command.returncode != 0, (tool, argv, command.stdout)
+                result = client.tool(tool, args)
+                assert result.get('isError'), (tool, args, result)
+                cli_error = json.loads(command.stderr)['error']
+                mcp_error = json.loads(result['content'][0]['text'])['error']
+                assert (cli_error['code'], cli_error['message']) == (mcp_error['code'], mcp_error['message']), (tool, cli_error, mcp_error)
+        finally:
+            client.close()
+    print(f'PASS: CLI/MCP parity for {len(ACCEPTED)} accepted and {len(REJECTED)} rejected requests across every tool')
+
+
 if __name__ == '__main__':
-    run(Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1')),
-        Path(os.environ.get('C1_TEST_MCP_BIN', ROOT / '.build/debug/c1-mcp')))
+    cli = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
+    mcp = Path(os.environ.get('C1_TEST_MCP_BIN', ROOT / '.build/debug/c1-mcp'))
+    run(cli, mcp)
+    run_parity(cli, mcp)

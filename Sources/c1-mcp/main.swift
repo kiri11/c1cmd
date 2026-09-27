@@ -6,35 +6,6 @@ import CaptureOneCore
 /// NSAppleScript on macOS requires execution on the main thread to prevent
 /// Carbon/HIToolbox event loop deadlocks when communicating via Apple Events.
 
-// MARK: - Argument Helpers
-func extractString(from args: [String: Value]?, key: String) -> String? {
-    args?[key]?.stringValue
-}
-
-func extractBool(from args: [String: Value]?, key: String) -> Bool? {
-    args?[key]?.boolValue
-}
-
-func extractInt(from args: [String: Value]?, key: String) -> Int? {
-    args?[key]?.intValue
-}
-
-func extractDouble(from args: [String: Value]?, key: String) -> Double? {
-    args?[key]?.doubleValue ?? args?[key]?.intValue.map(Double.init)
-}
-
-func extractStringArray(from args: [String: Value]?, key: String) -> [String]? {
-    guard let arr = args?[key]?.arrayValue else { return nil }
-    return arr.compactMap { $0.stringValue }
-}
-
-func parseAdjustments(from arguments: [String: Any]) throws -> Adjustments {
-    let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
-    let values = arguments["adjustments"] as? [String: Any] ?? arguments.filter { !controls.contains($0.key) }
-    // The tool-specific contract has already checked absolute bounds for set.
-    return try ContractSchema.parseAdjustments(values, delta: true)
-}
-
 func textContent(_ text: String) -> Tool.Content {
     .text(text: text, annotations: nil, _meta: nil)
 }
@@ -138,267 +109,27 @@ struct C1MCPServer {
             let result: CallTool.Result
             do {
                 result = try await withTaskCancellationHandler {
-                    // Status bypasses the occupied main actor and application lock entirely.
-                    if params.name == "request_status" {
-                        let data = try JSONEncoder().encode(params.arguments ?? [:])
-                        let args = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-                        try ContractSchema.validate(tool: params.name, arguments: args)
-                        let status = try CaptureOneCore.RequestContext.status(requestId: args["requestId"] as! String)
-                        return CallTool.Result(content: [textContent(OutputFormatter.formatJson(status))], isError: false)
-                    }
-                    if ["catalog_get", "catalog_inspect", "catalog_variants", "catalog_snapshot"].contains(params.name) {
-                        let data = try JSONEncoder().encode(params.arguments ?? [:])
-                        let args = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-                        try ContractSchema.validate(tool: params.name, arguments: args)
-                        return try await Task.detached {
-                            let reader = try CatalogReader(database: args["database"] as! String)
-                            let result: [String: Any]
-                            if params.name == "catalog_get" { result = try reader.get(variantID: extractInt(from: params.arguments, key: "variantID")!) }
-                            else if params.name == "catalog_variants" {
-                                result = try reader.variants(collectionID: extractInt(from: params.arguments, key: "collectionID"), rating: extractInt(from: params.arguments, key: "rating"), minRating: extractInt(from: params.arguments, key: "minRating"))
-                            } else if params.name == "catalog_inspect" { result = try reader.inspect() }
-                            else { result = try reader.snapshot(destination: args["destination"] as! String) }
-                            let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
-                            return CallTool.Result(content: [textContent(String(data: data, encoding: .utf8)!)], isError: false)
-                        }.value
+                    let raw = try JSONEncoder().encode(params.arguments ?? [:])
+                    let args = try JSONSerialization.jsonObject(with: raw) as! [String: Any]
+                    // Status and stored Catalog reads bypass the occupied main actor and application lock entirely.
+                    if ToolRequest.localTools.contains(params.name) {
+                        let request = try ToolRequest(tool: params.name, arguments: args)
+                        let response = try await Task.detached { try request.dispatch() }.value
+                        return CallTool.Result(content: [textContent(response.json)], isError: false)
                     }
                     return try await MainActor.run {
                         try context.withCurrent {
                             guard !Task.isCancelled else { throw C1Error.requestCancelled("Request cancelled before dispatch.") }
-                            let raw = try JSONEncoder().encode(params.arguments ?? [:])
-                            let args = try JSONSerialization.jsonObject(with: raw) as! [String: Any]
                             guard enabledNames.contains(params.name) else { throw C1Error.invalidRequest("Tool is not enabled in this MCP profile: \(params.name)") }
-                            try ContractSchema.validate(tool: params.name, arguments: args)
+                            let request = try ToolRequest(tool: params.name, arguments: args)
                             context.update(phase: "executing")
-                            switch params.name {
-                            case "doctor":
-                                let report = try SessionController.shared.doctor()
-                                let json = OutputFormatter.formatJson(report)
-                                return CallTool.Result(content: [textContent(json)], isError: !report.allChecksPassed)
-                        
-                            case "doc_info":
-                                let info = try SessionController.shared.getDocumentInfo()
-                                let json = OutputFormatter.formatJson(info)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "capabilities":
-                                let caps = SessionController.shared.capabilities()
-                                guard let data = try? JSONSerialization.data(withJSONObject: caps, options: [.prettyPrinted, .sortedKeys]),
-                                      let str = String(data: data, encoding: .utf8) else {
-                                    throw C1Error.invalidRequest("Failed to encode capabilities to JSON.")
-                                }
-                                return CallTool.Result(content: [textContent(str)], isError: false)
-                        
-                            case "schema":
-                                let schemaObj = ContractSchema.document()
-                                guard let data = try? JSONSerialization.data(withJSONObject: schemaObj, options: [.prettyPrinted, .sortedKeys]),
-                                      let str = String(data: data, encoding: .utf8) else {
-                                    throw C1Error.invalidRequest("Failed to encode schema to JSON.")
-                                }
-                                return CallTool.Result(content: [textContent(str)], isError: false)
-                        
-                            case "read_session_begin":
-                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.begin(collection: args["collection"] as? String, selected: args["selected"] as? Bool ?? false)))], isError: false)
-                            case "read_session_end":
-                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.end(workflowID: args["readWorkflow"] as? String)))], isError: false)
-                            case "read_session_status":
-                                return CallTool.Result(content: [textContent(try ReadWorkflow.json(ReadWorkflow.shared.status(workflowID: args["readWorkflow"] as? String)))], isError: false)
-                            case "variants_list":
-                                let collection = extractString(from: params.arguments, key: "collection")
-                                let selected = extractBool(from: params.arguments, key: "selected") ?? false
-                                let rating = (args["rating"] as? NSNumber)?.intValue
-                                let minRating = (args["minRating"] as? NSNumber)?.intValue
-                                if let ids = args["ids"] as? [String] {
-                                    let rows = try SessionController.shared.listVariantSubset(ids: ids, collection: collection, selected: selected,
-                                        rating: rating, minRating: minRating, parentPath: args["parentPath"] as? String, fields: args["fields"] as? String ?? "minimal",
-                                        batchSize: extractInt(from: params.arguments, key: "batchSize") ?? 32,
-                                        deadlineSeconds: extractDouble(from: params.arguments, key: "deadlineSeconds"))
-                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
-                                }
-                                if args["live"] as? Bool != true, args["deadlineSeconds"] == nil,
-                                   let rows = try ReadWorkflow.shared.variants(collection: collection, selected: selected, rating: rating, minRating: minRating, workflowID: args["readWorkflow"] as? String) {
-                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
-                                }
-                                let list = try SessionController.shared.listVariants(collectionName: collection, selectedOnly: selected, rating: rating, minRating: minRating, batchSize: extractInt(from: params.arguments, key: "batchSize") ?? 32, deadlineSeconds: extractDouble(from: params.arguments, key: "deadlineSeconds"))
-                                let json = OutputFormatter.formatJson(list)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "variant_edit":
-                                let result = try SessionController.shared.editVariant(sourceRef: args["sourceRef"] as! String,
-                                    ifState: args["ifState"] as! String, ifDocument: args["ifDocument"] as! String, ifGeometryState: args["ifGeometryState"] as? String)
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
-                            case "metadata_set":
-                                let result = try SessionController.shared.metadataSet(workingRef: args["workingRef"] as! String,
-                                    ifMetadataState: args["ifMetadataState"] as! String, rating: (args["rating"] as? NSNumber)?.intValue,
-                                    colorTag: (args["colorTag"] as? NSNumber)?.intValue, dryRun: args["dryRun"] as? Bool ?? false)
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
-                            case "geometry_restore":
-                                let result = try SessionController.shared.geometryRestore(workingRef: args["workingRef"] as! String,
-                                    ifGeometryState: args["ifGeometryState"] as! String, dryRun: args["dryRun"] as? Bool ?? false)
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
-                            case "variant_clone":
-                                guard let sourceRef = extractString(from: params.arguments, key: "sourceRef") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'sourceRef'")
-                                }
-                                let res = try SessionController.shared.cloneVariant(sourceRef: sourceRef)
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "variant_delete":
-                                guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
-                                }
-                                let res = try SessionController.shared.deleteVariant(workingRefString: workingRef)
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "variant_baseline":
-                                guard let sourceRef = extractString(from: params.arguments, key: "sourceRef") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'sourceRef'")
-                                }
-                                let res = try SessionController.shared.createBaselineVariant(sourceRef: sourceRef)
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status":
-                                let result = try RecipeWorkflow().run(params.name,arguments:args)
-                                return CallTool.Result(content:[textContent(try ReadWorkflow.json(result))],isError:["failed","outcome-unknown","interrupted"].contains(result["status"] as? String ?? ""))
-                            case "native_set", "native_action":
-                                let target = try NativeEditing.target(args["target"])
-                                let core = SessionController.shared
-                                let ref = args["workingRef"] as! String, token = args["ifNativeState"] as! String
-                                let result: NativeMutationResult
-                                if params.name == "native_set" {
-                                    let patch = try NativeEditing.parsePatch(JSONSerialization.data(withJSONObject: args["patch"]!), target: target)
-                                    result = try core.nativeSet(workingRef: ref, target: target, ifNativeState: token, patch: patch, dryRun: args["dryRun"] as? Bool ?? false)
-                                } else {
-                                    let values = try NativeEditing.parseValues(JSONSerialization.data(withJSONObject: args["arguments"] ?? [String:Any]()))
-                                    result = try core.nativeAction(workingRef: ref, target: target, ifNativeState: token, action: args["action"] as! String, arguments: values, dryRun: args["dryRun"] as? Bool ?? false)
-                                }
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
-                            case "get":
-                                guard let ref = extractString(from: params.arguments, key: "ref") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'ref'")
-                                }
-                                if args["live"] as? Bool != true, args["nativeTargets"] == nil, let result = try ReadWorkflow.shared.get(ref: ref, workflowID: args["readWorkflow"] as? String) {
-                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(result))], isError: false)
-                                }
-                                let res: GetResult
-                                if let targets = args["nativeTargets"] {
-                                    res = try SessionController.shared.get(ref: ref, nativeTargets: NativeEditing.parseTargets(targets, ref: ref))
-                                } else { res = try SessionController.shared.get(ref: ref) }
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "set", "add":
-                                guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
-                                }
-                                guard let ifState = extractString(from: params.arguments, key: "ifState") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'ifState'")
-                                }
-                                let dryRun = extractBool(from: params.arguments, key: "dryRun") ?? false
-                                let adjustments = try parseAdjustments(from: args)
-                                let res = try SessionController.shared.mutate(
-                                    workingRefString: workingRef,
-                                    ifState: ifState,
-                                    setAdjustments: params.name == "set" ? adjustments : nil,
-                                    addAdjustments: params.name == "add" ? adjustments : nil,
-                                    isDryRun: dryRun
-                                )
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "geometry_set":
-                                let crop: CropRect?
-                                if let value = args["crop"] { crop = try JSONDecoder().decode(CropRect.self, from: JSONSerialization.data(withJSONObject: value)) } else { crop = nil }
-                                let keystone = try args["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self, from: JSONSerialization.data(withJSONObject: $0)) }
-                                let result = try SessionController.shared.geometrySet(workingRef: args["workingRef"] as! String,
-                                    ifGeometryState: args["ifGeometryState"] as! String, crop: crop,
-                                    rotation: (args["rotation"] as? NSNumber)?.doubleValue, aspectRatio: (args["aspectRatio"] as? NSNumber)?.doubleValue, keystone: keystone,
-                                    dryRun: args["dryRun"] as? Bool ?? false)
-                                return CallTool.Result(content: [textContent(OutputFormatter.formatJson(result))], isError: false)
-                            case "reset":
-                                guard let workingRef = extractString(from: params.arguments, key: "workingRef") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'workingRef'")
-                                }
-                                guard let ifState = extractString(from: params.arguments, key: "ifState") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'ifState'")
-                                }
-                                let dryRun = extractBool(from: params.arguments, key: "dryRun") ?? false
-                                let fields = extractStringArray(from: params.arguments, key: "fields") ?? []
-                                let res = try SessionController.shared.reset(
-                                    workingRefString: workingRef,
-                                    ifState: ifState,
-                                    fields: fields,
-                                    isDryRun: dryRun
-                                )
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "diff":
-                                guard let ref1 = extractString(from: params.arguments, key: "ref1") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'ref1'")
-                                }
-                                let ref2 = extractString(from: params.arguments, key: "ref2")
-                                if args["live"] as? Bool != true, let result = try ReadWorkflow.shared.diff(ref1: ref1, ref2: ref2, workflowID: args["readWorkflow"] as? String) {
-                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(result))], isError: false)
-                                }
-                                let res = try SessionController.shared.diff(ref1: ref1, ref2: ref2)
-                                let json = OutputFormatter.formatJson(res)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "dump":
-                                let collection = extractString(from: params.arguments, key: "collection")
-                                let selected = extractBool(from: params.arguments, key: "selected") ?? false
-                                let batchSize = extractInt(from: params.arguments, key: "batchSize") ?? 100
-                                if args["live"] as? Bool != true, let rows = try ReadWorkflow.shared.dump(collection: collection, selected: selected, workflowID: args["readWorkflow"] as? String) {
-                                    return CallTool.Result(content: [textContent(try ReadWorkflow.json(rows))], isError: false)
-                                }
-                                let records = try SessionController.shared.dump(
-                                    collectionName: collection,
-                                    selectedOnly: selected,
-                                    batchSize: batchSize
-                                )
-                                let json = OutputFormatter.formatJson(records)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            case "preview":
-                                guard let ref = extractString(from: params.arguments, key: "ref") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'ref'")
-                                }
-                                let outputDir = extractString(from: params.arguments, key: "outputDir")
-                                let timeout = extractDouble(from: params.arguments, key: "timeout") ?? 30.0
-                                let res = try SessionController.shared.preview(
-                                    ref: ref,
-                                    outputDirOverride: outputDir,
-                                    timeout: timeout, fullFrame: extractBool(from: params.arguments, key: "fullFrame") ?? false
-                                )
-                                let json = OutputFormatter.formatJson(res)
-                        
-                                let imageUrl = URL(fileURLWithPath: res.outputPath)
-                                let imageData = try Data(contentsOf: imageUrl)
-                                let base64 = imageData.base64EncodedString()
-                        
-                                return CallTool.Result(
-                                    content: [
-                                        textContent(json),
-                                        imageContent(base64: base64, mimeType: "image/jpeg")
-                                    ],
-                                    isError: false
-                                )
-                        
-                            case "operation_status":
-                                guard let opId = extractString(from: params.arguments, key: "operationId") else {
-                                    throw C1Error.invalidRequest("Missing required argument: 'operationId'")
-                                }
-                                let entry = try SessionController.shared.operationStatus(operationId: opId)
-                                let json = OutputFormatter.formatJson(entry)
-                                return CallTool.Result(content: [textContent(json)], isError: false)
-                        
-                            default:
-                                throw C1Error.invalidRequest("Unknown tool name '\(params.name)'.")
+                            let response = try request.dispatch()
+                            var content = [textContent(response.json)]
+                            if case .preview(let preview) = response {
+                                let image = try Data(contentsOf: URL(fileURLWithPath: preview.outputPath))
+                                content.append(imageContent(base64: image.base64EncodedString(), mimeType: "image/jpeg"))
                             }
+                            return CallTool.Result(content: content, isError: response.reportsFailure)
                         }
                     }
                 } onCancel: { context.cancel() }

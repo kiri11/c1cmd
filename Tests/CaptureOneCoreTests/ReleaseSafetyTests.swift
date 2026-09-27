@@ -479,7 +479,9 @@ struct ReleaseSafetyTests {
         XCTAssertThrowsError(try ContractSchema.validate(tool: "set", arguments: ["workingRef": "x", "ifState": "h", "adjustments": ["exposure": 1], "contrast": 2]))
         XCTAssertThrowsError(try ContractSchema.validate(tool: "dump", arguments: ["batchSize": -1]))
         XCTAssertNoThrow(try ContractSchema.validate(tool: "set", arguments: ["workingRef": "x", "ifState": "h", "exp": 1]))
-        XCTAssertThrowsError(try FieldRegistry.shared.parseKeyValueArguments(["exposure=1", "exp=2"]))
+        XCTAssertThrowsError(try FieldRegistry.shared.keyValueArguments(["exposure=1", "exposure=2"]))
+        XCTAssertThrowsError(try ToolRequest(tool: "set", arguments: ["workingRef": "x", "ifState": "h",
+            "adjustments": FieldRegistry.shared.keyValueArguments(["exposure=1", "exp=2"])]))
         XCTAssertThrowsError(try ContractSchema.parseAdjustments(["exposure": 1, "unknown": 2], delta: false))
         XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: ContractSchema.document()))
         let record = ProvenanceRecord(workingRef: "c1_wrk_test", sourceVariantId: "1", cloneVariantId: "2", documentPath: dir.path, documentName: "fixture", parentImagePath: fake.parent, creationOperationId: "op", baselineAdjustments: Adjustments(), baselineStateHash: "h")

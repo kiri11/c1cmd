@@ -29,12 +29,8 @@ struct FieldSpecTests {
 
         XCTAssertNoThrowBlock {
             let args = ["exp=0.35", "contrast=12.0", "kelvin=5600"]
-            let parsed = try registry.parseKeyValueArguments(args)
-            XCTAssertEqual(parsed.exposure, 0.35)
-            XCTAssertEqual(parsed.contrast, 12.0)
-            XCTAssertEqual(parsed.temperature, 5600.0)
-            XCTAssertNil(parsed.saturation)
-            XCTAssertNil(parsed.tint)
+            let parsed = try registry.keyValueArguments(args)
+            XCTAssertEqual(parsed, ["exp": 0.35, "contrast": 12.0, "kelvin": 5600.0])
         }
 
         XCTAssertNoThrowBlock {

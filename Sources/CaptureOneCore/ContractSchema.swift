@@ -24,9 +24,12 @@ public enum ContractSchema {
         return result
     }
     public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    static func integer(_ range: ClosedRange<Int>) -> [String: Any] {
+        ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
+    }
+    static let rating = integer(VariantMetadata.ratingRange)
     static var writableMetadataSchema: [String: Any] {
-        object(["rating": ["type": "integer", "minimum": 0, "maximum": 5],
-                "colorTag": ["type": "integer", "minimum": 0, "maximum": 7]], required: ["rating", "colorTag"])
+        object(["rating": rating, "colorTag": integer(VariantMetadata.colorTagRange)], required: ["rating", "colorTag"])
     }
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
     static var keystoneSchema: [String: Any] {
@@ -45,7 +48,7 @@ public enum ContractSchema {
         case "read_session_end", "read_session_status": return object(["readWorkflow": string], required: ["readWorkflow"])
         case "read_session_begin": return object(["collection": string, "selected": boolean])
         case "catalog_get": return object(["database": string, "variantID": ["type": "integer", "minimum": 1]], required: ["database", "variantID"])
-        case "catalog_variants": return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": ["type": "integer", "minimum": 0, "maximum": 5], "minRating": ["type": "integer", "minimum": 0, "maximum": 5]], required: ["database"])
+        case "catalog_variants": return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": rating, "minRating": rating], required: ["database"])
         case "catalog_inspect": return object(["database": string], required: ["database"])
         case "catalog_snapshot": return object(["database": string, "destination": string], required: ["database", "destination"])
         case "variants_list":
@@ -56,8 +59,8 @@ public enum ContractSchema {
                 "parentPath": ["type": "string", "minLength": 1],
                 "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
                 "deadlineSeconds": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
-                "rating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."],
-                "minRating": ["type": "integer", "minimum": 0, "maximum": 5, "description": "Inclusive minimum star rating. Mutually exclusive with rating."]
+                "rating": rating.merging(["description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."]) { $1 },
+                "minRating": rating.merging(["description": "Inclusive minimum star rating. Mutually exclusive with rating."]) { $1 }
             ])
             result["not"] = ["required": ["rating", "minRating"]]
             return result
@@ -83,7 +86,7 @@ public enum ContractSchema {
             result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
             return result
         case "geometry_set":
-            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-45, "maximum":45], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
+            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-Geometry.maximumRotation, "maximum":Geometry.maximumRotation], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
             result["anyOf"] = ["crop", "rotation", "aspectRatio", "keystone"].map { ["required": [$0]] }
             result["not"] = ["required": ["crop", "aspectRatio"]]
             return result
@@ -136,7 +139,7 @@ public enum ContractSchema {
             let values = nested ?? top
             guard !values.isEmpty else { throw C1Error.invalidRequest("At least one adjustment is required.") }
             var canonical = Set<String>()
-            for key in values.keys {
+            for key in values.keys.sorted() {
                 guard let name = FieldRegistry.shared.canonicalName(for: key), canonical.insert(name).inserted else {
                     throw C1Error.invalidRequest("Duplicate adjustment aliases: \(key)")
                 }
@@ -163,7 +166,8 @@ public enum ContractSchema {
             let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
             for key in schema["required"] as? [String] ?? [] { guard object[key] != nil else { throw C1Error.invalidRequest("Missing required argument: \(path).\(key)") } }
             if let min = schema["minProperties"] as? Int, object.count < min { throw invalid() }
-            for (key, item) in object {
+            // Sorted, so the reported problem does not depend on dictionary order.
+            for (key, item) in object.sorted(by: { $0.key < $1.key }) {
                 guard let spec = properties[key] else { throw C1Error.invalidRequest("Unknown argument: \(path).\(key)") }
                 try validateValue(item, schema: spec, path: "\(path).\(key)")
             }

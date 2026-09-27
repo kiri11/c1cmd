@@ -59,6 +59,12 @@ public struct Geometry: Codable, Equatable {
     public var hideDistortedAreas: Bool
     public var cropOutsideImage: Bool
 
+    /// Absolute rotation writes are qualified within ± this many degrees.
+    public static let maximumRotation = 45.0
+    static var rotationOutOfRange: C1Error {
+        .invalidRequest("Rotation must be finite and between -\(Int(maximumRotation)) and \(Int(maximumRotation)) degrees.")
+    }
+
     public var hasLensDistortion: Bool { lensGeometry.first.map { $0 != 0 } ?? false }
     public var hasPerspectiveOrMovements: Bool {
         keystone.dropFirst().contains { $0 != 0 } || lensGeometry.dropFirst(2).contains { $0 != 0 }
@@ -74,7 +80,7 @@ public struct Geometry: Codable, Equatable {
         guard maximumCrop.values.allSatisfy({ $0.isFinite }), keystone.allSatisfy({ $0.isFinite }), lensGeometry.allSatisfy({ $0.isFinite }),
               imageWidth.isFinite, imageHeight.isFinite, imageWidth > 0, imageHeight > 0,
               maximumCrop.width > 0, maximumCrop.height > 0,
-              rotation.isFinite, abs(rotation) <= 45, crop.values.allSatisfy({ $0.isFinite }), crop.width > 0, crop.height > 0 else {
+              rotation.isFinite, abs(rotation) <= Self.maximumRotation, crop.values.allSatisfy({ $0.isFinite }), crop.width > 0, crop.height > 0 else {
             return "Image geometry is unavailable or outside the qualified range."
         }
         return nil
@@ -116,7 +122,7 @@ public struct Geometry: Codable, Equatable {
         guard requested != nil || angle != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
         guard requested == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
         let angle = angle ?? rotation
-        guard angle.isFinite, abs(angle) <= 45 else { throw C1Error.invalidRequest("Rotation must be finite and between -45 and 45 degrees.") }
+        guard angle.isFinite, abs(angle) <= Geometry.maximumRotation else { throw Geometry.rotationOutOfRange }
         guard !requiresNativeBounds || angle == rotation else {
             throw C1Error.invalidRequest("Corrected geometry bounds at a new rotation require native execution; a dry run cannot predict them.")
         }
@@ -171,7 +177,7 @@ public struct GeometryRequest: Codable, Equatable {
     public init(crop: CropRect?, rotation: Double, aspectRatio: Double?, keystone: KeystoneAdjustments? = nil) throws {
         try keystone?.validate()
         guard crop == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
-        guard rotation.isFinite, abs(rotation) <= 45 else { throw C1Error.invalidRequest("Rotation must be finite and between -45 and 45 degrees.") }
+        guard rotation.isFinite, abs(rotation) <= Geometry.maximumRotation else { throw Geometry.rotationOutOfRange }
         if let crop {
             guard crop.values.allSatisfy({ $0.isFinite }), crop.width >= 1, crop.height >= 1 else { throw C1Error.invalidRequest("Crop dimensions must be positive finite pixels.") }
         }

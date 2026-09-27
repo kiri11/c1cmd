@@ -199,8 +199,8 @@ public final class FieldRegistry {
             FieldSpec(name: "shutterSpeed", aliases: ["shutter"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
             FieldSpec(name: "asShotWB", aliases: ["asShotWhiteBalance"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
             FieldSpec(name: "captureDate", aliases: ["date"], type: "string", tolerance: 0, operations: [.get], isMetadata: true),
-            FieldSpec(name: "rating", type: "integer", minValue: 0, maxValue: 5, tolerance: 0, operations: [.get, .set], isMetadata: true),
-            FieldSpec(name: "colorTag", type: "integer", minValue: 0, maxValue: 7, tolerance: 0, operations: [.get, .set], isMetadata: true)
+            FieldSpec(name: "rating", type: "integer", minValue: Double(VariantMetadata.ratingRange.lowerBound), maxValue: Double(VariantMetadata.ratingRange.upperBound), tolerance: 0, operations: [.get, .set], isMetadata: true),
+            FieldSpec(name: "colorTag", type: "integer", minValue: Double(VariantMetadata.colorTagRange.lowerBound), maxValue: Double(VariantMetadata.colorTagRange.upperBound), tolerance: 0, operations: [.get, .set], isMetadata: true)
         ]
     }
 
@@ -228,9 +228,10 @@ public final class FieldRegistry {
         }
     }
 
-    public func parseKeyValueArguments(_ args: [String]) throws -> Adjustments {
-        var adj = Adjustments()
-        var seen = Set<String>()
+    /// CLI `field=value` pairs as an adjustments arguments object. Field names,
+    /// aliases and ranges are left to the contract schema, as for any other transport.
+    public func keyValueArguments(_ args: [String]) throws -> [String: Double] {
+        var values: [String: Double] = [:]
         for arg in args {
             let parts = arg.split(separator: "=", maxSplits: 1).map(String.init)
             guard parts.count == 2 else {
@@ -238,17 +239,13 @@ public final class FieldRegistry {
             }
             let key = parts[0].trimmingCharacters(in: .whitespaces)
             let valStr = parts[1].trimmingCharacters(in: .whitespaces)
-
-            guard let spec = findAdjustmentSpec(named: key) else {
-                throw C1Error.unsupportedField("Field '\(key)' is not a recognized or supported adjustment field.")
-            }
-            guard seen.insert(spec.name).inserted else { throw C1Error.invalidRequest("Duplicate adjustment field or alias: \(key)") }
+            guard values[key] == nil else { throw C1Error.invalidRequest("Duplicate adjustment field or alias: \(key)") }
             guard let doubleVal = Double(valStr), doubleVal.isFinite else {
-                throw C1Error.invalidRequest("Cannot parse numeric value for field '\(spec.name)': '\(valStr)'")
+                throw C1Error.invalidRequest("Cannot parse numeric value for field '\(key)': '\(valStr)'")
             }
-            adj.setValue(doubleVal, for: spec.name)
+            values[key] = doubleVal
         }
-        return adj
+        return values
     }
 
     public func validateAdjustments(_ adj: Adjustments) throws {
