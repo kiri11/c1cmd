@@ -14,7 +14,7 @@ import tempfile
 import time
 from contextlib import closing
 from catalog_integration_test import apple, sha, CLI, MCP
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 
 
 def main():
@@ -39,7 +39,7 @@ def main():
         if kind == 'catalog': env['C1_CATALOG_WRITE_PATH'] = str(base/'reads.cocatalog')
         def cli(*args):
             start = time.perf_counter()
-            p = subprocess.run([str(CLI), *map(str,args), '--format', 'json'], env=dict(env,C1_PROFILE='1'), capture_output=True, text=True, timeout=150)
+            p = subprocess.run([str(CLI), *complete(args), '--format', 'json'], env=dict(env,C1_PROFILE='1'), capture_output=True, text=True, timeout=150)
             assert p.returncode == 0, (args,p.stdout,p.stderr)
             traces = [json.loads(line) for line in p.stderr.splitlines() if line.startswith('{') and 'c1-profile' in line]
             return json.loads(p.stdout), dict(elapsedMs=1000*(time.perf_counter()-start), handlers=[x['handler'] for x in traces if x['phase']=='apple_event'])
@@ -77,7 +77,7 @@ def main():
         assert started['active'] and started['sqliteEnabled']==(kind=='catalog'), started
         client=Client(MCP,env=env,timeout=150)
         def tool(name,args):
-            r=client.tool(name,args); assert not r.get('isError'),r
+            r=client.tool(name, complete_args(name, args)); assert not r.get('isError'),r
             value=json.loads(r['content'][0]['text'])
             validate_response(value,contract['responses'][name],name)
             return value

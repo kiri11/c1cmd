@@ -12,7 +12,7 @@ import tempfile
 import time
 
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 
 
 def preview_pixels(path):
@@ -64,7 +64,7 @@ def main():
         print(event, data.get('case', ''), flush=True)
 
     def cli(*args, error=None):
-        result = subprocess.run([str(CLI), *map(str, args), '--format', 'json'], capture_output=True, text=True, timeout=150)
+        result = subprocess.run([str(CLI), *complete(args), '--format', 'json'], capture_output=True, text=True, timeout=150)
         data = json.loads(result.stderr if result.returncode else result.stdout)
         if error:
             assert result.returncode and data['error']['code'] == error, data
@@ -75,7 +75,7 @@ def main():
     contract = cli('schema')
 
     def tool(name, args, error=None):
-        result = client.tool(name, args)
+        result = client.tool(name, complete_args(name, args))
         data = json.loads(result['content'][0]['text'])
         if error:
             assert result.get('isError') and data['error']['code'] == error, data

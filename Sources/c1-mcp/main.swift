@@ -91,7 +91,7 @@ struct C1MCPServer {
                             context.update(phase: "executing")
                             let response = try request.dispatch()
                             var content = [textContent(response.json)]
-                            if case .preview(let preview) = response {
+                            if case .preview(let preview) = response.complete {
                                 let image = try Data(contentsOf: URL(fileURLWithPath: preview.outputPath))
                                 content.append(imageContent(base64: image.base64EncodedString(), mimeType: "image/jpeg"))
                             }

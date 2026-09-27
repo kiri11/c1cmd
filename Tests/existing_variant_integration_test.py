@@ -12,7 +12,10 @@ import tempfile
 import time
 
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, COMPACT_TOOLS
+
+COMMANDS = {('set',): 'set', ('add',): 'add', ('reset',): 'reset', ('preview',): 'preview', ('metadata', 'set'): 'metadata_set',
+            ('geometry', 'set'): 'geometry_set', ('geometry', 'restore'): 'geometry_restore'}
 
 
 def main():
@@ -47,25 +50,44 @@ def main():
         if kind == 'catalog':
             environment['C1_CATALOG_WRITE_PATH'] = str(package)
 
+        def complete(name, value, full):
+            """The agent workflow runs with compact results: check the summary against its schema and
+            its evidence file, and return the complete result from that file for the assertions below."""
+            if name not in COMPACT_TOOLS or full:
+                assert 'evidencePath' not in value, value
+                return value
+            validate_response(value, contract['compactResponses'][name], name)
+            path = Path(value['evidencePath'])
+            assert path.parent == Path(doc['documentPath']) / '.c1/results' and path.is_file(), value
+            stored = json.loads(path.read_text())
+            validate_response(stored, contract['responses'][name], name)
+            assert all(stored[k] == v for k, v in value.items() if k != 'evidencePath'), (value, stored)
+            if name.startswith('geometry') or name == 'preview':
+                assert len(json.dumps(value)) < len(json.dumps(stored)), value
+            return stored
+
         def cli(*args, error=None):
-            result = subprocess.run([str(CLI), *map(str, args), '--format', 'json'], env=environment,
+            args = [str(a) for a in args]
+            result = subprocess.run([str(CLI), *args, '--format', 'json'], env=environment,
                                     capture_output=True, text=True, timeout=150)
             value = json.loads(result.stderr if result.returncode else result.stdout)
             if error:
                 assert result.returncode != 0 and value['error']['code'] == error, value
-            else:
-                assert result.returncode == 0, value
-            return value
+                return value
+            assert result.returncode == 0, value
+            name = COMMANDS.get(tuple(args[:2])) or COMMANDS.get(tuple(args[:1]))
+            return complete(name, value, '--full' in args)
 
         def tool(name, args, error=None):
             result = client.tool(name, args)
             value = json.loads(result['content'][0]['text'])
             if error:
                 assert result.get('isError') and value['error']['code'] == error, value
-            else:
-                assert not result.get('isError'), value
+                return value, result
+            assert not result.get('isError'), value
+            if name not in COMPACT_TOOLS or args.get('full'):
                 validate_response(value, contract['responses'][name], name)
-            return value, result
+            return complete(name, value, args.get('full')), result
 
         try:
             apple(f'make new document with properties {{name:"existing", kind:{kind}, path:"{base}"}}')
@@ -136,8 +158,9 @@ def main():
                 ratings=list(range(6)), colorTags=list(range(8)), rawSHA256=sha(fixture))
             changed = cli('set', ref, '--if-state', source['stateHash'], 'exposure=0.5', 'contrast=5', 'saturation=8', 'temperature=5100', 'tint=2')
             tool('set', {'workingRef': ref, 'ifState': source['stateHash'], 'exposure': 1}, error='state-changed')
-            added, _ = tool('add', {'workingRef': ref, 'ifState': changed['stateHash'], 'exposure': .25})
-            reset = cli('reset', ref, '--if-state', added['stateHash'])
+            added, _ = tool('add', {'workingRef': ref, 'ifState': changed['stateHash'], 'exposure': .25, 'full': True})
+            assert added['before']['exposure'] == .5 and added['after']['exposure'] == .75, added
+            reset = cli('reset', '--full', ref, '--if-state', added['stateHash'])
             assert reset['after']['exposure'] == 0 and reset['after']['contrast'] == 0
             state = cli('get', ref)
             crop, _ = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash'], 'rotation': 2, 'aspectRatio': .75, 'keystone': {'vertical': 10, 'horizontal': -5}})
@@ -173,6 +196,7 @@ def main():
             assert example_result['workingRef'].startswith('c1_edit_') and len(cli('variants', 'list')) == 1
             review = json.loads(Path(example_result['reviewRecord']).read_text())
             assert review['mode'] == 'existing' and review['reviewStatus'] == 'unreviewed' and 'clone' not in review
+            assert Path(review['applied']['evidencePath']).is_file() and Path(review['afterPreview']['outputPath']).is_file()
             example_state = cli('get', example_result['workingRef'])
             tool('geometry_restore', {'workingRef': example_result['workingRef'], 'ifGeometryState': example_state['geometryStateHash']})
             process = subprocess.run([sys.executable, '-B', str(grade), '--c1-bin', str(CLI)],
@@ -183,6 +207,7 @@ def main():
             decision = json.loads(decisions[0].read_text())
             assert decision['mode'] == 'existing' and decision['cloneVariantId'] is None
             assert decision['sourceVariantId'] == source_id and len(cli('variants', 'list')) == 1
+            assert json.loads(Path(decision['evidencePath']).read_text())['diff'] == decision['diff']
             final_state = cli('get', ref)
             tool('set', {'workingRef': ref, 'ifState': final_state['stateHash'], 'adjustments': edit['baselineAdjustments']})
             # A read-only catalog configuration cannot use an existing edit permission.

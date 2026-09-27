@@ -58,14 +58,16 @@ extension GlobalOptions {
 
     /// Maps a command's flags to the shared arguments object and runs it through the
     /// core dispatcher, exactly as the MCP server does for the same tool.
-    func run(_ tool: String, _ arguments: () throws -> [String: Any]) throws {
-        try run(tool, arguments) { print(rendered($0)) }
+    func run(_ tool: String, full: ResultOptions? = nil, _ arguments: () throws -> [String: Any]) throws {
+        try run(tool, full: full, arguments) { print(rendered($0)) }
     }
 
-    func run(_ tool: String, _ arguments: () throws -> [String: Any], render: (ToolResponse) throws -> Void) throws {
+    func run(_ tool: String, full: ResultOptions? = nil, _ arguments: () throws -> [String: Any], render: (ToolResponse) throws -> Void) throws {
         var failed = false
         let code = handleExecution(tool: tool, format: outputFormat, progressMode: progressMode) {
-            let response = try ToolRequest(tool: tool, arguments: arguments()).dispatch()
+            var args = try arguments()
+            put(&args, "full", flag(full?.full ?? false))
+            let response = try ToolRequest(tool: tool, arguments: args).dispatch()
             try render(response)
             failed = response.reportsFailure
         }
@@ -85,6 +87,8 @@ extension GlobalOptions {
         case .delete(let res) where human:
             return ["Deleted working variant:", "  Working Ref: \(res.workingRef)", "  Clone ID   : \(res.cloneVariantId)",
                     "  Deleted    : \(res.deleted)"].joined(separator: "\n")
+        case .compact(let summary, let complete) where human:
+            return rendered(complete) + "\nEvidence: \(summary["evidencePath"] as? String ?? "")"
         case .operation(let entry) where human:
             var lines = ["Operation Status", "----------------", "Operation ID : \(entry.operationId)", "Type         : \(entry.operationType)",
                          "Status       : \(entry.status)", "Timestamp    : \(entry.timestamp)"]
@@ -93,6 +97,12 @@ extension GlobalOptions {
         default: return response.json
         }
     }
+}
+
+/// Only on commands whose results are compact by default.
+struct ResultOptions: ParsableArguments {
+    @Flag(help: "Print the complete result instead of a compact summary with evidencePath.")
+    var full = false
 }
 
 /// Adds a value to an arguments object only when the flag was given.
@@ -414,6 +424,7 @@ func adjustmentArguments(keyValues: [String], jsonStr: String?, filePath: String
 struct SetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute adjustments on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
     var workingRef: String
@@ -434,7 +445,7 @@ struct SetCommand: ParsableCommand {
     var keyValues: [String] = []
 
     mutating func run() throws {
-        try globals.run("set", {
+        try globals.run("set", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifState": ifState,
                                        "adjustments": try adjustmentArguments(keyValues: keyValues, jsonStr: json, filePath: file)]
             put(&args, "dryRun", flag(dryRun))
@@ -447,6 +458,7 @@ struct SetCommand: ParsableCommand {
 struct AddCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "add", abstract: "Apply relative delta adjustments on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
     var workingRef: String
@@ -467,7 +479,7 @@ struct AddCommand: ParsableCommand {
     var keyValues: [String] = []
 
     mutating func run() throws {
-        try globals.run("add", {
+        try globals.run("add", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifState": ifState,
                                        "adjustments": try adjustmentArguments(keyValues: keyValues, jsonStr: json, filePath: file)]
             put(&args, "dryRun", flag(dryRun))
@@ -480,6 +492,7 @@ struct AddCommand: ParsableCommand {
 struct ResetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "reset", abstract: "Reset verified adjustment fields on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
 
     @Argument(help: "Working reference (c1_wrk_<uuid>).")
     var workingRef: String
@@ -494,7 +507,7 @@ struct ResetCommand: ParsableCommand {
     var fields: [String] = []
 
     mutating func run() throws {
-        try globals.run("reset", {
+        try globals.run("reset", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifState": ifState]
             put(&args, "fields", fields.isEmpty ? nil : fields); put(&args, "dryRun", flag(dryRun))
             return args
@@ -572,6 +585,7 @@ struct DumpCommand: ParsableCommand {
 struct PreviewCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "preview", abstract: "Export and verify dedicated preview JPEG for a variant or working clone.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
 
     @Argument(help: "Variant reference (working ref c1_wrk_<uuid> or native variant ID).")
     var ref: String
@@ -586,7 +600,7 @@ struct PreviewCommand: ParsableCommand {
     var fullFrame: Bool = false
 
     mutating func run() throws {
-        try globals.run("preview", {
+        try globals.run("preview", full: result, {
             var args: [String: Any] = ["ref": ref]
             put(&args, "outputDir", outputDir); put(&args, "timeout", timeout); put(&args, "fullFrame", flag(fullFrame))
             return args
@@ -619,6 +633,7 @@ struct GeometryCommand: ParsableCommand {
 struct GeometrySetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation/keystone; preserves other edits.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     @Argument var workingRef: String
     @Option(help: "geometryStateHash from get, independent of the tonal stateHash.") var ifGeometryState: String
     @Option(help: "centerX,centerY,width,height in rotated-canvas pixels, bottom-left origin.") var crop: String?
@@ -631,7 +646,7 @@ struct GeometrySetCommand: ParsableCommand {
     @Option(help: "Absolute keystone aspect (-50 to 100).") var keystoneAspect: Double?
     @Flag var dryRun: Bool = false
     mutating func run() throws {
-        try globals.run("geometry_set", {
+        try globals.run("geometry_set", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifGeometryState": ifGeometryState]
             if let crop {
                 let parts = crop.split(separator: ",", omittingEmptySubsequences: false)
@@ -669,11 +684,12 @@ struct VariantEditCommand: ParsableCommand {
 struct GeometryRestoreCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved crop/rotation/keystone with fresh state and matching geometry context.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     @Argument var workingRef: String
     @Option var ifGeometryState: String
     @Flag var dryRun: Bool = false
     mutating func run() throws {
-        try globals.run("geometry_restore", {
+        try globals.run("geometry_restore", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifGeometryState": ifGeometryState]
             put(&args, "dryRun", flag(dryRun))
             return args
@@ -699,13 +715,14 @@ struct MetadataCommand: ParsableCommand {
 struct MetadataSetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "set", abstract: "Set rating and/or color tag on an editing reference or managed clone.")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     @Argument var workingRef: String
     @Option(help: "metadataStateHash from a fresh get.") var ifMetadataState: String
     @Option(help: "Star rating: integer 0–5; 0 clears.") var rating: Int?
     @Option(help: "Native color tag: integer 0–7; 0 clears.") var colorTag: Int?
     @Flag var dryRun: Bool = false
     mutating func run() throws {
-        try globals.run("metadata_set", {
+        try globals.run("metadata_set", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifMetadataState": ifMetadataState]
             put(&args, "rating", rating); put(&args, "colorTag", colorTag); put(&args, "dryRun", flag(dryRun))
             return args
@@ -730,13 +747,14 @@ struct NativeTargetOptions: ParsableArguments {
 struct NativeSetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName:"set")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     @OptionGroup var target: NativeTargetOptions
     @Argument var workingRef: String
     @Option var ifNativeState: String
     @Option(help:"JSON object using exact dictionary property names. Curves are flat x,y pairs.") var json: String
     @Flag var dryRun = false
     mutating func run() throws {
-        try globals.run("native_set", {
+        try globals.run("native_set", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifNativeState": ifNativeState, "target": target.target,
                                        "patch": try jsonArgument(json, name: "--json")]
             put(&args, "dryRun", flag(dryRun))
@@ -747,6 +765,7 @@ struct NativeSetCommand: ParsableCommand {
 struct NativeActionCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName:"action")
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     @OptionGroup var target: NativeTargetOptions
     @Argument var workingRef: String
     @Argument var action: String
@@ -754,7 +773,7 @@ struct NativeActionCommand: ParsableCommand {
     @Option(help:"JSON action arguments.") var json: String?
     @Flag var dryRun = false
     mutating func run() throws {
-        try globals.run("native_action", {
+        try globals.run("native_action", full: result, {
             var args: [String: Any] = ["workingRef": workingRef, "ifNativeState": ifNativeState, "target": target.target, "action": action]
             put(&args, "arguments", try json.map { try jsonArgument($0, name: "--json") }); put(&args, "dryRun", flag(dryRun))
             return args
@@ -834,9 +853,10 @@ struct RecipeCommand: ParsableCommand {
     @Argument(help:"capture, register, verify, apply, or status") var action: String
     @Option(help:"JSON request file using the shared MCP schema.") var file: String
     @OptionGroup var globals: GlobalOptions
+    @OptionGroup var result: ResultOptions
     mutating func run() throws {
         let names = ["capture":"reference_capture","register":"recipe_register","verify":"recipe_verify","apply":"edit_apply","status":"edit_status"]
-        try globals.run(names[action] ?? "recipe", {
+        try globals.run(names[action] ?? "recipe", full: result, {
             guard names[action] != nil, let args = try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:file))) as? [String:Any] else { throw C1Error.invalidRequest("Expected recipe action and JSON object request.") }
             return args
         })

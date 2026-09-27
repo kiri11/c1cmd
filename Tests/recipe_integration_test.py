@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
         (evidence/'results.json').write_text(json.dumps(events, indent=2)+'\n')
         print(name, flush=True)
     def cli(*args, ok=True):
-        r = subprocess.run([str(CLI), *map(str,args), '--format','json'], capture_output=True,text=True,timeout=240)
+        r = subprocess.run([str(CLI), *complete(args), '--format','json'], capture_output=True,text=True,timeout=240)
         value = json.loads(r.stdout or r.stderr)
         log('cli',dict(args=list(map(str,args)),code=r.returncode,result=value))
         assert (r.returncode == 0) == ok, value
@@ -99,7 +99,7 @@ def main():
             request.update(overrides={'clarity amount':7,'rgb curve':[0,0,50,57,100,100],'film grain type':'soft','vignetting method':'circular on crop'},exposure=dict(mode='absolute',value=.25),
                            whiteBalance=dict(mode='absolute',temperature=5200,tint=2),
                            ifGeometryState=source['geometryStateHash'],geometry=dict(aspectRatio=1.5),preview=True)
-            result = client.tool('edit_apply',request)
+            result = client.tool('edit_apply',complete_args('edit_apply',request))
             value = json.loads(result['content'][0]['text']); log('mcp-apply',value)
             assert not result.get('isError'), value
             assert value['status'] == 'succeeded'
@@ -183,7 +183,7 @@ def main():
             return rid
         scoped_id = verify_scoped(scoped)
         current = cli('get',source['id'])
-        applied = client.tool('edit_apply',dict(recipeId=scoped_id,sourceRef=source['id'],ifDocument=doc['openToken'],ifState=current['stateHash'],ifGeometryState=current['geometryStateHash'],preview=True))
+        applied = client.tool('edit_apply',complete_args('edit_apply',dict(recipeId=scoped_id,sourceRef=source['id'],ifDocument=doc['openToken'],ifState=current['stateHash'],ifGeometryState=current['geometryStateHash'],preview=True)))
         applied_value = json.loads(applied['content'][0]['text']); log('mcp-scoped-apply',applied_value)
         assert not applied.get('isError'), applied_value
         validate_response(applied_value,schema['responses']['edit_apply'])
@@ -197,6 +197,15 @@ def main():
         steps = [s['step'] for s in applied_value['completed']]
         assert 'scope-advanced-delete-1' in steps and 'scope-advanced-set-2' in steps
         assert recipe('status',dict(compoundId=applied_value['compoundId'])) == applied_value
+        # By default a succeeded compound edit is compact; the full report is in its evidence file.
+        compact = client.tool('edit_status',dict(compoundId=applied_value['compoundId']))
+        compact_value = json.loads(compact['content'][0]['text']); log('mcp-status-compact',compact_value)
+        assert not compact.get('isError'), compact_value
+        validate_response(compact_value,schema['compactResponses']['edit_status'])
+        assert json.loads(Path(compact_value['evidencePath']).read_text()) == applied_value
+        bundle = applied_value['resultBundle']
+        assert compact_value['diff'] == bundle['diff'] and compact_value['coverage'] == bundle['coverage']
+        assert compact_value['operations'] == bundle['provenance']['operations'] and compact_value['scopedDiff'] == bundle['scopedNative']['diff']
         # Version 2 with no scoped changes must preserve the populated scoped state.
         preserve = dict(version=2,referenceId=capture['referenceId'],settings={'clarity amount':9},
             exposure=dict(mode='preserve'),whiteBalance=dict(mode='preserve'),cropPolicy='preserve')

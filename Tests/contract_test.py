@@ -38,6 +38,28 @@ class Client:
         self.selector.close()
 
 
+COMPACT_TOOLS = {'set', 'add', 'reset', 'metadata_set', 'geometry_set', 'geometry_restore', 'native_set', 'native_action',
+                 'preview', 'reference_capture', 'recipe_register', 'recipe_verify', 'edit_apply', 'edit_status'}
+COMPACT_COMMANDS = [('geometry', 'set'), ('geometry', 'restore'), ('metadata', 'set'), ('native', 'set'), ('native', 'action'),
+                    *[('recipe', action) for action in ('capture', 'register', 'verify', 'apply', 'status')],
+                    ('set',), ('add',), ('reset',), ('preview',)]
+
+
+def complete(argv):
+    """Requests the complete result from a compact-by-default CLI command; suites that assert native
+    before/after detail use this, while the agent-workflow suites exercise the compact default."""
+    argv = [str(a) for a in argv]
+    for words in COMPACT_COMMANDS:
+        if tuple(argv[:len(words)]) == words:
+            return [*words, '--full', *argv[len(words):]]
+    return argv
+
+
+def complete_args(name, args):
+    """MCP counterpart of complete()."""
+    return dict(args or {}, full=True) if name in COMPACT_TOOLS else args
+
+
 def validate_response(value, schema, path='response'):
     """Small validator for the emitted response schema vocabulary; no third-party runtime."""
     kind = schema.get('type')
@@ -84,6 +106,18 @@ def run(cli, mcp):
 
         for tool in tools:
             assert tool['inputSchema'] == cli_schema['requests'][tool['name']]
+        # Mutation, recipe and preview results are compact by default; `full` returns the complete result.
+        compact = COMPACT_TOOLS
+        for name, schema in cli_schema['requests'].items():
+            assert ('full' in schema['properties']) == (name in compact), name
+        assert set(cli_schema['compactResponses']) == compact
+        for name, schema in cli_schema['compactResponses'].items():
+            assert 'evidencePath' in schema['required'] and schema['additionalProperties'] is False, name
+            assert set(schema['required']) <= set(schema['properties']), name
+        for name in ['set', 'geometry_set', 'preview']:
+            complete = cli_schema['responses'][name]['properties']
+            assert all(complete[k] == v for k, v in cli_schema['compactResponses'][name]['properties'].items() if k != 'evidencePath'), name
+        assert client.tool('get', {'ref': '1', 'full': True}).get('isError')
         for args in [{"ids": []}, {"ids": ["1", "1"]}, {"ids": [str(i) for i in range(513)]},
                      {"ids": ["1"], "fields": "unknown"}, {"fields": "minimal"}, {"parentPath": "/a.CR3"}]:
             assert client.tool("variants_list", args).get("isError"), args
@@ -340,8 +374,14 @@ ACCEPTED = [
     ('recipe_verify', ['recipe', 'verify'], {'recipeId': HEX, 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's'}),
     ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's'}),
     ('edit_status', ['recipe', 'status'], {'compoundId': HEX}),
+    # `full` selects the complete result; CLI --full maps to the same argument.
+    ('set', ['set', 'x', '--if-state', 'h', '--full', 'exposure=1'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 1}, 'full': True}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'g', '--rotation', '1', '--full'], {'workingRef': 'x', 'ifGeometryState': 'g', 'rotation': 1, 'full': True}),
+    ('preview', ['preview', 'x', '--full'], {'ref': 'x', 'full': True}),
+    ('edit_status', ['recipe', 'status', '--full'], {'compoundId': HEX, 'full': True}),
 ]
 REJECTED = [
+    ('edit_status', ['recipe', 'status'], {'compoundId': HEX, 'full': 'yes'}),
     ('read_session_begin', ['read-session', 'begin', '--collection', ''], {'collection': ''}),
     ('read_session_end', ['read-session', 'end'], {}),
     ('read_session_status', ['read-session', 'status'], {}),

@@ -94,7 +94,9 @@ class MCPClient:
         result = resp.get("result", {})
         if self.contract is not None:
             payload = parse_text_content(result.get("content", []))
-            spec = self.contract['definitions']['Error'] if result.get('isError') else self.contract['responses'][name]
+            if result.get('isError'): spec = self.contract['definitions']['Error']
+            elif 'evidencePath' in payload: spec = self.contract['compactResponses'][name]
+            else: spec = self.contract['responses'][name]
             validate_response(payload, spec, name)
         return result
 
@@ -262,14 +264,21 @@ def main():
         content_items = preview_res.get("content", [])
         preview_data = parse_text_content(content_items)
         assert preview_data["nativeVariantId"] == clone_data["cloneVariantId"], preview_data
+        # Compact by default: the complete result, including geometry, is on disk beside the journal.
+        validate_response(preview_data, schema["compactResponses"]["preview"], "preview")
+        evidence_path = Path(preview_data["evidencePath"])
+        assert evidence_path.parent == Path(doc_data["documentPath"]) / ".c1/results", evidence_path
+        complete_preview = json.loads(evidence_path.read_text())
+        validate_response(complete_preview, schema["responses"]["preview"], "preview")
+        assert complete_preview["geometry"] and "geometry" not in preview_data, preview_data
         img_block = find_image_content(content_items)
         assert img_block is not None and img_block.get("mimeType") == "image/jpeg", content_items
         raw_bytes = base64.b64decode(img_block.get("data", ""))
-        assert len(raw_bytes) == preview_data["fileSizeBytes"], (len(raw_bytes), preview_data["fileSizeBytes"])
+        assert len(raw_bytes) == complete_preview["fileSizeBytes"], (len(raw_bytes), complete_preview["fileSizeBytes"])
         assert raw_bytes[:3] == b"\xff\xd8\xff", "Image content block lacks a JPEG header"
         del_data = parse_text_content(client.call_tool("variant_delete", {"workingRef": working_ref}).get("content", []))
         assert del_data.get("deleted") is True, f"Delete failed: {del_data}"
-        print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content; clone deleted")
+        print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content with a compact result; clone deleted")
 
         client.close()
         trace.close()

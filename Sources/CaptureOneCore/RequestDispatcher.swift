@@ -6,6 +6,8 @@ import Foundation
 public struct ToolRequest {
     public let tool: String
     public let arguments: [String: Any]
+    /// Return the complete result instead of a compact summary with an evidence path.
+    public let full: Bool
     let command: Command
 
     enum Command {
@@ -43,10 +45,18 @@ public struct ToolRequest {
     }
 
     /// `profile` defaults to the configured `ToolProfile`; a disabled tool is rejected before validation.
-    public init(tool: String, arguments a: [String: Any], profile: ToolProfile? = nil) throws {
+    public init(tool: String, arguments: [String: Any], profile: ToolProfile? = nil) throws {
         let profile = try profile ?? .configured()
         guard profile.allows(tool) else {
             throw C1Error.invalidRequest("Tool is not enabled in the \(profile.rawValue) profile: \(tool)")
+        }
+        // `full` only selects presentation; the command and any stored request never see it.
+        var a = arguments
+        if ResultCompaction.tools.contains(tool), let full = a.removeValue(forKey: "full") {
+            try ContractSchema.validateValue(full, schema: ContractSchema.boolean, path: "\(tool).full")
+            self.full = full as! Bool
+        } else {
+            self.full = false
         }
         try ContractSchema.validate(tool: tool, arguments: a)
         self.tool = tool
@@ -136,11 +146,21 @@ public struct ToolRequest {
     public static let localTools: Set<String> = ["request_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot"]
 
     /// Runs the request against Capture One or local state. Nothing here retries a write.
+    /// Mutation, recipe and preview results are compact unless `full` was requested.
     public func dispatch() throws -> ToolResponse {
         #if DEBUG
         // Offline contract tests compare the arguments each transport produced, without executing them.
-        if ProcessInfo.processInfo.environment["C1_CONTRACT_ECHO"] == "1" { return .object(["tool": tool, "arguments": arguments]) }
+        if ProcessInfo.processInfo.environment["C1_CONTRACT_ECHO"] == "1" {
+            return .object(["tool": tool, "arguments": full ? arguments.merging(["full": true]) { _, new in new } : arguments])
+        }
         #endif
+        guard ResultCompaction.tools.contains(tool), !full else { return try execute() }
+        let (response, observed) = try ObservedDocument.recording { try execute() }
+        return ResultCompaction.compact(response, tool: tool,
+                                        documentPath: observed ?? (try? SessionController.shared.getDocumentInfo().documentPath))
+    }
+
+    private func execute() throws -> ToolResponse {
         let core = SessionController.shared, browsing = ReadWorkflow.shared
         switch command {
         case .doctor: return .doctor(try core.doctor())
@@ -225,6 +245,14 @@ public enum ToolResponse {
     case compound([String: Any])
     /// A JSON object or array.
     case object(Any)
+    /// A compact summary naming the file that holds `complete`.
+    indirect case compact([String: Any], complete: ToolResponse)
+
+    /// The uncompacted response.
+    public var complete: ToolResponse {
+        if case .compact(_, let complete) = self { return complete }
+        return self
+    }
 
     public var json: String {
         switch self {
@@ -242,6 +270,7 @@ public enum ToolResponse {
         case .value(let v): return OutputFormatter.formatJson(v)
         case .compound(let v): return (try? ReadWorkflow.json(v)) ?? "{}"
         case .object(let v): return (try? ReadWorkflow.json(v)) ?? "{}"
+        case .compact(let v, _): return (try? ReadWorkflow.json(v)) ?? "{}"
         }
     }
 
@@ -250,6 +279,7 @@ public enum ToolResponse {
         switch self {
         case .doctor(let report): return !report.allChecksPassed
         case .compound(let report): return ["failed", "outcome-unknown", "interrupted"].contains(report["status"] as? String ?? "")
+        case .compact(_, let complete): return complete.reportsFailure
         default: return false
         }
     }

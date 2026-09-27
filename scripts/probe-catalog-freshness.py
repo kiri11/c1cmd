@@ -142,7 +142,7 @@ def main():
     for i in range(a.trials):
         rating=1+i%5; tag=1+i%7
         before_stamp=stamp()
-        result=cli('metadata','set',ref,'--if-metadata-state',current['metadataStateHash'],'--rating',rating,'--color-tag',tag)
+        result=cli('metadata','set','--full',ref,'--if-metadata-state',current['metadataStateHash'],'--rating',rating,'--color-tag',tag)
         ack=time.perf_counter()
         assert result['after']==dict(rating=rating,colorTag=tag)
         log('mutation-acknowledged',label=f'metadata-{i}',result=result)
@@ -150,7 +150,7 @@ def main():
         assert current['metadata']['rating']==rating and current['metadata']['colorTag']==tag
         patch=dict(exposure=.125*(i+1),contrast=3*(1+i%10),saturation=-4*(i+1))
         before_stamp=stamp()
-        result=cli('set',ref,'--if-state',current['stateHash'],*[f'{k}={v}' for k,v in patch.items()])
+        result=cli('set','--full',ref,'--if-state',current['stateHash'],*[f'{k}={v}' for k,v in patch.items()])
         ack=time.perf_counter()
         assert matches(result['after'],patch)
         log('mutation-acknowledged',label=f'tonal-{i}',result=result)

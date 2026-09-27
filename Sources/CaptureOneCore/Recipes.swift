@@ -19,7 +19,7 @@ public enum Recipes {
     static var recipeSchema: [String:Any] { recipe }
     static var geometry: [String:Any] {
         var props = ContractSchema.input("geometry_set")["properties"] as! [String:Any]
-        for k in ["workingRef","ifGeometryState","dryRun"] { props.removeValue(forKey:k) }
+        for k in ["workingRef","ifGeometryState","dryRun","full"] { props.removeValue(forKey:k) }
         return ContractSchema.object(props)
     }
     public static func input(_ tool: String) -> [String:Any] {

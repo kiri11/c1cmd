@@ -88,6 +88,10 @@ Use `metadata_set` / `c1 metadata set` on a `c1_edit_` editing reference or mana
 
 New references save `baselineMetadata`; `diff` exposes metadata differences. Restore by explicitly setting the saved values with a fresh metadata token. Tonal `reset` does not reset ratings or tags. Native writes are sequential and may partially apply; the same journal, outcome-unknown, restart, and reconciliation rules apply. Never retry an uncertain classification write automatically.
 
+## Compact results
+
+Mutation, recipe and preview results are compact by default in the CLI and MCP. They keep IDs, changed fields, new state tokens, coverage and unavailable fields, status, the preview path and `evidencePath`, a file holding the complete result. Read that file, or pass `--full` / `full: true`, when before/after values or native snapshots are needed. Errors, uncertain outcomes and failed or interrupted compound edits are never compacted. Evidence files do not replace the journal for recovery.
+
 ## 4. MCP Server Usage Notes
 
 When using `c1-mcp`:

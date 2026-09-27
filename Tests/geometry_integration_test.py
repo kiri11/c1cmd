@@ -4,7 +4,7 @@ Requires C1_TEST_RAW_FIXTURE and zero open documents. Evidence retained in C1_GE
 """
 import hashlib, json, os, shutil, subprocess, sys, tempfile, time, uuid
 from pathlib import Path
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN',ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN',ROOT / '.build/debug/c1-mcp'))
@@ -20,7 +20,7 @@ def apple(body):
     assert p.returncode == 0,p.stderr
     return p.stdout.strip()
 def cli(*args, error=None):
-    p=subprocess.run([str(CLI),*map(str,args),'--format','json'],capture_output=True,text=True,timeout=90)
+    p=subprocess.run([str(CLI),*complete(args),'--format','json'],capture_output=True,text=True,timeout=90)
     result=json.loads(p.stderr if p.returncode else p.stdout)
     if error: assert result['error']['code']==error,result
     else: assert p.returncode==0,result
@@ -44,7 +44,7 @@ cloned=cli('variant','clone',original['id']); ref=cloned['workingRef']
 log('environment',doc=doc,source=original,clone=cloned,rawSHA256=original_sha,cliSHA256=sha(CLI),mcpSHA256=sha(MCP))
 client=Client(MCP, timeout=150)
 def tool(name,args):
-    result=client.tool(name,args)
+    result=client.tool(name, complete_args(name, args))
     assert not result.get('isError'),result
     data=json.loads(result['content'][0]['text'])
     validate_response(data,contract['responses'][name],name)

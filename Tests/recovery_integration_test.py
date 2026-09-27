@@ -26,6 +26,8 @@ import tempfile
 import time
 import uuid
 
+from contract_test import complete
+
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
 RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
@@ -150,7 +152,8 @@ class Run:
         print(event, flush=True)
 
     def cli(self, *args, ok=True):
-        p = subprocess.run([str(self.c1), *args, '--format', 'json'],
+        # Complete results keep the harness assertions independent of compact presentation.
+        p = subprocess.run([str(self.c1), *complete(args), '--format', 'json'],
                            capture_output=True, text=True, timeout=180)
         value = json.loads(p.stdout.strip() or p.stderr.strip())
         self.log('cli', args=args, code=p.returncode, response=value)

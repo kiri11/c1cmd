@@ -451,6 +451,7 @@ public final class SessionController {
                 .appendingPathComponent(location.package.lastPathComponent + ".c1-output").path
         }
 
+        ObservedDocument.note(docDir)
         let nativeId = info.docId ?? path
         let database: String
         if info.isSession {

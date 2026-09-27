@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 import tempfile
-from contract_test import validate_response
+from contract_test import validate_response, complete
 
 ROOT = Path(__file__).resolve().parents[1]
 C1_BIN = Path(os.environ.get("C1_TEST_BIN", str(ROOT / ".build" / "debug" / "c1")))
@@ -39,7 +39,7 @@ def compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 def run_c1(args: list[str]) -> tuple[int, dict]:
-    cmd = [str(C1_BIN)] + args + ["--format", "json"]
+    cmd = [str(C1_BIN)] + complete(args) + ["--format", "json"]
     res = subprocess.run(cmd, capture_output=True, text=True)
     parsed = {}
     out = res.stdout.strip()

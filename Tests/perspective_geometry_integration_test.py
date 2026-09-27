@@ -15,7 +15,7 @@ import tempfile
 import time
 import uuid
 
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 from preview_mapping import check_mapping
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +47,7 @@ def apple(body):
 
 
 def cli(*args, error=None):
-    result = subprocess.run([str(CLI), *map(str, args), '--format', 'json'],
+    result = subprocess.run([str(CLI), *complete(args), '--format', 'json'],
                             capture_output=True, text=True, timeout=150)
     payload = result.stderr if result.returncode else result.stdout
     try:
@@ -92,7 +92,7 @@ log('environment', session=str(session), document=document, original=original, c
 
 
 def tool(name, args):
-    result = client.tool(name, args)
+    result = client.tool(name, complete_args(name, args))
     assert not result.get('isError'), result
     data = json.loads(result['content'][0]['text'])
     validate_response(data, contract['responses'][name], name)

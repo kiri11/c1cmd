@@ -147,9 +147,9 @@ def main():
             "cloneVariantId": clone_id,
             "parentImagePath": v.get("parentImagePath"),
             "preset": str(args.preset),
-            "beforeAdjustments": mut_res["before"],
-            "afterAdjustments": mut_res["after"],
             "diff": mut_res["diff"],
+            # The compact result names the file holding the complete before/after adjustments.
+            "evidencePath": mut_res["evidencePath"],
             "previewPath": preview_path,
             "reviewStatus": "pending_photographer_review"
         }

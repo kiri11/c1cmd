@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
-from contract_test import Client, validate_response
+from contract_test import Client, validate_response, complete, complete_args
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
         (evidence/'results.json').write_text(json.dumps(events, indent=2)+'\n')
         print(name, flush=True)
     def cli(*args):
-        r = subprocess.run([str(CLI), *map(str,args), '--format','json'],capture_output=True,text=True,timeout=180)
+        r = subprocess.run([str(CLI), *complete(args), '--format','json'],capture_output=True,text=True,timeout=180)
         assert r.returncode == 0, r.stderr
         return json.loads(r.stdout)
     schema = cli("schema")
@@ -46,7 +46,7 @@ def main():
         sibling_before = cli('get',sibling['workingRef'],'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
         client = Client(MCP, timeout=180)
         def tool(name, args):
-            r = client.tool(name,args)
+            r = client.tool(name, complete_args(name, args))
             value = json.loads(r['content'][0]['text'])
             log(name, value)
             assert not r.get('isError'), value
@@ -67,8 +67,17 @@ def main():
         assert bundle['nativeSnapshots'] == singles + [singles[0]]
         assert bundle['id'] == source['id'] and bundle['openToken'] == doc['openToken']
         assert cli('get', ref, '--native-targets', json.dumps(targets))['nativeSnapshots'] == singles
-        tool('native_set', dict(workingRef=ref, target=bundle['nativeSnapshots'][0]['target'],
-             ifNativeState=bundle['nativeSnapshots'][0]['nativeStateHash'], patch={'clarity amount':3}))
+        # Default compact result: changed native values and the new token; snapshots are in the evidence file.
+        r = client.tool('native_set', dict(workingRef=ref, target=bundle['nativeSnapshots'][0]['target'],
+                        ifNativeState=bundle['nativeSnapshots'][0]['nativeStateHash'], patch={'clarity amount':3}))
+        compact = json.loads(r['content'][0]['text']); log('native_set-compact', compact)
+        assert not r.get('isError'), compact
+        validate_response(compact, schema['compactResponses']['native_set'])
+        stored = json.loads(Path(compact['evidencePath']).read_text())
+        validate_response(stored, schema['responses']['native_set'])
+        assert compact['nativeStateHash'] == stored['after']['nativeStateHash'] == get()['nativeStateHash']
+        assert compact['diff'].get('values.clarity amount', {}).get('after') == 3 or singles[0]['values']['clarity amount'] == 3, compact
+        assert compact.get('unavailable', {}) == stored['after']['unavailable'], compact
         patch({'clarity amount':singles[0]['values']['clarity amount']})
         initial = get()
         dry = tool('native_set',dict(workingRef=ref,target=initial['target'],ifNativeState=initial['nativeStateHash'],patch={'clarity amount':5},dryRun=True))
