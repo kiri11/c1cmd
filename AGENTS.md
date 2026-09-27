@@ -101,7 +101,7 @@ When using `c1-mcp`:
 
 ---
 
-Inventory listing filters before full metadata reads and uses sequential bounded batches (`batchSize` / `--batch-size`, default 32). The exact qualified Session build uses native predicates and bulk IDs; Catalogs and other allowed builds use a rating-scan fallback. Do not narrow the scope to UI selection unless requested. Native-filter counters describe returned candidates, not Capture One's internal scan progress.
+Inventory listing filters before full metadata reads and uses sequential bounded batches (`batchSize` / `--batch-size`, default 32). The exact qualified Session build uses native predicates and bulk IDs; Catalogs and other allowed builds use a rating-scan fallback. Do not narrow the scope to UI selection unless requested. Native-filter counters describe returned candidates, not Capture One's internal scan progress. `pass` 1 reads and pass 2 revalidates; treat `unconfirmedMatches` as provisional, and `matchesFound` only counts matches confirmed by revalidation.
 
 `request_status` / `c1 request status <requestId>` reads local diagnostic snapshots without contacting Capture One, so it can be used while an inventory request is running. Request IDs are separate from mutation operation IDs and never authorize writes. CLI Ctrl-C/SIGTERM (any command) and MCP cancellation stop inventory and `dump` between Apple Events and compound edits between steps; other commands finish normally. `deadlineSeconds` / `--deadline-seconds` applies to inventory. None of these interrupts an outstanding event. A heartbeat shows service activity, not completed photo processing. Keep using `operation_status` for uncertain mutations.
 
@@ -111,6 +111,7 @@ Inventory listing filters before full metadata reads and uses sequential bounded
 - `no-document`: Open a Session or Catalog in Capture One.
 - `unsupported-version`: Capture One version is outside supported range (16.4+ through 16.x) or unverified (<16.4 or 17+). Override with `C1_ALLOW_UNTESTED_BUILD=1`.
 - `unmanaged-variant`: Attempted write without editing permission, or attempted deletion of an existing variant. Use `variant_edit` before adjustment/geometry writes; deletion remains clone-only.
+- `variant-not-found`: A requested ID does not resolve. Known-ID `variants_list` reads list `missingIds` (absent from the document) and `outOfScopeIds` (outside the requested collection) and return nothing; drop those IDs or widen the scope. `request_status` keeps the code, message and lists.
 - `request-cancelled`: Inventory stopped at a safe boundary (no partial inventory is returned), a compound edit stopped between steps (inspect its report; never resume it automatically), or a queued MCP request was cancelled before dispatch.
 - `deadline-exceeded`: Inventory exceeded its read deadline at a boundary; an outstanding Apple Event cannot be interrupted.
 - `no-people-detected`: A people mask found no people and a readback confirmed nothing changed. The operation resolved as `failed` and blocks nothing; choose another mask instead of retrying.

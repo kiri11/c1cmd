@@ -10,6 +10,8 @@ final class FakeScript: ScriptExecuting {
     var colorTags: [String: Int] = [:]
     var metadataFault: String?
     var selectedIDs: Set<String> = []
+    /// Present in the document but outside any requested collection.
+    var outsideCollection: Set<String> = []
     var listArguments: [NSAppleEventDescriptor] = []
     var documentCount = 1
     var isSession = true
@@ -122,9 +124,15 @@ final class FakeScript: ScriptExecuting {
             documentDrift?()
             let requested = ids(from: args[3])
             ratingBatches.append(requested)
-            let responseIDs = ratingResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
-            result = responseIDs.map { ["variantId": $0, "starRating": ratings[$0] ?? 0,
-                "parentImagePath": parentOverride ?? parent, "inSelection": !args[2].booleanValue || selectedIDs.contains($0)] as [String: Any] }
+            let scoped = args[1].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType
+            let responseIDs = ratingResponseIDs?(requested) ?? requested
+            result = responseIDs.map { id -> [String: Any] in
+                guard values[id] != nil, !(scoped && outsideCollection.contains(id)) else {
+                    return ["variantId": id, "presence": values[id] == nil ? "missing" : "out-of-scope", "starRating": 0, "parentImagePath": "", "inSelection": false]
+                }
+                return ["variantId": id, "presence": "present", "starRating": ratings[id] ?? 0,
+                        "parentImagePath": parentOverride ?? parent, "inSelection": !args[2].booleanValue || selectedIDs.contains(id)]
+            }
         case "lookupVariantIdentities":
             result = ids(from: args[1]).map { id -> [String: Any] in
                 values[id] == nil ? ["variantId": id, "isPresent": false, "parentImagePath": ""]

@@ -63,12 +63,12 @@ struct C1MCPServer {
                 var lastUnits = -1
                 for await event in events {
                     guard let token = params._meta?.progressToken else { continue }
-                    let units = event.candidatesScanned + event.summariesCompleted
+                    let units = event.candidatesScanned + event.summariesCompleted + (event.revalidatedRows ?? 0)
                     // Heartbeats never masquerade as work. The total is unknown until filtering finishes.
                     guard units > lastUnits else { continue }
                     lastUnits = units
                     try? await server.notify(ProgressNotification.message(.init(progressToken: token, progress: Double(units),
-                        message: "\(event.requestId): \(event.phase); scanned \(event.candidatesScanned), summaries \(event.summariesCompleted)")))
+                        message: "\(event.requestId): \(event.phase); scanned \(event.candidatesScanned), summaries \(event.summariesCompleted), revalidated \(event.revalidatedRows ?? 0)")))
                 }
             }
             let result: CallTool.Result

@@ -2,7 +2,7 @@
 
 A recipe is a versioned c1 payload, not a Capture One processing/export recipe
 or an installed style. CLI and MCP use the same core and JSON request contract.
-The shared contract is 3.2.0. Successful recipe results are compact by default (see [compact results](../../README.md#contract-and-development)); pass `full` for the complete report. Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
+The shared contract is 3.3.0. Successful recipe results are compact by default (see [compact results](../../README.md#contract-and-development)); pass `full` for the complete report. Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
 path opt-in and referenced-original guards. Hand over exclusive control: the
 application lock coordinates c1 processes, not edits made in the Capture One UI.
 

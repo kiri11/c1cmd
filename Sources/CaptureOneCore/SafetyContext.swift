@@ -51,12 +51,37 @@ public struct CompoundFailure: Error, CustomStringConvertible {
     public var description: String { "Compound \(compoundId): \(cause). Report persistence failed: \(persistenceError). Inspect edit_status and linked child operations; do not retry." }
 }
 
+/// Requested native IDs that Capture One reported as no such object. The read failed as a whole.
+public struct VariantsNotFound: Error, CustomStringConvertible {
+    public let missingIds: [String]
+    public let outOfScopeIds: [String]
+    public let requested: Int
+    public init(missingIds: [String], outOfScopeIds: [String], requested: Int) {
+        self.missingIds = missingIds; self.outOfScopeIds = outOfScopeIds; self.requested = requested
+    }
+    public var cause: C1Error { .variantNotFound(summary) }
+    public var description: String { cause.description }
+    private var summary: String {
+        func list(_ ids: [String]) -> String { ids.prefix(20).joined(separator: ", ") + (ids.count > 20 ? " and \(ids.count - 20) more" : "") }
+        var parts: [String] = []
+        func count(_ ids: [String]) -> String { "\(ids.count) \(ids.count == 1 ? "is" : "are")" }
+        if !missingIds.isEmpty { parts.append("\(count(missingIds)) missing from the document (\(list(missingIds)))") }
+        if !outOfScopeIds.isEmpty { parts.append("\(count(outOfScopeIds)) outside the requested collection (\(list(outOfScopeIds)))") }
+        return "Of \(requested) requested IDs, " + parts.joined(separator: "; ") + ". No results were returned; remove these IDs or widen the scope."
+    }
+}
+
 public enum ErrorResponse {
     public static func payload(_ error: Error) -> [String: Any] {
         let compound = error as? CompoundFailure
         let failure = (compound?.cause ?? error) as? OperationFailure
-        let cause = failure?.cause ?? compound?.cause ?? error
+        let notFound = error as? VariantsNotFound
+        let cause = failure?.cause ?? compound?.cause ?? notFound?.cause ?? error
         var body: [String: Any] = ["code": (cause as? C1Error)?.errorCode ?? "unexpected-error", "message": String(describing: error)]
+        if let notFound {
+            body["missingIds"] = notFound.missingIds
+            if !notFound.outOfScopeIds.isEmpty { body["outOfScopeIds"] = notFound.outOfScopeIds }
+        }
         if let compound { body["compoundId"] = compound.compoundId }
         if let failure = failure { body["operationId"] = failure.operationId; body["outcome"] = "inspect-operation" }
         return ["error": body]

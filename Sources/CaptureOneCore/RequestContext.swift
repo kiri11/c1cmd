@@ -12,8 +12,14 @@ public struct RequestSnapshot: Codable, Sendable {
     public var status = "running"
     public var elapsedMs = 0
     public var lastProgressAgoMs: Int?
+    /// Bounded rows read in the first pass. Revalidation rows are counted separately.
     public var candidatesScanned = 0
+    /// Matches confirmed by the final revalidation; first-pass matches are `unconfirmedMatches`.
     public var matchesFound = 0
+    /// 1 while reading, 2 while revalidating what the first pass observed.
+    public var pass: Int?
+    public var unconfirmedMatches: Int?
+    public var revalidatedRows: Int?
     public var summariesCompleted = 0
     public var totalCandidates: Int?
     public var documentIdentity: String?
@@ -31,6 +37,28 @@ public struct RequestSnapshot: Codable, Sendable {
     public var stale: Bool?
     /// Set once a cancellation arrives; the request still ends at its next safe boundary.
     public var cancelRequested: Bool?
+    /// Terminal error, redacted like the rest of these diagnostics.
+    public var errorCode: String?
+    public var errorMessage: String?
+    public var missingIds: [String]?
+    public var outOfScopeIds: [String]?
+
+    /// Removes paths and quoted names from an error message; quoted IDs and references stay.
+    public static func redacted(_ message: String) -> String {
+        var text = message
+        let keep = try! NSRegularExpression(pattern: #"^(\d+|c1_[A-Za-z0-9_-]+|req-[0-9A-Fa-f-]{36}|[0-9A-Fa-f-]{32,64})$"#)
+        let quoted = try! NSRegularExpression(pattern: #"'[^'\n]*'|"[^"\n]*"|“[^”\n]*”"#)
+        for match in quoted.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            let range = Range(match.range, in: text)!
+            let inner = String(text[range].dropFirst().dropLast())
+            if keep.firstMatch(in: inner, range: NSRange(inner.startIndex..., in: inner)) == nil {
+                text.replaceSubrange(range, with: "\(text[range].first!)…\(text[range].last!)")
+            }
+        }
+        // An unquoted path may contain spaces, so everything after its start is dropped.
+        let path = try! NSRegularExpression(pattern: #"(^|[\s:(=])(~?/)[^'"“”]*"#)
+        return path.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1<path>")
+    }
 }
 
 public final class RequestContext: @unchecked Sendable {
@@ -99,13 +127,17 @@ public final class RequestContext: @unchecked Sendable {
         copy.updatedAt = Date().timeIntervalSince1970
         return copy
     }
-    public func update(phase: String, scanned: Int? = nil, matches: Int? = nil, completed: Int? = nil, total: Int? = nil) {
+    public func update(phase: String, scanned: Int? = nil, matches: Int? = nil, completed: Int? = nil, total: Int? = nil,
+                       pass: Int? = nil, unconfirmed: Int? = nil, revalidated: Int? = nil) {
         mutex.lock()
         let changed = state.phase != phase
         state.phase = phase
         if let scanned { if scanned > state.candidatesScanned { lastProgress = ProcessInfo.processInfo.systemUptime }; state.candidatesScanned = scanned }
         if let completed { if completed > state.summariesCompleted { lastProgress = ProcessInfo.processInfo.systemUptime }; state.summariesCompleted = completed }
+        if let revalidated { if revalidated > state.revalidatedRows ?? 0 { lastProgress = ProcessInfo.processInfo.systemUptime }; state.revalidatedRows = revalidated }
         if let matches { state.matchesFound = matches }
+        if let pass { state.pass = pass }
+        if let unconfirmed { state.unconfirmedMatches = unconfirmed }
         if let total { state.totalCandidates = total }
         mutex.unlock()
         emit(force: changed && !["ratings", "metadata"].contains(phase))
@@ -157,6 +189,11 @@ public final class RequestContext: @unchecked Sendable {
             let code = (cause as? C1Error)?.errorCode
             state.status = code == "outcome-unknown" || (error is OperationFailure) ? "outcome-unknown" : (code == "request-cancelled" ? "cancelled" : "failed")
             if let failure = error as? OperationFailure { state.operationId = failure.operationId }
+            let body = ErrorResponse.payload(error)["error"] as? [String: Any] ?? [:]
+            state.errorCode = body["code"] as? String
+            state.errorMessage = (body["message"] as? String).map(RequestSnapshot.redacted)
+            state.missingIds = body["missingIds"] as? [String]
+            state.outOfScopeIds = body["outOfScopeIds"] as? [String]
         } else { state.status = "completed" }
         mutex.unlock()
         emit(force: true)
@@ -198,7 +235,10 @@ public final class RequestContext: @unchecked Sendable {
             if progressMode == "json" { try? FileHandle.standardError.write(contentsOf: data + Data([10])) }
             if progressMode == "human" {
                 let waiting = (s.slow ? "; slow request" : "") + (s.waitingForAppleEvent ? "; Apple Event progress unknown" : "")
-                let message = "[\(s.requestId)] \(s.phase): \(s.status), \(s.elapsedMs / 1000)s; scanned \(s.candidatesScanned), matches \(s.matchesFound), summaries \(s.summariesCompleted)\(waiting)\n"
+                let pass = s.pass.map { "pass \($0), " } ?? ""
+                let unconfirmed = s.unconfirmedMatches.map { " (\($0) unconfirmed)" } ?? ""
+                let revalidated = s.revalidatedRows.map { ", revalidated \($0)" } ?? ""
+                let message = "[\(s.requestId)] \(s.phase): \(s.status), \(s.elapsedMs / 1000)s; \(pass)scanned \(s.candidatesScanned), matches \(s.matchesFound)\(unconfirmed), summaries \(s.summariesCompleted)\(revalidated)\(waiting)\n"
                 try? FileHandle.standardError.write(contentsOf: Data(message.utf8))
             }
             guard let directory else { return }

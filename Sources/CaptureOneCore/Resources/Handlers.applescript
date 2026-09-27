@@ -495,18 +495,43 @@ on applyMetadata(docName, variantId, ratingValue, tagValue, expectedRating, expe
     end tell
 end applyMetadata
 
--- Resolve only explicitly requested IDs. Missing or out-of-scope IDs fail the request.
+-- Resolve only explicitly requested IDs. Only Capture One's no-such-object reply
+-- (-1728) classifies an ID as missing or out of scope; every other error propagates.
+-- The caller fails the whole request when any ID is not present.
 on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
+        set scoped to collectionName is not missing value and collectionName is not ""
         set scope to d
-        if collectionName is not missing value and collectionName is not "" then set scope to collection collectionName of d
+        if scoped then set scope to collection collectionName of d
         set results to {}
         repeat with requestedID in variantIDs
-            set v to variant id (requestedID as text) of scope
-            set selectedValue to true
-            if selectedOnly then set selectedValue to selected of v as boolean
-            set end of results to {variantId:(id of v as text), starRating:(rating of v as integer), parentImagePath:(POSIX path of (path of parent image of v as text)), inSelection:selectedValue}
+            set idText to requestedID as text
+            set isPresent to true
+            -- An explicit get is required: coercing an unresolved reference reports -1700, not -1728.
+            try
+                set foundID to (get id of variant id idText of scope) as text
+            on error errorMessage number errorNumber
+                if errorNumber is not -1728 then error errorMessage number errorNumber
+                set isPresent to false
+            end try
+            if isPresent then
+                set v to variant id foundID of scope
+                set selectedValue to true
+                if selectedOnly then set selectedValue to selected of v as boolean
+                set end of results to {variantId:foundID, presence:"present", starRating:(rating of v as integer), parentImagePath:(POSIX path of (path of parent image of v as text)), inSelection:selectedValue}
+            else
+                set presence to "missing"
+                if scoped then
+                    try
+                        get id of variant id idText of d
+                        set presence to "out-of-scope"
+                    on error errorMessage number errorNumber
+                        if errorNumber is not -1728 then error errorMessage number errorNumber
+                    end try
+                end if
+                set end of results to {variantId:idText, presence:presence, starRating:0, parentImagePath:"", inSelection:false}
+            end if
         end repeat
         return results
     end tell

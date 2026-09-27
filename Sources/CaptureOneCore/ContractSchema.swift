@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.2.0"
+    public static let version = "3.3.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -217,9 +217,10 @@ public enum ContractSchema {
             "requestId": string, "tool": string, "phase": string, "status": string,
             "documentIdentity": string, "scope": string, "operationId": string, "handler": string,
             "applicationProgress": string, "inventoryStrategy": string, "waitingForAppleEvent": boolean, "processAlive": boolean, "stale": boolean, "slow": boolean, "cancelRequested": boolean,
-            "startedAt": number, "updatedAt": number
+            "startedAt": number, "updatedAt": number, "errorCode": string, "errorMessage": string,
+            "missingIds": array(string), "outOfScopeIds": array(string)
         ]
-        for name in ["processId", "elapsedMs", "lastProgressAgoMs", "candidatesScanned", "matchesFound", "summariesCompleted", "totalCandidates", "rating", "minRating", "handlerCalls"] {
+        for name in ["processId", "elapsedMs", "lastProgressAgoMs", "candidatesScanned", "matchesFound", "summariesCompleted", "totalCandidates", "rating", "minRating", "handlerCalls", "pass", "unconfirmedMatches", "revalidatedRows"] {
             requestStatusProperties[name] = ["type": "integer"]
         }
         let observation: [String: Any] = ["databasePath": string, "databaseFileIdentity": string,
@@ -271,6 +272,6 @@ public enum ContractSchema {
             "baselineGeometryStateHash": string, "baselineMetadata": writableMetadataSchema, "createdAt": string], required: ["workingRef", "variantId", "documentToken", "baselineAdjustments", "baselineStateHash"])
         return ["$schema": "https://json-schema.org/draft/2020-12/schema", "title": "c1-contract-schema", "version": version,
                 "requests": requests, "responses": responses, "compactResponses": ResultCompaction.schemas(responses),
-                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "compoundId":string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string], required: ["code", "message"])], required: ["error"])]]
+                "definitions": ["Adjustments": adj, "MutationResponse": mutation, "Error": object(["error": object(["code": string, "message": string, "compoundId":string, "operationId": string, "outcome": string, "requestId": string, "phase": string, "elapsedMs": ["type": "integer"], "recoveryAction": string, "missingIds": array(string), "outOfScopeIds": array(string)], required: ["code", "message"])], required: ["error"])]]
     }
 }

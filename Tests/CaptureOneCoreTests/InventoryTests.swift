@@ -21,6 +21,10 @@ struct InventoryTests {
     static func run() {
         print("Running InventoryTests...")
         testSubset()
+        testSubsetProgress()
+        testMissingSubsetIDs()
+        testInventoryConfirmsMatchesLast()
+        testTerminalErrorsAreRedacted()
         testFiltersBeforeHydration()
         testDuplicateAndSharedParentIDs()
         testMalformedAndVanishedResponsesFailClosed()
@@ -85,6 +89,129 @@ struct InventoryTests {
         fake.ratingResponseIDs = nil
         fake.documentDrift = { fake.generation = "app-2" }
         XCTAssertThrowsError(try core.listVariantSubset(ids: ["5"]))
+    }
+
+    private struct Sample: Equatable { let pass: Int?; let scanned: Int; let revalidated: Int?; let unconfirmed: Int?; let matches: Int }
+    private static func sample(_ context: RequestContext) -> Sample {
+        let s = context.snapshot
+        return Sample(pass: s.pass, scanned: s.candidatesScanned, revalidated: s.revalidatedRows, unconfirmed: s.unconfirmedMatches, matches: s.matchesFound)
+    }
+
+    /// Counters advance per bounded batch; pass 1 matches stay unconfirmed until pass 2 repeats them.
+    private static func testSubsetProgress() {
+        let (fake, core, dir) = fixture(12)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let context = RequestContext(tool: "variants_list", progressMode: "quiet", directory: dir)
+        var samples: [Sample] = []
+        fake.beforeHandler = { if $0 == "readVariantSubset" { samples.append(sample(context)) } }
+        XCTAssertNoThrowBlock {
+            let rows = try context.withCurrent { try core.listVariantSubset(ids: (1...10).map(String.init), rating: 5, batchSize: 3) }
+            XCTAssertEqual(rows.compactMap { $0["id"] as? String }, ["5"])
+        }
+        fake.beforeHandler = nil
+        XCTAssertEqual(samples, [
+            Sample(pass: 1, scanned: 0, revalidated: nil, unconfirmed: nil, matches: 0),
+            Sample(pass: 1, scanned: 3, revalidated: nil, unconfirmed: 0, matches: 0),
+            Sample(pass: 1, scanned: 6, revalidated: nil, unconfirmed: 1, matches: 0),
+            Sample(pass: 1, scanned: 9, revalidated: nil, unconfirmed: 1, matches: 0),
+            Sample(pass: 2, scanned: 10, revalidated: 0, unconfirmed: 1, matches: 0),
+            Sample(pass: 2, scanned: 10, revalidated: 3, unconfirmed: 1, matches: 0),
+            Sample(pass: 2, scanned: 10, revalidated: 6, unconfirmed: 1, matches: 0),
+            Sample(pass: 2, scanned: 10, revalidated: 9, unconfirmed: 1, matches: 0),
+        ], "Every bounded batch advances its own pass counter; nothing is confirmed before revalidation ends")
+        XCTAssertEqual(sample(context), Sample(pass: 2, scanned: 10, revalidated: 10, unconfirmed: 1, matches: 1))
+        XCTAssertEqual(context.snapshot.phase, "confirmed")
+
+        // Drift in pass 2 leaves the first-pass observation unconfirmed.
+        let drifted = RequestContext(tool: "variants_list", progressMode: "quiet", directory: dir)
+        var reads = 0
+        fake.beforeHandler = { if $0 == "readVariantSubset" { reads += 1; if reads == 2 { fake.ratings["5"] = 1 } } }
+        XCTAssertThrowsError(try drifted.withCurrent { try core.listVariantSubset(ids: ["5"], rating: 5) }) { drifted.finish(error: $0) }
+        fake.beforeHandler = nil
+        XCTAssertEqual(sample(drifted), Sample(pass: 2, scanned: 1, revalidated: 1, unconfirmed: 1, matches: 0))
+        XCTAssertEqual(drifted.snapshot.errorCode, "state-changed")
+    }
+
+    /// Absent IDs are listed after one full pass and never produce results or a revalidation pass.
+    private static func testMissingSubsetIDs() {
+        let (fake, core, dir) = fixture(12)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let context = RequestContext(tool: "variants_list", progressMode: "quiet", directory: dir)
+        XCTAssertThrowsError(try context.withCurrent { try core.listVariantSubset(ids: ["5", "7212", "6", "7213"], batchSize: 2) }) { error in
+            context.finish(error: error)
+            let failure = error as? VariantsNotFound
+            XCTAssertEqual(failure?.missingIds, ["7212", "7213"])
+            XCTAssertEqual(failure?.outOfScopeIds, [])
+            let body = ErrorResponse.payload(error)["error"] as? [String: Any] ?? [:]
+            XCTAssertEqual(body["code"] as? String, "variant-not-found")
+            XCTAssertEqual(body["missingIds"] as? [String], ["7212", "7213"])
+            XCTAssertNil(body["outOfScopeIds"])
+            XCTAssertTrue((body["message"] as? String ?? "").contains("2 are missing from the document (7212, 7213)"))
+        }
+        XCTAssertEqual(fake.ratingBatches, [["5", "7212"], ["6", "7213"]], "The first pass completes to list every absent ID, then stops")
+        XCTAssertEqual(sample(context), Sample(pass: 1, scanned: 4, revalidated: nil, unconfirmed: 2, matches: 0))
+        XCTAssertNoThrowBlock {
+            let stored = try RequestContext.status(requestId: context.snapshot.requestId, directory: dir)
+            XCTAssertEqual(stored.status, "failed")
+            XCTAssertEqual(stored.errorCode, "variant-not-found")
+            XCTAssertEqual(stored.missingIds, ["7212", "7213"])
+            XCTAssertTrue((stored.errorMessage ?? "").contains("(7212, 7213)"), "The stored message explains the failure without another read")
+        }
+
+        fake.outsideCollection = ["6"]
+        fake.ratingBatches = []
+        XCTAssertThrowsError(try core.listVariantSubset(ids: ["5", "6", "7212"], collection: "Capture")) { error in
+            XCTAssertEqual((error as? VariantsNotFound)?.missingIds, ["7212"])
+            XCTAssertEqual((error as? VariantsNotFound)?.outOfScopeIds, ["6"])
+            XCTAssertEqual((ErrorResponse.payload(error)["error"] as? [String: Any])?["outOfScopeIds"] as? [String], ["6"])
+        }
+        XCTAssertEqual(fake.ratingBatches.count, 1)
+        XCTAssertNoThrowBlock {
+            let rows = try core.listVariantSubset(ids: ["6"])
+            XCTAssertEqual(rows.count, 1, "Outside a collection is not missing")
+        }
+    }
+
+    /// Full inventory reports its scan as unconfirmed until the membership revalidation passes.
+    private static func testInventoryConfirmsMatchesLast() {
+        for native in [true, false] {
+            let (fake, core, dir) = fixture(6, native: native)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let context = RequestContext(tool: "variants_list", progressMode: "quiet", directory: dir)
+            var during: [Sample] = []
+            fake.beforeReadSummaries = { during.append(sample(context)) }
+            XCTAssertNoThrowBlock {
+                let rows = try context.withCurrent { try core.listVariants(minRating: 4, batchSize: 2) }
+                XCTAssertEqual(rows.count, 2)
+            }
+            XCTAssertFalse(during.isEmpty)
+            XCTAssertTrue(during.allSatisfy { $0.pass == 1 && $0.matches == 0 && ($0.unconfirmed ?? 0) > 0 }, "\(during)")
+            XCTAssertEqual(sample(context).pass, 2)
+            XCTAssertEqual(sample(context).matches, 2)
+            XCTAssertEqual(context.snapshot.phase, "confirmed")
+        }
+    }
+
+    private static func testTerminalErrorsAreRedacted() {
+        let cases = [
+            ("Cannot establish database file identity: /Users/a/My Photos/x.cocatalog", "Cannot establish database file identity: <path>"),
+            ("Operation 'variant_edit' is blocked for 'Wedding.cocatalog'.", "Operation '…' is blocked for '…'."),
+            (#"Can't get variant id "7212" of collection "Smith family" of document "x.cosessiondb"."#,
+             #"Can't get variant id "7212" of collection "…" of document "…"."#),
+            ("Working reference 'c1_edit_ab-12' has no provenance record.", "Working reference 'c1_edit_ab-12' has no provenance record."),
+            ("Preview export timed out waiting for output file in '/tmp/out'.", "Preview export timed out waiting for output file in '…'."),
+        ]
+        for (message, expected) in cases { XCTAssertEqual(RequestSnapshot.redacted(message), expected) }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let context = RequestContext(tool: "get", progressMode: "quiet", directory: dir)
+        context.finish(error: C1Error.identityAmbiguous("Known-ID lookup for '44' returned /Volumes/Card/IMG 1.CR3"))
+        XCTAssertNoThrowBlock {
+            let stored = try RequestContext.status(requestId: context.snapshot.requestId, directory: dir)
+            XCTAssertEqual(stored.errorCode, "identity-ambiguous")
+            XCTAssertEqual(stored.errorMessage, "identity-ambiguous: Known-ID lookup for '44' returned <path>")
+            XCTAssertNil(stored.missingIds)
+        }
     }
 
     private static func testFiltersBeforeHydration() {

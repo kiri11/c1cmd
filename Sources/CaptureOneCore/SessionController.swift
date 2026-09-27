@@ -519,7 +519,7 @@ public final class SessionController {
             RequestContext.current?.inventoryScope(collection: collection, selected: selected, rating: rating, minRating: minRating)
             RequestContext.current?.document(document.openToken)
             RequestContext.current?.inventoryStrategy("id-subset")
-            RequestContext.current?.update(phase: "discovering", total: ids.count)
+            RequestContext.current?.update(phase: "discovering", total: ids.count, pass: 1)
             let doc = NSAppleEventDescriptor(string: document.documentId)
             func validateDocument() throws {
                 try checkpoint()
@@ -530,11 +530,17 @@ public final class SessionController {
             }
             struct Row: Decodable, Equatable {
                 let variantId: String
+                let presence: String
                 let starRating: Int
                 let parentImagePath: String
                 let inSelection: Bool
             }
-            func read() throws -> [Row] {
+            func matching(_ row: Row) -> Bool {
+                row.presence == "present" && (parentPath.map { row.parentImagePath == $0 } ?? true) && (!selected || row.inSelection) &&
+                    (rating.map { row.starRating == $0 } ?? true) && (minRating.map { row.starRating >= $0 } ?? true)
+            }
+            // Pass 1 observes; pass 2 repeats the same bounded reads. Only matches that survive pass 2 are confirmed.
+            func read(pass: Int) throws -> [Row] {
                 var rows: [Row] = []
                 for offset in stride(from: 0, to: ids.count, by: batchSize) {
                     try validateDocument()
@@ -543,23 +549,34 @@ public final class SessionController {
                         collection.map(NSAppleEventDescriptor.init(string:)) ?? .missingValue(),
                         NSAppleEventDescriptor(boolean: selected),
                         NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
-                    guard values.map(\.variantId) == batch,
-                          values.allSatisfy({ VariantMetadata.ratingRange.contains($0.starRating) && $0.parentImagePath.hasPrefix("/") }) else {
+                    guard values.map(\.variantId) == batch, values.allSatisfy({ row in
+                        row.presence == "present" ? VariantMetadata.ratingRange.contains(row.starRating) && row.parentImagePath.hasPrefix("/")
+                            : ["missing", "out-of-scope"].contains(row.presence) && (collection != nil || row.presence == "missing")
+                    }) else {
                         throw C1Error.stateChanged("Subset identity or metadata mismatch; no partial results returned.")
                     }
                     rows += values
+                    if pass == 1 {
+                        RequestContext.current?.update(phase: "discovering", scanned: rows.count, unconfirmed: rows.filter(matching).count)
+                    } else {
+                        RequestContext.current?.update(phase: "revalidating", revalidated: rows.count)
+                    }
                     try checkpoint()
                 }
                 return rows
             }
-            let baseline = try read()
-            let matches = baseline.filter { row in
-                (parentPath.map { row.parentImagePath == $0 } ?? true) && (!selected || row.inSelection) && (rating.map { row.starRating == $0 } ?? true) &&
-                    (minRating.map { row.starRating >= $0 } ?? true)
+            let baseline = try read(pass: 1)
+            let absent = baseline.filter { $0.presence != "present" }
+            if !absent.isEmpty {
+                try validateDocument() // the list describes this document, not a replacement
+                throw VariantsNotFound(missingIds: absent.filter { $0.presence == "missing" }.map(\.variantId),
+                                       outOfScopeIds: absent.filter { $0.presence == "out-of-scope" }.map(\.variantId), requested: ids.count)
             }
+            let matches = baseline.filter(matching)
             var result: [[String: Any]] = matches.map { ["id": $0.variantId, "rating": $0.starRating, "parentImagePath": $0.parentImagePath] }
             if fields == "summary" {
                 result = []
+                RequestContext.current?.update(phase: "summaries")
                 for offset in stride(from: 0, to: matches.count, by: batchSize) {
                     try validateDocument()
                     let batch = Array(matches[offset..<min(offset + batchSize, matches.count)])
@@ -573,10 +590,13 @@ public final class SessionController {
                     }
                     result += summaries.map { ["id": $0.variantId, "rating": $0.starRating, "parentImagePath": $0.parentImagePath,
                                                 "name": $0.variantName, "isSelected": $0.isSelected, "colorTag": $0.colorTagVal] }
+                    RequestContext.current?.update(phase: "summaries", completed: result.count)
                 }
             }
-            guard try read() == baseline else { throw C1Error.stateChanged("Subset membership or identity changed; discard results.") }
+            RequestContext.current?.update(phase: "revalidating", pass: 2, revalidated: 0)
+            guard try read(pass: 2) == baseline else { throw C1Error.stateChanged("Subset membership or identity changed; discard results.") }
             try validateDocument()
+            RequestContext.current?.update(phase: "confirmed", matches: matches.count)
             return result
         }
     }
@@ -630,9 +650,9 @@ public final class SessionController {
                 try checkpoint()
                 return ids
             }
-            context?.update(phase: "discovering")
+            context?.update(phase: "discovering", pass: 1)
             let ids = try discover()
-            context?.update(phase: native ? "metadata" : "ratings", matches: native ? ids.count : 0, total: ids.count)
+            context?.update(phase: native ? "metadata" : "ratings", total: ids.count, unconfirmed: native ? ids.count : 0)
             var records: [VariantSummaryRecord] = []
             var scanned = 0
             var matched = 0
@@ -665,7 +685,7 @@ public final class SessionController {
                     (rating.map { item.starRating == $0 } ?? true) && (minRating.map { item.starRating >= $0 } ?? true)
                 }
                 scanned += batch.count; matched += matches.count
-                context?.update(phase: "ratings", scanned: scanned, matches: matched)
+                context?.update(phase: "ratings", scanned: scanned, unconfirmed: matched)
                 try checkpoint()
                 if !matches.isEmpty {
                     context?.update(phase: "metadata")
@@ -680,12 +700,13 @@ public final class SessionController {
                 }
                 try checkpoint()
             }
-            context?.update(phase: "validating-inventory")
+            context?.update(phase: "validating-inventory", pass: 2)
             try validateDocument()
             guard Set(try discover()) == Set(ids) else {
                 throw C1Error.stateChanged("Inventory scope membership changed; no partial inventory was returned.")
             }
             try validateDocument()
+            context?.update(phase: "confirmed", matches: records.count)
             let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
             let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
             return records.map { rec in
