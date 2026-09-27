@@ -161,7 +161,7 @@ pixels across area and `separateLayers` combinations, with a filled-mask layer p
 
 ## State, evidence, and recovery
 
-Writes follow the [safety invariants](../../AGENTS.md#safety-invariants) and
+Writes follow the [safety invariants](../../AGENT_GUIDE.md#safety-invariants) and
 require Capture One 16.8.5.30. `nativeStateHash` binds the target, available values, layer inventory, document
 lifetime, original-image identity, existing tonal/geometry/metadata tokens, and
 latest journal operation for the variant. Native handlers recheck target values
@@ -195,5 +195,3 @@ written. Hue readback uses circular distance, so 0 and 360 degrees are equivalen
 with a tolerance of 0.0001 degrees. At zero or very low saturation, some hue
 values cannot be represented within that tolerance; a readback mismatch follows
 the normal partial-failure and recovery rules.
-
-Validation: [maintainer guide](../MAINTAINING.md#run-only-what-the-change-affects).

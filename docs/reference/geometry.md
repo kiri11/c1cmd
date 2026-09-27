@@ -1,8 +1,8 @@
 # Geometry reference
 
 Crop, rotation and keystone on an existing editing reference or managed clone.
-Composition choices follow the [crop policy](../../AGENTS.md#crop-policy); writes
-follow the [safety invariants](../../AGENTS.md#safety-invariants). Geometry writes
+Composition choices follow the [crop policy](../../AGENT_GUIDE.md#crop-policy); writes
+follow the [safety invariants](../../AGENT_GUIDE.md#safety-invariants). Geometry writes
 require Capture One 16.8.5.30.
 
 ## Commands and tokens
@@ -127,5 +127,3 @@ array order `[amount, vertical, horizontal, skew, aspect]`. See the
 with source preconditions and before/after previews, keeping `unreviewed` sidecars
 for the photographer. It edits existing variants by default; `--clone` makes
 separate proposals. Neither it nor `grade-folder.py` judges aesthetic quality.
-
-Validation: [maintainer guide](../MAINTAINING.md#run-only-what-the-change-affects).

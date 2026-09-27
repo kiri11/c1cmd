@@ -47,8 +47,7 @@ mutation dispatch, journaling or reconciliation rules.
 Committed SQLite data can lag successful native acknowledgements. Neither
 `PRAGMA data_version` nor database mtime is a native synchronization barrier.
 Use native reads and mutation tokens for edits; do not treat an unchanged database
-as proof that the application's current settings are unchanged. The
-[freshness probe](../MAINTAINING.md#profiling-and-probes) measures the lag.
+as proof that the application's current settings are unchanged.
 
 ## Controlled browsing workflow
 
@@ -77,5 +76,3 @@ Active-document workflow calls still serialize and perform native document ident
 ### Capture One Sessions
 
 Sessions use the same controlled native cache and journal updates, but **do not route to Catalog SQL**. Session discovery and `CaptureOne/Settings1680/*.cos` sidecars are not fully represented by the live Session database. That database alone is not a complete discovery/settings source. Offline Session folder/sidecar discovery needs a separate reader and is not implemented here.
-
-Validation: [maintainer guide](../MAINTAINING.md#run-only-what-the-change-affects).

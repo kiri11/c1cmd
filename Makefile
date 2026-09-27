@@ -42,6 +42,7 @@ check: build-debug
 # Internal step of check and qualify; release CI reuses it with already built binaries.
 check-built-core:
 	/usr/bin/time -p "$(TEST_BUILD_DIR)/CaptureOneCoreTests"
+	python3 -B Tests/docs_test.py
 	python3 -B Tests/contained_crop_test.py
 	python3 -B Tests/catalog_freshness_probe_test.py
 	python3 -B Tests/benchmark_reads_test.py

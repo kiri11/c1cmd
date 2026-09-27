@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 from contract_test import run
+from docs_test import broken_links
 
 def extract_archive(archive, destination):
     archive = Path(archive).resolve()
@@ -36,11 +37,16 @@ def check_package(root):
     assert 'could not load resource bundle' not in result.stderr
     assert 'Could not locate Handlers' not in result.stderr
     assert '## MCP setup' in (root / 'README.md').read_text()
-    assert (root / 'docs/MAINTAINING.md').is_file()
+    for name in ['AGENT_GUIDE.md', 'docs/reference/editing.md', 'docs/reference/geometry.md']:
+        assert (root / name).is_file(), 'Missing user documentation: ' + name
+    for name in ['AGENTS.md', 'docs/MAINTAINING.md', 'docs/agents']:
+        assert not (root / name).exists(), 'Developer documentation shipped: ' + name
+    broken = broken_links(root, root.rglob('*.md'))
+    assert not broken, 'Shipped docs link outside the archive: ' + '; '.join(broken)
     assert (root / 'examples/crop-proposals.py').is_file()
     assert (root / 'examples/grade-folder.py').is_file()
     assert (root / 'examples/presets/daylight.json').is_file()
-    print('PASS: archive checksum, resource bundle, relocated CLI/MCP, documentation')
+    print('PASS: archive checksum, resource bundle, relocated CLI/MCP, user documentation and its links')
 
 
 if __name__ == '__main__':

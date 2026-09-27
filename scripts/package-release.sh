@@ -12,8 +12,10 @@ trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$NAME/bin"
 cp "$BUILD_DIR/c1" "$BUILD_DIR/c1-mcp" "$STAGE/$NAME/bin/"
 cp -R "$BUILD_DIR/c1_CaptureOneCore.bundle" "$STAGE/$NAME/bin/"
-cp README.md LICENSE AGENTS.md "$STAGE/$NAME/"
-cp -R docs "$STAGE/$NAME/"
+# Only user-facing docs ship; AGENTS.md and the maintainer docs are for developers.
+cp README.md LICENSE AGENT_GUIDE.md "$STAGE/$NAME/"
+mkdir -p "$STAGE/$NAME/docs"
+cp -R docs/reference "$STAGE/$NAME/docs/"
 mkdir -p "$STAGE/$NAME/examples"
 cp examples/crop-proposals.py examples/grade-folder.py "$STAGE/$NAME/examples/"
 cp -R examples/presets "$STAGE/$NAME/examples/"

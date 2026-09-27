@@ -2,7 +2,7 @@
 
 Validation, release, new-build qualification and profiling. This is the only place
 that states validation rules. Usage is in the [README](../README.md); the test
-invariants are in [AGENTS.md](../AGENTS.md#safety-invariants). Historical
+invariants are in [AGENTS.md](../AGENTS.md#development-invariants). Historical
 validation summaries belong in commit messages and issue comments, not in
 documentation.
 

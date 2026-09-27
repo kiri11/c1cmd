@@ -4,7 +4,7 @@ A recipe is a versioned c1 payload, not a Capture One processing/export recipe
 or an installed style. CLI and MCP use the same core and JSON request contract.
 Successful results are [compact](editing.md#compact-results); pass `full` for the
 complete report. Only Capture One 16.8.5.30 is supported, and every step follows
-the [safety invariants](../../AGENTS.md#safety-invariants), including
+the [safety invariants](../../AGENT_GUIDE.md#safety-invariants), including
 verification before reuse.
 
 ## Supported settings
@@ -279,5 +279,3 @@ do not prove the interrupted compound completed.
 Each operation handles one photo per call. Multi-photo scheduling, automatic
 resume, native style installation, mask reconstruction and generalized native
 recipe transfer are intentionally outside this contract.
-
-Validation: [maintainer guide](../MAINTAINING.md#recovery-case-selection).

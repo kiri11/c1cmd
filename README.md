@@ -3,121 +3,78 @@
 [![CI](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml/badge.svg)](https://github.com/kiri11/c1cmd/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Did you ever want to give your agent access to Capture One? Probably not. But now You can!
+Did you ever want to give your agent access to Capture One? Probably not. Now you can!
 
-`c1` reads, adjusts, compares, and previews Capture One variants through a CLI and a stdio MCP server. 
-
-Works with the **currently open Session or Catalog**. Catalog editing requires an explicit opt-in.
-
-Both adapters share `CaptureOneCore` and one versioned request/response schema. Creative judgment and photographer review belong in the caller.
+`c1` lets an AI agent read, adjust, compare and preview photos in the Capture One Session or Catalog you have open. It comes as a command-line tool (`c1`) and a local MCP server (`c1-mcp`) that share one core and one request/response schema. Creative judgment stays with you and the agent; `c1` supplies safe, checked access.
 
 Capture One is a trademark of Capture One A/S. This independent project is not affiliated with, endorsed by, or sponsored by Capture One A/S. Capture One and RAW fixtures are not distributed with the project.
 
-## Support boundary for v0.1
+## What it does
 
-- **Qualified application:** Capture One **16.8.5.30** on Apple Silicon. Other 16.4+ through 16.x builds pass the compatibility check but are unverified; older or future major builds need `C1_ALLOW_UNTESTED_BUILD=1`. `doctor` reports whether the build matched. See [current scope](docs/MAINTAINING.md#current-scope-and-remaining-gates).
-- **How to use it safely:** one open document, one operator, sequential calls, and turns between photographer and agent. The full rules are the [safety invariants](AGENTS.md#safety-invariants).
-- **Documents:** Sessions (`.cosessiondb`) support editing and preview export. Catalogs are read-only unless [explicitly enabled](#catalog-editing-experimental).
-- **Platform:** macOS 13+ is the deployment target, not a tested range. Intel and older macOS qualification is deferred.
+- **Edits your existing variants.** The agent works on the same variants you do, taking turns with you. It saves each photo's current state before editing, so a change can be reviewed with a preview and a diff and restored.
+- **Tonal, rating and color-tag edits**, plus crop, rotation and keystone correction.
+- **Expanded native editing** (experimental): most adjustment properties, curves, lens corrections, layers and masks.
+- **Reference recipes** (experimental): capture a look from a reference photo, verify it on a disposable copy, then apply it to other photos.
+- **Browsing**: filter by rating, collection and selection, and read closed Catalogs directly from their database.
 
-This is a narrow first release, not a general-purpose automation API. Session creation, image import, moving or relinking originals, automatic keystone detection, style learning and general recipe export are outside v0.1. Expanded adjustments, curves, layers and masks are available through the experimental [native editing API](docs/reference/native-editing.md).
+RAW files are never modified. Every edit is checked against the photo's current state and recorded in a journal beside your document before it is sent, so an interrupted edit can be investigated instead of guessed at. Catalogs are read-only unless you enable editing for one specific Catalog.
 
-## Installation
+**Requirements:** Capture One **16.8.5.30** on an Apple Silicon Mac is the qualified setup. Other 16.x builds are allowed but unverified.
 
-Building requires Swift 5.9+ and the macOS command line tools. Capture One must be installed at `/Applications/Capture One.app` and running.
+## Install from a release archive
+
+Download the latest `c1-<tag>-macos-arm64.tar.gz` and its `.sha256` file from [Releases](https://github.com/kiri11/c1cmd/releases), then:
 
 ```sh
-git clone https://github.com/kiri11/c1cmd.git
-cd c1cmd
-make build
-make install
+shasum -a 256 -c c1-<tag>-macos-arm64.tar.gz.sha256
+tar -xzf c1-<tag>-macos-arm64.tar.gz
+mv c1-<tag>-macos-arm64 ~/Applications/c1
+~/Applications/c1/bin/c1 doctor
 ```
 
-`make install` chooses a writable prefix, falling back to `~/.local`; override with `make install PREFIX="$HOME/.local"` and add its `bin` directory to `PATH` if necessary.
+Keep the `bin` folder intact: `c1` and `c1-mcp` need `c1_CaptureOneCore.bundle` beside them. Add `bin` to your `PATH` if you want the `c1` command everywhere. The binaries are ad-hoc signed, not notarized; if macOS blocks them, build from source instead.
 
-Both executables need **`c1_CaptureOneCore.bundle` beside them**. The Makefile installs it; with a release archive, keep its `bin` directory intact. Release archives on GitHub are ad-hoc signed, not notarized; build from source if macOS policy blocks a download.
+The archive contains:
+
+| Path | Contents |
+|---|---|
+| `bin/` | `c1`, `c1-mcp` and their resource bundle |
+| `AGENT_GUIDE.md` | Setup, safety rules and workflow for the agent |
+| `docs/reference/` | Command reference for editing, geometry, native editing, recipes and the Catalog reader |
+| `examples/` | Example scripts and presets |
+
+To build from source instead (Swift 5.9+ and the command line tools): `git clone https://github.com/kiri11/c1cmd.git`, then `make build install`.
 
 ## MCP setup
 
-Configure your MCP client to launch the server over stdio:
+Add the server to your MCP client's configuration, using the absolute path:
 
 ```json
 {
   "mcpServers": {
     "c1": {
-      "command": "/absolute/path/to/bin/c1-mcp"
+      "command": "/Users/you/Applications/c1/bin/c1-mcp"
     }
   }
 }
 ```
 
-macOS Automation permission must allow the launching application to control Capture One. If calls return `permission-denied`, check **System Settings → Privacy & Security → Automation**. No network server, API key or port is involved; diagnostics go to stderr.
+The first call asks macOS for permission to control Capture One. If it was refused, allow the client app under **System Settings → Privacy & Security → Automation**.
 
-The server exposes 30 tools: `read_session_begin`, `read_session_end`, `read_session_status`, `catalog_get`, `catalog_inspect`, `catalog_variants`, `catalog_snapshot`, `native_set`, `native_action`, `doctor`, `doc_info`, `capabilities`, `schema`, `variants_list`, `variant_edit`, `variant_clone`, `variant_delete`, `variant_baseline`, `get`, `metadata_set`, `set`, `add`, `geometry_set`, `geometry_restore`, `reset`, `diff`, `dump`, `preview`, `operation_status`, and `request_status`. Recipe tools are listed in the [recipes reference](docs/reference/recipes.md#cli-and-mcp).
+Then point your agent at [AGENT_GUIDE.md](AGENT_GUIDE.md) from the archive. It tells the agent how to check the setup and which rules keep your edits and Catalog safe.
 
-Start with `doctor` and check `allChecksPassed`, `writesEnabled` and `exactBuildMatched` before editing. `isSession` identifies the document type; it is not an editing permission. Agents should follow [AGENTS.md](AGENTS.md).
+### Editing a Catalog
 
-## Editing workflow
+Make a fresh **File → Backup Catalog** first and keep your RAW backups. Then add the exact Catalog path to the server's environment and restart the server:
 
-Photographer and agent take turns on **the same variants**. The agent prepares an existing variant for editing, which saves its current state and creates no duplicate:
-
-```sh
-c1 doctor
-c1 doc info                     # keep openToken
-c1 variants list --rating 5     # also check the folder or collection
-c1 get <source-id>
-c1 variant edit <source-id> --if-document <openToken> --if-state <stateHash>
-c1 get <editing-ref>
-c1 set <editing-ref> --if-state <fresh-stateHash> exposure=0.35 contrast=5
-c1 preview <editing-ref>
-c1 diff <editing-ref>
+```json
+"env": {"C1_CATALOG_WRITE_PATH": "/Users/you/Pictures/Main.cocatalog"}
 ```
 
-Review the preview before handing back. To put the saved crop, rotation and keystone back:
-
-```sh
-c1 get <editing-ref>
-c1 geometry restore <editing-ref> --if-geometry-state <fresh-geometryStateHash>
-```
-
-Tonal values are restored with `set` and the saved `baselineAdjustments`; `reset` applies defaults and is not an undo. `variant clone` makes a separate comparison variant, and only such clones can be deleted.
-
-Details: [editing](docs/reference/editing.md) (adjustment ranges, ratings and tags, selecting variants, progress, previews, errors), [crop, rotation and keystone](docs/reference/geometry.md), [native editing](docs/reference/native-editing.md) and [reference recipes](docs/reference/recipes.md).
-
-## If a command times out
-
-A failed write returns an `operationId`. Do not repeat the command. Check it:
-
-```sh
-c1 operation status <operationId>
-```
-
-An unresolved operation blocks further writes. Restart Capture One, reopen the same database and check the status again; the tool then records what it observes and unblocks writes. That record does not prove the edit succeeded, so review the photo and prepare a fresh editing reference to continue. Keep the `.c1` folder beside your document: it holds the journal needed for this. The rule is [safety invariant 4](AGENTS.md#safety-invariants); commands are in [recovery commands](docs/reference/editing.md#recovery-commands).
-
-## Catalog editing (experimental)
-
-You can edit existing variants directly in a main Catalog. First make a fresh **File → Backup Catalog** and keep your RAW backups; Capture One's [catalog backup](https://support.captureone.com/hc/en-us/articles/27502751010333-How-Catalog-and-Session-Backups-Work-in-Capture-One) covers the database and adjustments, not originals. `c1` does not create or verify it (see [safety invariant 5](AGENTS.md#safety-invariants)). Then enable **one exact Catalog**:
-
-```sh
-export C1_CATALOG_WRITE_PATH="/absolute/path/Main.cocatalog"
-c1 doctor
-```
-
-For MCP, put the same variable in the server's `env` and restart the server. Unset it to turn Catalog writes off again.
-
-- A package path is accepted when it holds exactly one `.cocatalogdb`; otherwise name the exact `.cocatalogdb` inside it.
-- Unpackaged Catalog directories must name the exact `.cocatalogdb` file.
-- Originals must be referenced, online and outside the Catalog; Catalog-stored originals are blocked.
-- Journals and provenance live in `Main.cocatalog/.c1`; previews go to `Main.cocatalog.c1-output/c1-previews/`. If the Catalog has no usable default output location, preview sets it to that folder.
-
-Read-only inspection needs no variable. `C1_TOOL_PROFILE=composition` restricts an agent to crop, rotation and keystone. Catalog fault recovery remains unqualified; see [current scope](docs/MAINTAINING.md#current-scope-and-remaining-gates).
-
-## Faster browsing and closed Catalogs
-
-During a long agent batch, `read-session begin` returns a `workflowId`; browsing calls that pass `--read-workflow <id>` use cached observations instead of per-photo native reads, and `read-session end` finishes before control returns to the photographer. Closed Catalogs can be read directly with `--database /absolute/path/Library.cocatalog/Library.cocatalogdb`, and `c1 catalog snapshot` copies one to a new SQLite file. Stored and cached reads never authorize edits. See the [Catalog reader](docs/reference/catalog-reader.md).
+Remove the variable to make Catalogs read-only again.
 
 ## Development
 
-`make check` runs the offline Swift, Python and contract tests. Every push to `main` publishes a release, and live checks must run locally first; see the [maintainer guide](docs/MAINTAINING.md).
+Contributor and agent instructions are in [AGENTS.md](https://github.com/kiri11/c1cmd/blob/main/AGENTS.md), and validation and releases in the [maintainer guide](https://github.com/kiri11/c1cmd/blob/main/docs/MAINTAINING.md).
 
 [MIT License](LICENSE).

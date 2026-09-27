@@ -2,8 +2,8 @@
 
 Commands for tonal, rating and color-tag edits, variant selection, progress,
 previews and recovery. The rules they enforce are the
-[safety invariants](../../AGENTS.md#safety-invariants); the order of calls is the
-[canonical workflow](../../AGENTS.md#canonical-editing-workflow).
+[safety invariants](../../AGENT_GUIDE.md#safety-invariants); the order of calls is the
+[canonical workflow](../../AGENT_GUIDE.md#canonical-editing-workflow).
 
 ## Contract
 
@@ -22,6 +22,19 @@ MCP adjustment keys may be flat (`{"workingRef": "...", "ifState": "...",
 "exposure": 0.3}`) or grouped under `adjustments`. Mixed forms, duplicate aliases,
 unknown fields and wrong types are rejected. `dump.batchSize` is 1–1000; preview
 timeout is greater than zero and at most 300 seconds.
+
+## Catalog editing
+
+`C1_CATALOG_WRITE_PATH` accepts a `.cocatalog` package holding exactly one
+`.cocatalogdb`, or the exact `.cocatalogdb` inside it; with several databases,
+name the database. Unpackaged Catalog directories must name the exact
+`.cocatalogdb`. Write authorization must resolve to the database Capture One has
+open; other Catalogs stay read-only and read-only inspection needs no variable.
+Originals must be referenced, online and outside the Catalog; Catalog-stored
+originals are blocked. Catalog journals and provenance live in
+`Main.cocatalog/.c1`, and previews in `Main.cocatalog.c1-output/c1-previews/`.
+If the Catalog has no usable default output location, preview sets it to that
+folder. Catalog fault recovery is unqualified.
 
 ## Tonal adjustments
 
