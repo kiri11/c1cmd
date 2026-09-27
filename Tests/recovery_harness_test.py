@@ -17,14 +17,58 @@ import recovery_integration_test as harness
 
 class HarnessTests(unittest.TestCase):
     def test_case_selection_rejects_invalid_before_setup(self):
-        self.assertEqual(harness.parse_args(['archive', 'evidence']).cases, list(harness.RECOVERY_CASES))
+        self.assertEqual(harness.parse_args(['archive', 'evidence']).cases,
+                         (list(harness.RECOVERY_CASES), list(harness.RECIPE_CASES)))
+        self.assertEqual(len(harness.ALL_CASES), 19)
         self.assertEqual(harness.selected_cases(['preview', 'clone-readback']), ['clone-readback', 'preview'])
-        for cases in [[], ['unknown'], ['preview', 'preview'], ['all', 'preview']]:
+        self.assertEqual(harness.parse_args(['archive', 'evidence', '--cases', 'recipe:lens', 'tonal', 'recipe:native']).cases,
+                         (['tonal'], ['native', 'lens']))
+        self.assertEqual(harness.parse_args(['archive', 'evidence', '--cases', 'recipe:layer-color']).cases, ([], ['layer-color']))
+        for cases in [[], ['unknown'], ['preview', 'preview'], ['all', 'preview'], ['layer-color'], ['recipe:clone-readback'],
+                      ['recipe:lens', 'recipe:lens'], ['recipe:all']]:
             with self.subTest(cases=cases), patch.object(harness, 'Run') as run, contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit) as error:
                     harness.main(['archive', 'evidence', '--cases', *cases])
                 self.assertEqual(error.exception.code, 2)
                 run.assert_not_called()
+
+    def test_campaign_runs_groups_in_order_and_stops_on_failure(self):
+        import recipe_recovery_integration_test as recipes
+        for failure in [None, 'recovery']:
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                calls = []
+                def group(name):
+                    def create(archive, evidence):
+                        def run_cases(cases):
+                            calls.append((name, evidence.name, cases))
+                            if failure == name:
+                                raise RuntimeError(name)
+                        run = Mock()
+                        run.run.side_effect = run_cases
+                        run.finish.side_effect = lambda: calls.append((name, 'finish'))
+                        return run
+                    return create
+                evidence = Path(directory) / 'evidence'
+                with patch.object(harness, 'Run', group('recovery')), patch.object(recipes, 'RecipeRun', group('recipes')), \
+                     contextlib.redirect_stdout(io.StringIO()) as output:
+                    arguments = ['archive', str(evidence), '--cases', 'recipe:geometry', 'preview']
+                    if failure:
+                        with self.assertRaises(RuntimeError):
+                            harness.main(arguments)
+                    else:
+                        harness.main(arguments)
+                expected = [('recovery', 'recovery', ['preview']), ('recovery', 'finish')]
+                if not failure:
+                    expected += [('recipes', 'recipe-recovery', ['geometry']), ('recipes', 'finish')]
+                self.assertEqual(calls, expected)
+                self.assertIn('Selected recovery cases: preview, recipe:geometry', output.getvalue())
+                self.assertIn('recipe:lens', output.getvalue().split('Skipped recovery cases: ')[1])
+                self.assertEqual('PASS' in output.getvalue(), failure is None)
+                with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                    harness.parse_args(['archive', str(evidence), '--cases', 'unknown'])
+                # An existing evidence directory is never reused.
+                with self.assertRaises(FileExistsError), contextlib.redirect_stdout(io.StringIO()):
+                    harness.main(['archive', str(evidence), '--cases', 'preview'])
 
     def test_selected_faults_skip_unrelated_stress_and_timeouts(self):
         self.run.apple_event_timeout = Mock()
@@ -161,6 +205,14 @@ class HarnessTests(unittest.TestCase):
                 harness.Run(self.root / 'archive', self.root / 'new-evidence')
             ae.assert_not_called()
             self.assertFalse((self.root / 'new-evidence').exists())
+
+    def test_shutdown_defaults_to_process_termination(self):
+        environment = {key: value for key, value in os.environ.items() if key != 'C1_RECOVERY_SHUTDOWN_MODE'}
+        environment['C1_RECOVERY_FIXTURE_PARENT'] = str(self.root / 'fixtures')
+        with patch.dict(os.environ, environment, clear=True), patch.object(harness, 'ae') as ae:
+            run = harness.Run(self.root / 'archive', self.root / 'default-evidence')
+            ae.assert_not_called()
+        self.assertEqual(run.shutdown_mode, 'sigterm')
 
     def test_quit_success_observes_exit_before_open(self):
         self.restart_patches()

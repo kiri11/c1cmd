@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Compound fault cases using the existing owned-fixture/restart watchdog harness.
 
+Run through recovery_integration_test.py with recipe:-prefixed cases.
+
 Exercises real Apple Event timeouts in compound native, lens, tonal, geometry and
 preview steps, plus layer color deletion through the shared native path.
 mcp-death kills a compound MCP caller after an observed completed mutation step.
 No faults are retried. Production binaries have no test hooks.
 """
-import argparse
 import json
 import os
 from pathlib import Path
@@ -18,21 +19,17 @@ import time
 import recovery_integration_test as harness
 
 
-CASES = ('native','native-action','lens','layer-color','tonal','geometry','preview','mcp-death')
-
-
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('archive',type=Path)
-    parser.add_argument('evidence',type=Path)
-    parser.add_argument('--cases',nargs='+',choices=[*CASES,'all'],default=['all'])
-    args = parser.parse_args(argv)
-    if args.cases == ['all']: args.cases = list(CASES)
-    elif 'all' in args.cases or len(set(args.cases)) != len(args.cases): parser.error('Select unique cases, or all alone')
-    return args
+CASES = harness.RECIPE_CASES
 
 
 class RecipeRun(harness.Run):
+    CASES = CASES
+
+    def __init__(self, archive, evidence):
+        super().__init__(archive, evidence)
+        shutil.copy2(__file__, self.evidence / 'compound-harness.py')
+        self.log('compound-harness', sha256=harness.sha(Path(__file__)))
+
     def restart(self):
         super().restart()
         self.wait_native_document()
@@ -214,17 +211,3 @@ class RecipeRun(harness.Run):
             assert case in CASES
             self.compound_fault(case)
 
-
-def main():
-    args = parse_args()
-    assert all(case in CASES for case in args.cases)
-    run = RecipeRun(args.archive,args.evidence)
-    shutil.copy2(__file__, run.evidence / "compound-harness.py")
-    run.log("compound-harness", sha256=harness.sha(Path(__file__)))
-    try: run.run(args.cases)
-    except BaseException as error:
-        run.log('failed',error=repr(error)); raise
-    finally: run.finish()
-
-
-if __name__ == '__main__': main()

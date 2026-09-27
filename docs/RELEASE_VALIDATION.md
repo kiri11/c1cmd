@@ -19,26 +19,26 @@ does not require another fault campaign.
 | Build/CI, unrelated features, test selection or reporting that leaves fault behavior unchanged | `make check`; no live faults |
 | Native behavior or a live harness | `make check`, then `make qualify QUALIFY_SUITES="..."` with the affected suites |
 | Dispatch, partial application, journaling, unresolved-write blocking, locks, timeouts, application lifetime, restart/reconciliation or stale references | The affected suites plus the affected [fault cases](#recovery-case-selection) |
-| A new Capture One build | Every regular suite and both recovery campaigns with `all` |
+| A new Capture One build | `make qualify QUALIFY_SUITES=all` plus `make qualify-recovery RECOVERY_CASES=all` |
 
 Report the selected and omitted coverage, and any required live check that could
 not run. Do not claim a focused pass covers the full campaign.
 
+There are three validation targets:
+
 | Command | Coverage |
 |---|---|
 | `make check` | Incremental debug build, offline assertions, Python tests, generated-resource drift, CLI/MCP contracts and profile restrictions |
-| `make qualify` | Release build, offline checks, relocated package/contracts, then `cli mcp existing` |
-| `make qualify QUALIFY_SUITES="native recipes"` | Only the selected regular matrices after package checks |
-| `make qualify-extended` | All eleven regular live suites |
-| `make qualify-recovery RECOVERY_CASES="..."` | Selected real faults using an already-built current archive |
-| `make qualify-recipes-recovery RECIPE_RECOVERY_CASES="..."` | Selected compound-edit faults using the current archive |
-| `make qualify-full` | All regular suites plus the generic recovery campaign; select recipe recovery separately when affected |
+| `make qualify [QUALIFY_SUITES="..."\|all]` | Release build, offline checks, relocated package/contracts, then the selected live suites (default `cli mcp existing`) |
+| `make qualify-recovery [RECOVERY_CASES="..."\|all]` | Selected real faults, including compound edits, using an already-built current archive (default `all`) |
 
 Regular suites are `cli mcp geometry lens perspective keystone catalog existing
-inventory native recipes`. They do not inject faults. `mcp` is a smoke test of the
+inventory native recipes read-workflow`. They do not inject faults. `mcp` is a smoke test of the
 MCP adapter (registration, error results, preview image content, one compile of
 each AppleScript handler script per server process); the CLI suites cover tool
-behaviour through the same dispatcher.
+behaviour through the same dispatcher. `read-workflow` covers the accelerated browsing
+handoff on owned Session and Catalog fixtures and waits for the 60-second Catalog
+catch-up boundary.
 
 ### Recovery case selection
 
@@ -57,12 +57,17 @@ the unchanged candidate from `make qualify`.
 | MCP process lifetime/cancellation around dispatch | `mcp-death` |
 | Clone native-ID readback | `clone-readback` |
 | Shared journal, locks, write blocking, restart/reconciliation or stale references | All affected paths; `all` when impact cannot be narrowed |
+| Compound edits (`edit_apply` steps, parent reports) | `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death`; add `recipe:tonal` or `recipe:preview` when those steps change |
 | Fault-harness pause, dispatch detection, shutdown, identity or recovery assertions | Cases using the changed behavior |
 | Unrelated features, docs, build/CI or selection/reporting only | Focused offline checks; no live faults |
 
-Compound recovery accepts `native native-action lens layer-color tonal geometry
-preview mcp-death`. Select these through `RECIPE_RECOVERY_CASES`, independently of
-the generic selector, when compound edits are affected. `layer-color` tests the
+One list holds all nineteen cases. Generic cases are `clone-readback tonal
+metadata native native-action geometry lens perspective keystone preview mcp-death`.
+Compound-edit cases carry a `recipe:` prefix: `recipe:native recipe:native-action
+recipe:lens recipe:layer-color recipe:tonal recipe:geometry recipe:preview
+recipe:mcp-death`. Generic cases run first in one owned Session and compound cases
+after them in another; evidence lands in `recovery/` and `recipe-recovery/` under
+`EVIDENCE_DIR`. The default `all` runs every case. `recipe:layer-color` tests the
 shared native deletion/readback context on a numbered layer; it does not enable
 layers in recipes.
 
@@ -98,8 +103,8 @@ Other limits:
 - Preview association requires exclusive output ownership. State hashes are not
   complete render fingerprints. General export and callback coexistence are outside
   scope. Successful value checks do not establish aesthetic quality.
-- Graceful native quit is unqualified. Recovery can explicitly select SIGTERM after
-  closing an owned fixture; there is no automatic shutdown fallback. Production
+- Graceful native quit is unqualified. Recovery uses SIGTERM after closing an
+  owned fixture by default; there is no automatic shutdown fallback. Production
   CLI/MCP commands never quit Capture One.
 - Archives are ad-hoc signed. Fresh-user downloaded-artifact launch, Automation
   consent in the intended host, Developer ID signing/notarization, Intel and
@@ -120,9 +125,8 @@ Set `C1_TEST_RAW_FIXTURE` to a preserved RAW outside the build tree and
 `EVIDENCE_DIR` to a new ignored or external directory. For the regular catalog
 suite, set `C1_TEST_CATALOG_LAYOUT=unpackaged` to exercise an unpackaged
 disposable catalog; the default is `package`. Both layouts include existing-variant
-rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`; use
-`C1_RECIPE_TEST_GROUP=scopes` when only the scoped recipe block is affected. Its
-default `all` includes version-1 cases too.
+rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`. The native
+suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people.
 
 Live recipe tests perform sequential native calls, independent clone verification
 and previews. Recovery tests retain real 120-second Apple Event timeouts; five
@@ -141,19 +145,15 @@ must match before mutations.
 ```sh
 make archive
 export C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3
-make qualify-recovery RECOVERY_CASES="native native-action" \
-  C1_RECOVERY_SHUTDOWN_MODE=sigterm \
+make qualify-recovery RECOVERY_CASES="native native-action recipe:native recipe:layer-color" \
   EVIDENCE_DIR=.build/qualification/native-recovery
-make qualify-recipes-recovery \
-  RECIPE_RECOVERY_CASES="native native-action lens layer-color geometry mcp-death" \
-  C1_RECOVERY_SHUTDOWN_MODE=sigterm \
-  EVIDENCE_DIR=.build/qualification/recipe-recovery
 ```
 
-The default shutdown mode `quit` requests native quit. Explicit `sigterm` closes
-only the owned Session, confirms zero documents, rechecks the verified PID, then
-terminates that process; it tests process-termination recovery, not graceful native
-quit. There is no automatic fallback. Both modes require old process exit and a
+The default shutdown mode `sigterm` closes only the owned Session, confirms zero
+documents, rechecks the verified PID, then terminates that process; it tests
+process-termination recovery, not graceful native quit. `C1_RECOVERY_SHUTDOWN_MODE=quit`
+requests native quit instead; it is not dependable (a recent run's quit timed out
+after 60 seconds). There is no automatic fallback. Both modes require old process exit and a
 different PID before reopening. The scoped harness also waits for repeated
 read-only CLI confirmation of the exact reopened document.
 
@@ -211,11 +211,9 @@ those paths or bypass their restrictions. Check `writesEnabled` and
    ```sh
    make check
    export C1_TEST_RAW_FIXTURE=/absolute/path/to/preserved.CR3
-   make qualify-extended EVIDENCE_DIR=/absolute/path/to/new-feature-evidence
-   make qualify-recovery RECOVERY_CASES=all C1_RECOVERY_SHUTDOWN_MODE=sigterm \
-     EVIDENCE_DIR=/absolute/path/to/new-recovery-evidence
-   make qualify-recipes-recovery RECIPE_RECOVERY_CASES=all C1_RECOVERY_SHUTDOWN_MODE=sigterm \
-     EVIDENCE_DIR=/absolute/path/to/new-recipe-recovery-evidence
+   export C1_TEST_PEOPLE_FIXTURE=/absolute/path/to/preserved-people.CR3
+   make qualify QUALIFY_SUITES=all EVIDENCE_DIR=/absolute/path/to/new-feature-evidence
+   make qualify-recovery RECOVERY_CASES=all EVIDENCE_DIR=/absolute/path/to/new-recovery-evidence
    ```
 
    Verify native identity/count and RAW preservation, concurrency tokens, clone-only

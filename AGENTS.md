@@ -124,11 +124,11 @@ Inventory listing filters before full metadata reads and uses sequential bounded
 
 ## Validation workflow
 
-Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`. Use `make qualify-extended` for all eleven regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
+Three targets cover validation. Use `make check` for routine offline feedback. For native behavior or live-harness changes, use `make qualify` (packaged CLI, MCP, and existing-variant workflows), or select affected suites with `QUALIFY_SUITES="geometry lens"`; `QUALIFY_SUITES=all` runs all twelve regular live suites. Avoid rerunning unrelated live matrices; documentation-only changes need relevant syntax/link checks.
 
-Run relevant recovery tests when a change can affect recovery behavior; a separate explicit user request is not required. Changes to mutation dispatch, durable journaling, unresolved-write blocking, lock ownership, timeout handling, application lifetime, restart/reconciliation, or stale-reference invalidation require affected live fault cases as well as offline safeguards. Use `make qualify-recovery RECOVERY_CASES="..."` against an archive rebuilt from the candidate. Select `tonal`, `metadata`, `geometry`, `lens`, `perspective`, or `keystone` for those mutation paths, `preview` for export timeout/completion, `mcp-death` for MCP cancellation/process lifetime, and `clone-readback` for clone-ID readback. Shared recovery changes need all affected fault paths; use `RECOVERY_CASES=all` when impact cannot be narrowed. Changes to the recovery harness's pause, dispatch detection, shutdown, identity checks, or reconciliation assertions require the cases they affect.
+Run relevant recovery tests when a change can affect recovery behavior; a separate explicit user request is not required. Changes to mutation dispatch, durable journaling, unresolved-write blocking, lock ownership, timeout handling, application lifetime, restart/reconciliation, or stale-reference invalidation require affected live fault cases as well as offline safeguards. Use `make qualify-recovery RECOVERY_CASES="..."` against an archive rebuilt from the candidate; it shuts Capture One down with SIGTERM by default (`C1_RECOVERY_SHUTDOWN_MODE=quit` selects native quit). Select `tonal`, `metadata`, `geometry`, `lens`, `perspective`, or `keystone` for those mutation paths, `preview` for export timeout/completion, `mcp-death` for MCP cancellation/process lifetime, and `clone-readback` for clone-ID readback. Compound-edit cases in the same list carry a `recipe:` prefix. Shared recovery changes need all affected fault paths; use `RECOVERY_CASES=all` when impact cannot be narrowed. Changes to the recovery harness's pause, dispatch detection, shutdown, identity checks, or reconciliation assertions require the cases they affect.
 
-Do not run live faults for unrelated features, documentation, build/CI changes, or test-selection/reporting changes that leave fault behavior and assertions unchanged; validate those with focused offline checks. Release checkpoints alone do not require a repeated fault campaign. `make qualify-full` combines all regular and recovery suites when broad coverage is needed. Keep Capture One calls sequential, retain real timeout durations and fixture/ownership guards, and never retry an uncertain mutation. Report selected and omitted coverage and explain any unavailable required live validation; do not claim a focused pass covers the full campaign.
+Do not run live faults for unrelated features, documentation, build/CI changes, or test-selection/reporting changes that leave fault behavior and assertions unchanged; validate those with focused offline checks. Release checkpoints alone do not require a repeated fault campaign. A new Capture One build runs `QUALIFY_SUITES=all` and `RECOVERY_CASES=all`. Keep Capture One calls sequential, retain real timeout durations and fixture/ownership guards, and never retry an uncertain mutation. Report selected and omitted coverage and explain any unavailable required live validation; do not claim a focused pass covers the full campaign.
 
 ## Expanded native editing
 
@@ -185,9 +185,9 @@ the parent `compoundId`; use `operation_status` with uncertain child operation I
 for normal restart/reconciliation. Interrupted parent reports do not become
 successful when a child is reconciled. Production commands never quit Capture One.
 
-Select `QUALIFY_SUITES=recipes` for the regular suite. Use
-`make qualify-recipes-recovery RECIPE_RECOVERY_CASES="native native-action lens layer-color geometry mcp-death"`
-for affected compound fault paths against the candidate archive. Keep offline tests
+Select `QUALIFY_SUITES=recipes` for the regular suite. For affected compound fault paths, use
+`make qualify-recovery RECOVERY_CASES="recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death"`
+against the candidate archive, adding `recipe:tonal` or `recipe:preview` when those steps change. Keep offline tests
 and live suites sequential because both use the application lock. See
 [recipe workflow](docs/recipes/README.md) for the full bounded contract.
 

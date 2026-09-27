@@ -7,8 +7,10 @@ Pauses Capture One with an independent resume watchdog; kills only its own MCP
 client; restarts Capture One between fault cases. Never retries a write.
 Fixtures default to .build/recovery-fixtures; C1_RECOVERY_FIXTURE_PARENT overrides
 the parent with an absolute, non-aliased path outside /tmp and /private/tmp.
-C1_RECOVERY_SHUTDOWN_MODE is quit (default) or explicit sigterm; no fallback.
-Usage: python3 Tests/recovery_integration_test.py ARCHIVE EVIDENCE_DIRECTORY [--cases tonal preview]
+C1_RECOVERY_SHUTDOWN_MODE is sigterm (default) or explicit quit; no fallback.
+Compound edit cases carry a recipe: prefix and run after the other cases in their
+own Session; all selects every case.
+Usage: python3 Tests/recovery_integration_test.py ARCHIVE EVIDENCE_DIRECTORY [--cases tonal recipe:lens]
 """
 import argparse
 import datetime
@@ -43,6 +45,9 @@ on run argv
 end run
 '''
 RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
+RECIPE_CASES = ('native', 'native-action', 'lens', 'layer-color', 'tonal', 'geometry', 'preview', 'mcp-death')
+RECIPE_PREFIX = 'recipe:'
+ALL_CASES = (*RECOVERY_CASES, *(RECIPE_PREFIX + case for case in RECIPE_CASES))
 
 
 def selected_cases(cases):
@@ -54,14 +59,25 @@ def selected_cases(cases):
     return [case for case in RECOVERY_CASES if case in cases]
 
 
+def campaign(cases):
+    """Split one fault list into ordered generic and compound (recipe:) cases."""
+    if list(cases) == ['all']:
+        return list(RECOVERY_CASES), list(RECIPE_CASES)
+    if not cases or len(set(cases)) != len(cases) or any(case not in ALL_CASES for case in cases):
+        raise ValueError('Select unique recovery cases, or all alone')
+    compound = {case[len(RECIPE_PREFIX):] for case in cases if case.startswith(RECIPE_PREFIX)}
+    generic = [case for case in cases if not case.startswith(RECIPE_PREFIX)]
+    return (selected_cases(generic) if generic else []), [case for case in RECIPE_CASES if case in compound]
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', type=Path)
     parser.add_argument('evidence', type=Path)
-    parser.add_argument('--cases', nargs='+', choices=[*RECOVERY_CASES, 'all'], default=['all'])
+    parser.add_argument('--cases', nargs='+', choices=[*ALL_CASES, 'all'], default=['all'])
     args = parser.parse_args(argv)
     try:
-        args.cases = selected_cases(args.cases)
+        args.cases = campaign(args.cases)
     except ValueError as error:
         parser.error(str(error))
     return args
@@ -121,8 +137,10 @@ def wait_for(fn, seconds=30):
 
 
 class Run:
+    CASES = RECOVERY_CASES
+
     def __init__(self, archive, evidence):
-        self.shutdown_mode = os.environ.get('C1_RECOVERY_SHUTDOWN_MODE', 'quit')
+        self.shutdown_mode = os.environ.get('C1_RECOVERY_SHUTDOWN_MODE', 'sigterm')
         if self.shutdown_mode not in SHUTDOWN_MODES:
             raise ValueError('C1_RECOVERY_SHUTDOWN_MODE must be quit or sigterm')
         self.fixture_parent = fixture_parent()
@@ -516,7 +534,7 @@ set keystone horizontal of adjustments of v to -5
 
     def run(self, cases=RECOVERY_CASES):
         cases = self.select_cases(cases)
-        self.log('selected-cases', selected=cases, skipped=[case for case in RECOVERY_CASES if case not in cases])
+        self.log('selected-cases', selected=cases, skipped=[case for case in self.CASES if case not in cases])
         fixture = Path(os.environ['C1_TEST_RAW_FIXTURE']).resolve()
         assert fixture.is_file()
         digest = sha(self.archive)
@@ -566,7 +584,7 @@ set keystone horizontal of adjustments of v to -5
         self.original = self.cli('get', self.source)
         self.run_cases(cases)
         assert sha(fixture) == self.raw_hash
-        self.log('all-cases-passed' if cases == list(RECOVERY_CASES) else 'selected-cases-passed',
+        self.log('all-cases-passed' if cases == list(self.CASES) else 'selected-cases-passed',
                  cases=len([case for case in cases if case != 'clone-readback']), selected=cases,
                  rawSHA256=sha(self.raw),
                  shutdownMode=self.shutdown_mode, shutdownKind=SHUTDOWN_MODES[self.shutdown_mode])
@@ -627,11 +645,10 @@ set keystone horizontal of adjustments of v to -5
                      retainedSession=str(self.session))
 
 
-def main(argv=None):
-    args = parse_args(argv)
-    run = Run(args.archive, args.evidence)
+def run_group(runner, evidence, cases):
+    run = runner(evidence)
     try:
-        run.run(args.cases)
+        run.run(cases)
     except BaseException as error:
         run.log('failed', error=repr(error))
         raise
@@ -639,5 +656,24 @@ def main(argv=None):
         run.finish()
 
 
+def main(argv=None):
+    args = parse_args(argv)
+    generic, compound = args.cases
+    selected = [*generic, *(RECIPE_PREFIX + case for case in compound)]
+    print('Selected recovery cases: ' + ', '.join(selected), flush=True)
+    print('Skipped recovery cases: ' + (', '.join(case for case in ALL_CASES if case not in selected) or 'none'), flush=True)
+    evidence = args.evidence.resolve()
+    evidence.mkdir(parents=True, exist_ok=False)
+    # Each group owns a fresh Session; a failed group stops the campaign.
+    if generic:
+        run_group(lambda path: Run(args.archive, path), evidence / 'recovery', generic)
+    if compound:
+        from recipe_recovery_integration_test import RecipeRun
+        run_group(lambda path: RecipeRun(args.archive, path), evidence / 'recipe-recovery', compound)
+    print('PASS: selected recovery cases: ' + ', '.join(selected), flush=True)
+
+
 if __name__ == '__main__':
+    # The compound harness imports this module by name; share one copy.
+    sys.modules.setdefault('recovery_integration_test', sys.modules[__name__])
     main()

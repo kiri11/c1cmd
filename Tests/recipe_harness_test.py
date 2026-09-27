@@ -4,7 +4,7 @@ import unittest
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch
-from recipe_recovery_integration_test import RecipeRun, parse_args, CASES
+from recipe_recovery_integration_test import RecipeRun, CASES
 
 
 class RecipeHarnessTests(unittest.TestCase):
@@ -33,10 +33,9 @@ class RecipeHarnessTests(unittest.TestCase):
         runner.run_cases(['native','native-action','lens','layer-color','mcp-death'])
         self.assertEqual([c.args for c in runner.compound_fault.call_args_list],[('native',),('native-action',),('lens',),('layer-color',),('mcp-death',)])
 
-    def test_case_parser(self):
-        self.assertEqual(parse_args(['archive','evidence','--cases','all']).cases,list(CASES))
-        self.assertEqual(parse_args(['archive','evidence','--cases','layer-color']).cases,['layer-color'])
-        with self.assertRaises(SystemExit): parse_args(['archive','evidence','--cases','native','native'])
+    def test_case_list_is_shared_with_the_campaign(self):
+        self.assertIs(RecipeRun.CASES, CASES)
+        self.assertEqual(len(CASES), 8)
 
     def test_failure_stops_campaign(self):
         runner = RecipeRun.__new__(RecipeRun)

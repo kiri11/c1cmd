@@ -293,24 +293,22 @@ parent/child correlation. Run the packaged regular suite with
 qualification and retained results are recorded separately; implementation alone
 does not establish live fault coverage.
 
-Run dedicated compound recovery against a freshly built archive:
+Run compound recovery cases against a freshly built archive:
 
 ```sh
-C1_RECOVERY_SHUTDOWN_MODE=sigterm \
-  python3 -B Tests/recipe_recovery_integration_test.py \
-  dist/c1-v0.1.0-macos-arm64.tar.gz /absolute/new/evidence \
-  --cases native native-action lens layer-color geometry mcp-death
+make archive
+make qualify-recovery EVIDENCE_DIR=/absolute/new/evidence \
+  RECOVERY_CASES="recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death"
 ```
+
+Add `recipe:tonal` or `recipe:preview` when those steps change.
 
 Set `C1_TEST_RAW_FIXTURE` to an existing RAW and close other documents first.
 This harness inherits the existing ownership, independent resume watchdog,
 real timeout, restart, stale-reference and original-preservation checks. The
-case names here select faults inside compound operations, except `layer-color`,
+`recipe:` cases select faults inside compound operations, except `recipe:layer-color`,
 which checks shared native deletion/reconciliation context on a layer. It creates its own
 Session and retains failed/ambiguous evidence; it never retries a faulted edit.
-
-For focused scoped regular checks, set `C1_RECIPE_TEST_GROUP=scopes`; the default
-`all` also repeats the version-1 recipe cases.
 
 These live checks include sequential native reads/writes, independent verification
 and preview exports. They are intentionally separate from the fast offline loop.

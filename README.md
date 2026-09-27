@@ -316,7 +316,6 @@ Mutation, recipe and preview results (`set`, `add`, `reset`, `metadata_set`, `ge
 
 ```sh
 make check                             # offline Swift, CLI/MCP contracts, recovery-harness guards
-make test                              # Swift assertions only (also available separately)
 export C1_TEST_RAW_FIXTURE=/path/to/image.CR3
 export C1_TEST_PEOPLE_FIXTURE=/path/to/people.CR3  # native suite only: a RAW with people
 # Normal candidate validation: release build, offline, package, CLI/MCP and existing edits.
@@ -324,14 +323,13 @@ export C1_TEST_PEOPLE_FIXTURE=/path/to/people.CR3  # native suite only: a RAW wi
 make qualify EVIDENCE_DIR=/private/tmp/c1-new-qualification
 # Affected live suites, or every regular matrix (no deliberate faults):
 make qualify QUALIFY_SUITES="geometry lens" EVIDENCE_DIR=/private/tmp/c1-geometry-check
-make qualify-extended EVIDENCE_DIR=/private/tmp/c1-extended-qualification
-# Relevant recovery changes: rebuild the archive, then select affected fault cases:
+make qualify QUALIFY_SUITES=all EVIDENCE_DIR=/private/tmp/c1-all-qualification
+# Relevant recovery changes: rebuild the archive, then select affected fault cases
+# (compound edit cases carry a recipe: prefix):
 make archive
-make qualify-recovery RECOVERY_CASES="preview mcp-death" C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-preview-recovery
-# All recovery paths when impact is broad:
-make qualify-recovery C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-new-recovery
-# All regular suites plus recovery, when both need broad validation:
-make qualify-full C1_RECOVERY_SHUTDOWN_MODE=sigterm EVIDENCE_DIR=/private/tmp/c1-full-qualification
+make qualify-recovery RECOVERY_CASES="preview mcp-death recipe:preview" EVIDENCE_DIR=/private/tmp/c1-preview-recovery
+# All recovery paths when impact is broad, or for a new Capture One build:
+make qualify-recovery RECOVERY_CASES=all EVIDENCE_DIR=/private/tmp/c1-new-recovery
 
 # Individual live suites during development:
 python3 Tests/integration_test.py       # disposable Session; requires Capture One
@@ -341,20 +339,19 @@ python3 Tests/keystone_integration_test.py # zero open documents; control ranges
 python3 Tests/catalog_integration_test.py # zero open documents; optional clone catalog workflow
 python3 Tests/existing_variant_integration_test.py # existing-variant tonal/crop edits; no duplicates
 C1_INVENTORY_EVIDENCE=/private/tmp/inventory.json python3 Tests/inventory_integration_test.py
-python3 Tests/native_inventory_probe.py # independent native-predicate qualification
 ```
 
 Live suites copy the fixture and create disposable Sessions/Catalogs under `/private/tmp` or `.build`. Do not point the fixture environment variable at a nonexistent file. `C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries for the same tests.
 
 `make check` is the default development loop: all offline Swift assertions, CLI/MCP contracts, and mocked failure safeguards. Documentation-only changes need relevant syntax/link checks. Run live tests when native behavior or the live harness changes; avoid rerunning unrelated matrices.
 
-`make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory native recipes`. `make qualify-extended` runs all eleven regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
+`make qualify` builds release once, runs the offline assertions against that build, checks the relocated archive/contract once, then runs `cli`, `mcp`, and `existing`. These cover clone and existing-variant editing, metadata, tonal and crop edits, previews, restoration, Session and referenced-Catalog behavior, and RAW preservation. `QUALIFY_SUITES` selects a space-separated subset of `cli mcp geometry lens perspective keystone catalog existing inventory native recipes read-workflow`; `all` runs all twelve regular suites. Detailed matrices remain available for changes in those areas or broad qualification. The runner lists selected and skipped suites so a focused pass cannot be mistaken for full coverage.
 
 CI runs debug offline checks; the publication workflow builds release once and checks its unit tests, harnesses, and packaged CLI/MCP before publishing. Release packaging is therefore checked on main rather than on every pull request.
 
-Run relevant live recovery cases when changes affect dispatch, journaling, locking, timeouts, restart/reconciliation, stale references, or the fault harness's behavior. No separate user request is needed. `make qualify-recovery RECOVERY_CASES="..."` reuses a current candidate archive and runs only selected cases: `tonal metadata native native-action geometry lens perspective keystone preview mcp-death clone-readback`; the default `all` retains the full campaign. Shared recovery changes need every affected path; use `all` when impact cannot be narrowed. Skip live faults for unrelated features, documentation, build/CI, or test-selection/reporting changes; use offline checks for those. Release checkpoints alone do not require rerunning faults. See the [recovery test selection guide](docs/RELEASE_VALIDATION.md#recovery-case-selection). Report actual coverage separately from omitted suites.
+Run relevant live recovery cases when changes affect dispatch, journaling, locking, timeouts, restart/reconciliation, stale references, or the fault harness's behavior. No separate user request is needed. `make qualify-recovery RECOVERY_CASES="..."` reuses a current candidate archive and runs only selected cases: `tonal metadata native native-action geometry lens perspective keystone preview mcp-death clone-readback`, plus compound-edit cases `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:tonal recipe:geometry recipe:preview recipe:mcp-death`; the default `all` runs all nineteen. Shared recovery changes need every affected path; use `all` when impact cannot be narrowed. Skip live faults for unrelated features, documentation, build/CI, or test-selection/reporting changes; use offline checks for those. Release checkpoints alone do not require rerunning faults. See the [recovery test selection guide](docs/RELEASE_VALIDATION.md#recovery-case-selection). Report actual coverage separately from omitted suites.
 
-Recovery Sessions default to `.build/recovery-fixtures`; `C1_RECOVERY_FIXTURE_PARENT` accepts an absolute path outside `/tmp` without symlink aliases. `C1_RECOVERY_SHUTDOWN_MODE=quit` is the default; explicit `sigterm` selects the qualified process-termination path, with no automatic fallback. Recovery verifies that Capture One is stopped before launching a fresh process. See [recovery qualification](docs/RELEASE_VALIDATION.md#recovery-settings) for settings and interpretation. Real fault tests retain the actual 120-second Apple Event timeout because shortening or mocking it would prove something different. Live suites remain sequential. Rerun affected checks for harness/documentation changes and verify executable/resource hashes when reusing prior runtime results.
+Recovery Sessions default to `.build/recovery-fixtures`; `C1_RECOVERY_FIXTURE_PARENT` accepts an absolute path outside `/tmp` without symlink aliases. `C1_RECOVERY_SHUTDOWN_MODE=sigterm` (the qualified process-termination path) is the default; `quit` requests native quit, which is not dependable. There is no automatic fallback. Recovery verifies that Capture One is stopped before launching a fresh process. See [recovery qualification](docs/RELEASE_VALIDATION.md#recovery-settings) for settings and interpretation. Real fault tests retain the actual 120-second Apple Event timeout because shortening or mocking it would prove something different. Live suites remain sequential. Rerun affected checks for harness/documentation changes and verify executable/resource hashes when reusing prior runtime results.
 
 For read latency investigations, see [performance profiling and local CLI/MCP benchmarks](docs/performance/README.md). Set `C1_PROFILE=1` for internal timing on stderr.
 

@@ -28,6 +28,7 @@ SUITES = {
     'inventory': ('inventory_integration_test.py', 600),
     'native': ('native_editing_integration_test.py', 1800),
     'recipes': ('recipe_integration_test.py', 1200),
+    'read-workflow': ('read_workflow_integration_test.py', 900),
 }
 DEFAULT_SUITES = ('cli', 'mcp', 'existing')
 
@@ -72,7 +73,8 @@ def run(archive, suites):
                            C1_TEST_BIN=str(root / 'bin/c1'), C1_TEST_MCP_BIN=str(root / 'bin/c1-mcp'),
                            C1_TEST_CROP_EXAMPLE=str(root / 'examples/crop-proposals.py'),
                            C1_TEST_GRADE_EXAMPLE=str(root / 'examples/grade-folder.py'),
-                           C1_INVENTORY_EVIDENCE=os.environ.get('C1_INVENTORY_EVIDENCE', str(Path(tmp) / 'inventory-evidence.json')))
+                           C1_INVENTORY_EVIDENCE=os.environ.get('C1_INVENTORY_EVIDENCE', str(Path(tmp) / 'inventory-evidence.json')),
+                           C1_READ_WORKFLOW_EVIDENCE=os.environ.get('C1_READ_WORKFLOW_EVIDENCE', str(Path(tmp) / 'read-workflow-evidence')))
         previous_directory = Path.cwd()
         moved = False
         try:
