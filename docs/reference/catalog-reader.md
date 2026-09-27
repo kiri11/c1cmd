@@ -30,7 +30,7 @@ Connections use `SQLITE_OPEN_READONLY`, `query_only`, ordinary locking, and WAL 
 
 Snapshots use incremental `sqlite3_backup` inside the validated source transaction, including committed WAL data. The destination must be a new absolute `.cocatalogdb` path outside Catalog packages; existing files and symlinks are rejected. Failed backups remove their newly reserved file. A snapshot contains database records, not original photos, previews, external mask files, or a complete native Catalog backup. Native Catalog backup and RAW backup remain separate workflows.
 
-## Routing and validation
+## Routing
 
 SQLite serves explicit stored discovery. It does not establish equivalence for
 live selection, smart collections, arbitrary settings conversions or unsaved edits.
@@ -38,37 +38,17 @@ Ordinary live commands use AppleScript; `--database` selects SQLite explicitly.
 An explicit database request never falls back to another document. On schema
 rejection, use native commands only after verifying the intended open document.
 
-Use `scripts/benchmark-catalog.py` and `scripts/qualify-catalog-reader.py` with a
-matching disposable Catalog for read-only comparisons. Native calls stay sequential.
-Keep generated results under `.build/qualification` or external artifact storage.
-
-`make check` covers schema/type/version rejection, both membership kinds, duplicate
-image variants, rating filters, path uncertainty, row limits, locking, concurrent
-reads, WAL visibility, backup integrity, overwrite/symlink protection and CLI/MCP
-parity. The upgraded schema has its own exact column order and version tuples.
-
 Session databases remain rejected: similarly named tables do not establish
 complete folder discovery or settings-sidecar behavior. Stored reads never change
 mutation dispatch, journaling or reconciliation rules.
 
-## Measuring freshness
-
-Read-only agreement does not establish read-after-write consistency. `scripts/probe-catalog-freshness.py` tests freshness using a **new disposable Catalog and copied RAW**, with zero documents required at startup:
-
-```sh
-python3 scripts/probe-catalog-freshness.py \
-  --cli .build/release/c1 \
-  --raw /absolute/path/fixture.CR3 \
-  --evidence /absolute/path/new-evidence-directory \
-  --trials 2 --observe-seconds 30
-```
-
-The probe confirms doctor/build/document/original identity, makes a native backup, prepares an existing editing reference, and performs sequential guarded rating/tag and nonzero tonal writes. After each successful native acknowledgement it polls an independent SQLite connection every 20 ms, using a fresh read transaction each time. It records the first observation, changes, the last observation, poll counts, elapsed time, and an independent native `get` afterward. A separate autocommit SQLite connection observes `PRAGMA data_version`; the database mtime is recorded as well. Success restores the saved native values and closes only the owned fixture. Any failed or uncertain native operation stops with the fixture retained; there is no automatic retry or exception-path restore. Capture One is never quit.
+## Freshness
 
 Committed SQLite data can lag successful native acknowledgements. Neither
 `PRAGMA data_version` nor database mtime is a native synchronization barrier.
 Use native reads and mutation tokens for edits; do not treat an unchanged database
-as proof that the application's current settings are unchanged.
+as proof that the application's current settings are unchanged. The
+[freshness probe](../MAINTAINING.md#profiling-and-probes) measures the lag.
 
 ## Controlled browsing workflow
 
@@ -84,7 +64,7 @@ c1 read-session status --read-workflow <workflowId>
 c1 read-session end --read-workflow <workflowId>
 ```
 
-MCP uses `read_session_begin`, `read_session_status`, `read_session_end`, and the `readWorkflow` argument on `variants_list`, `get`, `dump`, and two-reference `diff`. CLI batches can alternatively set `C1_READ_WORKFLOW` in their own environment. End in normal cleanup before returning control to the photographer. An abandoned workflow does not affect callers without its ID; start a new baseline after a crash. Ordinary calls remain native, and `--live` / `live: true` bypasses the workflow. Editing/managed references, native-target requests, and inventory calls with a deadline also remain native.
+MCP uses `read_session_begin`, `read_session_status`, `read_session_end`, and the `readWorkflow` argument on `variants_list`, `get`, `dump`, and two-reference `diff`. Begin only while the photographer has handed over control, and end before returning it. A CLI batch may set `C1_READ_WORKFLOW` in its own environment; never export it globally or share the ID with unrelated callers. An abandoned workflow does not affect callers without its ID; start a new baseline after a crash. Ordinary calls remain native, and `--live` / `live: true` bypasses the workflow. Editing/managed references, native-target requests, and inventory calls with a deadline also remain native.
 
 Workflow output contains `readObservation` with its backend, workflow ID, native confirmation time, and SQL agreement flags. Cached `get`, `dump`, and `diff` have no mutation tokens. Use a fresh native `get --live` before `variant edit`; all mutation preparation, internal reads, verification, and recovery remain native. Workflow CLI output is JSON (or JSONL for `dump --format jsonl`).
 
@@ -98,6 +78,4 @@ Active-document workflow calls still serialize and perform native document ident
 
 Sessions use the same controlled native cache and journal updates, but **do not route to Catalog SQL**. Session discovery and `CaptureOne/Settings1680/*.cos` sidecars are not fully represented by the live Session database. That database alone is not a complete discovery/settings source. Offline Session folder/sidecar discovery needs a separate reader and is not implemented here.
 
-### Workflow validation
-
-Offline tests cover uncertainty, unsupported operations, restart invalidation, persistence across callers, rating inclusion, and token stripping. Browsing does not bypass mutation dispatch, durable journals, native locks, timeout handling or reconciliation. Select recovery tests only when those behaviors change.
+Validation: [maintainer guide](../MAINTAINING.md#run-only-what-the-change-affects).

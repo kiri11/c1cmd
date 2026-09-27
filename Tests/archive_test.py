@@ -36,7 +36,7 @@ def check_package(root):
     assert 'could not load resource bundle' not in result.stderr
     assert 'Could not locate Handlers' not in result.stderr
     assert '## MCP setup' in (root / 'README.md').read_text()
-    assert (root / 'docs/RELEASE_VALIDATION.md').is_file()
+    assert (root / 'docs/MAINTAINING.md').is_file()
     assert (root / 'examples/crop-proposals.py').is_file()
     assert (root / 'examples/grade-folder.py').is_file()
     assert (root / 'examples/presets/daylight.json').is_file()

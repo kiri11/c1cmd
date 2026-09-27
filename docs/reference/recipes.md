@@ -2,13 +2,14 @@
 
 A recipe is a versioned c1 payload, not a Capture One processing/export recipe
 or an installed style. CLI and MCP use the same core and JSON request contract.
-The shared contract is 3.3.0. Successful recipe results are compact by default (see [compact results](../../README.md#contract-and-development)); pass `full` for the complete report. Only Capture One 16.8.5.30 is supported. Catalog edits retain the existing exact
-path opt-in and referenced-original guards. Hand over exclusive control: the
-application lock coordinates c1 processes, not edits made in the Capture One UI.
+Successful results are [compact](editing.md#compact-results); pass `full` for the
+complete report. Only Capture One 16.8.5.30 is supported, and every step follows
+the [safety invariants](../../AGENTS.md#safety-invariants), including
+verification before reuse.
 
 ## Supported settings
 
-Global numeric settings: brightness, contrast, saturation, highlight adjustment,
+Fourteen global numeric settings: brightness, contrast, saturation, highlight adjustment,
 shadow/white/black recovery, clarity amount/structure, sharpening amount/radius/
 threshold, and luminance/color noise reduction. Exposure and white balance have
 separate mandatory policies. Settings also accept:
@@ -109,9 +110,8 @@ The native highlight-recovery alias is checked as the negative of highlight
 adjustment; it is not treated as an unrelated omitted field.
 
 Verification evidence is bound to the recipe hash, exact build and durable report
-hash. A failed verification never authorizes reuse. Inspect its preview for visual
-quality; value verification is not aesthetic approval. The clone remains for
-review and explicit deletion. No automatic restoration follows any failure.
+hash. A failed verification never authorizes reuse. The clone remains for preview
+review and explicit deletion; nothing is restored automatically.
 
 ### Apply one photo
 
@@ -222,11 +222,9 @@ These hashes are evidence only, never mutation preconditions. Reference capture
 includes the same independent indexed-color observations. Version-1 reports
 retain their narrower comparison coverage.
 
-Layer settings, mask pixels and Skin Tone remain excluded; installed style
-registration/application is not part of this route. Numeric verification must be
-followed by visual review of the disposable clone. Implementing these scopes does
-not qualify a complete wedding look or make a recipe portable across arbitrary
-camera/lens/profile combinations.
+Layer settings, mask pixels, Skin Tone and installed styles remain excluded.
+Implementing these scopes does not qualify a complete look or make a recipe
+portable across arbitrary camera/lens/profile combinations.
 
 ## Consolidated result bundle
 
@@ -251,12 +249,10 @@ fields are reported as coverage gaps, not deletions or proof of preservation.
 Geometry includes the fields exposed by the geometry snapshot. These sequential
 observations are not an atomic snapshot or a complete backup.
 
-The same bundle is persisted for `edit_status`, so evidence-only follow-up reads
-are unnecessary. Existing `observed` and per-step results remain compatible.
-Failed, uncertain or interrupted runs have partial reports without a final bundle;
-older saved reports may also lack it. Hashes describe those observations: obtain
-fresh preconditions before any later independent mutation. This feature adds no
-read caching or execution-context optimization.
+The same bundle is persisted for `edit_status`. Failed, uncertain or interrupted
+runs have partial reports without a final bundle; older saved reports may also
+lack it. Hashes describe observations; read fresh tokens before any later
+mutation.
 
 ## Partial completion and recovery
 
@@ -284,34 +280,4 @@ Each operation handles one photo per call. Multi-photo scheduling, automatic
 resume, native style installation, mask reconstruction and generalized native
 recipe transfer are intentionally outside this contract.
 
-## Validation
-
-`make check` includes offline recipe validation, content/evidence integrity,
-unverified rejection, clone-only verification, partial completion and interrupted
-parent/child correlation. Run the packaged regular suite with
-`make qualify QUALIFY_SUITES=recipes` and a copied RAW fixture. Live recovery
-qualification and retained results are recorded separately; implementation alone
-does not establish live fault coverage.
-
-Run compound recovery cases against a freshly built archive:
-
-```sh
-make archive
-make qualify-recovery EVIDENCE_DIR=/absolute/new/evidence \
-  RECOVERY_CASES="recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death"
-```
-
-Add `recipe:tonal` or `recipe:preview` when those steps change.
-
-Set `C1_TEST_RAW_FIXTURE` to an existing RAW and close other documents first.
-This harness inherits the existing ownership, independent resume watchdog,
-real timeout, restart, stale-reference and original-preservation checks. The
-`recipe:` cases select faults inside compound operations, except `recipe:layer-color`,
-which checks shared native deletion/reconciliation context on a layer. It creates its own
-Session and retains failed/ambiguous evidence; it never retries a faulted edit.
-
-These live checks include sequential native reads/writes, independent verification
-and preview exports. They are intentionally separate from the fast offline loop.
-Recovery retains actual 120-second Apple Event timeouts. Save generated results
-and journals under `.build/qualification` or external artifact storage, not docs;
-record validation summaries in the commit message or issue.
+Validation: [maintainer guide](../MAINTAINING.md#recovery-case-selection).

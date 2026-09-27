@@ -1,9 +1,25 @@
-# Release validation
+# Maintainer guide
 
-Every push to `main` publishes a release. Live checks drive Capture One and
-cannot run in GitHub CI, so run the checks your change requires locally,
-**before pushing**. Usage is in the [README](../README.md). Historical validation
-summaries belong in commit messages and issue comments, not in documentation.
+Validation, release, new-build qualification and profiling. This is the only place
+that states validation rules. Usage is in the [README](../README.md); the test
+invariants are in [AGENTS.md](../AGENTS.md#safety-invariants). Historical
+validation summaries belong in commit messages and issue comments, not in
+documentation.
+
+## Releases
+
+Every push to `main` publishes a release. The release workflow builds release
+once, runs its unit tests, harnesses and packaged CLI/MCP checks, then publishes
+the archive and SHA-256 checksum. Tags are the UTC date plus a daily sequence
+(`YYYY-MM-DD-01`, `-02`, …); runs are queued so numbering stays unique, and each tag
+points to the commit that triggered it. CI runs `make check` on pushes and pull
+requests. Live checks drive Capture One and cannot run in GitHub CI, so run the
+checks a change requires locally, **before pushing to `main`**.
+
+Architecture: CLI / MCP → shared contract and `CaptureOneCore` → typed AppleScript
+executor → bundled handlers → Capture One. The executor is injectable for
+deterministic fault tests. Style learning and review policy belong in a separate
+repository that uses the public interface, not internal `.c1` files.
 
 ## Run only what the change affects
 
@@ -32,13 +48,29 @@ There are three validation targets:
 | `make qualify [QUALIFY_SUITES="..."\|all]` | Release build, offline checks, relocated package/contracts, then the selected live suites (default `cli mcp existing`) |
 | `make qualify-recovery [RECOVERY_CASES="..."\|all]` | Selected real faults, including compound edits, using an already-built current archive (default `all`) |
 
-Regular suites are `cli mcp geometry lens perspective keystone catalog existing
-inventory native recipes read-workflow`. They do not inject faults. `mcp` is a smoke test of the
+The runner lists selected and skipped suites and cases. Regular suites are
+`cli mcp geometry lens perspective keystone catalog existing inventory native
+recipes read-workflow`. They do not inject faults. `mcp` is a smoke test of the
 MCP adapter (registration, error results, preview image content, one compile of
 each AppleScript handler script per server process); the CLI suites cover tool
 behaviour through the same dispatcher. `read-workflow` covers the accelerated browsing
 handoff on owned Session and Catalog fixtures and waits for the 60-second Catalog
 catch-up boundary.
+
+| Area | Suites |
+|---|---|
+| Tonal, metadata, clone and existing-variant editing | `cli mcp existing` |
+| Geometry, bounds and stored-crop proposals | `geometry lens perspective keystone` as affected |
+| Native editing | `native` |
+| Recipes and compound edits | `recipes` |
+| Catalog reader and read workflow | `catalog read-workflow` |
+| Inventory, progress and cancellation | `inventory` |
+
+During development, individual suites run directly, for example
+`python3 Tests/geometry_integration_test.py` or
+`C1_INVENTORY_EVIDENCE=/private/tmp/inventory.json python3 Tests/inventory_integration_test.py`.
+`C1_TEST_BIN` and `C1_TEST_MCP_BIN` select extracted release binaries. Run
+`mcp_test.py` sequentially, never alongside a CLI suite.
 
 ### Recovery case selection
 
@@ -59,7 +91,6 @@ the unchanged candidate from `make qualify`.
 | Shared journal, locks, write blocking, restart/reconciliation or stale references | All affected paths; `all` when impact cannot be narrowed |
 | Compound edits (`edit_apply` steps, parent reports) | `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death`; add `recipe:tonal` or `recipe:preview` when those steps change |
 | Fault-harness pause, dispatch detection, shutdown, identity or recovery assertions | Cases using the changed behavior |
-| Unrelated features, docs, build/CI or selection/reporting only | Focused offline checks; no live faults |
 
 One list holds all nineteen cases. Generic cases are `clone-readback tonal
 metadata native native-action geometry lens perspective keystone preview mcp-death`.
@@ -74,13 +105,9 @@ layers in recipes.
 ## Current scope and remaining gates
 
 Capture One **16.8.5.30 on Apple Silicon** is the supported application build.
-Use one open document and sequential calls, without UI edits, document switching
-or competing exports. Existing variants are editable through `c1_edit_` references;
-only agent-created managed clones can be deleted.
-
 Sessions support tonal editing, crop/rotation, keystone, ratings, color tags,
-[expanded native editing](native-editing/README.md) and
-[reference recipes](recipes/README.md). Catalogs are read-only by default;
+[expanded native editing](reference/native-editing.md) and
+[reference recipes](reference/recipes.md). Catalogs are read-only by default;
 exact-path opt-in enables experimental editing of online referenced originals
 outside the Catalog directory. Both `.cocatalog` packages and unpackaged directories
 have regular CLI/MCP coverage; unpackaged writes require the exact `.cocatalogdb`
@@ -95,17 +122,12 @@ Other limits:
   observed native names, not hashes of external profile files.
 - Camera/lens and geometry qualification is fixture-specific. Flips,
   crop-outside-image and broad camera/lens coverage remain outside qualification.
-  Each changed recipe needs registration, independent disposable-clone verification
-  and visual review; implementation does not qualify a complete photographic look.
-- Same-file close/reopen within one application launch is not reliably detectable.
-  Application restart and database replacement invalidate working references.
-  Concurrent operators and arbitrary live database replacement are unsupported.
+  Implementation does not qualify a complete photographic look.
+- Concurrent operators and arbitrary live database replacement are unsupported.
 - Preview association requires exclusive output ownership. State hashes are not
   complete render fingerprints. General export and callback coexistence are outside
   scope. Successful value checks do not establish aesthetic quality.
-- Graceful native quit is unqualified. Recovery uses SIGTERM after closing an
-  owned fixture by default; there is no automatic shutdown fallback. Production
-  CLI/MCP commands never quit Capture One.
+- Graceful native quit is unqualified; the recovery harness uses SIGTERM.
 - Archives are ad-hoc signed. Fresh-user downloaded-artifact launch, Automation
   consent in the intended host, Developer ID signing/notarization, Intel and
   additional macOS versions remain separate distribution gates. A passing local
@@ -117,9 +139,9 @@ Other limits:
 ## Run live checks
 
 Close all documents and reserve exclusive use of Capture One. Tests create their
-own disposable Sessions/Catalogs; never qualify against a main Catalog. Do not run
+own disposable Sessions/Catalogs under `/private/tmp` or `.build`. Do not run
 offline core tests concurrently with live suites: both acquire the application
-lock. Keep native calls sequential.
+lock.
 
 Set `C1_TEST_RAW_FIXTURE` to a preserved RAW outside the build tree and
 `EVIDENCE_DIR` to a new ignored or external directory. For the regular catalog
@@ -128,11 +150,9 @@ disposable catalog; the default is `package`. Both layouts include existing-vari
 rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`. The native
 suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people.
 
-Live recipe tests perform sequential native calls, independent clone verification
-and previews. Recovery tests retain real 120-second Apple Event timeouts; five
-timeout cases therefore require at least ten minutes before setup, verification
-and restarts. Do not shorten timeouts or weaken preconditions to reduce test
-duration; select fewer cases instead.
+Recovery tests keep real 120-second Apple Event timeouts; five timeout cases take
+at least ten minutes before setup, verification and restarts. To save time, select
+fewer cases.
 
 ### Recovery settings
 
@@ -165,11 +185,9 @@ executed. Reconciliation records observations, never historical success.
 
 Failures stop without retry. A failed restart suppresses further cleanup Apple
 Events; otherwise cleanup closes only its owned Session and restores hidden build
-resources. Uncertain operations are never retried automatically, and uncertain
-clones are never deleted or adopted. Inspect unresolved journals and end the old
-application process before reconciliation. Restart alone does not clear write
-blocking; explicitly inspect operation status. New fault paths need matching cases:
-existing cases do not establish metadata-specific partial-write coverage, for example.
+resources. Restart alone does not clear write blocking; the harness inspects
+operation status explicitly. New fault paths need matching cases: existing cases
+do not establish metadata-specific partial-write coverage, for example.
 
 ## Qualify a new Capture One build
 
@@ -200,7 +218,7 @@ those paths or bypass their restrictions. Check `writesEnabled` and
    keystone controls, ratings/tags, recipe behavior, and inventory predicates.
    Dictionary compatibility is only a starting point; native behavior needs testing.
 2. Locate explicit build assumptions with
-   `rg -n '16\.8\.5\.30|testedBuilds|pinnedBuild' Sources Tests probes`. Update the
+   `rg -n '16\.8\.5\.30|testedBuilds|pinnedBuild' Sources Tests scripts`. Update the
    relevant guards, capability/schema declarations, and harness assertions together
    on the candidate branch. Those changes enable qualification; do not publish them
    as supported until the corresponding checks pass. Keep unsupported paths gated if
@@ -226,6 +244,33 @@ those paths or bypass their restrictions. Check `writesEnabled` and
    [current scope](#current-scope-and-remaining-gates) and support documentation.
    Rerun affected offline checks after final edits; if the runtime payload changes,
    validate affected native paths on the final archive.
+
+## Profiling and probes
+
+Set `C1_PROFILE=1` on the CLI or MCP server for JSON-lines timing on stderr
+(`type`, `version`, `pid`, `phase`, `handler`, `elapsedMs`, `succeeded`; monotonic
+clock). Phases nest: `script_compile` (cache-miss compilation), `script_lookup`,
+`apple_event` (handler execution, including its property reads), `handler_total`
+and `descriptor_decode`. Diagnostic write failures are ignored.
+
+Benchmarks need one disposable Session or Catalog left untouched while they run,
+and a new output file each run. Record screen-lock, build and load conditions with
+each measurement; a local comparison does not establish general scaling.
+
+| Script | Measures |
+|---|---|
+| `scripts/benchmark-reads.py --ref ID --samples 5 --conditions '...' --output FILE` | Fresh CLI processes against one persistent MCP process; add `--cli .build/release/c1 --mcp .build/release/c1-mcp` for release timings |
+| `scripts/benchmark-scoped-get.py --mcp ... --ref ID --samples 5 --conditions '...' --output FILE` | Single-scope against combined `nativeTargets` reads in one MCP process |
+| `scripts/benchmark-catalog.py`, `scripts/qualify-catalog-reader.py` | Stored SQLite reads against native reads on a matching disposable Catalog |
+| `scripts/probe-catalog-freshness.py --cli ... --raw ... --evidence NEW_DIR` | How long committed SQLite data lags native acknowledgements, on a new disposable Catalog |
+| `scripts/qualify-upgraded-schema.py` | Read-only upgraded-schema stored reads; no Capture One calls |
+
+Benchmarks alternate order, exclude one warmup pair, and stop on changed payloads,
+errors or timeouts while keeping partial evidence. The freshness probe backs up
+its Catalog, restores saved values on success and keeps the fixture on any
+failure. Regenerate the native editing allowlist with
+`python3 scripts/generate-native-editing.py`; `make check` detects drift from the
+retained SDEF. Store reports under `.build/benchmarks` or `.build/qualification`.
 
 ## Evidence
 

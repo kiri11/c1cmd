@@ -41,8 +41,7 @@ sequential live observations, not an atomic snapshot of every setting: do not ed
 in the UI or switch documents during a read. Native-only changes between scopes
 are not guaranteed to be detected by the final compact-state comparison. The
 bounded batch completes once dispatched; inventory-specific cancellation and
-deadline controls do not apply. A stalled Apple Event retains normal timeout
-behavior. No retries are automatic.
+deadline controls do not apply.
 
 Use each snapshot's `target` and `nativeStateHash` for its corresponding native
 mutation, with a fresh read before the next write. One scope's token cannot
@@ -54,11 +53,9 @@ Reads use Capture One's AppleScript interface to observe live application state.
 Verify indexed color-band targets against an independent bulk oracle before
 using them for palette transfer.
 
-Native mutation preparation uses a fresh single-target read for token validation
-and the journal's compact/native before-state, followed by independent readback.
-No observation is retained across operations or reused after a write, export,
-failure or restart. Reference/parent and document identity checks, immediate native
-preconditions, durable pending records and uncertain-outcome blocking remain in place.
+Each native mutation takes a fresh single-target read for its token and journal
+before-state, then an independent readback. No observation is reused after a
+write, export, failure or restart.
 
 ## Targets and coverage
 
@@ -164,9 +161,8 @@ pixels across area and `separateLayers` combinations, with a filled-mask layer p
 
 ## State, evidence, and recovery
 
-All writes require the exact build, existing write authorization, one open
-document, exclusive sequential use, and the normal referenced-Catalog guards.
-`nativeStateHash` binds the target, available values, layer inventory, document
+Writes follow the [safety invariants](../../AGENTS.md#safety-invariants) and
+require Capture One 16.8.5.30. `nativeStateHash` binds the target, available values, layer inventory, document
 lifetime, original-image identity, existing tonal/geometry/metadata tokens, and
 latest journal operation for the variant. Native handlers recheck target values
 and layer inventory immediately before dispatch. A successful mask command advances
@@ -180,37 +176,18 @@ their established fields; they are not a full native-state undo or diff.
 
 **Mask pixels are not exposed by the scripting dictionary.** Property snapshots
 cannot detect arbitrary painted-mask changes, preserve mask pixels, or restore
-a deleted layer/mask. Journal revision detects cooperating API operations only.
-Do not edit in the UI or through another automation during a workflow. Mask
+a deleted layer/mask. Journal revision detects cooperating API operations only. Mask
 commands record native command return and observable state, not pixel-level
 readback verification. Keep native document backups when editing valuable masks.
 
 `dryRun` validates target, permission, token, and arguments without dispatch. It
-returns the current snapshot, not a predicted native rendering. On partial
-failure, timeout, or missing readback, stop: inspect the operation, restart and
-reopen the same database, reconcile observations, and create a fresh editing
-reference. Never blindly retry or automatically undo.
+returns the current snapshot, not a predicted native rendering. A partial failure,
+timeout or missing readback is an uncertain operation.
 
 `C1_TOOL_PROFILE=composition` hides and rejects `native_set` and `native_action`.
 The read-only native inspection tool remains available.
 
-## Validation
-
-Offline coverage includes schema/type guards, generated-resource drift, stale
-state, unmanaged references, dry runs, durable native before-state, unresolved
-write blocking, restart observations, and expired references.
-
-`Tests/native_editing_integration_test.py` exercises the packaged CLI/MCP surface
-in an owned disposable Session with a copied RAW. Select it using
-`make qualify QUALIFY_SUITES=native`; it also requires `C1_TEST_PEOPLE_FIXTURE`, a
-RAW with people, for a second Session covering the successful people mask. Relevant real fault cases are
-`make qualify-recovery RECOVERY_CASES="native native-action"` against the rebuilt
-archive. Qualification results and exclusions must be recorded separately from
-this implemented capability inventory.
-
-Color-editor targets use indexed AppleScript references. The native integration
-suite checks named bands and sibling preservation through independent bulk
-property reads at image and layer scope.
+## Color balance
 
 Color-balance patches write each requested saturation before its paired hue on
 all four wheels, for both image and layer adjustments. Omitted controls are not
@@ -218,3 +195,5 @@ written. Hue readback uses circular distance, so 0 and 360 degrees are equivalen
 with a tolerance of 0.0001 degrees. At zero or very low saturation, some hue
 values cannot be represented within that tolerance; a readback mismatch follows
 the normal partial-failure and recovery rules.
+
+Validation: [maintainer guide](../MAINTAINING.md#run-only-what-the-change-affects).
