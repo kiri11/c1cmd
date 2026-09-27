@@ -10,7 +10,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
@@ -18,6 +17,7 @@ import time
 import uuid
 
 from contract_test import Client, validate_response
+from preview_mapping import check_mapping
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
@@ -60,47 +60,6 @@ def cli(*args, error=None):
     else:
         assert result.returncode == 0, data
     return data
-
-
-def pixels(path):
-    # macOS image decoding with no third-party Python packages. BMP rows are BGR.
-    with tempfile.TemporaryDirectory(prefix='c1-lens-pixels-') as directory:
-        out = Path(directory) / 'preview.bmp'
-        subprocess.run(['sips', '-s', 'format', 'bmp', str(path), '--out', str(out)],
-                       check=True, capture_output=True)
-        data = out.read_bytes()
-    offset = struct.unpack_from('<I', data, 10)[0]
-    width, height = struct.unpack_from('<ii', data, 18)
-    bits = struct.unpack_from('<H', data, 28)[0]
-    compression = struct.unpack_from('<I', data, 30)[0]
-    assert bits in (24, 32) and compression == 0, (bits, compression)
-    stride = ((width * bits + 31) // 32) * 4
-    def pixel(x, y):
-        x, y = min(width-1, max(0, int(x))), min(abs(height)-1, max(0, int(y)))
-        row = abs(height)-1-y if height > 0 else y
-        pos = offset + row*stride + x*(bits//8)
-        return data[pos:pos+3]
-    return width, abs(height), pixel
-
-
-def check_mapping(context, cropped):
-    cw, ch, cp = pixels(context['outputPath'])
-    pw, ph, pp = pixels(cropped['outputPath'])
-    outer, inner = context['geometry']['crop'], cropped['geometry']['crop']
-    errors = []
-    # Sample corresponding locations away from the resampled JPEG edges.
-    for iy in range(4, 77):
-        for ix in range(4, 77):
-            u, v = ix/80, iy/80
-            x = inner['centerX']-inner['width']/2+u*inner['width']
-            y = inner['centerY']+inner['height']/2-v*inner['height']
-            px = (x-(outer['centerX']-outer['width']/2))/outer['width']*cw
-            py = ((outer['centerY']+outer['height']/2)-y)/outer['height']*ch
-            a, b = cp(px, py), pp(u*pw, v*ph)
-            errors.extend(abs(x-y) for x, y in zip(a, b))
-    mean = sum(errors)/len(errors)
-    assert mean < 8, ('Preview/crop coordinate mismatch', mean)
-    return {'meanAbsoluteChannelError': mean, 'threshold': 8, 'sampledPixels': len(errors)//3}
 
 
 assert apple('return count of documents') == '0', 'Close documents before qualification'
