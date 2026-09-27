@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.0.0"
+    public static let version = "3.1.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -216,7 +216,7 @@ public enum ContractSchema {
         var requestStatusProperties: [String: Any] = [
             "requestId": string, "tool": string, "phase": string, "status": string,
             "documentIdentity": string, "scope": string, "operationId": string, "handler": string,
-            "applicationProgress": string, "inventoryStrategy": string, "waitingForAppleEvent": boolean, "processAlive": boolean, "stale": boolean, "slow": boolean,
+            "applicationProgress": string, "inventoryStrategy": string, "waitingForAppleEvent": boolean, "processAlive": boolean, "stale": boolean, "slow": boolean, "cancelRequested": boolean,
             "startedAt": number, "updatedAt": number
         ]
         for name in ["processId", "elapsedMs", "lastProgressAgoMs", "candidatesScanned", "matchesFound", "summariesCompleted", "totalCandidates", "rating", "minRating", "handlerCalls"] {

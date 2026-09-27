@@ -1022,6 +1022,7 @@ public final class SessionController {
         let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
 
         for chunkStart in stride(from: 0, to: variants.count, by: max(1, batchSize)) {
+            try RequestContext.current?.checkReadCancellation()
             let chunkEnd = min(chunkStart + batchSize, variants.count)
             let chunk = Array(variants[chunkStart..<chunkEnd])
             let idsDesc = NSAppleEventDescriptor(list: chunk.map { NSAppleEventDescriptor(string: $0.id) })

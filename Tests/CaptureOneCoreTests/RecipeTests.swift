@@ -14,6 +14,7 @@ private final class RecipeFake: ScriptExecuting {
     var corruptField = "clarity amount"
     var corruptAfterWrites = 0
     var writes = 0
+    var afterNativeApply: (() -> Void)?
     init(_ directory: URL) { geometry = GeometryFake(directory:directory) }
     var fields: [String] { ["exposure","temperature","tint"] + Recipes.supportedFields }
     func values(_ id: String) -> [String:Any] {
@@ -66,6 +67,7 @@ private final class RecipeFake: ScriptExecuting {
         } else if handler == "nativeApply" {
             writes += 1
             if fault == "native" { throw C1Error.timeout("recipe injected timeout") }
+            defer { afterNativeApply?() }
             let id = args[1].stringValue!
             for i in 1...args[9].numberOfItems {
                 let key = args[9].atIndex(i)!.stringValue!, descriptor = args[10].atIndex(i)!
@@ -228,6 +230,38 @@ struct RecipeTests {
             XCTAssertThrowsError(try workflow.run("edit_apply",arguments:request))
             XCTAssertEqual(fake.writes,count)
             try saved.write(to:evidence)
+            // Ctrl-C/SIGTERM: a cancellation that arrives before the first step dispatches nothing.
+            var cancelRequest = request; cancelRequest["exposure"] = ["mode":"absolute","value":0.3]; cancelRequest["preview"] = true
+            let early = RequestContext(tool:"edit_apply",progressMode:"quiet",directory:nil)
+            early.cancel()
+            let before = fake.writes
+            let untouched = try early.withCurrent { try workflow.run("edit_apply",arguments:cancelRequest) }
+            XCTAssertEqual(untouched["status"] as? String,"failed")
+            XCTAssertEqual((untouched["error"] as? [String:Any])?["code"] as? String,"request-cancelled")
+            XCTAssertEqual((untouched["completed"] as? [[String:Any]])?.count,0)
+            XCTAssertEqual(fake.writes,before)
+            // A signal during a step lets that step finish, then stops before the next one.
+            let late = RequestContext(tool:"edit_apply",progressMode:"quiet",directory:nil)
+            let signals = SignalCancellation(late,signals:[SIGTERM])
+            fake.afterNativeApply = {
+                kill(getpid(), SIGTERM)
+                let deadline = Date().addingTimeInterval(2)
+                while !late.cancellationRequested && Date() < deadline { usleep(1000) }
+            }
+            let stopped = try late.withCurrent { try workflow.run("edit_apply",arguments:cancelRequest) }
+            fake.afterNativeApply = nil; signals.stop()
+            XCTAssertEqual(stopped["status"] as? String,"failed")
+            XCTAssertEqual((stopped["error"] as? [String:Any])?["code"] as? String,"request-cancelled")
+            XCTAssertEqual((stopped["completed"] as? [[String:Any]])?.map { $0["step"] as? String },["prepare","settings"])
+            XCTAssertEqual(stopped["unattempted"] as? [String],["tonal","preview","observe"])
+            XCTAssertNil(stopped["resultBundle"])
+            XCTAssertEqual(base.values["1"]![0],0,"The tonal step after the signal never dispatched")
+            // Same end state as an MCP cancel: every dispatched child completed, nothing is left uncertain.
+            let children = try OperationJournal(sessionDirectory:directory).validatedEntries().filter { $0.compoundId == stopped["compoundId"] as? String }
+            let finalStatus = Dictionary(children.map { ($0.operationId,$0.status) }) { _, last in last }
+            XCTAssertEqual(Array(finalStatus.values),["succeeded"],"Exactly the settings child dispatched, and it resolved")
+            let saved2 = try workflow.run("edit_status",arguments:["compoundId":stopped["compoundId"]!])
+            XCTAssertEqual(saved2["status"] as? String,"failed")
             // Simulated lost reply stops before optional tonal and preview steps.
             fake.fault = "native"
             var failRequest = request; failRequest["exposure"] = ["mode":"absolute","value":0.3]; failRequest["preview"] = true

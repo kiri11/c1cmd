@@ -239,6 +239,7 @@ public final class RecipeWorkflow {
         func save() throws { try RequestContext.current?.checkCompoundCancellation(); report["completed"] = completed; report["activeStep"] = step; try Recipes.write(report,to:path) }
         func finish(_ result: [String:Any]) throws { completed.append(["step":step,"result":result]); try save() }
         do {
+            try save() // a cancellation that arrived before the first step dispatches nothing
             let oracleBefore = (verify || scoped) ? try linked.recipeOracle(ref:sourceRef) : [:]
             let nativeBefore = (verify || scoped) ? try linked.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
             if verify {

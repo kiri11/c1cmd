@@ -56,6 +56,38 @@ struct RequestContextTests {
         }
         XCTAssertThrowsError(try RequestContext.status(requestId: "../../private", directory: directory))
 
+        // Process signals become request cancellation; the process survives and later signals only repeat the notice.
+        func disposition(_ number: Int32) -> Int { var current = sigaction(); sigaction(number, nil, &current); return unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) }
+        var originalInt = sigaction(), ignore = sigaction(); ignore.__sigaction_u.__sa_handler = SIG_IGN
+        sigaction(SIGINT, &ignore, &originalInt)
+        let originalTerm = disposition(SIGTERM)
+        final class Notices: @unchecked Sendable {
+            private let lock = NSLock(); private var seen = Set<Int>()
+            func add(_ count: Int) { lock.lock(); seen.insert(count); lock.unlock() }
+            var count: Int { lock.lock(); defer { lock.unlock() }; return seen.count }
+        }
+        let notices = Notices()
+        let signalled = RequestContext(tool: "dump", progressMode: "quiet", directory: directory)
+        let signals = SignalCancellation(signalled) { notices.add($0) }
+        for number in [SIGINT, SIGTERM] {
+            kill(getpid(), number)
+            let wait = Date().addingTimeInterval(2)
+            while notices.count < (number == SIGINT ? 1 : 2) && Date() < wait { usleep(1000) }
+        }
+        XCTAssertTrue(signalled.cancellationRequested)
+        XCTAssertEqual(signalled.snapshot.cancelRequested, true)
+        XCTAssertEqual(notices.count, 2, "Each signal reports its running count")
+        XCTAssertThrowsError(try signalled.withCurrent { try core.dump() }) { error in
+            XCTAssertEqual((error as? C1Error)?.errorCode, "request-cancelled", "Batched dump reads stop at a boundary")
+        }
+        signals.stop()
+        XCTAssertEqual(disposition(SIGINT), unsafeBitCast(SIG_IGN, to: Int.self), "stop() restores the previous disposition")
+        XCTAssertEqual(disposition(SIGTERM), originalTerm)
+        sigaction(SIGINT, &originalInt, nil)
+        let single = RequestContext(tool: "get", progressMode: "quiet", directory: directory)
+        single.cancel()
+        XCTAssertNoThrow(try single.checkReadCancellation(), "Single reads have no inner boundary and finish normally")
+
         let write = RequestContext(tool: "variant_clone", progressMode: "quiet", directory: directory)
         write.cancel()
         XCTAssertNoThrow(try write.checkReadCancellation(), "Read cancellation cannot bypass mutation reconciliation")

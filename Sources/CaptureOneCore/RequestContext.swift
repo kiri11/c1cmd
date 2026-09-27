@@ -29,6 +29,8 @@ public struct RequestSnapshot: Codable, Sendable {
     public var applicationProgress = "unknown"
     public var processAlive: Bool?
     public var stale: Bool?
+    /// Set once a cancellation arrives; the request still ends at its next safe boundary.
+    public var cancelRequested: Bool?
 }
 
 public final class RequestContext: @unchecked Sendable {
@@ -132,10 +134,14 @@ public final class RequestContext: @unchecked Sendable {
         mutex.lock(); state.operationId = id; mutex.unlock()
         update(phase: "mutation-prepared")
     }
-    public func cancel() { mutex.lock(); cancelled = true; mutex.unlock() }
-    /// Only top-level inventory requests honor cancellation. Nested inventory inside a mutation must finish its safety work.
+    public func cancel() {
+        mutex.lock(); cancelled = true; state.cancelRequested = true; mutex.unlock()
+        emit(force: true)
+    }
+    public var cancellationRequested: Bool { mutex.lock(); defer { mutex.unlock() }; return cancelled }
+    /// Only top-level batched reads honor read cancellation. Nested inventory inside a mutation must finish its safety work.
     public func checkReadCancellation() throws {
-        mutex.lock(); let stop = cancelled && state.tool == "variants_list"; mutex.unlock()
+        mutex.lock(); let stop = cancelled && ["variants_list", "dump"].contains(state.tool); mutex.unlock()
         if stop { throw C1Error.requestCancelled("Inventory cancelled between Apple Events; no partial inventory was returned.") }
     }
     /// Compound workflows stop only after the current guarded operation has returned.
@@ -228,4 +234,41 @@ public final class RequestContext: @unchecked Sendable {
         result.stale = result.status == "running" && (result.processAlive == false || Date().timeIntervalSince1970 - result.updatedAt > 15)
         return result
     }
+}
+
+/// Routes process signals to request cancellation while a request runs. The request then
+/// stops at its next safe boundary; an outstanding Apple Event is never interrupted, and
+/// commands without such a boundary finish normally. Call `stop()` when the request ends
+/// to restore the previous signal dispositions.
+public final class SignalCancellation: @unchecked Sendable {
+    private var sources: [DispatchSourceSignal] = []
+    private var previous: [Int32: sigaction] = [:]
+    private let mutex = NSLock()
+    private var received = 0
+
+    /// `notice` receives the running count of signals, on a background queue.
+    public init(_ context: RequestContext, signals: [Int32] = [SIGINT, SIGTERM], notice: (@Sendable (Int) -> Void)? = nil) {
+        for number in signals {
+            // Ignore the default action so the process survives; the dispatch source still observes the signal.
+            var ignore = sigaction(), old = sigaction()
+            ignore.__sigaction_u.__sa_handler = SIG_IGN
+            sigaction(number, &ignore, &old)
+            previous[number] = old
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .global(qos: .userInitiated))
+            source.setEventHandler { [self] in
+                context.cancel()
+                mutex.lock(); received += 1; let count = received; mutex.unlock()
+                notice?(count)
+            }
+            source.resume()
+            sources.append(source)
+        }
+    }
+
+    public func stop() {
+        sources.forEach { $0.cancel() }; sources = []
+        for (number, var old) in previous { sigaction(number, &old, nil) }
+        previous = [:]
+    }
+    deinit { stop() }
 }

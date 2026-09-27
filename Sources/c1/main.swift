@@ -27,14 +27,17 @@ struct GlobalOptions: ParsableArguments {
 
 func handleExecution(tool: String, format: OutputFormat, progressMode: String? = nil, _ block: () throws -> Void) -> ExitCode {
     let context = RequestContext(tool: tool, progressMode: progressMode)
-    var signalSource: DispatchSourceSignal?
-    let oldSignal = tool == "variants_list" ? signal(SIGINT, SIG_IGN) : nil
-    if tool == "variants_list" {
-        let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
-        source.setEventHandler { context.cancel() }
-        source.resume(); signalSource = source
+    // Ctrl-C and SIGTERM request cancellation instead of killing the process mid-write. Notices
+    // go only to a terminal: writing to a closed pipe would raise SIGPIPE mid-request.
+    let interactive = isatty(STDERR_FILENO) == 1
+    let signals = SignalCancellation(context) { count in
+        guard interactive else { return }
+        let message = count == 1
+            ? "Cancelling at the next safe boundary; the current Capture One call is never interrupted.\n"
+            : "Still waiting for the current Capture One call to finish; stopping it now could leave an uncertain edit.\n"
+        try? FileHandle.standardError.write(contentsOf: Data(message.utf8))
     }
-    defer { signalSource?.cancel(); if tool == "variants_list" { signal(SIGINT, oldSignal) } }
+    defer { signals.stop() }
     do {
         if let progressMode, !["quiet", "json", "human"].contains(progressMode) { throw C1Error.invalidRequest("progress must be human, json, or quiet.") }
         context.update(phase: "executing")
