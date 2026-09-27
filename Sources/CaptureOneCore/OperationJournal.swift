@@ -30,7 +30,7 @@ public struct OperationRecord: Codable, Equatable {
     public let workingRef: String?
     public let documentPath: String
     public let preconditionStateHash: String?
-    public let intendedAdjustments: Adjustments?
+    public var intendedAdjustments: Adjustments?
     public let beforeAdjustments: Adjustments?
     public var afterAdjustments: Adjustments?
     public var beforeNative: NativeSnapshot?
@@ -138,21 +138,6 @@ public final class OperationJournal {
         try handle.write(contentsOf: data)
         try handle.synchronize()
         if entry.status == "pending" { RequestContext.current?.linkOperation(entry.operationId) }
-    }
-
-    public func update(operationId: String, status: String, afterAdjustments: Adjustments? = nil,
-                       diff: [String: DoubleDiff]? = nil, error: String? = nil, previewOutputPath: String? = nil, afterGeometry: Geometry? = nil, afterMetadata: VariantMetadata? = nil) throws {
-        guard var entry = try validatedEntries().first(where: { $0.operationId == operationId }) else {
-            throw C1Error.invalidRequest("Operation not found: \(operationId)")
-        }
-        entry.status = status
-        if let value = afterMetadata { entry.afterMetadata = value }
-        if let value = afterGeometry { entry.afterGeometry = value }
-        if let value = afterAdjustments { entry.afterAdjustments = value }
-        if let value = diff { entry.diff = value }
-        if let value = error { entry.error = value }
-        if let value = previewOutputPath { entry.previewOutputPath = value }
-        try append(entry: entry)
     }
 
     public func find(operationId: String) -> OperationRecord? { loadEntries().first { $0.operationId == operationId } }

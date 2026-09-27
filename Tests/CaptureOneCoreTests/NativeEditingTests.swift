@@ -8,18 +8,25 @@ final class NativeFake: ScriptExecuting {
     var prepared = false
     var calls: [String] = []
     var onNativeRead: (() -> Void)?
+    var layers: [[String:Any]] = []
     init(_ base: FakeScript) { self.base = base }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
         calls.append(handler)
         if handler == "nativeRead" {
             onNativeRead?()
-            let result: [String:Any] = ["nativeRows":[["fieldName":"clarity amount", "numbersVal":[clarity]]], "nativeLayers":[], "basicColorCount":0, "advancedColorCount":0]
+            let result: [String:Any] = ["nativeRows":[["fieldName":"clarity amount", "numbersVal":[clarity]]], "nativeLayers":layers, "basicColorCount":0, "advancedColorCount":0]
             return try JSONDecoder().decode(T.self, from:JSONSerialization.data(withJSONObject:result))
         }
-        if handler == "nativeApply" {
+        if handler == "nativeApply" || handler == "nativeAction" {
+            try base.intercept(handler)
             prepared = OperationJournal(sessionDirectory:base.directory).unresolvedEntries().contains { $0.beforeNative != nil && $0.nativePatch != nil }
             if fault { throw C1Error.timeout("native fault") }
-            clarity = args[10].atIndex(1)!.doubleValue
+            if handler == "nativeAction" {
+                // Only layer.create is modelled: a misapplied action adds nothing.
+                if !base.misapply { layers.append(["nativeName":"fixture layer", "nativeKind":"adjustment", "nativeOpacity":100, "nativeEnabled":true]) }
+            } else {
+                clarity = args[10].atIndex(1)!.doubleValue + (base.misapply ? 1 : 0)
+            }
             return try JSONDecoder().decode(T.self, from:Data("true".utf8))
         }
         return try base.executeAndDecode(handler:handler, args:args)

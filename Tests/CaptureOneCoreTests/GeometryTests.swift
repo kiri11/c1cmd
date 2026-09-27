@@ -12,6 +12,7 @@ final class GeometryFake: ScriptExecuting {
     var requestedBeforeWrite: GeometryRequest?
     var normalizePerspective = false
     init(directory: URL) { base = FakeScript(directory: directory) }
+    init(base: FakeScript) { self.base = base }
     func record(_ id: String) -> [String: Any] {
         records[id] ?? ["cropValues":[3000.0,2000,6000,4000], "rotationDegrees":0.0, "orientationDegrees":0,
             "sourceDimensions":[6000.0,4000], "maximumValues":[3000.0,2000,6000,4000], "flipName":"none", "ratioName":"",
@@ -36,6 +37,7 @@ final class GeometryFake: ScriptExecuting {
             if changeDuringPreview { var changed = r; changed["rotationDegrees"] = 1.0; records[id] = changed }
             result = ["jobId":"geometry-job"]
         case "applyGeometry", "applyCorrectedGeometry":
+            try base.intercept(handler)
             writeCount += 1
             pendingBeforeWrite = OperationJournal(sessionDirectory: base.directory).unresolvedEntries().contains { $0.operationType == "geometry_set" }
             requestedBeforeWrite = OperationJournal(sessionDirectory: base.directory).unresolvedEntries().last?.requestedGeometry
@@ -68,7 +70,7 @@ final class GeometryFake: ScriptExecuting {
             r["cropValues"] = fitted
             if dimensionsFollowRotation { r["sourceDimensions"] = args[6].doubleValue == 0 ? [6000.0, 4000] : [6135.0, 4206] }
             if failure == "keystone-mismatch" { r["keystoneValues"] = [100.0,99,0,0,0] }
-            if failure == "mismatch" { r["rotationDegrees"] = 22.0 }
+            if failure == "mismatch" || base.misapply { r["rotationDegrees"] = 22.0 }
             if failure == "lens-change" { r["lensValues"] = [0.0,35,0,0,0,0,0,0] }
             records[id] = r
             if failure == "lost-reply" { throw C1Error.timeout("applied, reply lost") }

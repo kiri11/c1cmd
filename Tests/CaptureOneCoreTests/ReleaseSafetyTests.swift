@@ -22,7 +22,10 @@ final class FakeScript: ScriptExecuting {
     var parents: [String: String] = [:]
     var createdIDOverride: String?
     var generation = "app-1"
+    /// Runs inside every mutation handler, after an injected `fail` would have thrown.
     var beforeApply: (() -> Void)?
+    /// Mutation handlers apply or report a different value than requested.
+    var misapply = false
     // Inventory test controls. These hooks let the offline suite model a
     // document changing between the discovery, rating, and summary phases.
     var beforeHandler: ((String) -> Void)?
@@ -72,13 +75,20 @@ final class FakeScript: ScriptExecuting {
                 "isSelected": selectedIDs.contains(id), "starRating": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0,
                 "exposureVal": a[0], "contrastVal": a[1], "saturationVal": a[2], "temperatureVal": a[3], "tintVal": a[4]]
     }
-    func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
+    static let mutationHandlers: Set = ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyMetadata", "applyAdjustments",
+                                        "applyGeometry", "applyCorrectedGeometry", "nativeApply", "nativeAction"]
+    /// Records a call and applies injected faults. Wrapper fakes call this for the handlers they answer.
+    func intercept(_ handler: String) throws {
         calls.append(handler)
         beforeHandler?(handler)
-        if ["cloneVariant", "createBaselineVariant", "deleteVariant", "applyMetadata", "applyAdjustments", "ensurePreviewRecipe", "processPreview"].contains(handler) {
+        if Self.mutationHandlers.union(["ensurePreviewRecipe", "processPreview"]).contains(handler) {
             preparedBeforeDispatch = preparedBeforeDispatch && OperationJournal(sessionDirectory: directory).unresolvedEntries().contains { $0.status == "pending" }
         }
         if fail == handler { throw C1Error.timeout("injected late reply") }
+        if Self.mutationHandlers.contains(handler) { beforeApply?() }
+    }
+    func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
+        try intercept(handler)
         let result: Any
         switch handler {
         case "getAppAndDocInfo":
@@ -147,7 +157,9 @@ final class FakeScript: ScriptExecuting {
             let id = createdIDOverride ?? "\((values.keys.compactMap(Int.init).max() ?? 0) + 1)"
             values[id] = handler == "cloneVariant" ? values[args[1].stringValue!] : [0, 0, 0, 5000, 0]
             result = [handler == "cloneVariant" ? "cloneId" : "baselineId": id]
-        case "deleteVariant": values.removeValue(forKey: args[1].stringValue!); result = ["deleted": true, "existsNow": false]
+        case "deleteVariant":
+            if !misapply { values.removeValue(forKey: args[1].stringValue!) }
+            result = ["deleted": true, "existsNow": misapply]
         case "ensurePreviewRecipe":
             previewRoot = args[2].stringValue
             result = ["configured": true, "recipeName": "c1-preview"]
@@ -156,7 +168,6 @@ final class FakeScript: ScriptExecuting {
             try FakeScript.jpeg().write(to: target)
             result = ["jobId": "job-1"]
         case "applyMetadata":
-            beforeApply?()
             let id = args[1].stringValue!
             guard args[6].stringValue == (parentOverride ?? parent) else { throw C1Error.identityAmbiguous("parent changed") }
             guard ratings[id] ?? 0 == Int(args[4].int32Value), colorTags[id] ?? 0 == Int(args[5].int32Value) else {
@@ -169,14 +180,13 @@ final class FakeScript: ScriptExecuting {
             if metadataFault == "tone" { values[id]![0] = 1 }
             result = ["variantId": id, "ratingVal": ratings[id] ?? 0, "colorTagVal": colorTags[id] ?? 0] as [String: Any]
         case "applyAdjustments":
-            beforeApply?()
             let id = args[1].stringValue!
             let before = values[id]!
             let expected = (1...5).map { args[7].atIndex($0)!.doubleValue }
             guard before == expected else { throw C1Error.stateChanged("injected UI edit at dispatch") }
             mutatePatch = (2...6).map { args[$0].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType }
             var after = before
-            for n in 0..<5 where mutatePatch[n] { after[n] = args[n + 2].doubleValue }
+            for n in 0..<5 where mutatePatch[n] { after[n] = args[n + 2].doubleValue + (misapply ? 0.5 : 0) }
             values[id] = after
             var object: [String: Any] = ["variantId": id]
             for (n, name) in ["Exposure", "Contrast", "Saturation", "Temperature", "Tint"].enumerated() {

@@ -260,13 +260,15 @@ public final class SessionController {
     private let isAppRunning: () -> Bool
     private let nativeInventoryEnabled: Bool
     let executor: ScriptExecuting
-    private let appInstance: () throws -> String
-    private let databaseIdentity: (String) throws -> String
+    let appInstance: () throws -> String
+    let databaseIdentity: (String) throws -> String
     private let catalogWritePath: String?
     private let imageDimensions: (String) -> [Double]?
     let lock = CaptureOneLock.shared
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
+    /// The parent compound edit that journaled writes through this controller belong to.
+    let compoundId: String?
 
     public init(executor: ScriptExecuting = AppleScriptExecutor.shared,
                 appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
@@ -282,9 +284,26 @@ public final class SessionController {
         self.databaseIdentity = databaseIdentity
         self.catalogWritePath = catalogWritePath
         self.imageDimensions = imageDimensions
+        self.compoundId = nil
     }
 
-    private func databasePath(_ doc: DocumentInfo) throws -> String {
+    private init(linking base: SessionController, compoundId: String) {
+        isAppRunning = base.isAppRunning
+        nativeInventoryEnabled = base.nativeInventoryEnabled
+        executor = base.executor
+        appInstance = base.appInstance
+        databaseIdentity = base.databaseIdentity
+        catalogWritePath = base.catalogWritePath
+        imageDimensions = base.imageDimensions
+        self.compoundId = compoundId
+    }
+
+    /// A controller whose journaled writes record `compoundId` as their parent compound edit.
+    func linked(toCompound compoundId: String) -> SessionController {
+        SessionController(linking: self, compoundId: compoundId)
+    }
+
+    func databasePath(_ doc: DocumentInfo) throws -> String {
         if !doc.isSession { return try CatalogLocation(nativeID: doc.documentId).database.path }
         return doc.isSession && !doc.documentId.hasSuffix(".cosessiondb")
             ? URL(fileURLWithPath: doc.documentPath).appendingPathComponent(doc.documentName).path
@@ -310,17 +329,6 @@ public final class SessionController {
                 throw C1Error.invalidRequest("Experimental Catalog editing supports referenced originals only. Originals stored inside the Catalog are not yet qualified.")
             }
         }
-    }
-
-    func prepare(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult? = nil) throws -> OperationRecord {
-        try assertWritableImage(doc: doc, source: source)
-        var result = entry
-        result.compoundId = Thread.current.threadDictionary["c1.compoundId"] as? String
-        result.appInstance = try appInstance()
-        result.documentIdentity = try databaseIdentity(databasePath(doc))
-        result.nativeVariantId = source?.id
-        result.parentImagePath = source?.parentImagePath
-        return result
     }
 
     // MARK: - Doctor
@@ -694,12 +702,8 @@ public final class SessionController {
 
     // MARK: - Edit an existing variant
     public func editVariant(sourceRef: String, ifState expected: String, ifDocument: String, ifGeometryState: String? = nil) throws -> EditingRecord {
-        try lock.withLock {
-            let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "variant_edit")
+        try guarded("variant_edit", pinned: "Existing-variant editing requires Capture One \(Self.pinnedBuild).") { doc in
             guard doc.openToken == ifDocument else { throw C1Error.documentChanged("Document changed since the editing targets were selected.") }
-            guard doc.appVersion == "16.8.5.30" else { throw C1Error.unsupportedVersion("Existing-variant editing requires Capture One 16.8.5.30.") }
-            try checkedDocument(doc)
             let source = try get(ref: sourceRef)
             guard let parent = source.parentImagePath, !parent.isEmpty else {
                 throw C1Error.identityAmbiguous("Existing-variant editing requires an identifiable parent image.")
@@ -721,81 +725,67 @@ public final class SessionController {
     }
 
     private func createVariant(sourceRef: String, baseline: Bool) throws -> CloneResult {
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            let operation = baseline ? "baseline" : "clone"
-            try assertSessionWritable(docInfo: doc, operation: operation)
-            try checkedDocument(doc)
+        let operation = baseline ? "baseline" : "clone"
+        return try guarded(operation) { doc in
             let source = try get(ref: sourceRef)
             guard let parent = source.parentImagePath, !parent.isEmpty else {
                 throw C1Error.identityAmbiguous("Source parent image path is unavailable.")
             }
+            try assertWritableImage(doc: doc, source: source)
             let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
             _ = try store.validatedRecords()
-            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
             let ref = WorkingRef().rawValue
-            var entry = try prepare(OperationRecord(operationType: operation, workingRef: ref,
-                documentPath: doc.documentPath, beforeAdjustments: source.adjustments), doc: doc, source: source)
             let lookup = VariantLookup(executor: executor)
-            entry.variantIdsBefore = try lookup.siblings(of: source.id, parent: parent, in: doc)
-            try journal.append(entry: entry)
-            do {
+            let siblings = try lookup.siblings(of: source.id, parent: parent, in: doc)
+            var entry = OperationRecord(operationType: operation, workingRef: ref,
+                documentPath: doc.documentPath, beforeAdjustments: source.adjustments)
+            entry.variantIdsBefore = siblings
+            return try journaled(entry, doc: doc, source: source, dispatch: {
                 let args = [NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: source.id)]
-                let id: String
                 if baseline {
                     let result: CreateBaselineVariantResult = try executor.executeAndDecode(handler: "createBaselineVariant", args: args)
-                    id = result.baselineId
-                } else {
-                    let result: CloneVariantResult = try executor.executeAndDecode(handler: "cloneVariant", args: args)
-                    id = result.cloneId
+                    return result.baselineId
                 }
-                guard id != source.id, !(entry.variantIdsBefore ?? []).contains(id) else {
-                    throw C1Error.identityAmbiguous("Creation did not return a new variant ID.")
+                let result: CloneVariantResult = try executor.executeAndDecode(handler: "cloneVariant", args: args)
+                return result.cloneId
+            }, readback: { pending, id in
+                guard id != source.id, !siblings.contains(id) else {
+                    return .mismatch(.identityAmbiguous("Creation did not return a new variant ID."))
                 }
                 let created = try get(ref: id)
-                guard created.parentImagePath == parent else { throw C1Error.identityAmbiguous("Created variant has the wrong parent image.") }
+                guard created.parentImagePath == parent else { return .mismatch(.identityAmbiguous("Created variant has the wrong parent image.")) }
                 guard try lookup.siblings(of: source.id, parent: parent, in: doc).contains(id) else {
-                    throw C1Error.identityAmbiguous("Created variant is not a sibling of its source.")
+                    return .mismatch(.identityAmbiguous("Created variant is not a sibling of its source."))
                 }
                 try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
                     cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
-                    parentImagePath: parent, creationOperationId: entry.operationId,
+                    parentImagePath: parent, creationOperationId: pending.entry.operationId,
                     baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken, baselineGeometry: created.geometry, baselineMetadata: VariantMetadata.from(created.metadata)))
-                try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: created.adjustments)
-                return CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
-                                   documentPath: doc.documentPath, baselineStateHash: created.stateHash)
-            } catch {
-                try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
-                throw OperationFailure(operationId: entry.operationId, cause: error)
-            }
+                pending.update { $0.afterAdjustments = created.adjustments }
+                return .confirmed(CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
+                                              documentPath: doc.documentPath, baselineStateHash: created.stateHash))
+            }).value
         }
     }
 
     // MARK: - Delete Variant
     public func deleteVariant(workingRefString: String) throws -> DeleteResult {
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "delete")
-            try checkedDocument(doc)
+        try guarded("delete") { doc in
             let current = try get(ref: workingRefString)
+            try assertWritableImage(doc: doc, source: current)
             let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
             let record = try store.resolveManagedWorkingReference(workingRefString, currentDocumentPath: doc.documentPath)
-            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
-            let entry = try prepare(OperationRecord(operationType: "delete", workingRef: workingRefString,
-                documentPath: doc.documentPath, beforeAdjustments: current.adjustments), doc: doc, source: current)
-            try journal.append(entry: entry)
-            do {
-                let result: DeleteVariantResult = try executor.executeAndDecode(handler: "deleteVariant", args: [
+            let entry = OperationRecord(operationType: "delete", workingRef: workingRefString,
+                documentPath: doc.documentPath, beforeAdjustments: current.adjustments)
+            return try journaled(entry, doc: doc, source: current, dispatch: { () -> DeleteVariantResult in
+                try executor.executeAndDecode(handler: "deleteVariant", args: [
                     NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: record.cloneVariantId),
                     NSAppleEventDescriptor(string: record.parentImagePath!), NSAppleEventDescriptor(string: record.sourceVariantId)])
-                guard result.deleted && !result.existsNow else { throw C1Error.readbackMismatch("Deleted variant still exists.") }
+            }, readback: { _, result in
+                guard result.deleted && !result.existsNow else { return .mismatch(.readbackMismatch("Deleted variant still exists.")) }
                 try store.remove(workingRef: workingRefString)
-                try journal.update(operationId: entry.operationId, status: "succeeded")
-                return DeleteResult(deleted: true, workingRef: workingRefString, cloneVariantId: record.cloneVariantId)
-            } catch {
-                try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
-                throw OperationFailure(operationId: entry.operationId, cause: error)
-            }
+                return .confirmed(DeleteResult(deleted: true, workingRef: workingRefString, cloneVariantId: record.cloneVariantId))
+            }).value
         }
     }
 
@@ -889,14 +879,14 @@ public final class SessionController {
         )
     }
 
-    func adjustmentTarget(_ ref: String, document: DocumentInfo) throws -> (workingRef: String, variantId: String, baselineAdjustments: Adjustments) {
+    func adjustmentTarget(_ ref: String, document: DocumentInfo) throws -> (workingRef: String, variantId: String, baselineAdjustments: Adjustments, baselineGeometry: Geometry?) {
         if EditingRecord.isEditingReference(ref) {
             let record = try EditingStore(document: document).resolve(ref, document: document)
-            return (record.workingRef, record.variantId, record.baselineAdjustments)
+            return (record.workingRef, record.variantId, record.baselineAdjustments, record.baselineGeometry)
         }
         let record = try ProvenanceStore(sessionDirectory: URL(fileURLWithPath: document.documentPath))
             .resolveManagedWorkingReference(ref, currentDocumentPath: document.documentPath)
-        return (record.workingRef, record.cloneVariantId, record.baselineAdjustments)
+        return (record.workingRef, record.cloneVariantId, record.baselineAdjustments, record.baselineGeometry)
     }
 
     // MARK: - Set / Add / Reset Mutations
@@ -905,293 +895,49 @@ public final class SessionController {
         ifState expectedHash: String,
         setAdjustments: Adjustments?,
         addAdjustments: Adjustments?,
-        isDryRun: Bool = false,
-        operationType: String? = nil
+        isDryRun: Bool = false
     ) throws -> MutationResult {
         guard (setAdjustments != nil) != (addAdjustments != nil), (setAdjustments ?? addAdjustments)?.hasAnyField == true else {
             throw C1Error.invalidRequest("Provide exactly one nonempty set or add adjustment patch.")
         }
-        let docInfo = try getDocumentInfo()
-        let resolvedOpType = operationType ?? (setAdjustments != nil ? "set" : "add")
-        try assertSessionWritable(docInfo: docInfo, operation: resolvedOpType)
+        let change: TonalWrite.Change = setAdjustments.map { .set($0) } ?? .add(addAdjustments!)
+        return try tonalWrite(change, workingRef: workingRefString, ifState: expectedHash, dryRun: isDryRun)
+    }
 
-        let sessUrl = URL(fileURLWithPath: docInfo.documentPath)
-        let journal = OperationJournal(sessionDirectory: sessUrl)
-
-        let record = try adjustmentTarget(workingRefString, document: docInfo)
-
-        return try lock.withLock {
-            try checkedDocument(docInfo, writes: !isDryRun)
-            // 1. Read current state
-            let current = try self.get(ref: record.workingRef)
-            guard current.stateHash == expectedHash else {
-                throw C1Error.stateChanged("Optimistic concurrency conflict for '\(workingRefString)'. Expected stateHash '\(expectedHash)', but actual is '\(current.stateHash)'.")
-            }
-
-            try assertWritableImage(doc: docInfo, source: current)
-            // 2. Compute target adjustments
-            var target = current.adjustments
-            if let s = setAdjustments {
-                if let v = s.exposure { target.exposure = v }
-                if let v = s.contrast { target.contrast = v }
-                if let v = s.saturation { target.saturation = v }
-                if let v = s.temperature { target.temperature = v }
-                if let v = s.tint { target.tint = v }
-            }
-            if let a = addAdjustments {
-                target = try self.registry.applyDelta(base: target, delta: a)
-            }
-            try self.registry.validateAdjustments(target)
-
-            let diff = self.computeDiff(before: current.adjustments, after: target)
-
-            let predictedHash = StateHash.compute(for: target).hex
-
-            if isDryRun {
-                return MutationResult(
-                    operationId: "dry-run",
-                    workingRef: record.workingRef,
-                    before: current.adjustments,
-                    after: target,
-                    diff: diff,
-                    stateHash: predictedHash,
-                    isDryRun: true
-                )
-            }
-
-            // 3. Pre-dispatch journal entry
-            let opId = UUID().uuidString.lowercased()
-            let journalEntry = try prepare(OperationRecord(
-                operationId: opId,
-                operationType: resolvedOpType,
-                workingRef: record.workingRef,
-                documentPath: docInfo.documentPath,
-                preconditionStateHash: expectedHash,
-                intendedAdjustments: target,
-                beforeAdjustments: current.adjustments,
-                status: "pending"
-            ), doc: docInfo, source: current)
-            try journal.append(entry: journalEntry)
-
-            // 4. Dispatch write
-            let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
-            let varIdDesc = NSAppleEventDescriptor(string: record.variantId)
-            var patch = Adjustments()
-            for field in self.registry.supportedAdjustmentFields {
-                if setAdjustments?.value(for: field.name) != nil || addAdjustments?.value(for: field.name) != nil {
-                    patch.setValue(target.value(for: field.name), for: field.name)
-                }
-            }
-            // White balance must be written and verified as a pair.
-            if patch.temperature != nil || patch.tint != nil { patch.temperature = target.temperature; patch.tint = target.tint }
-            let expDesc = patch.exposure != nil ? NSAppleEventDescriptor(double: patch.exposure!) : NSAppleEventDescriptor.missingValue()
-            let contDesc = patch.contrast != nil ? NSAppleEventDescriptor(double: patch.contrast!) : NSAppleEventDescriptor.missingValue()
-            let satDesc = patch.saturation != nil ? NSAppleEventDescriptor(double: patch.saturation!) : NSAppleEventDescriptor.missingValue()
-            let tempDesc = patch.temperature != nil ? NSAppleEventDescriptor(double: patch.temperature!) : NSAppleEventDescriptor.missingValue()
-            let tintDesc = patch.tint != nil ? NSAppleEventDescriptor(double: patch.tint!) : NSAppleEventDescriptor.missingValue()
-
-            let applyRes: ApplyAdjustmentsResult
-            do {
-                applyRes = try self.executor.executeAndDecode(
-                    handler: "applyAdjustments",
-                    args: [docNameDesc, varIdDesc, expDesc, contDesc, satDesc, tempDesc, tintDesc,
-                           NSAppleEventDescriptor(list: self.registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) }),
-                           NSAppleEventDescriptor(string: current.parentImagePath ?? "")]
-                )
-            } catch {
-                try? journal.update(operationId: opId, status: "outcome-unknown", error: error.localizedDescription)
-                throw OperationFailure(operationId: opId, cause: error)
-            }
-
-            // 5. Readback verification
-            let after = Adjustments(
-                exposure: applyRes.afterExposureVal,
-                contrast: applyRes.afterContrastVal,
-                saturation: applyRes.afterSaturationVal,
-                temperature: applyRes.afterTemperatureVal,
-                tint: applyRes.afterTintVal
-            )
-
-            // Verify readback matches targets within tolerance
-            var mismatches: [String] = []
-            if let expected = target.exposure, !self.registry.valuesMatchWithinTolerance(field: "exposure", expected: expected, actual: after.exposure ?? 0) {
-                mismatches.append("exposure (expected \(expected), got \(after.exposure ?? 0))")
-            }
-            if let expected = target.contrast, !self.registry.valuesMatchWithinTolerance(field: "contrast", expected: expected, actual: after.contrast ?? 0) {
-                mismatches.append("contrast (expected \(expected), got \(after.contrast ?? 0))")
-            }
-            if let expected = target.saturation, !self.registry.valuesMatchWithinTolerance(field: "saturation", expected: expected, actual: after.saturation ?? 0) {
-                mismatches.append("saturation (expected \(expected), got \(after.saturation ?? 0))")
-            }
-            if let expected = target.temperature, !self.registry.valuesMatchWithinTolerance(field: "temperature", expected: expected, actual: after.temperature ?? 0) {
-                mismatches.append("temperature (expected \(expected), got \(after.temperature ?? 0))")
-            }
-            if let expected = target.tint, !self.registry.valuesMatchWithinTolerance(field: "tint", expected: expected, actual: after.tint ?? 0) {
-                mismatches.append("tint (expected \(expected), got \(after.tint ?? 0))")
-            }
-
-            if !mismatches.isEmpty {
-                let errStr = "Readback mismatch after mutation: " + mismatches.joined(separator: ", ")
-                try? journal.update(operationId: opId, status: "partial-failure", afterAdjustments: after, error: errStr)
-                throw OperationFailure(operationId: opId, cause: C1Error.readbackMismatch(errStr))
-            }
-
-            // 6. Compute actual diff & stateHash
-            let actualHash = StateHash.compute(for: after).hex
-            let actualDiff = self.computeDiff(before: current.adjustments, after: after)
-
-            do {
-                try journal.update(operationId: opId, status: "succeeded", afterAdjustments: after, diff: actualDiff)
-            } catch { throw OperationFailure(operationId: opId, cause: error) }
-
-            return MutationResult(
-                operationId: opId,
-                workingRef: record.workingRef,
-                before: current.adjustments,
-                after: after,
-                diff: actualDiff,
-                stateHash: actualHash,
-                isDryRun: false
-            )
+    private func tonalWrite(_ change: TonalWrite.Change, workingRef: String, ifState: String, dryRun: Bool) throws -> MutationResult {
+        let outcome = try write(TonalWrite(change: change), workingRef: workingRef, precondition: ifState, dryRun: dryRun)
+        let before = outcome.before.state
+        guard let after = outcome.after else {
+            let target = outcome.intended.target
+            return MutationResult(operationId: outcome.operationId, workingRef: outcome.workingRef, before: before, after: target,
+                diff: target.changes(from: before), stateHash: StateHash.compute(for: target).hex, isDryRun: true)
         }
+        return MutationResult(operationId: outcome.operationId, workingRef: outcome.workingRef, before: before, after: after.state,
+            diff: after.state.changes(from: before), stateHash: after.observation.stateHash, isDryRun: false)
     }
 
     // MARK: - Crop, rotation, and keystone
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
                             rotation: Double? = nil, aspectRatio: Double? = nil, keystone: KeystoneAdjustments? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
-        try mutateGeometry(workingRef: workingRef, expected: expected, crop: crop, rotation: rotation, aspectRatio: aspectRatio, keystone: keystone, dryRun: dryRun, restore: false)
+        try geometryWrite(GeometryWrite(crop: crop, rotation: rotation, aspectRatio: aspectRatio, keystone: keystone, restore: false),
+                          workingRef: workingRef, expected: expected, dryRun: dryRun)
     }
 
     public func geometryRestore(workingRef: String, ifGeometryState expected: String, dryRun: Bool = false) throws -> GeometryMutationResult {
-        try mutateGeometry(workingRef: workingRef, expected: expected, crop: nil, rotation: nil, aspectRatio: nil, keystone: nil, dryRun: dryRun, restore: true)
+        try geometryWrite(GeometryWrite(crop: nil, rotation: nil, aspectRatio: nil, keystone: nil, restore: true),
+                          workingRef: workingRef, expected: expected, dryRun: dryRun)
     }
 
-    private func mutateGeometry(workingRef: String, expected: String, crop: CropRect?, rotation: Double?, aspectRatio: Double?, keystone: KeystoneAdjustments?, dryRun: Bool, restore: Bool) throws -> GeometryMutationResult {
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            let operation = restore ? "geometry_restore" : "geometry_set"
-            try assertSessionWritable(docInfo: doc, operation: operation)
-            guard doc.appVersion == "16.8.5.30" else { throw C1Error.unsupportedVersion("Geometry requires Capture One 16.8.5.30.") }
-            let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
-            let baseline: Geometry?
-            if EditingRecord.isEditingReference(workingRef) {
-                baseline = try EditingStore(document: doc).resolve(workingRef, document: doc).baselineGeometry
-            } else {
-                baseline = try store.resolveManagedWorkingReference(workingRef, currentDocumentPath: doc.documentPath).baselineGeometry
-            }
-            try checkedDocument(doc, writes: !dryRun)
-            let current = try get(ref: workingRef)
-            guard let before = current.geometry, let state = current.geometryStateHash else {
-                throw C1Error.invalidRequest(current.geometryUnavailableReason ?? "Geometry unavailable.")
-            }
-            guard state == expected else { throw C1Error.stateChanged("Geometry precondition no longer matches; read get again.") }
-            var requestedContext = before
-            if let keystone { requestedContext.keystone = try keystone.applying(to: before.keystone) }
-            let keystoneChanged = requestedContext.keystone != before.keystone
-            var target: Geometry?
-            var nativeRequest: GeometryRequest?
-            if restore {
-                guard let baseline, baseline.unsupportedReason == nil, before.unsupportedReason == nil,
-                      before.sameContext(as: baseline, includingKeystone: false) else {
-                    throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation/keystone.")
-                }
-                // This exact crop was observed on this image with the same lens/orientation
-                // context. It may legitimately exceed the conservative bounds for NEW crops.
-                var restored = before
-                restored.crop = baseline.crop; restored.rotation = baseline.rotation; restored.keystone = baseline.keystone
-                target = restored
-            } else if before.requiresNativeBounds || keystone != nil {
-                if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
-                guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
-                if dryRun && keystoneChanged {
-                    throw C1Error.invalidRequest("Keystone changes require native execution; dry runs cannot predict the final crop.")
-                }
-                if dryRun && before.hasPerspectiveOrMovements && aspectRatio != nil {
-                    throw C1Error.invalidRequest("Perspective and movement ratio fits require native crop normalization; dry runs cannot predict the final crop.")
-                }
-                nativeRequest = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio, keystone: keystone)
-                // Validate all knowable bounds before dispatch. At a new rotation,
-                // Capture One supplies bounds after its rotation setter executes.
-                if !keystoneChanged && (nativeRequest!.rotation == before.rotation || dryRun) {
-                    target = try before.target(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio)
-                }
-            } else {
-                target = try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio)
-            }
-            try assertWritableImage(doc: doc, source: current)
-            if dryRun {
-                return GeometryMutationResult(operationId: "dry-run", workingRef: workingRef, before: before, after: target!,
-                    diff: target!.changes(from: before), geometryStateHash: state, isDryRun: true)
-            }
-            let journal = OperationJournal(sessionDirectory: store.sessionDirectory)
-            var entry = try prepare(OperationRecord(operationType: operation, workingRef: workingRef,
-                documentPath: doc.documentPath, preconditionStateHash: expected, beforeAdjustments: current.adjustments,
-                beforeGeometry: before, intendedGeometry: target, requestedGeometry: nativeRequest), doc: doc, source: current)
-            try journal.append(entry: entry)
-            do {
-                let arguments = [
-                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: current.id),
-                    NSAppleEventDescriptor(string: current.parentImagePath ?? ""), before.eventSnapshot,
-                    NSAppleEventDescriptor(list: registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: current.adjustments.value(for: $0.name)!) })]
-                if let request = nativeRequest {
-                    let applied: CorrectedGeometryResult = try executor.executeAndDecode(handler: "applyCorrectedGeometry", args: arguments + [
-                        request.crop.map { NSAppleEventDescriptor(list: $0.values.map { NSAppleEventDescriptor(double: $0) }) } ?? .missingValue(),
-                        NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue(),
-                        NSAppleEventDescriptor(list: requestedContext.keystone.map { NSAppleEventDescriptor(double: $0) })])
-                    guard applied.targetCropValues.count == 4, applied.boundsValues.count == 4,
-                          applied.targetCropValues.allSatisfy({ $0.isFinite }), applied.boundsValues.allSatisfy({ $0.isFinite }) else {
-                        throw C1Error.readbackMismatch("Corrected geometry native target or bounds are malformed.")
-                    }
-                    let c = applied.targetCropValues, b = applied.boundsValues
-                    let nativeCropUnchangedByCaller = request.crop == nil && request.aspectRatio == nil
-                    guard c[2] >= 1, c[3] >= 1, b[2] > 0, b[3] > 0,
-                          nativeCropUnchangedByCaller || (abs(c[0]-b[0])+c[2]/2 <= b[2]/2+2 && abs(c[1]-b[1])+c[3]/2 <= b[3]/2+2) else {
-                        throw C1Error.readbackMismatch("Corrected geometry target exceeds the native bounds.")
-                    }
-                    var resolved = requestedContext
-                    resolved.rotation = request.rotation
-                    resolved.crop = CropRect(centerX: c[0], centerY: c[1], width: c[2], height: c[3])
-                    if let crop = request.crop, resolved.crop != crop { throw C1Error.readbackMismatch("Native crop differs from the explicit request.") }
-                    if let ratio = request.aspectRatio, abs(c[2] - c[3]*ratio) > max(2, ratio*2) {
-                        throw C1Error.readbackMismatch("Native crop does not match the requested aspect ratio.")
-                    }
-                    if (before.hasPerspectiveOrMovements || requestedContext.hasPerspectiveOrMovements || keystoneChanged), let ratio = request.aspectRatio {
-                        guard let fit = applied.fittedCropValues, fit.count == 4,
-                              fit.allSatisfy({ $0.isFinite }), fit[2] >= 1, fit[3] >= 1,
-                              abs(fit[0]-c[0])+fit[2]/2 <= c[2]/2+2,
-                              abs(fit[1]-c[1])+fit[3]/2 <= c[3]/2+2,
-                              abs(fit[2]-fit[3]*ratio) <= max(2,ratio*2) else {
-                            throw C1Error.readbackMismatch("Native perspective fit must preserve the requested ratio inside the target rectangle.")
-                        }
-                        resolved.crop = CropRect(centerX:fit[0],centerY:fit[1],width:fit[2],height:fit[3])
-                    }
-                    target = resolved
-                    // Preserve the concrete target once native bounds are known;
-                    // the original pending record already contains the user's request.
-                    entry.intendedGeometry = resolved
-                    try journal.append(entry: entry)
-                } else {
-                    let _: GeometryRecord = try executor.executeAndDecode(handler: "applyGeometry", args: arguments + [
-                        NSAppleEventDescriptor(list: target!.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: target!.rotation),
-                        NSAppleEventDescriptor(list: target!.keystone.map { NSAppleEventDescriptor(double: $0) })])
-                }
-                let readback = try get(ref: workingRef)
-                guard let after = readback.geometry else { throw C1Error.readbackMismatch("Geometry missing after write.") }
-                guard after.matchesTarget(target!), after.sameContext(as: before, includingKeystone: false), readback.stateHash == current.stateHash else {
-                    try journal.update(operationId: entry.operationId, status: "partial-failure", afterAdjustments: readback.adjustments, afterGeometry: after)
-                    throw C1Error.readbackMismatch("Crop/rotation/keystone or preserved settings did not match; inspect operation status.")
-                }
-                let diff = after.changes(from: before)
-                try journal.update(operationId: entry.operationId, status: "succeeded", afterAdjustments: readback.adjustments, diff: diff, afterGeometry: after)
-                return GeometryMutationResult(operationId: entry.operationId, workingRef: workingRef, before: before, after: after,
-                    diff: diff, geometryStateHash: after.stateHash(tonalHash: readback.stateHash), isDryRun: false)
-            } catch {
-                if journal.find(operationId: entry.operationId)?.status != "partial-failure" {
-                    try? journal.update(operationId: entry.operationId, status: "outcome-unknown", error: String(describing: error))
-                }
-                throw OperationFailure(operationId: entry.operationId, cause: error)
-            }
+    private func geometryWrite(_ kind: GeometryWrite, workingRef: String, expected: String, dryRun: Bool) throws -> GeometryMutationResult {
+        let outcome = try write(kind, workingRef: workingRef, precondition: expected, dryRun: dryRun)
+        let before = outcome.before.state
+        guard let after = outcome.after else {
+            guard let target = outcome.intended.target else { throw C1Error.invalidRequest("Dry runs cannot predict this geometry change.") }
+            return GeometryMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before.geometry, after: target,
+                diff: target.changes(from: before.geometry), geometryStateHash: before.hash, isDryRun: true)
         }
+        return GeometryMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before.geometry, after: after.state.geometry,
+            diff: after.state.geometry.changes(from: before.geometry), geometryStateHash: after.state.hash, isDryRun: false)
     }
 
     // MARK: - Reset Mutation
@@ -1201,21 +947,7 @@ public final class SessionController {
         fields: [String] = [],
         isDryRun: Bool = false
     ) throws -> MutationResult {
-        let docInfo = try getDocumentInfo()
-        try assertSessionWritable(docInfo: docInfo, operation: "reset")
-
-        let record = try adjustmentTarget(workingRefString, document: docInfo)
-
-        let targetResetAdjustments = try registry.computeResetValues(fields: fields, baseline: record.baselineAdjustments)
-
-        return try mutate(
-            workingRefString: workingRefString,
-            ifState: expectedHash,
-            setAdjustments: targetResetAdjustments,
-            addAdjustments: nil,
-            isDryRun: isDryRun,
-            operationType: "reset"
-        )
+        try tonalWrite(.reset(fields), workingRef: workingRefString, ifState: expectedHash, dryRun: isDryRun)
     }
 
     // MARK: - Create Baseline Variant (New Variant)
@@ -1271,23 +1003,7 @@ public final class SessionController {
     }
 
     public func computeDiff(before: Adjustments, after: Adjustments) -> [String: DoubleDiff] {
-        var diff: [String: DoubleDiff] = [:]
-        if let b = before.exposure, let a = after.exposure, b != a {
-            diff["exposure"] = DoubleDiff(before: b, after: a)
-        }
-        if let b = before.contrast, let a = after.contrast, b != a {
-            diff["contrast"] = DoubleDiff(before: b, after: a)
-        }
-        if let b = before.saturation, let a = after.saturation, b != a {
-            diff["saturation"] = DoubleDiff(before: b, after: a)
-        }
-        if let b = before.temperature, let a = after.temperature, b != a {
-            diff["temperature"] = DoubleDiff(before: b, after: a)
-        }
-        if let b = before.tint, let a = after.tint, b != a {
-            diff["tint"] = DoubleDiff(before: b, after: a)
-        }
-        return diff
+        after.changes(from: before)
     }
 
     // MARK: - Dump
@@ -1385,29 +1101,27 @@ public final class SessionController {
             result.contextSourceRef = ref
             return result
         }
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "preview")
-            try checkedDocument(doc)
+        return try guarded("preview") { doc in
             let current = try get(ref: ref)
-            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
+            try assertWritableImage(doc: doc, source: current)
             let opId = UUID().uuidString.lowercased()
             let root = URL(fileURLWithPath: outputDirOverride ?? doc.outputFolder).resolvingSymlinksInPath()
             let subfolder = "c1-previews/\(opId)"
             let jobDir = root.appendingPathComponent(subfolder, isDirectory: true)
             try FileManager.default.createDirectory(at: jobDir, withIntermediateDirectories: true)
-            let entry = try prepare(OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
+            let entry = OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
                 documentPath: doc.documentPath, preconditionStateHash: current.stateHash,
-                beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path, beforeGeometry: current.geometry), doc: doc, source: current)
-            try journal.append(entry: entry)
-            do {
+                beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path, beforeGeometry: current.geometry)
+            // Exports change no adjustments, so every failed check leaves the outcome unknown.
+            return try journaled(entry, doc: doc, source: current, dispatch: {
                 let args = [NSAppleEventDescriptor(string: doc.documentId),
                             NSAppleEventDescriptor(string: PreviewManager.defaultRecipeName), NSAppleEventDescriptor(string: root.path)]
                 let _: PreviewRecipeResult = try executor.executeAndDecode(handler: "ensurePreviewRecipe", args: args)
                 let _: ProcessPreviewResult = try executor.executeAndDecode(handler: "processPreview", args: [
                     args[0], NSAppleEventDescriptor(string: current.id), args[1], args[2],
                     NSAppleEventDescriptor(string: subfolder), NSAppleEventDescriptor(string: "preview")])
-                let file = try previewMgr.pollForOutputFile(inDirectory: jobDir, timeout: timeout)
+                return try previewMgr.pollForOutputFile(inDirectory: jobDir, timeout: timeout)
+            }, readback: { pending, file in
                 let image = try previewMgr.verifyAndDecodeImage(atPath: file.path)
                 let after = try get(ref: ref)
                 guard after.stateHash == current.stateHash, after.geometryStateHash == current.geometryStateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
@@ -1418,14 +1132,11 @@ public final class SessionController {
                     }
                 }
                 let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
-                try journal.update(operationId: opId, status: "succeeded", previewOutputPath: file.path)
-                return PreviewResult(operationId: opId, workingRef: current.workingRef, outputPath: file.path,
+                pending.update { $0.previewOutputPath = file.path }
+                return .confirmed(PreviewResult(operationId: opId, workingRef: current.workingRef, outputPath: file.path,
                     fileSizeBytes: size, width: image.width, height: image.height, pixelSha256: image.pixelSha256,
-                    stateHash: current.stateHash, nativeVariantId: current.id, geometry: current.geometry, geometryStateHash: current.geometryStateHash)
-            } catch {
-                try? journal.update(operationId: opId, status: "outcome-unknown", error: String(describing: error))
-                throw OperationFailure(operationId: opId, cause: error)
-            }
+                    stateHash: current.stateHash, nativeVariantId: current.id, geometry: current.geometry, geometryStateHash: current.geometryStateHash))
+            }).value
         }
     }
 
@@ -1438,9 +1149,10 @@ public final class SessionController {
         try ContractSchema.validate(tool: "metadata_set", arguments: arguments)
         let outcome = try write(MetadataWrite(rating: rating, colorTag: colorTag), workingRef: workingRef,
                                 precondition: ifMetadataState, dryRun: dryRun)
-        return MetadataMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: outcome.before,
-            after: outcome.intended, diff: outcome.intended.changes(from: outcome.before),
-            metadataStateHash: (outcome.isDryRun ? outcome.before : outcome.intended).stateHash, isDryRun: outcome.isDryRun)
+        let before = outcome.before.state, after = outcome.after?.state ?? outcome.intended
+        return MetadataMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before,
+            after: after, diff: after.changes(from: before),
+            metadataStateHash: (outcome.isDryRun ? before : after).stateHash, isDryRun: outcome.isDryRun)
     }
 
     // MARK: - Operation Status & Reconciliation
@@ -1510,7 +1222,7 @@ public final class SessionController {
         try readNative(ref: ref, target: target).nativeSnapshots![0]
     }
 
-    private func readNative(ref: String, target: NativeTarget) throws -> GetResult {
+    func readNative(ref: String, target: NativeTarget) throws -> GetResult {
         try target.validate()
         return try lock.withLock {
             let doc = try getDocumentInfo()
@@ -1600,69 +1312,10 @@ public final class SessionController {
 
     private func nativeMutate(workingRef: String, target: NativeTarget, expected: String, patch: [String:NativeValue],
                               action: String?, arguments: [String:NativeValue], dryRun: Bool) throws -> NativeMutationResult {
-        return try lock.withLock {
-            let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: "native editing")
-            _ = try adjustmentTarget(workingRef, document: doc)
-            try checkedDocument(doc, writes: !dryRun)
-            // One fresh, operation-local observation supplies both the native
-            // precondition and durable before-state. Do not cache it across calls:
-            // readNative validates reference/parent identity and checks the document
-            // after the native read; dispatch still verifies native values/layers.
-            let current = try readNative(ref: workingRef, target: target)
-            guard current.openToken == doc.openToken else {
-                throw C1Error.documentChanged("Active database changed during native mutation preparation.")
-            }
-            try assertWritableImage(doc: doc, source: current)
-            let before = current.nativeSnapshots![0]
-            guard before.nativeStateHash == expected else { throw C1Error.stateChanged("Native editing state changed. Read get with nativeTargets again.") }
-            for key in patch.keys where before.values[key] == nil { throw C1Error.invalidRequest("Native field unavailable on this target: " + key) }
-            if target.layer > before.layers.count { throw C1Error.invalidRequest("Layer no longer exists.") }
-            if (action?.hasPrefix("mask.") == true && action != "mask.people") || action == "layer.delete" {
-                guard target.layer > 0, before.layers[target.layer-1].nativeKind != "background" else { throw C1Error.invalidRequest("The image layer cannot be deleted or masked.") }
-            }
-            if case .number(let sourceLayer) = arguments["sourceLayer"], Int(sourceLayer) > before.layers.count { throw C1Error.invalidRequest("Source mask layer does not exist.") }
-            if dryRun { return NativeMutationResult(operationId: "dry-run", before: before, after: before, dryRun: true) }
-            let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
-            var entry = try prepare(OperationRecord(operationType: "native", workingRef: workingRef, documentPath: doc.documentPath,
-                preconditionStateHash: expected, beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
-            entry.beforeNative = before; entry.nativePatch = action == nil ? patch : arguments; entry.nativeAction = action
-            try journal.append(entry: entry)
-            let fields = before.values.keys.sorted(), keys = action == nil ? NativeEditing.orderedPatchKeys(patch, target: target) : arguments.keys.sorted()
-            var args = [NSAppleEventDescriptor(string: doc.documentId), .init(string: current.id)] + target.descriptors + [
-                .init(string: current.parentImagePath ?? ""), .init(list: fields.map { .init(string: $0) }),
-                .init(list: fields.map { before.values[$0]!.descriptor }), .init(list: before.layers.map { .init(list:[.init(string:$0.nativeName), .init(string:$0.nativeKind), .init(int32:Int32($0.nativeOpacity)), .init(boolean:$0.nativeEnabled)]) })]
-            if let action { args.append(.init(string: action)) }
-            args += [.init(list: keys.map { .init(string: $0) }), .init(list: keys.map { (action == nil ? patch : arguments)[$0]!.descriptor })]
-            do {
-                let _: Bool = try executor.executeAndDecode(handler: action == nil ? "nativeApply" : "nativeAction", args: args)
-                try checkedDocument(doc, writes: false)
-                // Deleted targets no longer exist; inspect the image scope and layer inventory instead.
-                let afterTarget = action == "color.delete" ? NativeTarget(layer:target.layer) : action == "layer.delete" ? NativeTarget() : target
-                let after = try nativeGet(ref: workingRef, target: afterTarget)
-                entry.afterNative = after
-                if let action {
-                    let change = after.layers.count - before.layers.count
-                    if action == "layer.create", change != 1 { throw C1Error.readbackMismatch("Layer creation did not add exactly one layer.") }
-                    if action == "layer.delete", change != -1 { throw C1Error.readbackMismatch("Layer deletion did not remove exactly one layer.") }
-                    if action == "color.create", after.advancedColorCount != before.advancedColorCount + 1 { throw C1Error.readbackMismatch("Color correction creation readback differs.") }
-                    if action == "color.delete", after.advancedColorCount != before.advancedColorCount - 1 { throw C1Error.readbackMismatch("Color correction deletion readback differs.") }
-                }
-                for (key, value) in patch {
-                    guard let actual = after.values[key], NativeEditing.matchesReadback(field: key, expected: value, actual: actual) else {
-                        entry.status = "partial-failure"; entry.error = "Native readback mismatch: " + key
-                        try journal.append(entry: entry)
-                        throw C1Error.readbackMismatch(entry.error!)
-                    }
-                }
-                entry.status = "succeeded"
-                try journal.append(entry: entry)
-                return NativeMutationResult(operationId: entry.operationId, before: before, after: after, dryRun: false)
-            } catch {
-                if entry.status == "pending" { entry.status = "outcome-unknown"; entry.error = error.localizedDescription; try? journal.append(entry: entry) }
-                throw OperationFailure(operationId: entry.operationId, cause: error)
-            }
-        }
+        let outcome = try write(NativeWrite(target: target, patch: patch, action: action, arguments: arguments),
+                                workingRef: workingRef, precondition: expected, dryRun: dryRun)
+        let before = outcome.before.state
+        return NativeMutationResult(operationId: outcome.operationId, before: before, after: outcome.after?.state ?? before, dryRun: outcome.isDryRun)
     }
 
     /// Independent direct-property reader: does not call nativeRead/nativeReadField.

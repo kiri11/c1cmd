@@ -16,15 +16,28 @@ protocol WriteKind {
     /// Reported when the precondition token no longer matches.
     var staleMessage: String { get }
 
+    /// A fresh observation of the target; `afterDispatch` selects the readback.
+    func observe(_ ref: String, afterDispatch: Bool, with core: SessionController) throws -> GetResult
     /// The kind's state in a fresh observation, or nil when unavailable.
     func read(_ observation: GetResult) -> State?
+    /// Why the write is refused when `read` finds no state before dispatch.
+    func unavailable(_ observation: GetResult) -> C1Error
     func token(_ state: State) -> String
-    func plan(from before: State) throws -> Intended
-    func dispatch(_ intended: Intended, before: State, to target: WriteTarget) throws -> Reply
+    func plan(from before: State, target: WriteTarget, dryRun: Bool) throws -> Intended
+    /// A throw means the native outcome is unknown.
+    func dispatch(_ intended: Intended, before: Observed<State>, to target: WriteTarget) throws -> Reply
     /// Pure: nil when the readback confirms the write, otherwise why it does not.
-    func verify(before: Observed<State>, intended: Intended, reply: Reply, after: Observed<State>?) -> String?
-    /// Kind-specific journal fields. `after` is nil before dispatch.
-    func record(_ entry: inout OperationRecord, before: State, intended: Intended, after: State?)
+    func verify(before: Observed<State>, intended: Intended, reply: Reply, after: Observed<State>) -> String?
+    /// Kind-specific journal fields. `reply` and `after` are nil until observed.
+    func record(_ entry: inout OperationRecord, before: State, intended: Intended, reply: Reply?, after: State?)
+}
+
+extension WriteKind {
+    var pinnedBuildRequirement: String? { nil }
+    func observe(_ ref: String, afterDispatch: Bool, with core: SessionController) throws -> GetResult {
+        try core.get(ref: ref)
+    }
+    func unavailable(_ observation: GetResult) -> C1Error { .stateChanged(staleMessage) }
 }
 
 struct Observed<State> {
@@ -32,19 +45,31 @@ struct Observed<State> {
     let state: State
 }
 
-/// The resolved native destination of one write.
+/// The resolved native destination of one write and the saved baseline of its reference.
 struct WriteTarget {
     let documentId: String
+    let workingRef: String
     let variantId: String
     let parentImagePath: String
+    let baselineAdjustments: Adjustments
+    let baselineGeometry: Geometry?
     let executor: ScriptExecuting
 }
 
 struct WriteOutcome<Kind: WriteKind> {
     let operationId: String
-    let before: Kind.State
+    let workingRef: String
+    let before: Observed<Kind.State>
     let intended: Kind.Intended
-    let isDryRun: Bool
+    /// The verified readback; nil for a dry run.
+    let after: Observed<Kind.State>?
+    var isDryRun: Bool { after == nil }
+}
+
+/// What a dispatched write observed: its confirmed result, or a difference from the intent.
+enum Readback<Value> {
+    case confirmed(Value)
+    case mismatch(C1Error)
 }
 
 /// A durable pending journal entry, which ends at most once. A failed append of
@@ -80,107 +105,101 @@ struct PendingWrite {
 }
 
 extension SessionController {
-    /// The whole guard sequence of one mutation. Never retries or undoes: a dispatch
-    /// that may have run leaves a journal entry that blocks writes until reconciled.
-    func write<Kind: WriteKind>(_ kind: Kind, workingRef: String, precondition: String, dryRun: Bool) throws -> WriteOutcome<Kind> {
+    /// The guards every write shares before reading its target: the application
+    /// lock, one active writable document on an allowed build, and no unresolved operation.
+    func guarded<T>(_ operation: String, pinned requirement: String? = nil, dryRun: Bool = false,
+                    _ body: (DocumentInfo) throws -> T) throws -> T {
         try lock.withLock {
             let doc = try getDocumentInfo()
-            try assertSessionWritable(docInfo: doc, operation: kind.operationType)
-            if let requirement = kind.pinnedBuildRequirement, doc.appVersion != Self.pinnedBuild {
-                throw C1Error.unsupportedVersion(requirement)
-            }
+            try assertSessionWritable(docInfo: doc, operation: operation)
+            if let requirement, doc.appVersion != Self.pinnedBuild { throw C1Error.unsupportedVersion(requirement) }
             try checkedDocument(doc, writes: !dryRun)
-            let target = try adjustmentTarget(workingRef, document: doc)
-            let current = try get(ref: workingRef)
+            return try body(doc)
+        }
+    }
+
+    /// Dispatches one write under a durable pending journal entry and classifies it.
+    /// A throw from dispatch, the document re-check or the readback leaves the outcome
+    /// unknown; an observed difference is a partial failure. Both block writes until
+    /// reconciled after a restart; nothing is retried or undone.
+    func journaled<Reply, Value>(_ entry: OperationRecord, doc: DocumentInfo, source: GetResult,
+                                 dispatch: () throws -> Reply,
+                                 readback: (inout PendingWrite, Reply) throws -> Readback<Value>) throws -> (operationId: String, value: Value) {
+        var prepared = entry
+        prepared.compoundId = compoundId
+        prepared.appInstance = try appInstance()
+        prepared.documentIdentity = try databaseIdentity(databasePath(doc))
+        prepared.nativeVariantId = source.id
+        prepared.parentImagePath = source.parentImagePath
+        var pending = try PendingWrite(prepared, journal: OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath)))
+        let operationId = prepared.operationId
+        let result: Readback<Value>
+        do {
+            let reply = try dispatch()
+            try checkedDocument(doc, writes: false)
+            result = try readback(&pending, reply)
+        } catch {
+            try? pending.end(.outcomeUnknown, error: String(describing: error))
+            throw OperationFailure(operationId: operationId, cause: error)
+        }
+        switch result {
+        case .mismatch(let error):
+            try? pending.end(.partialFailure, error: String(describing: error))
+            throw OperationFailure(operationId: operationId, cause: error)
+        case .confirmed(let value):
+            do { try pending.end(.succeeded) } catch { throw OperationFailure(operationId: operationId, cause: error) }
+            return (operationId, value)
+        }
+    }
+
+    /// The whole guard sequence of one mutation of an editing reference or managed clone.
+    func write<Kind: WriteKind>(_ kind: Kind, workingRef: String, precondition: String, dryRun: Bool) throws -> WriteOutcome<Kind> {
+        try guarded(kind.operationType, pinned: kind.pinnedBuildRequirement, dryRun: dryRun) { doc in
+            let resolved = try adjustmentTarget(workingRef, document: doc)
+            let current = try kind.observe(workingRef, afterDispatch: false, with: self)
             try assertWritableImage(doc: doc, source: current)
-            guard current.id == target.variantId else {
+            guard current.id == resolved.variantId else {
                 throw C1Error.identityAmbiguous("The reference resolved to a different native variant than its record.")
             }
-            guard let before = kind.read(current), kind.token(before) == precondition else {
-                throw C1Error.stateChanged(kind.staleMessage)
+            if let token = current.openToken, token != doc.openToken {
+                throw C1Error.documentChanged("Active database changed while the write was prepared.")
             }
-            let intended = try kind.plan(from: before)
-            if dryRun { return WriteOutcome(operationId: "dry-run", before: before, intended: intended, isDryRun: true) }
+            guard let state = kind.read(current) else { throw kind.unavailable(current) }
+            guard kind.token(state) == precondition else { throw C1Error.stateChanged(kind.staleMessage) }
+            let before = Observed(observation: current, state: state)
+            let target = WriteTarget(documentId: doc.documentId, workingRef: resolved.workingRef, variantId: resolved.variantId,
+                parentImagePath: current.parentImagePath ?? "", baselineAdjustments: resolved.baselineAdjustments,
+                baselineGeometry: resolved.baselineGeometry, executor: executor)
+            let intended = try kind.plan(from: state, target: target, dryRun: dryRun)
+            if dryRun {
+                return WriteOutcome(operationId: "dry-run", workingRef: resolved.workingRef, before: before, intended: intended, after: nil)
+            }
 
-            var entry = try prepare(OperationRecord(operationType: kind.operationType, workingRef: workingRef,
+            var entry = OperationRecord(operationType: kind.operationType, workingRef: resolved.workingRef,
                 documentPath: doc.documentPath, preconditionStateHash: precondition,
-                beforeAdjustments: current.adjustments, beforeGeometry: current.geometry), doc: doc, source: current)
-            kind.record(&entry, before: before, intended: intended, after: nil)
-            var pending = try PendingWrite(entry, journal: OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath)))
-            let operationId = entry.operationId
-
-            let reply: Kind.Reply, readback: GetResult
-            do {
-                reply = try kind.dispatch(intended, before: before, to: WriteTarget(documentId: doc.documentId,
-                    variantId: target.variantId, parentImagePath: current.parentImagePath ?? "", executor: executor))
-                try checkedDocument(doc, writes: false)
-                readback = try get(ref: workingRef)
-            } catch {
-                try? pending.end(.outcomeUnknown, error: error.localizedDescription)
-                throw OperationFailure(operationId: operationId, cause: error)
-            }
-            let after = kind.read(readback)
-            pending.update {
-                $0.afterAdjustments = readback.adjustments
-                $0.afterGeometry = readback.geometry
-                kind.record(&$0, before: before, intended: intended, after: after)
-            }
-            if let mismatch = kind.verify(before: Observed(observation: current, state: before), intended: intended,
-                                          reply: reply, after: after.map { Observed(observation: readback, state: $0) }) {
-                try? pending.end(.partialFailure, error: mismatch)
-                throw OperationFailure(operationId: operationId, cause: C1Error.readbackMismatch(mismatch))
-            }
-            do { try pending.end(.succeeded) } catch { throw OperationFailure(operationId: operationId, cause: error) }
-            return WriteOutcome(operationId: operationId, before: before, intended: intended, isDryRun: false)
+                beforeAdjustments: current.adjustments, beforeGeometry: current.geometry)
+            kind.record(&entry, before: state, intended: intended, reply: nil, after: nil)
+            let (operationId, after) = try journaled(entry, doc: doc, source: current,
+                dispatch: { try kind.dispatch(intended, before: before, to: target) },
+                readback: { (pending: inout PendingWrite, reply: Kind.Reply) -> Readback<Observed<Kind.State>> in
+                    pending.update { kind.record(&$0, before: state, intended: intended, reply: reply, after: nil) }
+                    let readback = try kind.observe(workingRef, afterDispatch: true, with: self)
+                    let after = kind.read(readback)
+                    pending.update {
+                        $0.afterAdjustments = readback.adjustments
+                        $0.afterGeometry = readback.geometry
+                        kind.record(&$0, before: state, intended: intended, reply: reply, after: after)
+                    }
+                    guard readback.id == resolved.variantId, let after else {
+                        return .mismatch(.readbackMismatch("The \(kind.operationType) readback is unavailable after the write."))
+                    }
+                    let observed = Observed(observation: readback, state: after)
+                    if let mismatch = kind.verify(before: before, intended: intended, reply: reply, after: observed) {
+                        return .mismatch(.readbackMismatch(mismatch))
+                    }
+                    return .confirmed(observed)
+                })
+            return WriteOutcome(operationId: operationId, workingRef: resolved.workingRef, before: before, intended: intended, after: after)
         }
-    }
-}
-
-/// Rating and color tag, verified against the native reply and an independent readback.
-struct MetadataWrite: WriteKind {
-    let rating: Int?
-    let colorTag: Int?
-
-    struct Reply: Decodable { let variantId: String; let ratingVal: Int; let colorTagVal: Int }
-
-    var operationType: String { "metadata_set" }
-    var pinnedBuildRequirement: String? { "Metadata writes require Capture One \(SessionController.pinnedBuild)." }
-    var staleMessage: String { "Rating or color tag changed or is unavailable; read get again." }
-
-    func read(_ observation: GetResult) -> VariantMetadata? { VariantMetadata.from(observation.metadata) }
-    func token(_ state: VariantMetadata) -> String { state.stateHash }
-    func plan(from before: VariantMetadata) -> VariantMetadata {
-        VariantMetadata(rating: rating ?? before.rating, colorTag: colorTag ?? before.colorTag)
-    }
-
-    func dispatch(_ intended: VariantMetadata, before: VariantMetadata, to target: WriteTarget) throws -> Reply {
-        try target.executor.executeAndDecode(handler: "applyMetadata", args: [
-            NSAppleEventDescriptor(string: target.documentId), NSAppleEventDescriptor(string: target.variantId),
-            rating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
-            colorTag.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
-            NSAppleEventDescriptor(int32: Int32(before.rating)), NSAppleEventDescriptor(int32: Int32(before.colorTag)),
-            NSAppleEventDescriptor(string: target.parentImagePath)])
-    }
-
-    func verify(before: Observed<VariantMetadata>, intended: VariantMetadata, reply: Reply,
-                after: Observed<VariantMetadata>?) -> String? {
-        let id = before.observation.id
-        guard let after else { return "Rating or color tag is unreadable after the write." }
-        guard reply.variantId == id, after.observation.id == id else { return "Metadata write reported a different variant." }
-        guard reply.ratingVal == intended.rating, reply.colorTagVal == intended.colorTag, after.state == intended else {
-            return "Metadata readback did not match: intended rating \(intended.rating) and color tag \(intended.colorTag), observed rating \(after.state.rating) and color tag \(after.state.colorTag)."
-        }
-        guard after.observation.stateHash == before.observation.stateHash,
-              after.observation.geometryStateHash == before.observation.geometryStateHash else {
-            return "Tone or geometry changed during the metadata write."
-        }
-        return nil
-    }
-
-    func record(_ entry: inout OperationRecord, before: VariantMetadata, intended: VariantMetadata, after: VariantMetadata?) {
-        entry.beforeMetadata = before
-        entry.intendedMetadata = intended
-        entry.afterMetadata = after
-        entry.diff = after?.changes(from: before)
     }
 }

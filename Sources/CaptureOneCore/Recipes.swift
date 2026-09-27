@@ -119,19 +119,26 @@ public final class RecipeWorkflow {
     public init(core: SessionController = .shared) { self.core = core }
     public func run(_ tool: String, arguments args: [String:Any]) throws -> [String:Any] {
         try Recipes.validate(tool,args)
+        let requirement = "Recipes require the qualified Capture One build."
+        func checked(_ doc: DocumentInfo) throws -> DocumentInfo {
+            if let token = args["ifDocument"] as? String, token != doc.openToken { throw C1Error.documentChanged("Recipe document changed.") }
+            return doc
+        }
+        // Compound edits take every write guard up front; child writes repeat them per step.
+        if tool == "recipe_verify" || tool == "edit_apply" {
+            return try core.guarded("compound edit", pinned: requirement) { try apply(checked($0),args,verify:tool == "recipe_verify") }
+        }
         return try CaptureOneLock.shared.withLock {
             let doc = try core.getDocumentInfo()
-            guard doc.appVersion == SessionController.pinnedBuild else { throw C1Error.unsupportedVersion("Recipes require the qualified Capture One build.") }
-            if let token = args["ifDocument"] as? String, token != doc.openToken { throw C1Error.documentChanged("Recipe document changed.") }
+            guard doc.appVersion == SessionController.pinnedBuild else { throw C1Error.unsupportedVersion(requirement) }
             switch tool {
-            case "reference_capture": return try capture(doc,args)
+            case "reference_capture": return try capture(checked(doc),args)
             case "recipe_register":
                 let recipe = args["recipe"] as! [String:Any]
-                _ = try Recipes.loadContent(doc,"references",recipe["referenceId"] as! String)
+                _ = try Recipes.loadContent(checked(doc),"references",recipe["referenceId"] as! String)
                 let id = try Recipes.putContent(recipe,doc,"recipes")
                 return ["recipeId":id,"status":"unverified","recipe":recipe]
-            case "edit_status": return try status(doc,args["compoundId"] as! String)
-            case "recipe_verify", "edit_apply": return try apply(doc,args,verify:tool == "recipe_verify")
+            case "edit_status": return try status(checked(doc),args["compoundId"] as! String)
             default: throw C1Error.invalidRequest("Unknown recipe operation.")
             }
         }
@@ -212,11 +219,10 @@ public final class RecipeWorkflow {
         let adjustments = tonal.isEmpty ? nil : try ContractSchema.parseAdjustments(tonal,delta:false)
         let nativePatch = try NativeEditing.parseValues(Recipes.data(patch))
         if !nativePatch.isEmpty { try NativeEditing.validate(nativePatch,target:NativeTarget()) }
-        let journal = OperationJournal(sessionDirectory:URL(fileURLWithPath:doc.documentPath))
-        try core.assertSessionWritable(docInfo:doc,operation:"compound edit")
-        try journal.assertReady()
-        let journalOffset = try journal.validatedEntries().count
+        let journalOffset = try OperationJournal(sessionDirectory:URL(fileURLWithPath:doc.documentPath)).validatedEntries().count
         let compoundId = try Recipes.digest(["nonce":UUID().uuidString])
+        // Child writes record the compound through this controller.
+        let linked = core.linked(toCompound:compoundId)
         let path = Recipes.file(doc,"compounds",compoundId)
         var plan: [String] = ["prepare"]
         plan += scopeSteps.map(\.name)
@@ -230,67 +236,65 @@ public final class RecipeWorkflow {
         if let scopeBefore { report["scopedBefore"] = try scopeBefore.evidence() }
         var completed: [[String:Any]] = [], ref = sourceRef, step = "prepare"
         try Recipes.write(report,to:path)
-        Thread.current.threadDictionary["c1.compoundId"] = compoundId
-        defer { Thread.current.threadDictionary.removeObject(forKey:"c1.compoundId") }
         func save() throws { try RequestContext.current?.checkCompoundCancellation(); report["completed"] = completed; report["activeStep"] = step; try Recipes.write(report,to:path) }
         func finish(_ result: [String:Any]) throws { completed.append(["step":step,"result":result]); try save() }
         do {
-            let oracleBefore = (verify || scoped) ? try core.recipeOracle(ref:sourceRef) : [:]
-            let nativeBefore = (verify || scoped) ? try core.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
+            let oracleBefore = (verify || scoped) ? try linked.recipeOracle(ref:sourceRef) : [:]
+            let nativeBefore = (verify || scoped) ? try linked.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
             if verify {
                 // Existing mutation guards validate clone provenance before dispatch.
-                let snapshot = try core.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                let snapshot = try linked.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
                 guard let contrast = snapshot.values["contrast"], contrast != .unset else { throw C1Error.invalidRequest("Verification target has no readable contrast.") }
-                _ = try core.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:snapshot.nativeStateHash,patch:["contrast":contrast],dryRun:true)
+                _ = try linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:snapshot.nativeStateHash,patch:["contrast":contrast],dryRun:true)
                 try finish(["workingRef":ref])
             } else {
-                let edit = try core.editVariant(sourceRef:sourceRef,ifState:initial.stateHash,ifDocument:doc.openToken,ifGeometryState:args["ifGeometryState"] as? String)
+                let edit = try linked.editVariant(sourceRef:sourceRef,ifState:initial.stateHash,ifDocument:doc.openToken,ifGeometryState:args["ifGeometryState"] as? String)
                 ref = edit.workingRef; report["workingRef"] = ref; try finish(Recipes.object(edit))
             }
             report["workingRef"] = ref
             for scopedStep in scopeSteps {
                 step = scopedStep.name; try save()
-                let fresh = try core.get(ref:ref,nativeTargets:[scopedStep.target]).nativeSnapshots![0]
+                let fresh = try linked.get(ref:ref,nativeTargets:[scopedStep.target]).nativeSnapshots![0]
                 let result: NativeMutationResult
                 if let action = scopedStep.action {
-                    result = try core.nativeAction(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,action:action)
+                    result = try linked.nativeAction(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,action:action)
                 } else {
-                    result = try core.nativeSet(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,patch:scopedStep.patch)
+                    result = try linked.nativeSet(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,patch:scopedStep.patch)
                 }
                 try finish(Recipes.object(result))
             }
             if !patch.isEmpty {
                 step = "settings"; try save()
-                let fresh = try core.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
-                try finish(Recipes.object(core.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:fresh.nativeStateHash,patch:nativePatch)))
+                let fresh = try linked.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+                try finish(Recipes.object(linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:fresh.nativeStateHash,patch:nativePatch)))
             }
             if let adjustments {
                 step = "tonal"; try save()
-                let fresh = try core.get(ref:ref)
+                let fresh = try linked.get(ref:ref)
                 // Relative exposure is computed again from the immediately observed state.
                 var actual = adjustments
                 if exposure["mode"] as? String == "relative" { actual.exposure = fresh.adjustments.exposure! + (exposure["value"] as! NSNumber).doubleValue }
-                try finish(Recipes.object(core.mutate(workingRefString:ref,ifState:fresh.stateHash,setAdjustments:actual,addAdjustments:nil)))
+                try finish(Recipes.object(linked.mutate(workingRefString:ref,ifState:fresh.stateHash,setAdjustments:actual,addAdjustments:nil)))
             }
             if let geometry = args["geometry"] as? [String:Any] {
                 step = "geometry"; try save()
-                let fresh = try core.get(ref:ref)
+                let fresh = try linked.get(ref:ref)
                 guard let token = fresh.geometryStateHash else { throw C1Error.invalidRequest("Geometry unavailable.") }
                 let crop = try geometry["crop"].map { try JSONDecoder().decode(CropRect.self,from:Recipes.data($0)) }
                 let keystone = try geometry["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self,from:Recipes.data($0)) }
-                try finish(Recipes.object(core.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,keystone:keystone)))
+                try finish(Recipes.object(linked.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,keystone:keystone)))
             }
             if verify || scoped {
                 step = "verify"; try save()
                 var expected = oracleBefore
                 for (key,value) in nativePatch { expected[key] = value }
                 for (key,value) in tonal { expected[key] = .number((value as! NSNumber).doubleValue) }
-                let observed = try core.recipeOracle(ref:ref)
+                let observed = try linked.recipeOracle(ref:ref)
                 for key in Recipes.oracleFields {
                     let tolerance = key == "temperature" ? 1.0 : (key == "tint" ? 0.05 : 0.0001)
                     guard let a = observed[key], let b = expected[key], (key.hasPrefix("color balance") ? NativeEditing.matchesReadback(field:key,expected:b,actual:a) : a.matches(b, tolerance:tolerance)) else { throw C1Error.readbackMismatch("Independent recipe verification failed: " + key) }
                 }
-                let fullAfter = try core.get(ref:ref,nativeTargets:[NativeTarget()])
+                let fullAfter = try linked.get(ref:ref,nativeTargets:[NativeTarget()])
                 let nativeAfter = fullAfter.nativeSnapshots![0]
                 var changedKeys = Set(patch.keys).union(tonal.keys).union(wb["mode"] as? String == "absolute" ? ["white balance preset"] : [])
                 if let camera = scopes["camera"] as? [String:Any] { changedKeys.formUnion((camera["settings"] as! [String:Any]).keys) }
@@ -320,22 +324,22 @@ public final class RecipeWorkflow {
                     }
                 }
                 if let scopeBefore {
-                    let scopeAfter = try core.recipeScopesOracle(ref:ref)
+                    let scopeAfter = try linked.recipeScopesOracle(ref:ref)
                     report["scopedObserved"] = try scopeAfter.evidence()
                     try scopeAfter.assertMatches(scopeBefore.expected(scopes))
                 }
                 try finish(["independentBefore":try Recipes.object(oracleBefore),"independentAfter":try Recipes.object(observed),"coverage":Recipes.oracleFields])
             }
-            if verify || args["preview"] as? Bool == true { step = "preview"; try save(); try finish(Recipes.object(core.preview(ref:ref))) }
+            if verify || args["preview"] as? Bool == true { step = "preview"; try save(); try finish(Recipes.object(linked.preview(ref:ref))) }
             step = "observe"; try save()
-            let observed = try core.get(ref:ref,nativeTargets:[NativeTarget()])
+            let observed = try linked.get(ref:ref,nativeTargets:[NativeTarget()])
             try finish(Recipes.object(observed))
             if let scopeBefore {
-                let finalScopes = try core.recipeScopesOracle(ref:ref)
+                let finalScopes = try linked.recipeScopesOracle(ref:ref)
                 report["scopedObserved"] = try finalScopes.evidence()
                 try finalScopes.assertMatches(scopeBefore.expected(scopes))
             }
-            guard try core.getDocumentInfo().openToken == doc.openToken else { throw C1Error.documentChanged("Compound document changed.") }
+            guard try linked.getDocumentInfo().openToken == doc.openToken else { throw C1Error.documentChanged("Compound document changed.") }
             report["resultBundle"] = CompoundResultBundle.make(initial:try Recipes.object(initial), observed:try Recipes.object(observed), completed:completed,
                 document:try Recipes.object(doc), recipe:recipe, verification:verificationEvidence, request:args, compoundId:compoundId, workingRef:ref)
             if let before = report["scopedBefore"], let after = report["scopedObserved"] {

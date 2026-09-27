@@ -23,7 +23,9 @@ struct OperationJournalTests {
         XCTAssertNotNil(loaded)
         XCTAssertEqual(loaded?.status, "pending")
 
-        XCTAssertNoThrow(try journal.update(operationId: "op-test-1", status: "succeeded"))
+        var ended = entry
+        ended.status = "succeeded"
+        XCTAssertNoThrow(try journal.append(entry: ended))
         let updated = journal.find(operationId: "op-test-1")
         XCTAssertEqual(updated?.status, "succeeded")
 
