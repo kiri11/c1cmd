@@ -14,6 +14,41 @@ public struct CropRect: Codable, Equatable {
     public var aspectRatio: Double { width / height }
 }
 
+/// Exact containment of an axis-aligned crop in an uncorrected rotated image. The
+/// canvas is the bounding box of the oriented `width` × `height` image rotated
+/// clockwise by `rotation` degrees about its centre; a crop corner is exposed when
+/// it lies outside the image by more than `tolerance` pixels on either image axis.
+public enum CropContainment {
+    /// Native crop and parent dimensions differ by up to two pixels in retained probes.
+    public static let tolerance = 2.0
+
+    public struct Corner: Codable, Equatable {
+        /// Canvas coordinates of the crop corner.
+        public let x: Double
+        public let y: Double
+        /// Distance from the corner to the image, in pixels.
+        public let distance: Double
+    }
+
+    public static func exposedCorners(of crop: CropRect, rotation: Double, width: Double, height: Double,
+                                      tolerance: Double = tolerance) -> [Corner] {
+        let r = rotation * .pi / 180
+        let c = cos(r), s = sin(r)
+        let centerX = (width*abs(c) + height*abs(s)) / 2, centerY = (width*abs(s) + height*abs(c)) / 2
+        var exposed: [Corner] = []
+        for (sx, sy) in [(-1.0, -1.0), (1, -1), (1, 1), (-1, 1)] {
+            let dx = (crop.centerX - centerX) + sx*crop.width/2, dy = (crop.centerY - centerY) + sy*crop.height/2
+            // Undo the clockwise image rotation: image-frame offsets from the centre.
+            let u = abs(dx*c - dy*s) - width/2, v = abs(dx*s + dy*c) - height/2
+            if u > tolerance || v > tolerance {
+                exposed.append(Corner(x: crop.centerX + sx*crop.width/2, y: crop.centerY + sy*crop.height/2,
+                                      distance: hypot(max(u, 0), max(v, 0))))
+            }
+        }
+        return exposed
+    }
+}
+
 /// Absolute keystone controls. Omitted fields retain their current values.
 public struct KeystoneAdjustments: Codable, Equatable {
     public var amount: Double?
@@ -70,6 +105,16 @@ public struct Geometry: Codable, Equatable {
         keystone.dropFirst().contains { $0 != 0 } || lensGeometry.dropFirst(2).contains { $0 != 0 }
     }
     public var requiresNativeBounds: Bool { hasLensDistortion || hasPerspectiveOrMovements }
+    /// Intrinsic image size after orientation, before rotation.
+    var orientedSize: (width: Double, height: Double) {
+        orientation == 90 || orientation == 270 ? (imageHeight, imageWidth) : (imageWidth, imageHeight)
+    }
+    /// Crop corners outside the rotated image; always empty for corrected geometry,
+    /// whose canvas only Capture One can report.
+    public func exposedCorners(of crop: CropRect, rotation angle: Double) -> [CropContainment.Corner] {
+        guard !requiresNativeBounds else { return [] }
+        return CropContainment.exposedCorners(of: crop, rotation: angle, width: orientedSize.width, height: orientedSize.height)
+    }
 
     public var unsupportedReason: String? {
         guard [0, 90, 180, 270].contains(orientation), flip == "none" else { return "Orientation or flip is not qualified for geometry writes." }
@@ -87,8 +132,9 @@ public struct Geometry: Codable, Equatable {
     }
 
     /// Native reported bounds for corrected geometry; perspective fits may be
-    /// further reduced by Capture One. Otherwise a conservative centered rectangle
-    /// inside the rotated image, excluding triangular corner areas.
+    /// further reduced by Capture One. Otherwise the largest centred rectangle with
+    /// the image's proportions inside the rotated image: a planning rectangle for
+    /// ratio fits, not the containment test.
     public func safeBounds(rotation angle: Double) throws -> CropRect {
         // Native bounds are valid only in the currently observed canvas. A new
         // corrected geometry rotation must obtain fresh bounds inside the journaled handler.
@@ -96,9 +142,7 @@ public struct Geometry: Codable, Equatable {
             guard angle == rotation else { throw C1Error.invalidRequest("Native corrected geometry bounds belong to the current rotation only.") }
             return maximumCrop
         }
-        let portrait = orientation == 90 || orientation == 270
-        let w = portrait ? imageHeight : imageWidth
-        let h = portrait ? imageWidth : imageHeight
+        let (w, h) = orientedSize
         let r = abs(angle) * .pi / 180
         let c = cos(r), s = sin(r)
         let scale = min(w / (w*c + h*s), h / (w*s + h*c))
@@ -135,10 +179,15 @@ public struct Geometry: Codable, Equatable {
             rect = CropRect(centerX: bounds.centerX.rounded(), centerY: bounds.centerY.rounded(), width: floor(w), height: floor(w / ratio))
         }
         guard rect.values.allSatisfy({ $0.isFinite }), rect.width >= 1, rect.height >= 1 else { throw C1Error.invalidRequest("Crop dimensions must be positive finite pixels.") }
-        // Native crop and parent dimensions differ by up to two pixels in retained probes.
-        guard abs(rect.centerX - bounds.centerX) + rect.width/2 <= bounds.width/2 + 2,
-              abs(rect.centerY - bounds.centerY) + rect.height/2 <= bounds.height/2 + 2 else {
-            throw C1Error.invalidRequest("Crop lies outside conservative usable bounds at the requested rotation. Supply a smaller crop or aspectRatio.")
+        if requiresNativeBounds {
+            let tolerance = CropContainment.tolerance
+            guard abs(rect.centerX - bounds.centerX) + rect.width/2 <= bounds.width/2 + tolerance,
+                  abs(rect.centerY - bounds.centerY) + rect.height/2 <= bounds.height/2 + tolerance else {
+                throw C1Error.invalidRequest("Crop lies outside the native corrected bounds. Supply a smaller crop or aspectRatio.")
+            }
+        } else if case let exposed = exposedCorners(of: rect, rotation: angle), !exposed.isEmpty {
+            let worst = exposed.map(\.distance).max()!
+            throw C1Error.invalidRequest("Crop exposes \(exposed.count) corner(s) outside the rotated image at \(angle) degrees, up to \(Int(worst.rounded(.up))) px. Supply a smaller or recentred crop, or aspectRatio.")
         }
         var result = self; result.crop = rect; result.rotation = angle
         return result
@@ -202,6 +251,9 @@ public struct GeometryMutationResult: Codable {
     public let diff: [String: DoubleDiff]
     public let geometryStateHash: String
     public let isDryRun: Bool
+    /// Observed crop corners outside an uncorrected rotated image, such as
+    /// Capture One's automatic crop after a rotation-only change. Never accepted silently.
+    public var exposedCorners: [CropContainment.Corner]? = nil
 }
 
 /// Bridge keys deliberately avoid Capture One's reserved AppleScript property names.

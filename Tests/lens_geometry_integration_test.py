@@ -143,7 +143,8 @@ set crop of v to (maximum crop v apply false)''')
             spec = importlib.util.spec_from_file_location('contained_crop', ROOT / 'scripts/propose-contained-crop.py')
             planner = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(planner)
-            proposal = planner.propose(stored['geometry']['crop'], stored['geometryUsableBounds'])
+            proposal = planner.plan(stored['geometry']['crop'], stored['geometry'])
+            assert proposal['bounds'] == stored['geometryUsableBounds'], proposal
             log('stored-off-center-probe', requested=rect, observed=stored, proposal=proposal,
                 nativeNormalized=rect != stored['geometry']['crop'])
             # This is fixture setup restoration after a completed read, not an

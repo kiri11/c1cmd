@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.3.0"
+    public static let version = "3.4.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -39,6 +39,9 @@ public enum ContractSchema {
         }
         var result = object(properties); result["minProperties"] = 1
         return result
+    }
+    static var exposedCorners: [String: Any] {
+        ["type": "array", "minItems": 1, "maxItems": 4, "items": object(["x": number, "y": number, "distance": number], required: ["x", "y", "distance"])]
     }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     /// Mutation, recipe and preview tools also accept `full`, which `ToolRequest` removes before validation.
@@ -257,7 +260,7 @@ public enum ContractSchema {
                 "after": writableMetadataSchema, "diff": diffs, "metadataStateHash": string, "isDryRun": boolean],
                 required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
             "get": get, "set": mutation, "add": mutation, "reset": mutation,
-            "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
+            "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),

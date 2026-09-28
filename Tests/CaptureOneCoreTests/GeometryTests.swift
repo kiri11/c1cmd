@@ -11,6 +11,8 @@ final class GeometryFake: ScriptExecuting {
     var pendingBeforeWrite = false
     var requestedBeforeWrite: GeometryRequest?
     var normalizePerspective = false
+    /// Capture One's automatic crop after a transform-only request.
+    var automaticCrop: [Double] = [3150,2300,2400,1600]
     init(directory: URL) { base = FakeScript(directory: directory) }
     init(base: FakeScript) { self.base = base }
     func record(_ id: String) -> [String: Any] {
@@ -58,7 +60,7 @@ final class GeometryFake: ScriptExecuting {
                 } else if args[7].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType {
                     let ratio = args[7].doubleValue, w = floor(min(bounds[2], bounds[3]*args[7].doubleValue))
                     target = [bounds[0], bounds[1], w, floor(w/ratio)]
-                } else { target = [3150,2300,2400,1600] }
+                } else { target = automaticCrop }
                 r["maximumValues"] = bounds
             } else { target = (1...4).map { args[5].atIndex($0)!.doubleValue } }
             var fitted = target
@@ -84,6 +86,8 @@ final class GeometryFake: ScriptExecuting {
 struct GeometryTests {
     static func run() {
         print("Running GeometryTests...")
+        testContainmentTable()
+        testRotationOnly()
         testCorrectedLens()
         testKeystone()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -214,6 +218,72 @@ struct GeometryTests {
                 let next = try core.cloneVariant(sourceRef:"1")
                 faultRef = next.workingRef
             }
+        }
+    }
+
+    /// Shared with Tests/contained_crop_test.py, so c1 and the planner apply one test.
+    private static func testContainmentTable() {
+        struct Case: Decodable {
+            let name: String, rotation: Double, canvas: [String: Double], crop: CropRect, exposed: [Int], distances: [Double]
+        }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("fixtures/crop-containment.json")
+        let cases = try! JSONDecoder().decode([Case].self, from: Data(contentsOf: url))
+        XCTAssertTrue(cases.count >= 10)
+        let order: [(Double, Double)] = [(-1,-1), (1,-1), (1,1), (-1,1)]
+        for item in cases {
+            let exposed = CropContainment.exposedCorners(of: item.crop, rotation: item.rotation, width: item.canvas["width"]!, height: item.canvas["height"]!)
+            let indices = order.indices.filter { index in exposed.contains {
+                abs($0.x - (item.crop.centerX + order[index].0*item.crop.width/2)) < 1e-9 && abs($0.y - (item.crop.centerY + order[index].1*item.crop.height/2)) < 1e-9 } }
+            XCTAssertEqual(indices, item.exposed, item.name)
+            XCTAssertEqual(exposed.map { ($0.distance*1000).rounded()/1000 }, item.distances, item.name)
+            // Uncorrected validation accepts exactly the contained crops at the requested rotation.
+            let portrait = item.canvas["width"]! < item.canvas["height"]!
+            var geometry = Geometry.fixture(width: item.canvas["width"]!, height: item.canvas["height"]!)
+            if portrait { geometry.orientation = 90; (geometry.imageWidth, geometry.imageHeight) = (geometry.imageHeight, geometry.imageWidth) }
+            let accepted = (try? geometry.target(crop: item.crop, rotation: item.rotation, aspectRatio: nil)) != nil
+            XCTAssertEqual(accepted, item.exposed.isEmpty, item.name)
+        }
+        var corrected = Geometry.fixture(width: 6000, height: 4000); corrected.lensGeometry[0] = 50
+        XCTAssertEqual(corrected.exposedCorners(of: CropRect(centerX: 0, centerY: 0, width: 9000, height: 9000), rotation: 0), [])
+    }
+
+    private static func testRotationOnly() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "rotation-db"}, imageDimensions:{_ in [6000,4000]})
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
+            let ref = try core.editVariant(sourceRef:"1",ifState:source.stateHash,ifDocument:doc.openToken).workingRef
+            // The stored full-frame crop cannot be validated at the new rotation; Capture One's crop is kept.
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:source.geometryStateHash!,rotation:5,dryRun:true))
+            XCTAssertEqual(fake.writeCount,0)
+            let rotated = try core.geometrySet(workingRef:ref,ifGeometryState:source.geometryStateHash!,rotation:5)
+            XCTAssertEqual(rotated.after.rotation,5)
+            XCTAssertEqual(rotated.after.crop,CropRect(centerX:3150,centerY:2300,width:2400,height:1600))
+            XCTAssertNil(rotated.exposedCorners)
+            XCTAssertTrue(fake.pendingBeforeWrite)
+            let record = journal.find(operationId:rotated.operationId)!
+            XCTAssertEqual(record.requestedGeometry?.rotation,5)
+            XCTAssertNil(record.requestedGeometry?.crop)
+            XCTAssertEqual(record.intendedGeometry?.crop,rotated.after.crop)
+            XCTAssertEqual(record.status,"succeeded")
+            // An automatic crop exposing a corner is reported, not accepted silently.
+            fake.automaticCrop = [3163,2254,6000,4000]
+            let exposed = try core.geometrySet(workingRef:ref,ifGeometryState:rotated.geometryStateHash,rotation:-5)
+            XCTAssertEqual(exposed.exposedCorners?.count,4)
+            XCTAssertTrue(exposed.exposedCorners!.allSatisfy { $0.distance > 100 })
+            // Explicit crops at a new rotation still use exact containment before dispatch.
+            let writes = fake.writeCount
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:exposed.geometryStateHash,crop:CropRect(centerX:3163,centerY:2254,width:6000,height:4000),rotation:5))
+            XCTAssertEqual(fake.writeCount,writes)
+            // Restoring an observed crop reports what it restores; it is not a new containment claim.
+            let restored = try core.geometryRestore(workingRef:ref,ifGeometryState:exposed.geometryStateHash)
+            XCTAssertEqual(restored.after.crop,source.geometry!.crop)
+            XCTAssertNil(restored.exposedCorners)
         }
     }
 
@@ -371,5 +441,15 @@ struct GeometryTests {
                 fake.records["1"] = source
             }
         }
+    }
+}
+
+extension Geometry {
+    fileprivate static func fixture(width: Double, height: Double) -> Geometry {
+        let full: [String: Any] = ["centerX": width/2, "centerY": height/2, "width": width, "height": height]
+        let object: [String: Any] = ["crop": full, "rotation": 0, "orientation": 0, "imageWidth": width, "imageHeight": height,
+            "maximumCrop": full, "flip": "none", "keystone": [100,0,0,0,0], "lensGeometry": [0,35,0,0,0,0,0,0],
+            "lensProfile": "fixture", "hideDistortedAreas": true, "cropOutsideImage": false]
+        return try! JSONDecoder().decode(Geometry.self, from: JSONSerialization.data(withJSONObject: object))
     }
 }

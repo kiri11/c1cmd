@@ -958,8 +958,11 @@ public final class SessionController {
             return GeometryMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before.geometry, after: target,
                 diff: target.changes(from: before.geometry), geometryStateHash: before.hash, isDryRun: true)
         }
-        return GeometryMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before.geometry, after: after.state.geometry,
-            diff: after.state.geometry.changes(from: before.geometry), geometryStateHash: after.state.hash, isDryRun: false)
+        let geometry = after.state.geometry
+        let exposed = geometry.exposedCorners(of: geometry.crop, rotation: geometry.rotation)
+        return GeometryMutationResult(operationId: outcome.operationId, workingRef: workingRef, before: before.geometry, after: geometry,
+            diff: geometry.changes(from: before.geometry), geometryStateHash: after.state.hash, isDryRun: false,
+            exposedCorners: exposed.isEmpty ? nil : exposed)
     }
 
     // MARK: - Reset Mutation
@@ -1379,7 +1382,7 @@ public final class SessionController {
             "catalogWrites": ["optInEnvironment": "C1_CATALOG_WRITE_PATH", "requiresExactPath": true,
                               "requiredBuild": Self.pinnedBuild, "configuredPath": catalogWritePath ?? "",
                               "status": "experimental", "imageStorage": "referenced-originals-only", "activeDocumentPermission": "doc_info.writesEnabled"],
-            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation", "keystone"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-Geometry.maximumRotation, Geometry.maximumRotation], "bounds": "native maximum crop for lens and keystone corrections; conservative centered rectangle otherwise", "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": true, "keystoneChangeDryRun": false, "keystoneControls": ContractSchema.keystoneSchema],
+            "geometry": ["testedBuilds": ["16.8.5.30"], "fields": ["crop", "rotation", "keystone"], "coordinateSpace": "oriented-rotated-canvas-bottom-left-pixels", "precondition": "geometry-v1", "rotationRange": [-Geometry.maximumRotation, Geometry.maximumRotation], "bounds": "native maximum crop for lens and keystone corrections; exact containment in the rotated image otherwise", "rotationOnlyDryRun": false, "lensDistortionRange": [0, 100], "correctedLensRotationDryRun": false, "correctedGeometryRotationDryRun": false, "perspectiveRatioDryRun": false, "existingKeystoneSupported": true, "existingLensMovementsSupported": true, "keystoneWrites": true, "keystoneChangeDryRun": false, "keystoneControls": ContractSchema.keystoneSchema],
             "supportedFields": registry.supportedAdjustmentFields.map { spec in
                 [
                     "name": spec.name,

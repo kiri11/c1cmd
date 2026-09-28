@@ -30,7 +30,7 @@ public enum ResultCompaction {
         switch tool {
         case "set", "add", "reset": return pick(["operationId", "workingRef", "diff", "stateHash", "isDryRun"])
         case "metadata_set": return pick(["operationId", "workingRef", "diff", "metadataStateHash", "isDryRun"])
-        case "geometry_set", "geometry_restore": return pick(["operationId", "workingRef", "diff", "geometryStateHash", "isDryRun"])
+        case "geometry_set", "geometry_restore": return pick(["operationId", "workingRef", "diff", "geometryStateHash", "isDryRun", "exposedCorners"])
         case "native_set", "native_action":
             guard let before = full["before"] as? [String: Any], let after = full["after"] as? [String: Any] else { return nil }
             let identity = ["target", "nativeStateHash", "unavailable"]
@@ -98,7 +98,7 @@ public enum ResultCompaction {
             "recipe_verify": report, "edit_apply": report, "edit_status": report,
         ]
         let geometry = ["operationId", "workingRef", "diff", "geometryStateHash", "isDryRun"]
-        result["geometry_set"] = compact("geometry_set", geometry, required: geometry)
+        result["geometry_set"] = compact("geometry_set", geometry + ["exposedCorners"], required: geometry)
         result["geometry_restore"] = result["geometry_set"]
         let native = compact("native_set", ["operationId", "dryRun"],
             extra: ["target": NativeEditing.targetSchema, "nativeStateHash": string, "diff": changes, "unavailable": open],

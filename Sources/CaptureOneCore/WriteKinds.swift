@@ -201,16 +201,21 @@ struct GeometryWrite: WriteKind {
                 throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation/keystone.")
             }
             // This exact crop was observed on this image with the same lens/orientation
-            // context. It may legitimately exceed the conservative bounds for NEW crops.
+            // context. It may legitimately fail the containment test for NEW crops.
             var restored = before
             restored.crop = baseline.crop; restored.rotation = baseline.rotation; restored.keystone = baseline.keystone
             return Intended(target: restored, request: nil, context: context)
         }
-        guard before.requiresNativeBounds || keystone != nil else {
+        // Rotation-only changes keep Capture One's automatic crop, as on corrected geometry.
+        let rotationOnly = crop == nil && aspectRatio == nil && keystone == nil && rotation != nil && rotation != before.rotation
+        guard before.requiresNativeBounds || keystone != nil || rotationOnly else {
             return Intended(target: try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio), request: nil, context: context)
         }
         if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
         guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
+        if dryRun && rotationOnly && !before.requiresNativeBounds {
+            throw C1Error.invalidRequest("Rotation-only changes keep Capture One's automatic crop; a dry run cannot predict it.")
+        }
         if dryRun && keystoneChanged {
             throw C1Error.invalidRequest("Keystone changes require native execution; dry runs cannot predict the final crop.")
         }

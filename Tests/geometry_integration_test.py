@@ -2,7 +2,7 @@
 """Crop/rotation CLI + MCP qualification in a disposable Session; originals preserved.
 Requires C1_TEST_RAW_FIXTURE and zero open documents. Evidence retained in C1_GEOMETRY_EVIDENCE.
 """
-import hashlib, json, os, shutil, subprocess, sys, tempfile, time, uuid
+import hashlib, importlib.util, json, math, os, re, shutil, subprocess, sys, tempfile, time, uuid
 from pathlib import Path
 from contract_test import Client, validate_response, complete, complete_args
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +11,7 @@ MCP = Path(os.environ.get('C1_TEST_MCP_BIN',ROOT / '.build/debug/c1-mcp'))
 RAW = Path(os.environ['C1_TEST_RAW_FIXTURE'])
 EVIDENCE = Path(os.environ.get('C1_GEOMETRY_EVIDENCE', tempfile.mkdtemp(prefix='c1-geometry-evidence-',dir='/private/tmp')))
 EVIDENCE.mkdir(parents=True,exist_ok=True)
+KEYS=('centerX','centerY','width','height')
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def log(event, **data):
@@ -134,13 +135,69 @@ try:
         if abs(angle)==45:
             pr,_=tool('preview',{'ref':ref});assert abs(pr['width']/pr['height']-.75)<.003
         log('rotation-boundary',angle=angle,result=result)
+    # Exact containment on uncorrected images: the rotated-image model decides, and
+    # Capture One's own normalization of native crops is recorded as the oracle.
+    spec=importlib.util.spec_from_file_location('contained_crop',ROOT/'scripts/propose-contained-crop.py')
+    planner=importlib.util.module_from_spec(spec);spec.loader.exec_module(planner)
+    native_fixture('orientation-reset','set orientation of adjustments of v to 0')
+    g=cli('get',ref)['geometry'];w,h=g['imageWidth'],g['imageHeight']
+    full=dict(centerX=w/2,centerY=h/2,width=w,height=h)
+    def reset():
+        current=cli('get',ref)
+        return cli('geometry','set',ref,'--if-geometry-state',current['geometryStateHash'],'--rotation',0,'--crop',','.join(str(full[k]) for k in KEYS))
+    def native_crop(label,angle,rect):
+        body=f'set rotation of adjustments of v to {angle}\nset crop of v to {{{",".join(str(rect[k]) for k in KEYS)}}}\nreturn crop of v'
+        stored=[float(x) for x in re.findall(r'-?[\d.]+(?:e[-+]?\d+)?',native_fixture(label,body),re.I)]
+        return dict(zip(KEYS,stored))
+    def off_centre(angle):
+        # Tall crop pushed along the image's long axis: inside at +angle, exposed at -angle.
+        r=math.radians(angle);c,s=math.cos(r),math.sin(r)
+        cw,ch=round(w/4),round(h/2)
+        a=(w-cw*abs(c)-ch*abs(s))/2
+        return dict(centerX=round((w*abs(c)+h*abs(s))/2+.9*a*c),centerY=round((w*abs(s)+h*abs(c))/2-.9*a*s),width=cw,height=ch)
+    reset()
+    rect=off_centre(20)
+    assert not planner.exposed_corners(rect,20,w,h,tolerance=0) and planner.exposed_corners(rect,-20,w,h)
+    planning=cli('get',ref)['geometryUsableBounds']
+    current=cli('get',ref)
+    accepted,_=tool('geometry_set',{'workingRef':ref,'ifGeometryState':current['geometryStateHash'],'rotation':20,'crop':rect})
+    assert accepted['after']['crop']==rect and 'exposedCorners' not in accepted,accepted
+    rejected=cli('geometry','set',ref,'--if-geometry-state',accepted['geometryStateHash'],'--rotation=-20','--crop',','.join(str(rect[k]) for k in KEYS),error='invalid-request')
+    log('off-centre-rotated',crop=rect,planningRectangleAtZero=planning,accepted=accepted,rejectedMirror=rejected)
+    # Native oracle: Capture One keeps the contained crop and normalizes its mirror.
+    kept=native_crop('containment-kept',20,rect)
+    mirrored=native_crop('containment-mirror',-20,rect)
+    log('native-containment',requested=rect,keptAt20=kept,storedAtMinus20=mirrored,
+        storedExposure=planner.exposed_corners(mirrored,-20,w,h,tolerance=0))
+    assert all(abs(kept[k]-rect[k])<=2 for k in KEYS),kept
+    assert mirrored!=rect and not planner.exposed_corners(mirrored,-20,w,h),mirrored
+    # Native normalization near an edge: overshoot the centred fit by 1 and 5 px.
+    for over in (1,5):
+        r=math.radians(20);c,s=math.cos(r),math.sin(r)
+        k=min((w+2*over)/(w*c+h*s),(h+2*over)/(w*s+h*c))
+        edge=dict(centerX=(w*c+h*s)/2,centerY=(w*s+h*c)/2,width=w*k,height=h*k)
+        stored=native_crop(f'containment-edge-{over}',20,edge)
+        log('native-edge-normalization',overshoot=over,requested=edge,stored=stored,
+            requestedExposure=planner.exposed_corners(edge,20,w,h,tolerance=0),storedExposure=planner.exposed_corners(stored,20,w,h,tolerance=0))
+        assert not planner.exposed_corners(stored,20,w,h),stored
+    # Rotation-only keeps Capture One's automatic crop; a dry run cannot predict it.
+    reset();current=cli('get',ref)
+    cli('geometry','set',ref,'--if-geometry-state',current['geometryStateHash'],'--rotation',3,'--dry-run',error='invalid-request')
+    rotated,_=tool('geometry_set',{'workingRef':ref,'ifGeometryState':current['geometryStateHash'],'rotation':3})
+    assert abs(rotated['after']['rotation']-3)<.001,rotated
+    operation=cli('operation','status',rotated['operationId'])
+    assert operation['status']=='succeeded' and operation['requestedGeometry'].get('crop') is None,operation
+    log('rotation-only',before=current['geometry'],result=rotated,operation=operation)
+    assert 'exposedCorners' not in rotated and not planner.exposed_corners(rotated['after']['crop'],3,w,h),rotated
+    pr,_=tool('preview',{'ref':ref});log('preview-rotation-only',result=pr)
+    reset()
     assert cli('get',original['id'])==original,'Original variant changed'
     assert sha(RAW)==original_sha and sha(fixture)==original_sha
     cli('variant','delete',ref)
     log('passed',originalUnchanged=True,rawSHA256=sha(fixture))
     shutil.copy2(journal,EVIDENCE/'journal.jsonl')
     apple('close current document')
-    print('PASS: geometry CLI/MCP, ratios, rotations, off-center crop, full-frame context, orientation, original/RAW preservation')
+    print('PASS: geometry CLI/MCP, ratios, rotations, off-center crop, exact containment, rotation-only, full-frame context, orientation, original/RAW preservation')
     print(EVIDENCE)
 except BaseException as e:
     log('failed',error=str(e));raise

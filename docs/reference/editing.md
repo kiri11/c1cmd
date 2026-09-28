@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `3.3.0`; package version is
+AppleScript handlers are reused. Contract version is `3.4.0`; package version is
 `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.

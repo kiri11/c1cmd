@@ -327,6 +327,11 @@ class Run:
             assert reconciled['requestedGeometry']['rotation'] == 3
             assert reconciled['afterGeometry']['lensGeometry'] == reconciled['beforeGeometry']['lensGeometry']
             assert reconciled['afterGeometry']['keystone'] == reconciled['beforeGeometry']['keystone']
+        if label == 'rotation-only-geometry-apple-event-timeout':
+            # Capture One's automatic crop is unknown until observed; only the request is journaled.
+            assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry'), reconciled
+            assert reconciled['requestedGeometry']['rotation'] == 3 and reconciled['requestedGeometry'].get('crop') is None
+            assert reconciled['afterGeometry']['rotation'] in (reconciled['beforeGeometry']['rotation'], 3)
         if label == 'keystone-geometry-apple-event-timeout':
             assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry')
             assert reconciled['requestedGeometry']['keystone'] == {'vertical':12, 'horizontal':-7}
@@ -350,7 +355,7 @@ class Run:
         assert sha(self.raw) == self.raw_hash
         fresh, current = self.clone()
         self.cli('set', fresh['workingRef'], '--if-state', current['stateHash'], 'exposure=0.125')
-        if label in ('geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout', 'keystone-geometry-apple-event-timeout'):
+        if label in ('geometry-apple-event-timeout', 'rotation-only-geometry-apple-event-timeout', 'corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout', 'keystone-geometry-apple-event-timeout'):
             if label in ('corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
                 self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
@@ -404,7 +409,7 @@ set keystone horizontal of adjustments of v to -5
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False, metadata=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False, metadata=False, rotation_only=False):
         clone, current = self.clone()
         if corrected or perspective:
             assert geometry
@@ -430,6 +435,9 @@ set keystone horizontal of adjustments of v to -5
             if keystone:
                 assert geometry
                 command += ['--keystone-vertical=12', '--keystone-horizontal=-7']
+            if rotation_only:
+                assert geometry and not (corrected or perspective or keystone)
+                command.remove('--aspect-ratio'); command.remove('1.5')
             self.child = subprocess.Popen(command + ['--format', 'json'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             pending = wait_for(lambda: next((r for r in self.records()
@@ -455,7 +463,7 @@ set keystone horizontal of adjustments of v to -5
                 self.child.kill()
                 self.child.wait()
         self.log('target-resumed', current=self.cli('get', clone['workingRef']))
-        label = 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
+        label = 'rotation-only-geometry-apple-event-timeout' if rotation_only else 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
         if native or native_action: label = 'native-action-timeout' if native_action else 'native-property-timeout'
         if metadata: label = 'metadata-apple-event-timeout'
         self.recovery(pending['operationId'], clone, label)
@@ -615,6 +623,8 @@ set keystone horizontal of adjustments of v to -5
                 if case != 'geometry':
                     options['corrected' if case == 'lens' else case] = True
                 self.apple_event_timeout(**options)
+                if case == 'geometry':
+                    self.apple_event_timeout(geometry=True, rotation_only=True)
             elif case == 'preview':
                 self.preview_timeout()
             elif case == 'mcp-death':

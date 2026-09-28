@@ -104,6 +104,7 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(self.run.clone.call_count, 10)
         self.run.lookup_identities.assert_called_once_with(['2', '1'])
         self.assertEqual(calls, [('timeout', {}), ('timeout', {'metadata': True}), ('timeout', {'native': True}), ('timeout', {'native_action': True}), ('timeout', {'geometry': True}),
+                               ('timeout', {'geometry': True, 'rotation_only': True}),
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),

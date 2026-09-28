@@ -447,7 +447,8 @@ on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTon
 end applyGeometry
 
 -- Lens and perspective corrections change the canvas. Do not extrapolate from RAW dimensions or
--- reuse bounds from another rotation. The caller journals the request before
+-- reuse bounds from another rotation. Uncorrected rotation-only changes also come
+-- here to keep Capture One's automatic crop. The caller journals the request before
 -- entering this handler; any error after dispatch keeps the write block.
 on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone)
     set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)

@@ -56,37 +56,45 @@ source crop is never reset.
 
 ## Bounds
 
-**Uncorrected images** (no lens distortion, keystone or lens movements) use a
-conservative centered rectangle inside the rotated image, exposed as
-`geometryUsableBounds`.
+**Uncorrected images** (no lens distortion, keystone or lens movements) use exact
+containment: an explicit or ratio-fit crop is accepted when all four corners lie
+inside the rotated image, allowing two pixels per edge. The image is the oriented
+intrinsic size rotated about the canvas centre, so off-centre crops at any
+rotation are accepted when contained, and a crop exposing a corner is rejected
+before dispatch. `geometryUsableBounds` is the largest centred rectangle with the
+image's proportions: the rectangle ratio fits are planned in, not the test.
 
 **Corrected images** use Capture One's read-only `maximumCrop` at the current
 rotation. Lens distortion 0–100 is supported and its amount, profile and "hide
 distorted areas" setting are preserved. Existing keystone and lens tilt/shift are
 preserved. Their native maximum is an upper bound: Capture One may shrink a
 centered ratio fit, so the final crop must keep the requested ratio and lie inside
-the proposed rectangle.
+the proposed rectangle. A rotation change queries fresh bounds after the native
+rotation, inside the journaled operation, then fits `aspectRatio` or validates the
+explicit crop. With lens or perspective corrections, `dryRun` rejects rotation
+changes and ratio fits because native results cannot be predicted; explicit-crop
+dry runs at the current rotation remain.
 
-A rotation change queries fresh bounds after the native rotation, inside the
-journaled operation, then fits `aspectRatio` or validates the explicit crop.
-Rotation-only requests keep Capture One's automatically recentered crop, even when
-it exceeds the reported bounds. With lens or perspective corrections, `dryRun`
-rejects rotation changes and ratio fits because native results cannot be
-predicted; explicit-crop dry runs at the current rotation remain. A failure after
-rotation, including an explicit crop outside the new bounds, can leave the
-rotation applied and is an uncertain operation.
+**Rotation-only requests** on either kind of image keep Capture One's automatic
+crop: the native rotation runs inside the journaled operation and the observed crop
+is the result, even when it differs from the stored one. `dryRun` rejects them
+because that crop cannot be predicted. On an uncorrected image, a result whose crop
+exposes a corner lists it in `exposedCorners` (canvas `x`, `y` and `distance` in
+pixels); inspect a preview and choose an explicit crop.
 
-Explicit crops allow two pixels per edge. Distortion outside 0–100, flips,
-crop-outside-image and unqualified orientations are blocked.
+A failure after rotation, including an explicit crop outside the new bounds, can
+leave the rotation applied and is an uncertain operation. Distortion outside
+0–100, flips, crop-outside-image and unqualified orientations are blocked.
 
 ### Stored crops
 
 A stored crop is an observation, not proof that the same rectangle can be
 submitted. Never widen bounds to the union of bounds and a stored crop, and never
 disable lens correction to admit a request. `scripts/propose-contained-crop.py
-input.json` reads `crop` and `bounds` objects (`centerX`, `centerY`, `width`,
-`height`) from the same fresh read and rotation. It scales both dimensions by one
-factor (never enlarging), moves the center the minimum distance to fit, and
+input.json` reads a `crop` (`centerX`, `centerY`, `width`, `height`) and the
+`geometry` object of the same fresh `get`. It applies exact containment on
+uncorrected images and `maximumCrop` on corrected ones, scales both dimensions by
+one factor (never enlarging), moves the center the minimum distance to fit, and
 reports every delta. The result is a changed rectangle that needs preview review;
 nothing is applied and no token is produced.
 

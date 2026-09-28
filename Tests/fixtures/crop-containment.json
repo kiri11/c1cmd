@@ -1,0 +1,208 @@
+[
+ {
+  "name": "centred full frame at 0 degrees",
+  "rotation": 0,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3000,
+   "centerY": 2000,
+   "width": 6000,
+   "height": 4000
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "shifted by the 2 px tolerance at 0 degrees",
+  "rotation": 0,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3002,
+   "centerY": 1998,
+   "width": 6000,
+   "height": 4000
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "shifted 3 px right at 0 degrees",
+  "rotation": 0,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3003,
+   "centerY": 2000,
+   "width": 6000,
+   "height": 4000
+  },
+  "exposed": [
+   1,
+   2
+  ],
+  "distances": [
+   3.0,
+   3.0
+  ]
+ },
+ {
+  "name": "centred planning rectangle at 10 degrees",
+  "rotation": 10,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3301.7196145,
+   "centerY": 2490.560039,
+   "width": 4817,
+   "height": 3211
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "planning rectangle 1.5 px past the edge at 10 degrees",
+  "rotation": 10,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3301.7196145,
+   "centerY": 2490.560039,
+   "width": 4821.807,
+   "height": 3214.538
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "planning rectangle 2.5 px past the edge at 10 degrees",
+  "rotation": 10,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3301.7196145,
+   "centerY": 2490.560039,
+   "width": 4824.215999999999,
+   "height": 3216.144
+  },
+  "exposed": [
+   0,
+   2
+  ],
+  "distances": [
+   2.5,
+   2.5
+  ]
+ },
+ {
+  "name": "off-centre crop inside the image at 20 degrees",
+  "rotation": 20,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 5003,
+   "centerY": 2359,
+   "width": 2000,
+   "height": 1600
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "same off-centre crop at -20 degrees",
+  "rotation": -20,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 5003,
+   "centerY": 2359,
+   "width": 2000,
+   "height": 1600
+  },
+  "exposed": [
+   1
+  ],
+  "distances": [
+   120.255
+  ]
+ },
+ {
+  "name": "full image size at 5 degrees",
+  "rotation": 5,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 3162.89558,
+   "centerY": 2253.8566245,
+   "width": 6000,
+   "height": 4000
+  },
+  "exposed": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "distances": [
+   253.857,
+   162.896,
+   253.857,
+   162.896
+  ]
+ },
+ {
+  "name": "portrait off-centre at -30 degrees",
+  "rotation": -30,
+  "canvas": {
+   "width": 4000,
+   "height": 6000
+  },
+  "crop": {
+   "centerX": 3100,
+   "centerY": 2600,
+   "width": 1800,
+   "height": 2400
+  },
+  "exposed": [],
+  "distances": []
+ },
+ {
+  "name": "one exposed corner at 45 degrees",
+  "rotation": 45,
+  "canvas": {
+   "width": 6000,
+   "height": 4000
+  },
+  "crop": {
+   "centerX": 4136,
+   "centerY": 3836,
+   "width": 2400,
+   "height": 1600
+  },
+  "exposed": [
+   2
+  ],
+  "distances": [
+   51.269
+  ]
+ }
+]
