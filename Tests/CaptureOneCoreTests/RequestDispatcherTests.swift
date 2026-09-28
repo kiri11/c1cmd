@@ -18,7 +18,7 @@ struct RequestDispatcherTests {
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.destructive).map(\.name).sorted(), ["native_action", "variant_delete"])
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.readOnly).map(\.name).sorted(),
                        ["capabilities", "catalog_get", "catalog_inspect", "catalog_variants", "diff", "doc_info", "doctor", "dump",
-                        "edit_status", "get", "read_session_status", "request_status", "schema", "variants_list"])
+                        "edit_status", "exif", "get", "read_session_status", "request_status", "schema", "variants_list"])
 
         // The composition profile is transport-neutral: ToolRequest enforces it for the CLI and MCP alike.
         let blocked = ["set", "add", "reset", "variant_baseline", "metadata_set", "native_set", "native_action",

@@ -103,7 +103,8 @@ before preparing an edit.
 
 Use 3:2 (`aspectRatio` 1.5) for horizontal and 3:4 (0.75) for vertical pictures.
 Straighten credible horizons and lines with rotation, and apply keystone only when
-credible straight lines establish the correction. Preserve interesting
+credible straight lines establish the correction. `exif` reports the camera's
+recorded roll as `levelRotation`, a starting hint to confirm against the preview. Preserve interesting
 composition; do not level natural diagonals. Flag ambiguous perspective and ratio
 exceptions for review; an unchanged proposal is not acceptance. After rotation or
 keystone, inspect a fresh preview before choosing an explicit crop. Never disable

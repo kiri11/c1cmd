@@ -21,6 +21,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
     case deadlineExceeded(String)
     /// Capture One refused a people mask and a readback showed nothing changed.
     case noPeopleDetected(String)
+    /// An optional local tool, such as exiftool, is not installed or cannot start.
+    case dependencyMissing(String)
     case scriptError(String, code: Int?)
 
     public var errorCode: String {
@@ -44,6 +46,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .requestCancelled: return "request-cancelled"
         case .deadlineExceeded: return "deadline-exceeded"
         case .noPeopleDetected: return "no-people-detected"
+        case .dependencyMissing: return "dependency-missing"
         case .scriptError: return "script-error"
         }
     }
@@ -58,7 +61,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
             return 3
         case .partialFailure, .outcomeUnknown, .readbackMismatch, .timeout:
             return 4
-        case .appNotRunning, .noDocument, .permissionDenied, .unsupportedVersion:
+        case .appNotRunning, .noDocument, .permissionDenied, .unsupportedVersion, .dependencyMissing:
             return 5
         }
     }
@@ -84,6 +87,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case .requestCancelled(let msg): return "request-cancelled: \(msg)"
         case .deadlineExceeded(let msg): return "deadline-exceeded: \(msg)"
         case .noPeopleDetected(let msg): return "no-people-detected: \(msg)"
+        case .dependencyMissing(let msg): return "dependency-missing: \(msg)"
         case .scriptError(let msg, let code):
             if let c = code {
                 return "script-error (\(c)): \(msg)"
@@ -108,7 +112,8 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
              .unsupportedVersion(let msg), .unsupportedField(let msg), .invalidRequest(let msg),
              .captureOneBusy(let msg), .documentChanged(let msg), .stateChanged(let msg),
              .readbackMismatch(let msg), .partialFailure(let msg), .outcomeUnknown(let msg),
-             .timeout(let msg), .requestCancelled(let msg), .deadlineExceeded(let msg), .noPeopleDetected(let msg):
+             .timeout(let msg), .requestCancelled(let msg), .deadlineExceeded(let msg), .noPeopleDetected(let msg),
+             .dependencyMissing(let msg):
             try container.encode(msg, forKey: .message)
         case .scriptError(let msg, let code):
             try container.encode(msg, forKey: .message)
@@ -141,6 +146,7 @@ public enum C1Error: Error, CustomStringConvertible, Codable, Equatable {
         case "request-cancelled": self = .requestCancelled(msg)
         case "deadline-exceeded": self = .deadlineExceeded(msg)
         case "no-people-detected": self = .noPeopleDetected(msg)
+        case "dependency-missing": self = .dependencyMissing(msg)
         case "script-error": self = .scriptError(msg, code: sCode)
         default: self = .invalidRequest(msg)
         }

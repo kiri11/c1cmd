@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `3.5.0`; package version is
+AppleScript handlers are reused. Contract version is `3.6.0`; package version is
 `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -213,5 +213,6 @@ disagree, rejects every request.
 | `request-cancelled` | Stopped at a safe boundary; a compound report lists completed steps. Never resume it automatically. |
 | `deadline-exceeded` | Inventory passed its deadline at a boundary. |
 | `no-people-detected` | A people mask found nobody and readback confirmed no change; the operation failed and blocks nothing. |
+| `dependency-missing` | An optional local tool, such as exiftool for `exif`, is not installed or cannot start. Nothing was changed. |
 | `capture-one-busy` | The advisory lock timed out; check for hung processes. |
 | `permission-denied` | Allow the host app under **Privacy & Security → Automation**. |

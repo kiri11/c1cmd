@@ -21,6 +21,7 @@ public struct ToolRequest {
         case variantEdit(sourceRef: String, ifState: String, ifDocument: String, ifGeometryState: String?)
         case variantClone(sourceRef: String), variantBaseline(sourceRef: String), variantDelete(workingRef: String)
         case get(ref: String, live: Bool, readWorkflow: String?, nativeTargets: [NativeTarget]?)
+        case exif(ref: String)
         case adjust(workingRef: String, ifState: String, adjustments: Adjustments, delta: Bool, dryRun: Bool)
         case reset(workingRef: String, ifState: String, fields: [String], dryRun: Bool)
         case metadataSet(workingRef: String, ifMetadataState: String, rating: Int?, colorTag: Int?, dryRun: Bool)
@@ -100,6 +101,7 @@ public struct ToolRequest {
             let ref = string("ref")!
             command = .get(ref: ref, live: flag("live"), readWorkflow: string("readWorkflow"),
                            nativeTargets: try a["nativeTargets"].map { try NativeEditing.parseTargets($0, ref: ref) })
+        case "exif": command = .exif(ref: string("ref")!)
         case "set", "add":
             let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
             let values = a["adjustments"] as? [String: Any] ?? a.filter { !controls.contains($0.key) }
@@ -195,6 +197,7 @@ public struct ToolRequest {
             if let targets { return .get(try core.get(ref: ref, nativeTargets: targets)) }
             if !live, let result = try browsing.get(ref: ref, workflowID: workflow) { return .object(result) }
             return .get(try core.get(ref: ref))
+        case .exif(let ref): return .value(try ExifReader.read(try core.get(ref: ref)))
         case .adjust(let workingRef, let ifState, let adjustments, let delta, let dryRun):
             return .mutation(try core.mutate(workingRefString: workingRef, ifState: ifState, setAdjustments: delta ? nil : adjustments,
                                              addAdjustments: delta ? adjustments : nil, isDryRun: dryRun))

@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.5.0"
+    public static let version = "3.6.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static func integer(_ range: ClosedRange<Int>) -> [String: Any] {
         ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
     }
@@ -44,6 +44,10 @@ public enum ContractSchema {
         ["type": "array", "minItems": 1, "maxItems": 4, "items": object(["x": number, "y": number, "distance": number], required: ["x", "y", "distance"])]
     }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
+    static var exifSchema: [String: Any] {
+        object(["id": string, "workingRef": string, "pitchAngle": number, "focalLength35mm": number,
+            "levelRotation": ["type": "number", "minimum": -Geometry.maximumRotation, "maximum": Geometry.maximumRotation]], required: ["id"])
+    }
     /// Mutation, recipe and preview tools also accept `full`, which `ToolRequest` removes before validation.
     public static func input(_ name: String) -> [String: Any] {
         var schema = request(name)
@@ -89,6 +93,7 @@ public enum ContractSchema {
             return result
         case "get": return object(["ref": string, "live": boolean, "readWorkflow": string, "nativeTargets": ["type": "array", "items": NativeEditing.targetSchema,
             "minItems": 1, "maxItems": 16]], required: ["ref"])
+        case "exif": return object(["ref": string], required: ["ref"])
         case "set", "add":
             let adj = adjustments(delta: name == "add", aliases: true)
             var props = adj["properties"] as! [String: Any]
@@ -259,7 +264,7 @@ public enum ContractSchema {
             "metadata_set": object(["operationId": string, "workingRef": string, "before": writableMetadataSchema,
                 "after": writableMetadataSchema, "diff": diffs, "metadataStateHash": string, "isDryRun": boolean],
                 required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
-            "get": get, "set": mutation, "add": mutation, "reset": mutation,
+            "get": get, "exif": exifSchema, "set": mutation, "add": mutation, "reset": mutation,
             "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),

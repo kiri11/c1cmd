@@ -97,7 +97,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 35
+        assert len(tools) == 36
         assert "native_get" not in cli_schema["requests"]
         removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
         assert removed.get('isError'), removed
@@ -256,7 +256,7 @@ def run(cli, mcp):
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
         assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
-        print('PASS: shared CLI/MCP schemas, 35 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 36 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
@@ -354,6 +354,7 @@ ACCEPTED = [
     ('variant_delete', ['variant', 'delete', 'c1_wrk_x'], {'workingRef': 'c1_wrk_x'}),
     ('variant_baseline', ['variant', 'baseline', '1'], {'sourceRef': '1'}),
     ('get', ['get', '1', '--live', '--native-targets', '[{"scope": "lens"}]'], {'ref': '1', 'live': True, 'nativeTargets': [{'scope': 'lens'}]}),
+    ('exif', ['exif', 'c1_edit_x'], {'ref': 'c1_edit_x'}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '5', '--color-tag', '0', '--dry-run'],
      {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 5, 'colorTag': 0, 'dryRun': True}),
     ('set', ['set', 'x', '--if-state', 'h', 'exposure=0.5', 'kelvin=5400'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 0.5, 'kelvin': 5400}}),
@@ -401,6 +402,7 @@ REJECTED = [
     ('variant_delete', ['variant', 'delete', ' '], {'workingRef': ' '}),
     ('variant_baseline', ['variant', 'baseline', ''], {'sourceRef': ''}),
     ('get', ['get', '1', '--native-targets', '[]'], {'ref': '1', 'nativeTargets': []}),
+    ('exif', ['exif', ' '], {'ref': ' '}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '6'], {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 6}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--color-tag', '8'], {'workingRef': 'x', 'ifMetadataState': 'h', 'colorTag': 8}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h'], {'workingRef': 'x', 'ifMetadataState': 'h'}),

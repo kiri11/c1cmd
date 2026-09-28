@@ -66,6 +66,7 @@ public struct ToolDefinition {
             "variant_delete": ("Delete a c1-managed working clone. (Originals cannot be deleted).", false),
             "variant_baseline": ("Create a managed default-settings baseline variant using native New Variant behavior.", false),
             "get": ("Read a variant: adjustments, metadata, geometry and their state tokens. Optionally include 1...16 nativeTargets for curves, lens or layer properties in nativeSnapshots, with shared validation and independent nativeStateHash tokens. Live AppleScript observations; not SQLite or an atomic multi-scope snapshot.", true),
+            "exif": ("Camera level hints from the original, read with exiftool: levelRotation is the geometry_set rotation that levels the recorded roll; pitchAngle is upward lens tilt, with focalLength35mm to judge convergence. Hints to confirm against a preview. Needs exiftool; no state tokens.", true),
             "set": ("Set absolute adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             "add": ("Apply relative delta adjustments on an editing reference or managed working clone. Requires matching ifState precondition.", false),
             "metadata_set": ("Set rating (0–5) and/or colorTag (0–7; 0 clears) on an editing reference or managed clone. Requires ifMetadataState from get. Preserves omitted fields and image adjustments. dryRun returns the current metadata token.", false),

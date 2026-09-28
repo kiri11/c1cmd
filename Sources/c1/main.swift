@@ -132,6 +132,7 @@ struct C1: ParsableCommand {
             VariantsCommand.self,
             VariantCommand.self,
             GetCommand.self,
+            ExifCommand.self,
             SetCommand.self,
             AddCommand.self,
             ResetCommand.self,
@@ -399,6 +400,17 @@ struct GetCommand: ParsableCommand {
             return args
         })
     }
+}
+
+// MARK: - Exif
+struct ExifCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "exif", abstract: "Read camera EXIF and level-sensor roll/pitch from a variant's original with exiftool.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Native variant ID or working reference.")
+    var ref: String
+
+    mutating func run() throws { try globals.run("exif", { ["ref": ref] }) }
 }
 
 /// A JSON flag value, decoded into the arguments object unchanged.

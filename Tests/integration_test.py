@@ -169,6 +169,25 @@ def main():
         baseline_adj = get_orig["adjustments"]
         print(f"PASS: initial stateHash: {baseline_hash}, adjustments: {baseline_adj}")
 
+        # 5b. c1 exif reads the original read-only; Capture One's orientation sets the level frame.
+        print(f"\n[Step 5b] Testing c1 exif on original variant {source_id}...")
+        code, exif_res = run_c1(["exif", source_id])
+        exiftool = shutil.which("exiftool") or ("/opt/homebrew/bin/exiftool" if Path("/opt/homebrew/bin/exiftool").exists() else None)
+        if exiftool:
+            assert code == 0, f"exif failed: {exif_res}"
+            tags = json.loads(subprocess.check_output([exiftool, "-j", "-RollAngle#", str(fixture_raw)], text=True))[0]
+            orientation = (get_orig.get("geometry") or {}).get("orientation")
+            if "RollAngle" in tags and orientation is not None:
+                offset = (tags["RollAngle"] - orientation + 180) % 360 - 180
+                if abs(offset) <= 45:
+                    assert abs(exif_res["levelRotation"] - offset) < 0.01, (exif_res, tags, orientation)
+            assert compute_sha256(fixture_raw) == baseline_raw_sha, "exif must not modify the original"
+            print(f"PASS: exif levelRotation {exif_res.get('levelRotation')} pitch {exif_res.get('pitchAngle')} "
+                  f"at Capture One orientation {orientation}")
+        else:
+            assert code != 0 and exif_res.get("error", {}).get("code") == "dependency-missing", exif_res
+            print("PASS: exif reports dependency-missing without exiftool")
+
         # 6. c1 variant clone
         print(f"\n[Step 6] Testing c1 variant clone {source_id}...")
         code, clone_res = run_c1(["variant", "clone", source_id])

@@ -221,7 +221,7 @@ def main():
         tools = client.send_request("tools/list", {}).get("result", {}).get("tools", [])
         schema = parse_text_content(client.call_tool("schema").get("content", []))
         client.contract = schema
-        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 35, [t["name"] for t in tools]
+        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 36, [t["name"] for t in tools]
         for t in tools:
             assert t.get("description"), f"Tool {t['name']} missing description"
             assert t["inputSchema"] == schema["requests"][t["name"]], t["name"]

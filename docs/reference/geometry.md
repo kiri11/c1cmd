@@ -98,6 +98,28 @@ one factor (never enlarging), moves the center the minimum distance to fit, and
 reports every delta. The result is a changed rectangle that needs preview review;
 nothing is applied and no token is produced.
 
+## Camera level
+
+`c1 exif <ref>` / `exif` reads the camera's level sensor from the variant's
+original with [exiftool](https://exiftool.org), which is installed separately
+(`brew install exiftool`; `C1_EXIFTOOL` names a binary outside `PATH` and the
+Homebrew locations). It only reads the file, needs no write opt-in and returns no
+state tokens. Values the camera did not record are omitted.
+
+`levelRotation` is the `geometry_set` rotation that levels the recorded roll,
+measured from the variant's Capture One orientation, or the EXIF orientation when
+native geometry is unavailable. Positive roll is clockwise camera rotation and is
+levelled by the same clockwise rotation, so a vertical frame recorded at 93.9°
+gives 3.9. It is omitted when roll is unrecorded, the variant is flipped, or the
+result is more than 45° from level. The sensor measures the camera to about a
+degree, not the scene: treat it as a starting point, confirm it against a preview
+and never level an intentional diagonal.
+
+`pitchAngle` is upward lens tilt and `focalLength35mm` the 35 mm-equivalent focal
+length. Together they indicate how strongly verticals converge (strongly at 24 mm,
+barely at 85 mm), but they are not a keystone amount. Verified on Canon EOS R6
+Mark II CR3 files; other makes are reported as exiftool reads them.
+
 ## Keystone
 
 Keystone controls are optional absolute values; omitted controls keep their
