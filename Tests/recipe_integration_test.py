@@ -75,7 +75,7 @@ def main():
             'brightness':4,'contrast':3,'saturation':2,'highlight adjustment':5,'shadow recovery':6,
             'white recovery':4,'black recovery':3,'clarity amount':5,'clarity structure':2,
             'sharpening amount':170,'sharpening radius':.8,'sharpening threshold':1,
-            'noise reduction luminance':35,'noise reduction color':40,
+            'noise reduction luminance':35,'noise reduction color':40,'noise reduction single pixel':30,
             'rgb curve':[0,0,50,55,100,100], 'luma curve':[0,0,50,52,100,100],
             'red curve':[0,0,50,53,100,100], 'green curve':[0,0,50,54,100,100],
             'blue curve':[0,0,50,56,100,100],
@@ -122,6 +122,8 @@ def main():
         assert bundle['diff']['metadata'] == {}
         native = observed['nativeSnapshots'][0]['values']
         effective = dict(payload['settings'],**request['overrides'])
+        # No qualified native range: record the observed normalization with the run.
+        log('single-pixel-readback',dict(requested=effective['noise reduction single pixel'],observed=native['noise reduction single pixel']))
         for key, wanted in effective.items():
             actual = native[key]
             if isinstance(wanted,list):

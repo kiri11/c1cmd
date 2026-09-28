@@ -9,9 +9,9 @@ verification before reuse.
 
 ## Supported settings
 
-Fourteen global numeric settings: brightness, contrast, saturation, highlight adjustment,
+Fifteen global numeric settings: brightness, contrast, saturation, highlight adjustment,
 shadow/white/black recovery, clarity amount/structure, sharpening amount/radius/
-threshold, and luminance/color noise reduction. Exposure and white balance have
+threshold, and luminance/color/single-pixel noise reduction. Exposure and white balance have
 separate mandatory policies. Settings also accept:
 
 - `rgb curve`, `luma curve`, `red curve`, `green curve`, `blue curve`: flat x/y
@@ -102,7 +102,7 @@ its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument
 and `ifState`. It never chooses or creates a clone silently and rejects existing
 editing references and bare native IDs.
 
-Verification applies the payload, checks all 38 supported image settings (numbers, enums
+Verification applies the payload, checks all 39 supported image settings (numbers, enums
 and curve point lists) through an independent direct-property AppleScript reader,
 checks omitted image-native properties plus geometry/metadata/layers for
 preservation, and exports a preview.

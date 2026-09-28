@@ -135,7 +135,7 @@ struct RecipeTests {
             let doc = try core.getDocumentInfo(), initial = try core.get(ref:"1")
             let capture = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":initial.stateHash])
             var recipe = policy; recipe["referenceId"] = capture["referenceId"]
-            var settings: [String:Any] = ["clarity amount":5,"film grain type":"silver rich","film grain impact":25,"film grain granularity":30,"vignetting method":"circular","vignetting amount":-0.5]
+            var settings: [String:Any] = ["clarity amount":5,"noise reduction single pixel":30,"film grain type":"silver rich","film grain impact":25,"film grain granularity":30,"vignetting method":"circular","vignetting amount":-0.5]
             for key in Recipes.curveFields { settings[key] = [0,0,50,55,100,100] }
             recipe["settings"] = settings
             let registered = try workflow.run("recipe_register",arguments:["recipe":recipe]), id = registered["recipeId"] as! String
@@ -147,6 +147,7 @@ struct RecipeTests {
             let verification = try workflow.run("recipe_verify",arguments:["workingRef":clone.workingRef,"ifState":try core.get(ref:clone.workingRef).stateHash,"ifDocument":doc.openToken,"recipeId":id])
             XCTAssertEqual(verification["status"] as? String,"succeeded")
             fake.properties["clarity amount"] = 1
+            fake.properties["noise reduction single pixel"] = 0.0
             fake.properties["rgb curve"] = [0.0,0,100,100]
             fake.properties["film grain type"] = "fine"
             let result = try workflow.run("edit_apply",arguments:request)
@@ -158,6 +159,9 @@ struct RecipeTests {
             XCTAssertEqual(clarity["before"] as? Double,1)
             XCTAssertEqual(clarity["after"] as? Double,5)
             XCTAssertEqual(clarity["delta"] as? Double,4)
+            let singlePixel = diff["nativeAdjustments"]!["noise reduction single pixel"] as! [String:Any]
+            XCTAssertEqual(singlePixel["before"] as? Double,0)
+            XCTAssertEqual(singlePixel["after"] as? Double,30)
             XCTAssertNotNil(diff["nativeAdjustments"]!["rgb curve"])
             XCTAssertEqual((diff["nativeAdjustments"]!["film grain type"] as! [String:Any])["after"] as? String,"silver rich")
             XCTAssertTrue(diff["adjustments"]!.isEmpty)
@@ -187,7 +191,7 @@ struct RecipeTests {
             let rejected = try workflow.run("recipe_verify",arguments:["recipeId":otherID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken])
             XCTAssertEqual(rejected["status"] as? String,"failed")
             XCTAssertFalse(FileManager.default.fileExists(atPath:directory.appendingPathComponent(".c1/verified-recipes/" + otherID + ".json").path))
-            for key in ["rgb curve","film grain type","vignetting amount"] {
+            for key in ["rgb curve","film grain type","vignetting amount","noise reduction single pixel"] {
                 fake.corruptField = key
                 fake.corruptAfterWrites = fake.writes
                 let rejected = try workflow.run("recipe_verify",arguments:["recipeId":otherID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken])

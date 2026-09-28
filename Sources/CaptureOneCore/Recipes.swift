@@ -4,7 +4,7 @@ import CryptoKit
 /// Versioned image-level recipes. Layers, masks and installed styles are excluded.
 public enum Recipes {
     public static let tools = ["reference_capture", "recipe_register", "recipe_verify", "edit_apply", "edit_status"]
-    public static let fields = ["brightness", "contrast", "saturation", "highlight adjustment", "shadow recovery", "white recovery", "black recovery", "clarity amount", "clarity structure", "sharpening amount", "sharpening radius", "sharpening threshold", "noise reduction luminance", "noise reduction color"]
+    public static let fields = ["brightness", "contrast", "saturation", "highlight adjustment", "shadow recovery", "white recovery", "black recovery", "clarity amount", "clarity structure", "sharpening amount", "sharpening radius", "sharpening threshold", "noise reduction luminance", "noise reduction color", "noise reduction single pixel"]
     public static let curveFields = ["rgb curve", "luma curve", "red curve", "green curve", "blue curve"]
     public static let finishFields = ["film grain type", "film grain impact", "film grain granularity", "vignetting method", "vignetting amount"]
     public static let balanceFields = ["color balance master hue", "color balance master saturation", "color balance shadow hue", "color balance shadow saturation", "color balance shadow lightness", "color balance midtone hue", "color balance midtone saturation", "color balance midtone lightness", "color balance highlight hue", "color balance highlight saturation", "color balance highlight lightness"]
