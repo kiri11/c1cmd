@@ -19,6 +19,7 @@ ARCHIVE := dist/c1-v0.1.0-macos-$(shell uname -m).tar.gz
 C1_RECOVERY_FIXTURE_PARENT ?= $(CURDIR)/.build/recovery-fixtures
 C1_RECOVERY_SHUTDOWN_MODE ?= sigterm
 QUALIFY_SUITES ?= cli mcp existing
+QUALIFY_DOCUMENT_KINDS ?= session
 RECOVERY_CASES ?= all
 TEST_BUILD_DIR ?= .build/debug
 
@@ -50,6 +51,7 @@ check-built-core:
 	python3 -B Tests/recovery_harness_test.py
 	python3 -B Tests/recipe_harness_test.py
 	python3 -B Tests/release_runner_test.py
+	python3 -B Tests/editing_fixture_test.py
 	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" C1_TEST_MCP_BIN="$(abspath $(TEST_BUILD_DIR))/c1-mcp" python3 -B Tests/catalog_reader_test.py
 
 # Packaged live suites on disposable fixtures; QUALIFY_SUITES=all runs every one.
@@ -60,7 +62,7 @@ qualify:
 	$(MAKE) archive
 	$(MAKE) check-built-core TEST_BUILD_DIR=.build/release
 	mkdir -p "$(EVIDENCE_DIR)"
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" C1_READ_WORKFLOW_EVIDENCE="$(abspath $(EVIDENCE_DIR))/read-workflow" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES)
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_NATIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/native" C1_RECIPE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/recipes" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory.json" C1_READ_WORKFLOW_EVIDENCE="$(abspath $(EVIDENCE_DIR))/read-workflow" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES) --document-kinds $(QUALIFY_DOCUMENT_KINDS)
 
 # Real fault cases against a current archive; compound edit cases carry a recipe: prefix.
 qualify-recovery:

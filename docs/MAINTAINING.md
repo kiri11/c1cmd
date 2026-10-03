@@ -111,8 +111,12 @@ Sessions support tonal editing, crop/rotation, keystone, ratings, color tags,
 exact-path opt-in enables experimental editing of online referenced originals
 outside the Catalog directory. Both `.cocatalog` packages and unpackaged directories
 have regular CLI/MCP coverage; unpackaged writes require the exact `.cocatalogdb`
-opt-in. The latest unpackaged run passed; the package regression run stopped at
-an uncertain native default-baseline creation (variant-ID readback error). Catalog-stored originals and Catalog fault recovery remain unqualified.
+opt-in. Native editing, including layers, color bands and people masks, has owned
+referenced-original coverage in both layouts. Recipe capture, registration,
+managed-clone verification and compound application also have coverage in both,
+including scoped recipes and single-pixel readback. Catalog-stored originals and
+Catalog fault recovery remain unqualified. Package Catalog default-baseline
+creation remains a qualification gap after uncertain native-ID readback.
 
 Other limits:
 
@@ -122,7 +126,8 @@ Other limits:
   observed native names, not hashes of external profile files.
 - Camera/lens and geometry qualification is fixture-specific. Flips,
   crop-outside-image and broad camera/lens coverage remain outside qualification.
-  Implementation does not qualify a complete photographic look.
+  The full lens/perspective suites have not run in Catalogs. Implementation does
+  not qualify a complete photographic look.
 - Concurrent operators and arbitrary live database replacement are unsupported.
 - Preview association requires exclusive output ownership. State hashes are not
   complete render fingerprints. General export and callback coexistence are outside
@@ -149,6 +154,28 @@ suite, set `C1_TEST_CATALOG_LAYOUT=unpackaged` to exercise an unpackaged
 disposable catalog; the default is `package`. Both layouts include existing-variant
 rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`. The native
 suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people.
+
+For `native` and `recipes`, `QUALIFY_DOCUMENT_KINDS` selects `session` (default),
+`catalog`, or `"session catalog"`. Each mode runs sequentially with separate evidence
+under `native/<mode>` and `recipes/<mode>`; Catalog mode is labelled
+`catalog-package` or `catalog-unpackaged`. Other suites keep their own fixture modes.
+Catalog mode creates a new owned Catalog under `.build`, imports a copied RAW as a
+referenced original outside it, sets the exact fixture write path (the
+`.cocatalogdb` for unpackaged), and takes a native backup before editing. It asserts
+RAW preservation and the Catalog's `.c1` journal/provenance/result locations and
+sibling `.c1-output/c1-previews` paths. Failed fixtures and evidence are retained.
+The native suite uses a second owned fixture for the successful people-mask cases.
+
+```sh
+make qualify QUALIFY_SUITES="native recipes" QUALIFY_DOCUMENT_KINDS="session catalog" \
+  C1_TEST_CATALOG_LAYOUT=package EVIDENCE_DIR=.build/qualification/native-recipes-package
+make qualify QUALIFY_SUITES="native recipes" QUALIFY_DOCUMENT_KINDS=catalog \
+  C1_TEST_CATALOG_LAYOUT=unpackaged EVIDENCE_DIR=.build/qualification/native-recipes-unpackaged
+```
+
+When running either script directly, `C1_TEST_DOCUMENT_KIND=session|catalog`
+selects the mode, and `C1_TEST_CATALOG_LAYOUT=package|unpackaged` selects the Catalog
+layout. Keep `C1_NATIVE_EVIDENCE` / `C1_RECIPE_EVIDENCE` distinct for each run.
 
 Recovery tests keep real 120-second Apple Event timeouts; five timeout cases take
 at least ten minutes before setup, verification and restarts. To save time, select

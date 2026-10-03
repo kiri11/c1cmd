@@ -1,50 +1,43 @@
 #!/usr/bin/env python3
-"""Native editing in an owned disposable Session; never retry uncertain writes."""
+"""Native editing in an owned disposable Session or Catalog; never retry uncertain writes."""
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
-import tempfile
-import time
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
 from contract_test import Client, validate_response, complete, complete_args
+from editing_fixture import EditingFixture, document_mode
 
 
 def main():
+    document_mode(os.environ)
     raw = Path(os.environ['C1_TEST_RAW_FIXTURE']).resolve()
     assert raw.is_file()
     original = sha(raw)
     assert apple('return count of documents') == '0', 'Close documents before native qualification'
-    base = Path(tempfile.mkdtemp(prefix='c1-native-', dir=str(ROOT / '.build')))
-    evidence = Path(os.environ.get('C1_NATIVE_EVIDENCE', base / 'evidence'))
-    evidence.mkdir(parents=True, exist_ok=True)
     events = []
     def log(name, value):
         events.append(dict(event=name, value=value))
         (evidence/'results.json').write_text(json.dumps(events, indent=2)+'\n')
         print(name, flush=True)
+    owned = EditingFixture('native', raw, log)
+    base = owned.base
+    evidence = Path(os.environ.get('C1_NATIVE_EVIDENCE', base / 'evidence'))
+    evidence.mkdir(parents=True, exist_ok=True)
     def cli(*args):
-        r = subprocess.run([str(CLI), *complete(args), '--format','json'],capture_output=True,text=True,timeout=180)
+        r = subprocess.run([str(CLI), *complete(args), '--format','json'],env=owned.environment,capture_output=True,text=True,timeout=180)
         assert r.returncode == 0, r.stderr
         return json.loads(r.stdout)
     schema = cli("schema")
     client = None
     try:
-        apple(f'make new document with properties {{name:"native", kind:session, path:{json.dumps(str(base))}}}')
-        fixture = base / 'native/Capture' / raw.name
-        shutil.copy2(raw, fixture)
-        apple('set current collection of current document to collection "Capture" of current document')
-        for _ in range(40):
-            variants = cli('variants','list')
-            if variants: break
-            time.sleep(.5)
-        assert len(variants) == 1
+        variants = owned.open(cli)
+        fixture = owned.fixture
         source = cli('get',variants[0]['id']); doc = cli('doc','info')
         ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
         sibling = cli('variant','clone',source['id'])
         sibling_before = cli('get',sibling['workingRef'],'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
-        client = Client(MCP, timeout=180)
+        client = Client(MCP, env=owned.environment, timeout=180)
         def tool(name, args):
             r = client.tool(name, complete_args(name, args))
             value = json.loads(r['content'][0]['text'])
@@ -231,47 +224,45 @@ return rows'''
         assert sha(raw) == sha(fixture) == original
         preview = cli('preview',ref)
         log('preview',preview)
-        apple('close current document')
-        people = people_success(cli, log)
-        log('passed',dict(group=os.environ.get('C1_NATIVE_TEST_GROUP','all'),rawSHA256=original,peopleRawSHA256=people,session=str(base/'native'),cliSHA256=sha(CLI),mcpSHA256=sha(MCP)))
+        owned.verify([preview], [compact['evidencePath']])
+        owned.close()
+        client.close(); client = None
+        people = people_success(log)
+        log('passed',dict(group=os.environ.get('C1_NATIVE_TEST_GROUP','all'),rawSHA256=original,peopleRawSHA256=people,document=str(owned.document),documentKind=owned.kind,layout=owned.layout if owned.kind == 'catalog' else None,cliSHA256=sha(CLI),mcpSHA256=sha(MCP)))
     finally:
         if client: client.close()
 
 
-def people_success(cli, log):
+def people_success(log):
     """A people mask on a photo with people appends mask layers and keeps the existing ones."""
     raw = Path(os.environ['C1_TEST_PEOPLE_FIXTURE']).resolve()
     original = sha(raw)
     assert apple('return count of documents') == '0'
-    base = Path(tempfile.mkdtemp(prefix='c1-native-people-', dir=str(ROOT / '.build')))
-    apple(f'make new document with properties {{name:"people", kind:session, path:{json.dumps(str(base))}}}')
-    try:
-        fixture = base / 'people/Capture' / raw.name
-        shutil.copy2(raw, fixture)
-        apple('set current collection of current document to collection "Capture" of current document')
-        for _ in range(40):
-            variants = cli('variants','list')
-            if variants: break
-            time.sleep(.5)
-        assert len(variants) == 1
-        source = cli('get',variants[0]['id']); doc = cli('doc','info')
-        ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
-        def layers():
-            return cli('get',ref,'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
-        for areas, separate in [(['body skin','face skin'], False), (['face skin','hair'], True)]:
-            before = layers()
-            result = cli('native','action',ref,'mask.people','--if-native-state',before['nativeStateHash'],
-                         '--json',json.dumps(dict(areas=areas,separateLayers=separate)))
-            log('people-mask', dict(areas=areas, separateLayers=separate, before=before['layers'], after=result['after']['layers']))
-            added = result['after']['layers'][len(before['layers']):]
-            assert result['after']['layers'][:len(before['layers'])] == before['layers'], 'Existing layers must be kept'
-            assert 1 <= len(added) <= (len(areas) if separate else 1) and all(l['nativeKind'] == 'adjustment' for l in added), added
-            assert result['after']['values'] == before['values']
-            assert cli('operation','status',result['operationId'])['status'] == 'succeeded'
-        assert sha(raw) == sha(fixture) == original
-        return original
-    finally:
-        if apple('return count of documents') == '1' and apple('return name of current document') == '"people.cosessiondb"':
-            apple('close current document')
+    owned = EditingFixture('people', raw, log)
+    def cli(*args):
+        r = subprocess.run([str(CLI), *complete(args), '--format', 'json'], env=owned.environment, capture_output=True, text=True, timeout=180)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)
+    variants = owned.open(cli)
+    fixture = owned.fixture
+    source = cli('get',variants[0]['id']); doc = cli('doc','info')
+    ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
+    def layers():
+        return cli('get',ref,'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
+    for areas, separate in [(['body skin','face skin'], False), (['face skin','hair'], True)]:
+        before = layers()
+        result = cli('native','action',ref,'mask.people','--if-native-state',before['nativeStateHash'],
+                     '--json',json.dumps(dict(areas=areas,separateLayers=separate)))
+        log('people-mask', dict(areas=areas, separateLayers=separate, before=before['layers'], after=result['after']['layers']))
+        added = result['after']['layers'][len(before['layers']):]
+        assert result['after']['layers'][:len(before['layers'])] == before['layers'], 'Existing layers must be kept'
+        assert 1 <= len(added) <= (len(areas) if separate else 1) and all(l['nativeKind'] == 'adjustment' for l in added), added
+        assert result['after']['values'] == before['values']
+        assert cli('operation','status',result['operationId'])['status'] == 'succeeded'
+    assert sha(raw) == sha(fixture) == original
+    preview = cli('preview', ref)
+    owned.verify([preview], provenance_files=('editing.json',))
+    owned.close()
+    return original
 
 if __name__ == '__main__': main()

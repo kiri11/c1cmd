@@ -3,28 +3,28 @@
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
-import tempfile
-import time
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
 from contract_test import Client, validate_response, complete, complete_args
+from editing_fixture import EditingFixture, document_mode
 
 
 def main():
+    document_mode(os.environ)
     raw = Path(os.environ['C1_TEST_RAW_FIXTURE']).resolve()
     original = sha(raw)
     assert apple('return count of documents') == '0', 'Close documents before recipe qualification'
-    base = Path(tempfile.mkdtemp(prefix='c1-recipes-', dir=str(ROOT / '.build')))
-    evidence = Path(os.environ.get('C1_RECIPE_EVIDENCE', base / 'evidence'))
-    evidence.mkdir(parents=True, exist_ok=True)
     events = []
     def log(name, value):
         events.append(dict(event=name, value=value))
         (evidence/'results.json').write_text(json.dumps(events, indent=2)+'\n')
         print(name, flush=True)
+    owned = EditingFixture('recipes', raw, log)
+    base = owned.base
+    evidence = Path(os.environ.get('C1_RECIPE_EVIDENCE', base / 'evidence'))
+    evidence.mkdir(parents=True, exist_ok=True)
     def cli(*args, ok=True):
-        r = subprocess.run([str(CLI), *complete(args), '--format','json'], capture_output=True,text=True,timeout=240)
+        r = subprocess.run([str(CLI), *complete(args), '--format','json'], env=owned.environment,capture_output=True,text=True,timeout=240)
         value = json.loads(r.stdout or r.stderr)
         log('cli',dict(args=list(map(str,args)),code=r.returncode,result=value))
         assert (r.returncode == 0) == ok, value
@@ -35,15 +35,8 @@ def main():
         return cli('recipe',action,'--file',path,ok=ok)
     client = None
     try:
-        apple(f'make new document with properties {{name:"recipes", kind:session, path:{json.dumps(str(base))}}}')
-        fixture = base/'recipes/Capture'/raw.name
-        shutil.copy2(raw,fixture)
-        apple('set current collection of current document to collection "Capture" of current document')
-        for _ in range(40):
-            variants = cli('variants','list')
-            if variants: break
-            time.sleep(.25)
-        assert len(variants) == 1
+        variants = owned.open(cli)
+        fixture = owned.fixture
         doctor = cli('doctor')
         assert doctor['allChecksPassed'] and doctor['writesEnabled'] and doctor['exactBuildMatched']
         source = cli('get',variants[0]['id'])
@@ -69,7 +62,7 @@ def main():
         capture = recipe('capture',dict(ref=source['id'],ifDocument=doc['openToken'],ifState=source['stateHash']))
         assert capture['bundle']['coverage']['maskPixels'] == 'unsupported'
         assert sha(Path(capture['bundle']['preview']['outputPath'])) == capture['bundle']['previewFileSha256']
-        client = Client(MCP,timeout=240)
+        client = Client(MCP,env=owned.environment,timeout=240)
         schema = json.loads(client.tool("schema")["content"][0]["text"])
         payload = dict(version=1,referenceId=capture['referenceId'],settings={
             'brightness':4,'contrast':3,'saturation':2,'highlight adjustment':5,'shadow recovery':6,
@@ -231,8 +224,12 @@ def main():
         assert cleared['status'] == 'succeeded' and cleared['scopedObserved']['advancedColor'] == []
         assert len(cli('variants','list')) == 1, 'Compound edits must not duplicate variants'
         assert sha(raw) == sha(fixture) == original
-        log('passed',dict(rawSHA256=original,cliSHA256=sha(CLI),mcpSHA256=sha(MCP),session=str(base/'recipes')))
-        apple('close current document')
+        owned.verify([capture['bundle']['preview'], verified['resultBundle']['preview'], bundle['preview'], composed['resultBundle']['preview']], [compact_value['evidencePath']])
+        c1 = owned.document / '.c1'
+        for folder, identifier in [('references', capture['referenceId']), ('recipes', scoped_id), ('verified-recipes', scoped_id)]:
+            assert (c1 / folder / (identifier + '.json')).is_file(), folder
+        log('passed',dict(rawSHA256=original,cliSHA256=sha(CLI),mcpSHA256=sha(MCP),document=str(owned.document),documentKind=owned.kind,layout=owned.layout if owned.kind == 'catalog' else None))
+        owned.close()
     finally:
         if client: client.close()
         # Failed fixtures and unresolved operations remain available for inspection.

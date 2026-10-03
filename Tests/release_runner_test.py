@@ -20,6 +20,20 @@ class ReleaseRunnerTests(unittest.TestCase):
         self.assertEqual(len(runner.SUITES), 12)
         self.assertFalse(any('recovery' in script for script, _ in runner.SUITES.values()))
 
+    def test_document_mode_matrix(self):
+        self.assertEqual(runner.parse_args(['archive']).document_kinds, ['session'])
+        self.assertEqual(runner.parse_args(['archive', '--document-kinds', 'session', 'catalog']).document_kinds, ['session', 'catalog'])
+        self.assertEqual(runner.suite_runs(['native', 'mcp', 'recipes'], ['session', 'catalog'], 'unpackaged'),
+                         [('native', 'session', 'session'), ('native', 'catalog', 'catalog-unpackaged'),
+                          ('mcp', None, None), ('recipes', 'session', 'session'), ('recipes', 'catalog', 'catalog-unpackaged')])
+        for kinds, layout in [([], 'package'), (['catalog', 'catalog'], 'package'), (['main'], 'package'), (['catalog'], 'other')]:
+            with self.subTest(kinds=kinds, layout=layout), patch.object(runner, 'extract_archive') as extract:
+                with patch.dict(os.environ, C1_TEST_CATALOG_LAYOUT=layout), self.assertRaises(ValueError):
+                    runner.run('archive', ['native'], kinds)
+                extract.assert_not_called()
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            runner.parse_args(['archive', '--document-kinds', 'catalog', 'catalog'])
+
     def test_invalid_selection_has_no_side_effects(self):
         for selection in [[], ['unknown'], ['cli', 'cli'], ['all', 'cli']]:
             with self.subTest(selection=selection), patch.object(runner, 'run') as run, contextlib.redirect_stderr(io.StringIO()):
@@ -40,6 +54,28 @@ class ReleaseRunnerTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     runner.run('archive', ['native'])
             extract.assert_not_called()
+
+    def test_document_modes_reach_suites_with_separate_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); raw = root / 'fixture.CR3'; raw.write_bytes(b'RAW')
+            calls = []
+            def command(args, **kwargs):
+                env = kwargs['env']; name = 'native' if 'native_editing' in args[-1] else 'recipes'
+                key = 'C1_NATIVE_EVIDENCE' if name == 'native' else 'C1_RECIPE_EVIDENCE'
+                calls.append((name, env['C1_TEST_DOCUMENT_KIND'], env[key], kwargs['timeout']))
+            environment = dict(C1_TEST_RAW_FIXTURE=str(raw), C1_TEST_PEOPLE_FIXTURE=str(raw),
+                               C1_TEST_CATALOG_LAYOUT='unpackaged', C1_NATIVE_EVIDENCE=str(root/'evidence/native'),
+                               C1_RECIPE_EVIDENCE='relative-recipe-evidence')
+            recipe_evidence = Path('relative-recipe-evidence').resolve()
+            with patch.object(runner, 'ROOT', root), patch.dict(os.environ, environment), \
+                 patch.object(runner, 'extract_archive', return_value=root), patch.object(runner, 'check_package'), \
+                 patch.object(runner.subprocess, 'run', command), contextlib.redirect_stdout(io.StringIO()):
+                runner.run(root/'archive', ['native', 'recipes'], ['session', 'catalog'])
+            self.assertEqual(calls, [
+                ('native', 'session', str(root/'evidence/native/session'), 1800),
+                ('native', 'catalog', str(root/'evidence/native/catalog-unpackaged'), 1800),
+                ('recipes', 'session', str(recipe_evidence/'session'), 1200),
+                ('recipes', 'catalog', str(recipe_evidence/'catalog-unpackaged'), 1200)])
 
     def test_runner_cleanup_and_fail_fast(self):
         for failure in [None, 'package', 'suite', 'timeout']:

@@ -38,7 +38,11 @@ def parse_args(argv=None):
     parser.add_argument('archive', type=Path)
     parser.add_argument('--suites', nargs='+', choices=[*SUITES, 'all'], default=DEFAULT_SUITES,
                         help='Sequential live suites (default: cli mcp existing); all includes every regular matrix')
+    parser.add_argument('--document-kinds', nargs='+', choices=['session', 'catalog'], default=['session'],
+                        help='Native/recipes fixture modes, run sequentially (default: session)')
     args = parser.parse_args(argv)
+    if len(set(args.document_kinds)) != len(args.document_kinds):
+        parser.error('duplicate document kinds would repeat live mutations')
     if 'all' in args.suites:
         if len(args.suites) != 1:
             parser.error('all must be used alone')
@@ -48,10 +52,20 @@ def parse_args(argv=None):
     return args
 
 
-def run(archive, suites):
+def suite_runs(suites, document_kinds, layout):
+    if not document_kinds or len(set(document_kinds)) != len(document_kinds) or any(k not in ("session", "catalog") for k in document_kinds):
+        raise ValueError("Select unique session/catalog document kinds")
+    if layout not in ("package", "unpackaged"):
+        raise ValueError("Select package/unpackaged Catalog layout")
+    return [(name, kind, f"{kind}-{layout}" if kind == "catalog" else kind)
+            for name in suites for kind in (document_kinds if name in ("native", "recipes") else [None])]
+
+
+def run(archive, suites, document_kinds=("session",)):
     # Reject invalid selections before extracting files or contacting Capture One.
     if not suites or len(set(suites)) != len(suites) or any(name not in SUITES for name in suites):
         raise ValueError('Select unique known live suites')
+    runs = suite_runs(suites, document_kinds, os.environ.get('C1_TEST_CATALOG_LAYOUT', 'package'))
     archive = Path(archive).resolve()
     raw = Path(os.environ.get('C1_TEST_RAW_FIXTURE', ''))
     if not raw.is_file():
@@ -61,6 +75,11 @@ def run(archive, suites):
     people = Path(os.environ.get('C1_TEST_PEOPLE_FIXTURE', ''))
     if 'native' in suites and not people.is_file():
         raise ValueError('Set C1_TEST_PEOPLE_FIXTURE to an existing RAW image with people for the native suite')
+    # Resolve caller-relative evidence paths before entering the temporary checkout.
+    default_evidence = ROOT / '.build' / ('qualification-' + str(uuid.uuid4()))
+    evidence_roots = {name: Path(os.environ.get(key, str(default_evidence / name))).resolve()
+                      for name, key in [('native', 'C1_NATIVE_EVIDENCE'), ('recipes', 'C1_RECIPE_EVIDENCE')]
+                      if name in suites}
     print('Selected live suites: ' + ', '.join(suites), flush=True)
     skipped = [name for name in SUITES if name not in suites]
     print('Skipped live suites: ' + (', '.join(skipped) or 'none'), flush=True)
@@ -85,11 +104,16 @@ def run(archive, suites):
             started = time.perf_counter()
             check_package(root)
             print(f'TIMING archive and contract: {time.perf_counter() - started:.3f}s', flush=True)
-            for name in suites:
+            for name, kind, label in runs:
                 script, timeout = SUITES[name]
-                print(f'Running {script} using extracted binaries with build resources hidden', flush=True)
+                suite_environment = dict(environment)
+                if kind:
+                    suite_environment['C1_TEST_DOCUMENT_KIND'] = kind
+                    evidence_key = 'C1_NATIVE_EVIDENCE' if name == 'native' else 'C1_RECIPE_EVIDENCE'
+                    suite_environment[evidence_key] = str(evidence_roots[name] / label)
+                print(f'Running {script} ({label or "default"}) using extracted binaries with build resources hidden', flush=True)
                 started = time.perf_counter()
-                subprocess.run([sys.executable, '-B', '-u', str(ROOT / 'Tests' / script)], env=environment,
+                subprocess.run([sys.executable, '-B', '-u', str(ROOT / 'Tests' / script)], env=suite_environment,
                                cwd=tmp, check=True, timeout=timeout)
                 print(f'TIMING {script}: {time.perf_counter() - started:.3f}s', flush=True)
             print('PASS: selected packaged live suites: ' + ', '.join(suites), flush=True)
@@ -101,7 +125,7 @@ def run(archive, suites):
 
 def main(argv=None):
     args = parse_args(argv)
-    run(args.archive, args.suites)
+    run(args.archive, args.suites, args.document_kinds)
 
 
 if __name__ == '__main__':
