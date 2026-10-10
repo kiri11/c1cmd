@@ -58,7 +58,7 @@ struct RequestContextTests {
         for (tool, deadline, code) in [("variants_list", nil, "request-cancelled"), ("variants_list", 0.01, "deadline-exceeded"), ("dump", nil, "request-cancelled")] {
             let result = recovery(catalogFake, catalogCore, tool: tool, deadline: deadline)
             XCTAssertEqual(result.code, code)
-            XCTAssertEqual(result.action, "Use catalog_variants with the same filters (collectionID selects a collection) for stored discovery in seconds, then variants_list with those ids (up to 512 per call) to revalidate the candidates live.", "\(tool) \(code) on a Catalog")
+            XCTAssertEqual(result.action, "Use catalog_variants with the same filters, naming the collection by exact name (collection) or collectionID, for stored discovery in seconds; stored discovery does not cover selected scopes or smart collections. Then call variants_list with those ids (up to 512 per call) to revalidate the candidates live.", "\(tool) \(code) on a Catalog")
         }
         XCTAssertEqual(recovery(fake, core, tool: "variants_list").action, nil, "Session cancellation keeps no recovery action")
         XCTAssertEqual(recovery(fake, core, tool: "variants_list", deadline: 0.01).action,

@@ -293,7 +293,7 @@ struct VariantsListCommand: ParsableCommand {
         if let database {
             try globals.run("catalog_variants", {
                 guard ids == nil, fields == nil, parentPath == nil, !live, !selected, collection == nil, deadlineSeconds == nil, batchSize == nil else {
-                    throw C1Error.invalidRequest("--database uses stored discovery: --selected, --collection, --deadline-seconds and custom --batch-size require live AppleScript reads. Use --collection-id for explicit stored membership.")
+                    throw C1Error.invalidRequest("--database uses stored discovery: --selected, --collection, --deadline-seconds and custom --batch-size require live AppleScript reads. Use --collection-id, or c1 catalog variants --collection NAME, for explicit stored membership.")
                 }
                 var args: [String: Any] = ["database": database]
                 put(&args, "collectionID", collectionID); put(&args, "rating", rating); put(&args, "minRating", minRating)
@@ -797,7 +797,13 @@ struct NativeActionCommand: ParsableCommand {
 }
 
 struct CatalogCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "catalog", abstract: "Inspect stored Catalog records or archive a SQLite snapshot without contacting Capture One.", subcommands: [CatalogInspect.self, CatalogSnapshot.self, CatalogVariants.self])
+    static let configuration = CommandConfiguration(commandName: "catalog", abstract: "Inspect stored Catalog records or archive a SQLite snapshot without contacting Capture One.", subcommands: [CatalogCollections.self, CatalogInspect.self, CatalogSnapshot.self, CatalogVariants.self])
+}
+struct CatalogCollections: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "collections", abstract: "List stored collections with IDs and name paths; explicit memberships only.")
+    @Option var database: String
+    @OptionGroup var globals: GlobalOptions
+    mutating func run() throws { try globals.run("catalog_collections", { ["database": database] }) }
 }
 struct CatalogInspect: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "inspect")
@@ -826,6 +832,7 @@ struct CatalogVariants: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "variants", abstract: "Discover distinct stored variants through SQLite; explicit memberships only.")
     @Option var database: String
     @Option var collectionID: Int?
+    @Option(help: "Exact name of one stored collection; cannot combine with --collection-id.") var collection: String?
     @Option var rating: Int?
     @Option var minRating: Int?
     @Option(help: "Keyset cursor: list variants with variantDatabaseID above this value.") var afterVariantID: Int?
@@ -834,7 +841,8 @@ struct CatalogVariants: ParsableCommand {
     mutating func run() throws {
         try globals.run("catalog_variants", {
             var args: [String: Any] = ["database": database]
-            put(&args, "collectionID", collectionID); put(&args, "rating", rating); put(&args, "minRating", minRating)
+            put(&args, "collectionID", collectionID); put(&args, "collection", collection)
+            put(&args, "rating", rating); put(&args, "minRating", minRating)
             put(&args, "afterVariantID", afterVariantID); put(&args, "limit", limit)
             return args
         })

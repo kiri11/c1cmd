@@ -221,7 +221,7 @@ public final class RequestContext: @unchecked Sendable {
         default: break
         }
         if catalog, ["variants_list", "dump"].contains(s.tool), ["deadline-exceeded", "request-cancelled"].contains(error["code"] as? String) {
-            error["recoveryAction"] = "Use catalog_variants with the same filters (collectionID selects a collection) for stored discovery in seconds, then variants_list with those ids (up to 512 per call) to revalidate the candidates live."
+            error["recoveryAction"] = "Use catalog_variants with the same filters, naming the collection by exact name (collection) or collectionID, for stored discovery in seconds; stored discovery does not cover selected scopes or smart collections. Then call variants_list with those ids (up to 512 per call) to revalidate the candidates live."
         }
         if error["operationId"] != nil && error["code"] as? String != "no-people-detected" { error["recoveryAction"] = "Inspect operation status; do not retry the mutation." }
         payload["error"] = error

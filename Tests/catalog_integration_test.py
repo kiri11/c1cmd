@@ -174,6 +174,28 @@ def main():
         settings = inspected['storedSettings']
         assert len(settings) > 1 and pages('inspect', 'storedSettings', '--after-pk', inspected, '--tables', 'storedSettings') == settings
         log('stored-pages', variants=len(whole['variants']), storedSettings=len(settings))
+        # Owned collections: a nested album and a top-level album share one name.
+        apple('tell current document\n'
+              'set g to make new collection with properties {kind:group, name:"c1 group"}\n'
+              'tell g to set a to make new collection with properties {kind:album, name:"c1 album"}\n'
+              'make new collection with properties {kind:album, name:"c1 album"}\n'
+              f'add inside a variants {{variant id {json.dumps(variants[0]["id"])}}}\n'
+              'end tell')
+        for _ in range(180):
+            listed = stored('collections')['collections']
+            nested = [c for c in listed if c['namePath'] == ['c1 group', 'c1 album']]
+            if nested and len(stored('variants', '--collection-id', nested[0]['collectionID'])['variants']) == 1:
+                break
+            time.sleep(.5)
+        validate_response(stored('collections'), contract['responses']['catalog_collections'])
+        assert sorted(c['namePath'] for c in listed if c['name'] == 'c1 album') == [['c1 album'], ['c1 group', 'c1 album']], listed
+        group = next(c for c in listed if c['namePath'] == ['c1 group'])
+        assert nested[0]['parentID'] == group['collectionID'], listed
+        assert stored('variants', '--collection', 'c1 group')['collectionID'] == group['collectionID']
+        duplicate = cli('catalog', 'variants', '--database', database, '--collection', 'c1 album', error='invalid-request')
+        assert f"{nested[0]['collectionID']} (c1 group / c1 album)" in duplicate['error']['message'], duplicate
+        cli('catalog', 'variants', '--database', database, '--collection', 'c1 missing', error='invalid-request')
+        log('stored-collections', collections=listed)
         client = Client(MCP, env=environment, timeout=150)
         for source in originals.values():
             clone, _ = tool('variant_clone', {'sourceRef': source['id']})

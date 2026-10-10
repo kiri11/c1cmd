@@ -219,7 +219,37 @@ public final class CatalogReader {
         return output
     }
 
-    public func variants(collectionID: Int? = nil, rating: Int? = nil, minRating: Int? = nil,
+    /// Every stored collection with its raw entity and the names from the root to itself.
+    private func collectionRecords() throws -> [[String: Any]] {
+        let records = try rows("""
+            SELECT c.Z_PK AS collectionID,c.ZNAME AS name,c.Z_ENT AS entity,e.ZNAME AS kind,c.ZPARENT AS parentID
+            FROM ZCOLLECTION c LEFT JOIN ZENTITIES e ON e.Z_ENT=c.Z_ENT ORDER BY c.Z_PK
+            """)
+        let byID = Dictionary(uniqueKeysWithValues: records.map { ($0["collectionID"] as! Int64, $0) })
+        return try records.map { record in
+            var namePath: [Any] = [], seen = Set<Int64>(), current: [String: Any]? = record
+            while let collection = current {
+                guard seen.insert(collection["collectionID"] as! Int64).inserted else {
+                    throw C1Error.invalidRequest("Stored collection parents form a cycle.")
+                }
+                namePath.insert(collection["name"]!, at: 0)
+                current = (collection["parentID"] as? Int64).flatMap { byID[$0] }
+                if let parent = current, parent["parentID"] as? Int64 == nil, parent["kind"] as? String == "ProjectCollection" { break }
+            }
+            return record.merging(["namePath": namePath]) { $1 }
+        }
+    }
+
+    public func collections() throws -> [String: Any] {
+        try beginObservation()
+        defer { endObservation() }
+        let records = try collectionRecords()
+        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
+        var output = provenance(); output["collections"] = records
+        return output
+    }
+
+    public func variants(collectionID: Int? = nil, collection: String? = nil, rating: Int? = nil, minRating: Int? = nil,
                          afterVariantID: Int? = nil, limit: Int? = nil) throws -> [String: Any] {
         var filters: [String: Any] = [:]
         if let rating { filters["rating"] = rating }; if let minRating { filters["minRating"] = minRating }
@@ -227,6 +257,23 @@ public final class CatalogReader {
         if let collectionID, collectionID <= 0 { throw C1Error.invalidRequest("collectionID must be positive.") }
         try beginObservation()
         defer { endObservation() }
+        var collectionID = collectionID
+        if let collection {
+            let matches = try collectionRecords().filter { $0["name"] as? String == collection }
+            switch matches.count {
+            case 1:
+                collectionID = Int(matches[0]["collectionID"] as! Int64)
+                guard try rows("SELECT 1 FROM ZCOLLECTION WHERE Z_PK=\(collectionID!) AND ZSMARTCRITERIA<>''").isEmpty else {
+                    throw C1Error.invalidRequest("Stored collection '\(collection)' is a smart album; stored reads do not evaluate smart rules. Use live variants_list with collection.")
+                }
+            case 0: throw C1Error.invalidRequest("No stored collection is named '\(collection)'.")
+            default:
+                let candidates = matches.map { match in
+                    "\(match["collectionID"]!) (\((match["namePath"] as! [Any]).map { $0 as? String ?? "" }.joined(separator: " / ")))"
+                }
+                throw C1Error.invalidRequest("Several stored collections are named '\(collection)': \(candidates.joined(separator: ", ")). Use collectionID.")
+            }
+        }
         if let collectionID {
             let collections = try rows("SELECT Z_PK FROM ZCOLLECTION WHERE Z_PK=\(collectionID)")
             guard collections.count == 1 else { throw C1Error.invalidRequest("Unknown stored collection ID.") }

@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.2.0"
+    public static let version = "4.3.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,7 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_collections", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     static func integer(_ range: ClosedRange<Int>) -> [String: Any] {
         ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
     }
@@ -69,8 +69,9 @@ public enum ContractSchema {
         case "read_session_end", "read_session_status": return object(["readWorkflow": string], required: ["readWorkflow"])
         case "read_session_begin": return object(["collection": string, "selected": boolean])
         case "catalog_get": return object(["database": string, "variantID": ["type": "integer", "minimum": 1]], required: ["database", "variantID"])
+        case "catalog_collections": return object(["database": string], required: ["database"])
         case "catalog_variants":
-            return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": rating, "minRating": rating,
+            return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "collection": string, "rating": rating, "minRating": rating,
                            "afterVariantID": cursor, "limit": pageLimit], required: ["database"])
         case "catalog_inspect":
             let tables: [String: Any] = ["type": "array", "items": ["type": "string", "enum": CatalogReader.inspectTables.map(\.0)], "minItems": 1, "uniqueItems": true]
@@ -156,6 +157,9 @@ public enum ContractSchema {
             if let fields = arguments["fields"] as? String, !["minimal", "summary"].contains(fields) {
                 throw C1Error.invalidRequest("fields must be minimal or summary.")
             }
+        }
+        if tool == "catalog_variants", arguments["collection"] != nil, arguments["collectionID"] != nil {
+            throw C1Error.invalidRequest("collection and collectionID are mutually exclusive.")
         }
         if tool == "catalog_inspect", let tables = arguments["tables"] as? [String] {
             let known = CatalogReader.inspectTables.map(\.0)
@@ -259,6 +263,10 @@ public enum ContractSchema {
         storedVariantProps["next"] = ["type": "integer"]
         inspectProps["next"] = ["type": "object", "additionalProperties": ["type": "integer"]]
         var snapshotProps = observation; snapshotProps["snapshotPath"] = string
+        let nullableInteger: [String: Any] = ["type": ["integer", "null"]], nullableString: [String: Any] = ["type": ["string", "null"]]
+        let collectionProps: [String: Any] = ["collectionID": ["type": "integer"], "name": nullableString, "entity": nullableInteger,
+            "kind": nullableString, "parentID": nullableInteger, "namePath": array(nullableString)]
+        var collectionsProps = observation; collectionsProps["collections"] = array(object(collectionProps, required: collectionProps.keys.sorted()))
         let readStatus = object(["active": boolean, "workflowId": string, "documentPath": string,
             "variantCount": ["type": "integer"], "sqliteEnabled": boolean, "pendingVariantCount": ["type": "integer"],
             "catchUpIntervalSeconds": ["const": 60], "reason": string], required: ["active"])
@@ -270,6 +278,7 @@ public enum ContractSchema {
             "read_session_begin": readStatus, "read_session_end": readStatus, "read_session_status": readStatus,
             "catalog_get": object(storedGetProps, required: observation.keys.sorted() + ["variant", "storedSettings", "storedMetadata", "storedRetouching"]),
             "catalog_inspect": object(inspectProps, required: observation.keys.sorted()),
+            "catalog_collections": object(collectionsProps, required: collectionsProps.keys.sorted()),
             "catalog_snapshot": object(snapshotProps, required: snapshotProps.keys.sorted()),
             "catalog_variants": object(storedVariantProps, required: observation.keys.sorted() + ["variants", "membershipSemantics"]),
             "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "writesDisabledReason": writesDisabledReason, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),

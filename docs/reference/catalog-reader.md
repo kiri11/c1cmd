@@ -6,11 +6,13 @@ uses SQLite directly, without Capture One, its application lock, or the currentl
 ```sh
 c1 catalog variants --database /absolute/path/Library.cocatalog/Library.cocatalogdb --min-rating 3
 c1 catalog inspect --database /absolute/path/Library.cocatalog/Library.cocatalogdb --tables variants,storedSettings --limit 1000
+c1 catalog collections --database /absolute/path/Library.cocatalog/Library.cocatalogdb
+c1 catalog variants --database /absolute/path/Library.cocatalog/Library.cocatalogdb --collection "Trips 2024"
 c1 catalog variants --database /absolute/path/Library.cocatalog/Library.cocatalogdb --collection-id 7
 c1 catalog snapshot --database /absolute/path/Library.cocatalog/Library.cocatalogdb --destination /absolute/path/archive.cocatalogdb
 ```
 
-Single-variant stored inspection is `c1 get <numeric-variant-id> --database /absolute/path/Library.cocatalog/Library.cocatalogdb`. MCP equivalents are `catalog_get`, `catalog_variants`, `catalog_inspect`, and `catalog_snapshot`, using `database`, `collectionID`, `rating`, `minRating`, `afterVariantID`, `tables`, `afterPK`, `limit`, and `destination`. `catalog_variants` and the CLI database route share the same core. MCP stored reads run outside the AppleScript main actor and application lock. Use an independent reader per concurrent operation.
+Single-variant stored inspection is `c1 get <numeric-variant-id> --database /absolute/path/Library.cocatalog/Library.cocatalogdb`. MCP equivalents are `catalog_get`, `catalog_collections`, `catalog_variants`, `catalog_inspect`, and `catalog_snapshot`, using `database`, `collectionID`, `collection`, `rating`, `minRating`, `afterVariantID`, `tables`, `afterPK`, `limit`, and `destination`. `catalog_variants` and the CLI database route share the same core. MCP stored reads run outside the AppleScript main actor and application lock. Use an independent reader per concurrent operation.
 
 ## Data and identity
 
@@ -20,7 +22,11 @@ Every response includes the canonical database path, device/inode identity, stor
 
 `catalog inspect` exposes raw collection, image, variant, path-location, membership, layer, metadata, retouching, and document-setting rows. Links such as `ZCOMBINEDSETTINGS`, `ZDEFAULTLAYER`, `ZADJUSTMENTLAYER`, and `ZMETADATA` remain explicit. `catalog variants` joins the combined settings layer's metadata for ratings and color tags. It resolves absolute externally referenced Mac paths only; relative, managed, or unrecognized locations retain their components and return `originalPath: null`. A stored path does not establish that an original is online.
 
-`--collection-id` uses explicit membership: an image membership expands to every stored variant of that image; variant membership includes only that variant. Overlap does not duplicate variants. Virtual/smart collection rules, selection, manual sort order, and UI filters are not evaluated. Unscoped reads include stored trashed records, identified by `trashed`. Live selection/collection-name flags are rejected on the explicit-database route.
+`catalog collections` lists every stored collection with `collectionID`, `name`, the raw Core Data `entity` number and its `kind` name from `ZENTITIES`, `parentID`, and `namePath`, the names from the top level down to this one; the Catalog's hidden `root` project collection is omitted from other collections' paths. System collections are listed too. A parent cycle fails closed. Use it to find the ID of a named album.
+
+`catalog variants --collection NAME` resolves an exact, case-sensitive name to one stored collection and reports its `collectionID`. A name shared by several collections fails with `invalid-request` and lists each candidate's ID and name path; pass the intended one as `--collection-id`. An unknown name fails the same way. `--collection` and `--collection-id` are mutually exclusive. Both use the same explicit membership, and neither evaluates smart-collection rules. A name that resolves to a smart album (stored `ZSMARTCRITERIA`) fails with `invalid-request`; list it live with `variants_list` `collection`. `--collection-id` does not check, and returns only the smart album's explicit stored membership.
+
+`--collection-id` uses explicit membership: an image membership expands to every stored variant of that image; variant membership includes only that variant. Overlap does not duplicate variants. Virtual/smart collection rules, selection, manual sort order, and UI filters are not evaluated. Unscoped reads include stored trashed records, identified by `trashed`. `variants list --database` rejects the live `--selected` and `--collection` flags; use `catalog variants --collection` for a stored collection name.
 
 Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash`, document tokens, or any other mutation token, and cannot replace native post-write verification. Stored white balance is not decoded into Kelvin/tint; compound settings remain raw strings. External masks are not reconstructed. Use native `get` and normal editing preconditions immediately before writes.
 

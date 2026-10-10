@@ -328,6 +328,65 @@ class CatalogReaderTests(unittest.TestCase):
             client.close()
             for stream in (client.process.stdin, client.process.stdout, client.process.stderr): stream.close()
 
+    def nested_collections(self):
+        self.db.executemany('INSERT INTO ZENTITIES(Z_ENT,ZNAME) VALUES(?,?)', [(10,'Album'),(11,'Group'),(12,'ProjectCollection')])
+        self.db.execute('UPDATE ZCOLLECTION SET Z_ENT=10')
+        self.db.execute("INSERT INTO ZCOLLECTION(Z_PK,Z_ENT,ZNAME) VALUES(9,12,'root')")
+        self.db.execute("INSERT INTO ZCOLLECTION(Z_PK,Z_ENT,ZNAME,ZPARENT) VALUES(3,11,'Trips',9)")
+        self.db.execute("INSERT INTO ZCOLLECTION(Z_PK,Z_ENT,ZNAME,ZPARENT) VALUES(4,11,'2024',3)")
+        self.db.execute("INSERT INTO ZCOLLECTION(Z_PK,Z_ENT,ZNAME,ZPARENT) VALUES(5,10,'album-1',4)")
+        self.db.execute('INSERT INTO ZVARIANTINCOLLECTION VALUES(48,3,3,5)')
+        self.db.commit()
+
+    def test_collections_listing_and_name_paths(self):
+        self.nested_collections()
+        before = self.path.read_bytes()
+        result = self.cli('collections')
+        self.assertTrue(result['storedStateOnly'])
+        self.assertEqual(result['collections'][-2], {'collectionID': 5, 'name': 'album-1', 'entity': 10, 'kind': 'Album',
+                                                     'parentID': 4, 'namePath': ['Trips', '2024', 'album-1']})
+        self.assertEqual([c['namePath'] for c in result['collections']],
+                         [['album-1'], ['album-2'], ['Trips'], ['Trips', '2024'], ['Trips', '2024', 'album-1'], ['root']])
+        client = Client(MCP)
+        try:
+            schema = json.loads(client.tool('schema')['content'][0]['text'])
+            response = client.tool('catalog_collections', {'database': str(self.path)})
+            data = json.loads(response['content'][0]['text'])
+            validate_response(data, schema['responses']['catalog_collections'])
+            self.assertEqual(data['collections'], result['collections'])
+        finally:
+            client.close()
+            for stream in (client.process.stdin, client.process.stdout, client.process.stderr): stream.close()
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_collection_names_resolve_exactly_once(self):
+        self.nested_collections()
+        result = self.cli('variants', '--collection', '2024')
+        self.assertEqual((result['collectionID'], result['variants']), (4, []))
+        self.assertEqual([r['variantDatabaseID'] for r in self.cli('variants', '--collection', 'album-2')['variants']], [2])
+        duplicate = json.loads(self.cli('variants', '--collection', 'album-1', '--format', 'json', error=True))['error']
+        self.assertEqual(duplicate['code'], 'invalid-request')
+        self.assertIn('1 (album-1), 5 (Trips / 2024 / album-1)', duplicate['message'])
+        unknown = json.loads(self.cli('variants', '--collection', 'Album-1', '--format', 'json', error=True))['error']
+        self.assertEqual(unknown['code'], 'invalid-request')
+        self.assertIn("No stored collection is named 'Album-1'", unknown['message'])
+        self.assertIn('mutually exclusive', self.cli('variants', '--collection', 'Trips', '--collection-id', 3, error=True))
+
+    def test_smart_album_name_is_rejected(self):
+        self.nested_collections()
+        self.db.execute("INSERT INTO ZCOLLECTION(Z_PK,Z_ENT,ZNAME,ZSMARTCRITERIA) VALUES(6,10,'Picks','rating >= 4')"); self.db.commit()
+        error = json.loads(self.cli('variants', '--collection', 'Picks', '--format', 'json', error=True))['error']
+        self.assertEqual(error['code'], 'invalid-request')
+        self.assertIn('smart rules', error['message'])
+        self.assertIn('variants_list with collection', error['message'])
+        self.assertEqual(self.cli('variants', '--collection-id', 6)['variants'], [])
+        self.assertEqual(self.cli('variants', '--collection', '2024')['collectionID'], 4)
+
+    def test_collection_cycle_fails_closed(self):
+        self.nested_collections()
+        self.db.execute('UPDATE ZCOLLECTION SET ZPARENT=5 WHERE Z_PK=3'); self.db.commit()
+        self.assertIn('cycle', self.cli('collections', error=True))
+
     def test_cli_database_route(self):
         result=subprocess.run([str(CLI),'variants','list','--database',str(self.path),'--rating','2'],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stderr)

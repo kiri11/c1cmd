@@ -15,7 +15,8 @@ public struct ToolRequest {
         case readSessionBegin(collection: String?, selected: Bool)
         case readSessionEnd(workflow: String), readSessionStatus(workflow: String)
         case catalogGet(database: String, variantID: Int)
-        case catalogVariants(database: String, collectionID: Int?, rating: Int?, minRating: Int?, afterVariantID: Int?, limit: Int?)
+        case catalogCollections(database: String)
+        case catalogVariants(database: String, collectionID: Int?, collection: String?, rating: Int?, minRating: Int?, afterVariantID: Int?, limit: Int?)
         case catalogInspect(database: String, tables: [String]?, afterPK: Int?, limit: Int?)
         case catalogSnapshot(database: String, destination: String)
         case variantsList(VariantsQuery)
@@ -83,8 +84,10 @@ public struct ToolRequest {
         case "read_session_end": command = .readSessionEnd(workflow: string("readWorkflow")!)
         case "read_session_status": command = .readSessionStatus(workflow: string("readWorkflow")!)
         case "catalog_get": command = .catalogGet(database: string("database")!, variantID: int("variantID")!)
+        case "catalog_collections": command = .catalogCollections(database: string("database")!)
         case "catalog_variants":
-            command = .catalogVariants(database: string("database")!, collectionID: int("collectionID"), rating: int("rating"), minRating: int("minRating"),
+            command = .catalogVariants(database: string("database")!, collectionID: int("collectionID"), collection: string("collection"),
+                                       rating: int("rating"), minRating: int("minRating"),
                                        afterVariantID: int("afterVariantID"), limit: int("limit"))
         case "catalog_inspect":
             command = .catalogInspect(database: string("database")!, tables: a["tables"] as? [String], afterPK: int("afterPK"), limit: int("limit"))
@@ -148,7 +151,7 @@ public struct ToolRequest {
 
     /// Tools that never contact Capture One or take the application lock, so a
     /// transport can serve them while another request is running.
-    public static let localTools: Set<String> = ["request_status", "catalog_get", "catalog_variants", "catalog_inspect", "catalog_snapshot"]
+    public static let localTools: Set<String> = ["request_status", "catalog_get", "catalog_collections", "catalog_variants", "catalog_inspect", "catalog_snapshot"]
 
     /// Runs the request against Capture One or local state. Nothing here retries a write.
     /// Mutation, recipe and preview results are compact unless `full` was requested.
@@ -176,9 +179,10 @@ public struct ToolRequest {
         case .readSessionEnd(let workflow): return .object(try browsing.end(workflowID: workflow))
         case .readSessionStatus(let workflow): return .object(try browsing.status(workflowID: workflow))
         case .catalogGet(let database, let id): return .object(try CatalogReader(database: database).get(variantID: id))
-        case .catalogVariants(let database, let collectionID, let rating, let minRating, let afterVariantID, let limit):
-            return .object(try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating,
-                                                                          afterVariantID: afterVariantID, limit: limit))
+        case .catalogCollections(let database): return .object(try CatalogReader(database: database).collections())
+        case .catalogVariants(let database, let collectionID, let collection, let rating, let minRating, let afterVariantID, let limit):
+            return .object(try CatalogReader(database: database).variants(collectionID: collectionID, collection: collection, rating: rating,
+                                                                          minRating: minRating, afterVariantID: afterVariantID, limit: limit))
         case .catalogInspect(let database, let tables, let afterPK, let limit):
             return .object(try CatalogReader(database: database).inspect(tables: tables, afterPK: afterPK, limit: limit))
         case .catalogSnapshot(let database, let destination): return .object(try CatalogReader(database: database).snapshot(destination: destination))
