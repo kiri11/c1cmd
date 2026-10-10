@@ -79,7 +79,7 @@ struct CatalogEditingTests {
             fake.base.catalogID = package.path
             try Data("original".utf8).write(to: URL(fileURLWithPath: fake.base.parent))
             func core(_ path: String?) -> SessionController {
-                SessionController(executor: fake, appInstance: { fake.base.generation }, catalogWritePath: path, imageDimensions: { _ in [6000, 4000] })
+                SessionController(executor: fake, appInstance: { fake.base.generation }, catalogWritePath: path, imageDimensions: { _ in [6000, 4000] }, isAppRunning: { true })
             }
             func assertWritesDisabled(_ path: String?, _ reason: WritesDisabledReason, _ detail: String, line: UInt = #line) throws {
                 let denied = core(path)
