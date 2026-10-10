@@ -15,8 +15,9 @@ public struct ToolRequest {
         case readSessionBegin(collection: String?, selected: Bool)
         case readSessionEnd(workflow: String), readSessionStatus(workflow: String)
         case catalogGet(database: String, variantID: Int)
-        case catalogVariants(database: String, collectionID: Int?, rating: Int?, minRating: Int?)
-        case catalogInspect(database: String), catalogSnapshot(database: String, destination: String)
+        case catalogVariants(database: String, collectionID: Int?, rating: Int?, minRating: Int?, afterVariantID: Int?, limit: Int?)
+        case catalogInspect(database: String, tables: [String]?, afterPK: Int?, limit: Int?)
+        case catalogSnapshot(database: String, destination: String)
         case variantsList(VariantsQuery)
         case variantEdit(sourceRef: String, ifState: String, ifDocument: String, ifGeometryState: String?)
         case variantClone(sourceRef: String), variantBaseline(sourceRef: String), variantDelete(workingRef: String)
@@ -83,8 +84,10 @@ public struct ToolRequest {
         case "read_session_status": command = .readSessionStatus(workflow: string("readWorkflow")!)
         case "catalog_get": command = .catalogGet(database: string("database")!, variantID: int("variantID")!)
         case "catalog_variants":
-            command = .catalogVariants(database: string("database")!, collectionID: int("collectionID"), rating: int("rating"), minRating: int("minRating"))
-        case "catalog_inspect": command = .catalogInspect(database: string("database")!)
+            command = .catalogVariants(database: string("database")!, collectionID: int("collectionID"), rating: int("rating"), minRating: int("minRating"),
+                                       afterVariantID: int("afterVariantID"), limit: int("limit"))
+        case "catalog_inspect":
+            command = .catalogInspect(database: string("database")!, tables: a["tables"] as? [String], afterPK: int("afterPK"), limit: int("limit"))
         case "catalog_snapshot": command = .catalogSnapshot(database: string("database")!, destination: string("destination")!)
         case "variants_list":
             command = .variantsList(VariantsQuery(collection: string("collection"), selected: flag("selected"), live: flag("live"),
@@ -173,9 +176,11 @@ public struct ToolRequest {
         case .readSessionEnd(let workflow): return .object(try browsing.end(workflowID: workflow))
         case .readSessionStatus(let workflow): return .object(try browsing.status(workflowID: workflow))
         case .catalogGet(let database, let id): return .object(try CatalogReader(database: database).get(variantID: id))
-        case .catalogVariants(let database, let collectionID, let rating, let minRating):
-            return .object(try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating))
-        case .catalogInspect(let database): return .object(try CatalogReader(database: database).inspect())
+        case .catalogVariants(let database, let collectionID, let rating, let minRating, let afterVariantID, let limit):
+            return .object(try CatalogReader(database: database).variants(collectionID: collectionID, rating: rating, minRating: minRating,
+                                                                          afterVariantID: afterVariantID, limit: limit))
+        case .catalogInspect(let database, let tables, let afterPK, let limit):
+            return .object(try CatalogReader(database: database).inspect(tables: tables, afterPK: afterPK, limit: limit))
         case .catalogSnapshot(let database, let destination): return .object(try CatalogReader(database: database).snapshot(destination: destination))
         case .variantsList(let q):
             if let ids = q.ids {

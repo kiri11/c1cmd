@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.1.0"
+    public static let version = "4.2.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -30,6 +30,8 @@ public enum ContractSchema {
     static let rating = integer(VariantMetadata.ratingRange)
     static let deadlineSeconds: [String: Any] = ["type": "number", "exclusiveMinimum": 0, "maximum": 86400,
         "description": "Stop with deadline-exceeded after this many seconds, checked between Apple Events; nothing partial is returned and an outstanding event is not interrupted. Keep it below the MCP client's request timeout, which otherwise ends the call with no response."]
+    static let cursor: [String: Any] = ["type": "integer", "minimum": 0]
+    static let pageLimit = integer(1...10000)
     static var writableMetadataSchema: [String: Any] {
         object(["rating": rating, "colorTag": integer(VariantMetadata.colorTagRange)], required: ["rating", "colorTag"])
     }
@@ -67,8 +69,12 @@ public enum ContractSchema {
         case "read_session_end", "read_session_status": return object(["readWorkflow": string], required: ["readWorkflow"])
         case "read_session_begin": return object(["collection": string, "selected": boolean])
         case "catalog_get": return object(["database": string, "variantID": ["type": "integer", "minimum": 1]], required: ["database", "variantID"])
-        case "catalog_variants": return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": rating, "minRating": rating], required: ["database"])
-        case "catalog_inspect": return object(["database": string], required: ["database"])
+        case "catalog_variants":
+            return object(["database": string, "collectionID": ["type": "integer", "minimum": 1], "rating": rating, "minRating": rating,
+                           "afterVariantID": cursor, "limit": pageLimit], required: ["database"])
+        case "catalog_inspect":
+            let tables: [String: Any] = ["type": "array", "items": ["type": "string", "enum": CatalogReader.inspectTables.map(\.0)], "minItems": 1, "uniqueItems": true]
+            return object(["database": string, "tables": tables, "afterPK": cursor, "limit": pageLimit], required: ["database"])
         case "catalog_snapshot": return object(["database": string, "destination": string], required: ["database", "destination"])
         case "variants_list":
             var result = object([
@@ -149,6 +155,12 @@ public enum ContractSchema {
             }
             if let fields = arguments["fields"] as? String, !["minimal", "summary"].contains(fields) {
                 throw C1Error.invalidRequest("fields must be minimal or summary.")
+            }
+        }
+        if tool == "catalog_inspect", let tables = arguments["tables"] as? [String] {
+            let known = CatalogReader.inspectTables.map(\.0)
+            guard !tables.isEmpty, Set(tables).count == tables.count, Set(tables).isSubset(of: known) else {
+                throw C1Error.invalidRequest("tables must be unique names from: \(known.joined(separator: ", ")).")
             }
         }
         if tool == "set" || tool == "add" {
@@ -244,6 +256,8 @@ public enum ContractSchema {
         var storedVariantProps = observation
         storedVariantProps["variants"] = array(["type": "object"])
         storedVariantProps["membershipSemantics"] = string; storedVariantProps["collectionID"] = ["type": "integer"]
+        storedVariantProps["next"] = ["type": "integer"]
+        inspectProps["next"] = ["type": "object", "additionalProperties": ["type": "integer"]]
         var snapshotProps = observation; snapshotProps["snapshotPath"] = string
         let readStatus = object(["active": boolean, "workflowId": string, "documentPath": string,
             "variantCount": ["type": "integer"], "sqliteEnabled": boolean, "pendingVariantCount": ["type": "integer"],
@@ -255,7 +269,7 @@ public enum ContractSchema {
         var responses: [String: Any] = [
             "read_session_begin": readStatus, "read_session_end": readStatus, "read_session_status": readStatus,
             "catalog_get": object(storedGetProps, required: observation.keys.sorted() + ["variant", "storedSettings", "storedMetadata", "storedRetouching"]),
-            "catalog_inspect": object(inspectProps, required: inspectProps.keys.sorted()),
+            "catalog_inspect": object(inspectProps, required: observation.keys.sorted()),
             "catalog_snapshot": object(snapshotProps, required: snapshotProps.keys.sorted()),
             "catalog_variants": object(storedVariantProps, required: observation.keys.sorted() + ["variants", "membershipSemantics"]),
             "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "writesDisabledReason": writesDisabledReason, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),

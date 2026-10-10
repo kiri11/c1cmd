@@ -802,8 +802,17 @@ struct CatalogCommand: ParsableCommand {
 struct CatalogInspect: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "inspect")
     @Option var database: String
+    @Option(help: "Tables to read, comma-separated (e.g. variants,storedSettings); default all.") var tables: String?
+    @Option(help: "Keyset cursor: read rows with Z_PK above this value in each table.") var afterPK: Int?
+    @Option(help: "Rows per table (1–10000); returns next cursors for tables with more rows.") var limit: Int?
     @OptionGroup var globals: GlobalOptions
-    mutating func run() throws { try globals.run("catalog_inspect", { ["database": database] }) }
+    mutating func run() throws {
+        try globals.run("catalog_inspect", {
+            var args: [String: Any] = ["database": database]
+            put(&args, "tables", tables?.components(separatedBy: ",")); put(&args, "afterPK", afterPK); put(&args, "limit", limit)
+            return args
+        })
+    }
 }
 struct CatalogSnapshot: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "snapshot")
@@ -819,11 +828,14 @@ struct CatalogVariants: ParsableCommand {
     @Option var collectionID: Int?
     @Option var rating: Int?
     @Option var minRating: Int?
+    @Option(help: "Keyset cursor: list variants with variantDatabaseID above this value.") var afterVariantID: Int?
+    @Option(help: "Variants per page (1–10000); returns a next cursor when more remain.") var limit: Int?
     @OptionGroup var globals: GlobalOptions
     mutating func run() throws {
         try globals.run("catalog_variants", {
             var args: [String: Any] = ["database": database]
             put(&args, "collectionID", collectionID); put(&args, "rating", rating); put(&args, "minRating", minRating)
+            put(&args, "afterVariantID", afterVariantID); put(&args, "limit", limit)
             return args
         })
     }

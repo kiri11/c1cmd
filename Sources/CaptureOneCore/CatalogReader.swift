@@ -149,7 +149,7 @@ public final class CatalogReader {
         }
         documentUUID = uuid
     }
-    private func rows(_ sql: String) throws -> [[String: Any]] {
+    private func rows(_ sql: String, cap: Int = 10000) throws -> [[String: Any]] {
         guard ProcessInfo.processInfo.systemUptime <= deadline else { throw C1Error.invalidRequest("Catalog observation exceeded 10 seconds.") }
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { throw C1Error.invalidRequest("Catalog SQL prepare failed.") }
@@ -159,7 +159,7 @@ public final class CatalogReader {
             let status = sqlite3_step(statement)
             if status == SQLITE_DONE { return result }
             guard status == SQLITE_ROW else { throw C1Error.invalidRequest("Catalog read failed or timed out (SQLite \(status)).") }
-            guard result.count < 10000 else { throw C1Error.invalidRequest("Catalog result exceeds 10000 records; no partial result returned.") }
+            guard result.count < cap else { throw C1Error.invalidRequest("Catalog result exceeds \(cap) records; no partial result returned. Page with catalog_variants limit and afterVariantID, or catalog_inspect tables, limit and afterPK.") }
             var row: [String: Any] = [:]
             for i in 0..<sqlite3_column_count(statement) {
                 let name = String(cString: sqlite3_column_name(statement, i))
@@ -188,23 +188,39 @@ public final class CatalogReader {
          "observedAt": ISO8601DateFormatter().string(from: Date()), "storedStateOnly": true,
          "limitation": "May lag Capture One. Database IDs are not native references. No live mutation tokens. Settings are raw stored layers; masks and originals are not embedded in snapshots."]
     }
-    public func inspect() throws -> [String: Any] {
+    /// Keyset page: up to `limit` rows ordered by `key`, plus the cursor for the next page when more rows exist.
+    private func page(_ sql: String, key: String, limit: Int?) throws -> (rows: [[String: Any]], next: Int64?) {
+        guard let limit else { return (try rows(sql), nil) }
+        var records = try rows(sql + " LIMIT \(limit + 1)", cap: limit + 1)
+        guard records.count > limit else { return (records, nil) }
+        records.removeLast()
+        return (records, records.last?[key] as? Int64)
+    }
+
+    static let inspectTables = [("document", "ZDOCUMENTCONTENT"), ("version", "ZVERSIONINFO"),
+        ("collections", "ZCOLLECTION"), ("images", "ZIMAGE"), ("variants", "ZVARIANT"),
+        ("imageMembership", "ZIMAGEINCOLLECTION"), ("variantMembership", "ZVARIANTINCOLLECTION"),
+        ("pathLocations", "ZPATHLOCATION"), ("storedSettings", "ZVARIANTLAYER"), ("storedMetadata", "ZVARIANTMETADATA"),
+        ("storedRetouching", "ZRETOUCHINGLAYER"), ("documentSettings", "ZDOCUMENTSETTING")]
+
+    public func inspect(tables: [String]? = nil, afterPK: Int? = nil, limit: Int? = nil) throws -> [String: Any] {
         try beginObservation()
         defer { endObservation() }
         var output = provenance()
-        for (key, table) in [("document", "ZDOCUMENTCONTENT"), ("version", "ZVERSIONINFO"),
-            ("collections", "ZCOLLECTION"), ("images", "ZIMAGE"), ("variants", "ZVARIANT"),
-            ("imageMembership", "ZIMAGEINCOLLECTION"), ("variantMembership", "ZVARIANTINCOLLECTION"),
-            ("pathLocations", "ZPATHLOCATION"), ("storedSettings", "ZVARIANTLAYER"), ("storedMetadata", "ZVARIANTMETADATA"),
-            ("storedRetouching", "ZRETOUCHINGLAYER"), ("documentSettings", "ZDOCUMENTSETTING")] {
-            output[key] = try rows("SELECT * FROM \(table) ORDER BY Z_PK")
+        var next: [String: Int64] = [:]
+        for (key, table) in Self.inspectTables where tables?.contains(key) ?? true {
+            let after = afterPK.map { " WHERE Z_PK>\($0)" } ?? ""
+            let result = try page("SELECT * FROM \(table)\(after) ORDER BY Z_PK", key: "Z_PK", limit: limit)
+            output[key] = result.rows; next[key] = result.next
         }
         guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
         output.merge(provenance()) { _, fresh in fresh }
+        if !next.isEmpty { output["next"] = next }
         return output
     }
 
-    public func variants(collectionID: Int? = nil, rating: Int? = nil, minRating: Int? = nil) throws -> [String: Any] {
+    public func variants(collectionID: Int? = nil, rating: Int? = nil, minRating: Int? = nil,
+                         afterVariantID: Int? = nil, limit: Int? = nil) throws -> [String: Any] {
         var filters: [String: Any] = [:]
         if let rating { filters["rating"] = rating }; if let minRating { filters["minRating"] = minRating }
         try ContractSchema.validate(tool: "variants_list", arguments: filters)
@@ -221,7 +237,8 @@ public final class CatalogReader {
         }
         if let rating { predicates.append("m.ZBASIC_RATING=\(rating)") }
         if let minRating { predicates.append("m.ZBASIC_RATING>=\(minRating)") }
-        var records = try rows("""
+        if let afterVariantID { predicates.append("v.Z_PK>\(afterVariantID)") }
+        var (records, next) = try page("""
             SELECT v.Z_PK AS variantDatabaseID,v.ZVARIANTUUID AS variantUUID,
                    i.Z_PK AS imageDatabaseID,i.ZIMAGEUUID AS imageUUID,i.ZDISPLAYNAME AS name,
                    i.ZIMAGEFILENAME AS originalFilename,i.ZISINSIDECATALOG AS insideCatalog,
@@ -233,7 +250,7 @@ public final class CatalogReader {
             LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
             LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA
             WHERE \(predicates.joined(separator: " AND ")) ORDER BY v.Z_PK
-            """)
+            """, key: "variantDatabaseID", limit: limit)
         for index in records.indices {
             let record = records[index]
             records[index]["originalPath"] = NSNull()
@@ -247,6 +264,7 @@ public final class CatalogReader {
         var output = provenance(); output["variants"] = records
         output["membershipSemantics"] = "Explicit stored image membership expands to all image variants; explicit variant membership includes only that variant. Virtual/smart collection rules are not evaluated. Unscoped reads include stored trashed records."
         if let collectionID { output["collectionID"] = collectionID }
+        if let next { output["next"] = next }
         return output
     }
 

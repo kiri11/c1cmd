@@ -146,6 +146,34 @@ def main():
             assert not info['writesEnabled'] and info['writesDisabledReason'] == 'database-path-required', info
             cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=directory_env)
         log('default-and-wrong-path-denied', layout=layout)
+        database = next(catalog.glob('*.cocatalogdb'))
+
+        def stored(command, *args):
+            return cli('catalog', command, '--database', database, *args)
+
+        def pages(command, key, cursor, whole, *args):
+            records, after = [], None
+            while True:
+                page = stored(command, *args, '--limit', 1, *([cursor, after] if after is not None else []))
+                assert all(page[k] == whole[k] for k in ('databaseDocumentUUID', 'schemaFingerprint', 'databaseFileIdentity')), (page, whole)
+                assert records or 'next' in page, page
+                records += page[key]
+                after = page.get('next')
+                if isinstance(after, dict):
+                    after = after.get(key)
+                if after is None:
+                    return records
+
+        for _ in range(180):
+            if len(stored('variants')['variants']) == len(variants):
+                break
+            time.sleep(.5)
+        whole = stored('variants')
+        assert len(whole['variants']) == len(variants), whole
+        inspected = stored('inspect', '--tables', 'storedSettings')
+        settings = inspected['storedSettings']
+        assert len(settings) > 1 and pages('inspect', 'storedSettings', '--after-pk', inspected, '--tables', 'storedSettings') == settings
+        log('stored-pages', variants=len(whole['variants']), storedSettings=len(settings))
         client = Client(MCP, env=environment, timeout=150)
         for source in originals.values():
             clone, _ = tool('variant_clone', {'sourceRef': source['id']})

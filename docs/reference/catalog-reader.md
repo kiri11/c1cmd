@@ -5,12 +5,12 @@ uses SQLite directly, without Capture One, its application lock, or the currentl
 
 ```sh
 c1 catalog variants --database /absolute/path/Library.cocatalog/Library.cocatalogdb --min-rating 3
-c1 catalog inspect --database /absolute/path/Library.cocatalog/Library.cocatalogdb
+c1 catalog inspect --database /absolute/path/Library.cocatalog/Library.cocatalogdb --tables variants,storedSettings --limit 1000
 c1 catalog variants --database /absolute/path/Library.cocatalog/Library.cocatalogdb --collection-id 7
 c1 catalog snapshot --database /absolute/path/Library.cocatalog/Library.cocatalogdb --destination /absolute/path/archive.cocatalogdb
 ```
 
-Single-variant stored inspection is `c1 get <numeric-variant-id> --database /absolute/path/Library.cocatalog/Library.cocatalogdb`. MCP equivalents are `catalog_get`, `catalog_variants`, `catalog_inspect`, and `catalog_snapshot`, using `database`, `collectionID`, `rating`, `minRating`, and `destination`. `catalog_variants` and the CLI database route share the same core. MCP stored reads run outside the AppleScript main actor and application lock. Use an independent reader per concurrent operation.
+Single-variant stored inspection is `c1 get <numeric-variant-id> --database /absolute/path/Library.cocatalog/Library.cocatalogdb`. MCP equivalents are `catalog_get`, `catalog_variants`, `catalog_inspect`, and `catalog_snapshot`, using `database`, `collectionID`, `rating`, `minRating`, `afterVariantID`, `tables`, `afterPK`, `limit`, and `destination`. `catalog_variants` and the CLI database route share the same core. MCP stored reads run outside the AppleScript main actor and application lock. Use an independent reader per concurrent operation.
 
 ## Data and identity
 
@@ -26,7 +26,15 @@ Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash
 
 ## Transactions and archives
 
-Connections use `SQLITE_OPEN_READONLY`, `query_only`, ordinary locking, and WAL visibility. There is no `immutable=1`, `nolock`, forced checkpoint, journal-mode change, or direct database-file copy. Reads observe one SQLite transaction. Each operation has a ten-second monotonic deadline, 250 ms busy timeout, 10,000-row per-result limit, and 64 MiB cumulative field-data limit; oversized or failed reads return no partial inventory. Large Catalogs exceeding these limits need a future paginated reader; current results are never silently truncated.
+Connections use `SQLITE_OPEN_READONLY`, `query_only`, ordinary locking, and WAL visibility. There is no `immutable=1`, `nolock`, forced checkpoint, journal-mode change, or direct database-file copy. Reads observe one SQLite transaction. Each operation has a ten-second monotonic deadline, 250 ms busy timeout, 10,000-row per-result limit, and 64 MiB cumulative field-data limit; oversized or failed reads return no partial inventory.
+
+### Paging
+
+Large Catalogs exceed these limits, so `catalog variants` and `catalog inspect` page by key. `catalog variants` takes `--limit` (1–10,000) and `--after-variant-id`, and returns `next`, the `variantDatabaseID` to pass as `afterVariantID` for the following page, while more variants match. `catalog inspect` takes `--tables` (a subset of `document`, `version`, `collections`, `images`, `variants`, `imageMembership`, `variantMembership`, `pathLocations`, `storedSettings`, `storedMetadata`, `storedRetouching` and `documentSettings`), `--after-pk` and `--limit`. Both apply to every selected table, and `next` maps each table with more rows to its `afterPK` cursor; continue one table at a time with `--tables`. Filters and collection scope apply before paging.
+
+A page holds either `limit` rows or the final rows, and an omitted `next` means the read reached the end. Without `limit`, a read returns every remaining row or fails. The deadline and both limits still apply to each page; on the 64 MiB limit, request fewer tables or a smaller `limit`.
+
+Each page is a separate observation in its own transaction, with full provenance. Compare `databaseFileIdentity`, `databaseDocumentUUID` and `schemaFingerprint` across pages to detect a replaced or different database. Matching provenance does not prove the content is unchanged: rows committed between pages can be missed or appear in a later page. For one consistent view, take a `catalog snapshot` and page the snapshot.
 
 Snapshots use incremental `sqlite3_backup` inside the validated source transaction, including committed WAL data. The destination must be a new absolute `.cocatalogdb` path outside Catalog packages; existing files and symlinks are rejected. Failed backups remove their newly reserved file. A snapshot contains database records, not original photos, previews, external mask files, or a complete native Catalog backup. Native Catalog backup and RAW backup remain separate workflows.
 

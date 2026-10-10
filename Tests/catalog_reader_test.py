@@ -266,10 +266,67 @@ class CatalogReaderTests(unittest.TestCase):
     def test_row_limit_and_locked_source_fail_without_partial_output(self):
         self.db.executemany('INSERT INTO ZVARIANT(Z_PK,ZIMAGE,ZVARIANTUUID) VALUES(?,1,?)', ((i,str(i)) for i in range(4,10002)))
         self.db.commit()
-        self.assertIn('10000 records',self.cli(error=True))
+        message = self.cli(error=True)
+        self.assertIn('10000 records', message)
+        self.assertIn('catalog_variants limit and afterVariantID, or catalog_inspect tables, limit and afterPK', message)
         self.db.execute('BEGIN EXCLUSIVE')
         self.cli(error=True)
         self.db.rollback()
+
+    def test_variant_pages_cross_the_cap(self):
+        self.db.executemany('INSERT INTO ZVARIANT(Z_PK,ZIMAGE,ZVARIANTUUID) VALUES(?,1,?)', ((i,str(i)) for i in range(4,10006)))
+        self.db.commit()
+        first = self.cli('variants','--limit',10000)
+        self.assertEqual([r['variantDatabaseID'] for r in first['variants']], list(range(1,10001)))
+        self.assertEqual(first['next'], 10000)
+        last = self.cli('variants','--limit',10000,'--after-variant-id',first['next'])
+        self.assertEqual([r['variantDatabaseID'] for r in last['variants']], list(range(10001,10006)))
+        self.assertNotIn('next', last)
+        for key in ('databaseDocumentUUID','schemaFingerprint','databaseFileIdentity'):
+            self.assertEqual(first[key], last[key])
+        self.assertEqual(self.cli('variants','--limit',5,'--after-variant-id',10005)['variants'], [])
+
+    def test_variant_pages_keep_filters(self):
+        pages, after = [], None
+        while True:
+            args = ['--min-rating',2,'--limit',1] + (['--after-variant-id',after] if after is not None else [])
+            page = self.cli('variants',*args)
+            pages.append([r['variantDatabaseID'] for r in page['variants']])
+            if 'next' not in page: break
+            after = page['next']
+        self.assertEqual(pages, [[2],[3]])
+        self.assertEqual(self.cli('variants','--collection-id',1,'--limit',2,'--after-variant-id',1)['variants'][0]['variantDatabaseID'], 2)
+
+    def test_inspect_tables_and_pages(self):
+        self.db.executemany('INSERT INTO ZVARIANTLAYER(Z_PK,ZVARIANT) VALUES(?,1)', ((i,) for i in range(4,10003)))
+        self.db.commit()
+        self.assertIn('10000 records', self.cli('inspect',error=True))
+        first = self.cli('inspect','--tables','storedSettings,variants','--limit',10000)
+        self.assertNotIn('images', first)
+        self.assertEqual(len(first['storedSettings']), 10000)
+        self.assertEqual([r['Z_PK'] for r in first['variants']], [1,2,3])
+        self.assertEqual(first['next'], {'storedSettings': 10000})
+        last = self.cli('inspect','--tables','storedSettings','--limit',10000,'--after-pk',first['next']['storedSettings'])
+        self.assertEqual([r['Z_PK'] for r in last['storedSettings']], [10001,10002])
+        self.assertEqual(set(last) & {'variants','next'}, set())
+        empty = self.cli('inspect','--tables','storedSettings','--limit',3,'--after-pk',10002)
+        self.assertEqual(empty['storedSettings'], [])
+        self.assertNotIn('next', empty)
+        self.assertIn('tables must be', self.cli('inspect','--tables','storedSettings,ZVARIANT',error=True))
+        client = Client(MCP)
+        try:
+            schema = json.loads(client.tool('schema')['content'][0]['text'])
+            result = client.tool('catalog_inspect', {'database': str(self.path), 'tables': ['storedSettings'], 'limit': 10000})
+            data = json.loads(result['content'][0]['text'])
+            validate_response(data, schema['responses']['catalog_inspect'])
+            self.assertEqual(data['next'], {'storedSettings': 10000})
+            result = client.tool('catalog_variants', {'database': str(self.path), 'limit': 2})
+            data = json.loads(result['content'][0]['text'])
+            validate_response(data, schema['responses']['catalog_variants'])
+            self.assertEqual(data['next'], 2)
+        finally:
+            client.close()
+            for stream in (client.process.stdin, client.process.stdout, client.process.stderr): stream.close()
 
     def test_cli_database_route(self):
         result=subprocess.run([str(CLI),'variants','list','--database',str(self.path),'--rating','2'],capture_output=True,text=True,timeout=20)
