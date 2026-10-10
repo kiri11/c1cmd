@@ -420,6 +420,8 @@ REJECTED = [
     ('variant_delete', ['variant', 'delete', ' '], {'workingRef': ' '}),
     ('variant_baseline', ['variant', 'baseline', ''], {'sourceRef': ''}),
     ('get', ['get', '1', '--native-targets', '[]'], {'ref': '1', 'nativeTargets': []}),
+    ('get', ['get', '6f9619ff-8b86-d011-b42d-00c04fc964ff', '--live'], {'ref': '6f9619ff-8b86-d011-b42d-00c04fc964ff', 'live': True}),
+    ('variants_list', ['variants', 'list', '--ids', '1,6F9619FF-8B86-D011-B42D-00C04FC964FF'], {'ids': ['1', '6F9619FF-8B86-D011-B42D-00C04FC964FF']}),
     ('exif', ['exif', ' '], {'ref': ' '}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '6'], {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 6}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--color-tag', '8'], {'workingRef': 'x', 'ifMetadataState': 'h', 'colorTag': 8}),

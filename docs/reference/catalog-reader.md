@@ -18,7 +18,7 @@ Single-variant stored inspection is `c1 get <numeric-variant-id> --database /abs
 
 Reader version 1 compares complete DDL against retained schema manifests, allowing ASCII whitespace differences outside quoted strings/identifiers and the standard SQLite `sqlite_stat1`/`sqlite_stat4` table definitions. It requires document type 1 and an exact version history for the matching schema, ordered by `Z_PK`. The original manifest requires one row with format `16.8.5.30 Pro Mac` and compatibility/version 160800. The separately qualified upgraded Catalog manifest (`catalog-schema-upgraded-16.8.5.json`) retains its specific column order and four historical version tuples ending in that same build. Histories cannot be mixed between manifests; no maximum-version or latest-row heuristic is used. Types, constraints, indexes, column order, quoted text, token boundaries and unknown objects must match a retained manifest; comments are not normalized. The manifests are bundled beside the executables in `c1_CaptureOneCore.bundle`. Unrecognized schemas and histories fail closed. This is a reverse-engineered, fixture-qualified stored-data interface. The reported `schemaFingerprint` remains the exact raw schema hash, so compatible databases can report different fingerprints.
 
-Every response includes the canonical database path, device/inode identity, stored document UUID, schema fingerprint, transaction start time, observation time, reader version, and `storedStateOnly: true`. These identify the observation, not a live mutation precondition. Distinct variants of an image remain distinct; `variantDatabaseID` and `variantUUID` are separate from `imageDatabaseID` and `imageUUID`. Do not treat database IDs as authorized native references, even when numeric IDs agree on a fixture.
+Every response includes the canonical database path, device/inode identity, stored document UUID, schema fingerprint, transaction start time, observation time, reader version, and `storedStateOnly: true`. These identify the observation, not a live mutation precondition. Distinct variants of an image remain distinct; `variantDatabaseID` and `variantUUID` are separate from `imageDatabaseID` and `imageUUID`.
 
 `catalog inspect` exposes raw collection, image, variant, path-location, membership, layer, metadata, retouching, and document-setting rows. Links such as `ZCOMBINEDSETTINGS`, `ZDEFAULTLAYER`, `ZADJUSTMENTLAYER`, and `ZMETADATA` remain explicit. `catalog variants` joins the combined settings layer's metadata for ratings and color tags. It resolves absolute externally referenced Mac paths only; relative, managed, or unrecognized locations retain their components and return `originalPath: null`. A stored path does not establish that an original is online.
 
@@ -29,6 +29,16 @@ Every response includes the canonical database path, device/inode identity, stor
 `--collection-id` uses explicit membership: an image membership expands to every stored variant of that image; variant membership includes only that variant. Overlap does not duplicate variants. Virtual/smart collection rules, selection, manual sort order, and UI filters are not evaluated. Unscoped reads include stored trashed records, identified by `trashed`. `variants list --database` rejects the live `--selected` and `--collection` flags; use `catalog variants --collection` for a stored collection name.
 
 Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash`, document tokens, or any other mutation token, and cannot replace native post-write verification. Stored white balance is not decoded into Kelvin/tint; compound settings remain raw strings. External masks are not reconstructed. Use native `get` and normal editing preconditions immediately before writes.
+
+### From a stored variant to a live edit
+
+`variantDatabaseID` is the stored field that addresses a live variant: Capture One's native variant ID is the same number, as text. The `catalog` live suite checks this for every stored variant of its owned Catalog fixture, including several variants of one image. `variantUUID` and `imageUUID` are never live references; live `get` and `variants_list` `ids` reject a UUID-shaped ref with `invalid-request` before contacting Capture One.
+
+1. Take `variantDatabaseID` from `catalog variants`.
+2. Confirm it live: `variants_list` with `ids` and `fields: summary` (check `name` and `parentImagePath`), or `get --live`. Compare `parentImagePath` with the stored `originalPath` after resolving symlinks in both: the stored path drops a leading `/private` that the live path can keep.
+3. Prepare the edit with `variant_edit`, using the tokens from a fresh live `get`.
+
+A stored ID is a lookup candidate, never a write authorization ([invariant 1](../../AGENT_GUIDE.md#safety-invariants)). Always confirm it live: stored state can lag, and the variant can have been deleted or the database replaced since the read.
 
 ## Transactions and archives
 

@@ -196,6 +196,27 @@ def main():
         assert f"{nested[0]['collectionID']} (c1 group / c1 album)" in duplicate['error']['message'], duplicate
         cli('catalog', 'variants', '--database', database, '--collection', 'c1 missing', error='invalid-request')
         log('stored-collections', collections=listed)
+        # Several variants of one image: each stored variantDatabaseID is its live native ID.
+        clone = cli('variant', 'clone', variants[0]['id'])
+        for _ in range(180):
+            if len(stored('variants')['variants']) == len(variants) + 1:
+                break
+            time.sleep(.5)
+        whole = stored('variants')
+        records = whole['variants']
+        assert len(records) == len(variants) + 1 and len({r['imageDatabaseID'] for r in records}) == len(variants), records
+        assert pages('variants', 'variants', '--after-variant-id', whole) == records
+        log('stored-variant-pages', variants=len(records))
+        mapping = []
+        for record in records:
+            live = cli('variants', 'list', '--ids', record['variantDatabaseID'], '--fields', 'summary')
+            assert [(v['id'], v['name'], Path(v['parentImagePath']).resolve()) for v in live] == [
+                (str(record['variantDatabaseID']), record['name'], Path(record['originalPath']).resolve())], (record, live)
+            cli('get', record['variantUUID'], '--live', error='invalid-request')
+            mapping.append(dict(stored=record, live=live[0]))
+        assert str(clone['cloneVariantId']) in {m['live']['id'] for m in mapping}, (clone, mapping)
+        cli('variant', 'delete', clone['workingRef'])
+        log('stored-to-live-ids', layout=layout, mapping=mapping)
         client = Client(MCP, env=environment, timeout=150)
         for source in originals.values():
             clone, _ = tool('variant_clone', {'sourceRef': source['id']})

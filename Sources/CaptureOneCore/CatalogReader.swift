@@ -186,7 +186,7 @@ public final class CatalogReader {
         ["databasePath": path, "databaseFileIdentity": fileIdentity, "databaseDocumentUUID": documentUUID, "schemaFingerprint": fingerprint, "readerVersion": 1,
          "observationStartedAt": observationStartedAt, "backend": "sqlite",
          "observedAt": ISO8601DateFormatter().string(from: Date()), "storedStateOnly": true,
-         "limitation": "May lag Capture One. Database IDs are not native references. No live mutation tokens. Settings are raw stored layers; masks and originals are not embedded in snapshots."]
+         "limitation": "May lag Capture One. Database IDs are lookup candidates, never write authorization; confirm variantDatabaseID live. No live mutation tokens. Settings are raw stored layers; masks and originals are not embedded in snapshots."]
     }
     /// Keyset page: up to `limit` rows ordered by `key`, plus the cursor for the next page when more rows exist.
     private func page(_ sql: String, key: String, limit: Int?) throws -> (rows: [[String: Any]], next: Int64?) {

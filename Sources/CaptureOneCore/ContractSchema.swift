@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.3.0"
+    public static let version = "4.3.1"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -157,6 +157,10 @@ public enum ContractSchema {
             if let fields = arguments["fields"] as? String, !["minimal", "summary"].contains(fields) {
                 throw C1Error.invalidRequest("fields must be minimal or summary.")
             }
+        }
+        if ["get", "variants_list"].contains(tool),
+           let ref = (arguments["ids"] as? [String] ?? [arguments["ref"] as? String ?? ""]).first(where: { UUID(uuidString: $0) != nil }) {
+            throw C1Error.invalidRequest("'\(ref)' is UUID-shaped; a stored variantUUID never addresses a live variant. Use the stored variantDatabaseID and confirm it with variants_list ids or get --live.")
         }
         if tool == "catalog_variants", arguments["collection"] != nil, arguments["collectionID"] != nil {
             throw C1Error.invalidRequest("collection and collectionID are mutually exclusive.")
