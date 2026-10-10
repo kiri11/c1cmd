@@ -646,8 +646,8 @@ public final class SessionController {
             context?.update(phase: "validating-document")
             let docInfo = try getDocumentInfo()
             context?.document(docInfo)
-            // Native predicates/bulk IDs are qualified only for Sessions on this exact build.
-            let native = nativeInventoryEnabled && docInfo.isSession && docInfo.appVersion == Self.pinnedBuild
+            // Native predicates/bulk IDs are qualified only on this exact build.
+            let native = nativeInventoryEnabled && docInfo.appVersion == Self.pinnedBuild
             context?.inventoryStrategy(native ? "native-filter" : "rating-scan")
             func validateDocument() throws {
                 try checkpoint()

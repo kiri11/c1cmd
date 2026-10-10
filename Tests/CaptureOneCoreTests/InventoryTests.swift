@@ -26,6 +26,7 @@ struct InventoryTests {
         testInventoryConfirmsMatchesLast()
         testTerminalErrorsAreRedacted()
         testFiltersBeforeHydration()
+        testCatalogStrategyGate()
         testDuplicateAndSharedParentIDs()
         testMalformedAndVanishedResponsesFailClosed()
         testRatingAndMembershipDriftFailClosed()
@@ -257,6 +258,38 @@ struct InventoryTests {
             XCTAssertEqual(fake.listArguments[1].descriptorType, NSAppleEventDescriptor.missingValue().descriptorType,
                            "An omitted collection is passed as a missing Apple Event value")
             XCTAssertFalse(fake.listArguments[2].booleanValue)
+        }
+    }
+
+    /// Catalogs use native predicates on the pinned build only; the scan stays for other builds and the explicit override.
+    private static func testCatalogStrategyGate() {
+        for (version, native, strategy, total) in [("16.8.5.30", true, "native-filter", 3), ("16.8.5.31", true, "rating-scan", 6),
+                                                   ("16.8.5.30", false, "rating-scan", 6)] {
+            let (fake, core, dir) = fixture(6, native: native)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let catalog = dir.appendingPathComponent("inventory.cocatalog")
+            try! FileManager.default.createDirectory(at: catalog, withIntermediateDirectories: true)
+            try! Data("catalog".utf8).write(to: catalog.appendingPathComponent("inventory.cocatalogdb"))
+            fake.catalogID = catalog.path
+            fake.isSession = false
+            fake.version = version
+            let label = "\(version) native=\(native)"
+            let context = RequestContext(tool: "variants_list", progressMode: "quiet", directory: dir)
+            XCTAssertNoThrowBlock {
+                let rows = try context.withCurrent { try core.listVariants(minRating: 3, batchSize: 2) }
+                XCTAssertEqual(rows.map(\.id), ["3", "4", "5"], label)
+            }
+            XCTAssertEqual(fake.calls.contains("discoverFilteredVariantIDs"), strategy == "native-filter", label)
+            XCTAssertEqual(fake.calls.contains("readVariantRatings"), strategy == "rating-scan", label)
+            XCTAssertEqual(fake.hydrationCounterIDs, ["3", "4", "5"], "\(label): only matches are hydrated")
+            let status = context.snapshot
+            XCTAssertEqual(status.inventoryStrategy, strategy, label)
+            XCTAssertEqual(status.totalCandidates, total, "\(label): predicate matches or every scanned ID")
+            XCTAssertEqual(status.candidatesScanned, total, label)
+            XCTAssertEqual(status.unconfirmedMatches, 3, label)
+            XCTAssertEqual(status.matchesFound, 3, label)
+            XCTAssertEqual(status.summariesCompleted, 3, label)
+            XCTAssertEqual(status.phase, "confirmed", label)
         }
     }
 

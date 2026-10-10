@@ -35,7 +35,7 @@ EVIDENCE = Path(os.environ.get("C1_INVENTORY_EVIDENCE", "/private/tmp/c1-invento
 # the built-in collection holding every variant and a collection holding none.
 DOCUMENTS = {
     "session": dict(strategy="native-filter", allVariants="Capture", noVariants="Selects"),
-    "catalog": dict(strategy="rating-scan", allVariants="All Images", noVariants="c1-inventory-empty"),
+    "catalog": dict(strategy="native-filter", allVariants="All Images", noVariants="c1-inventory-empty"),
 }
 STATUS_KEYS = ["requestId", "phase", "status", "elapsedMs", "candidatesScanned", "matchesFound",
                "summariesCompleted", "totalCandidates", "inventoryStrategy", "handlerCalls"]

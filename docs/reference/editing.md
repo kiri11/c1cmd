@@ -106,8 +106,8 @@ MCP `variants_list` takes `rating` or `minRating` (not both), plus `collection` 
 returns an empty list. Results are variants: several edits of one photo, including
 managed clones (`isManagedWorkingClone`), can appear.
 
-Filtering runs before full metadata reads. On 16.8.5.30 Sessions, native rating
-predicates and bulk ID reads select candidates; Catalogs and other builds use a
+Filtering runs before full metadata reads. On 16.8.5.30, native rating predicates
+and bulk ID reads select candidates in Sessions and Catalogs; other builds use a
 two-stage rating scan (`C1_INVENTORY_STRATEGY=scan` forces it). Summaries are read
 in sequential batches of `batchSize` / `--batch-size` (default 32, 1–256). A failed
 rating read fails the request. The inventory holds the application lock, rechecks

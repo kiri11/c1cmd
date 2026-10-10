@@ -64,8 +64,8 @@ on getAppAndDocInfo()
     end tell
 end getAppAndDocInfo
 
--- Qualified by the independent legacy enumeration for Session document, collection,
--- and selected scopes on 16.8.5.30. Every ID stays paired with its own summary.
+-- Qualified by the independent legacy enumeration for Session and Catalog document,
+-- album and selected scopes on 16.8.5.30. Every ID stays paired with its own summary.
 on discoverFilteredVariantIDs(docName, collectionName, selectedOnly, exactRating, minimumRating)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"

@@ -114,9 +114,15 @@ have regular CLI/MCP coverage; unpackaged writes require the exact `.cocatalogdb
 opt-in. Native editing, including layers, color bands and people masks, has owned
 referenced-original coverage in both layouts. Recipe capture, registration,
 managed-clone verification and compound application also have coverage in both,
-including scoped recipes and single-pixel readback. Catalog-stored originals and
-Catalog fault recovery remain unqualified. Package Catalog default-baseline
-creation remains a qualification gap after uncertain native-ID readback.
+including scoped recipes and single-pixel readback. Filtered inventories use native
+rating predicates and bulk ID reads in both document kinds, qualified against the
+legacy enumeration on owned album, selection and document scopes in both layouts.
+Album qualification covers variant-level membership, including several variants of
+one image, because AppleScript `add inside` adds variants only. Image-level album
+entries made in the UI are not covered by the live suite.
+Catalog-stored originals and Catalog fault recovery remain unqualified. Package
+Catalog default-baseline creation remains a qualification gap after uncertain
+native-ID readback.
 
 Other limits:
 
