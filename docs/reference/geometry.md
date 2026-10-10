@@ -111,14 +111,24 @@ measured from the variant's Capture One orientation, or the EXIF orientation whe
 native geometry is unavailable. Positive roll is clockwise camera rotation and is
 levelled by the same clockwise rotation, so a vertical frame recorded at 93.9°
 gives 3.9. It is omitted when roll is unrecorded, the variant is flipped, or the
-result is more than 45° from level. The sensor measures the camera to about a
-degree, not the scene: treat it as a starting point, confirm it against a preview
-and never level an intentional diagonal.
+result is more than 45° from level.
+
+The hint levels the camera body, not the picture. Canon records roll in 0.1°
+steps as a full-circle angle that passes 90° in vertical frames, so it is already
+the direction of gravity in the sensor plane and pitch does not change it.
+`levelRotation` therefore ignores `pitchAngle`. Canon's manuals give the level a
+margin of about ±1°, larger when the camera is tilted far. Expect a
+photographer's rotation to differ by a degree or two, and a hint near zero can
+have the other sign. A tilted lens makes off-centre verticals converge (about 6°
+at the edge of a vertical 50 mm frame pitched 24°), which rotation cannot fix, so
+confirm the hint on a horizon or a line facing the camera, not on a converging
+vertical, and never level an intentional diagonal.
 
 `pitchAngle` is upward lens tilt and `focalLength35mm` the 35 mm-equivalent focal
 length. Together they indicate how strongly verticals converge (strongly at 24 mm,
 barely at 85 mm), but they are not a keystone amount. Verified on Canon EOS R6
-Mark II CR3 files; other makes are reported as exiftool reads them.
+Mark II CR3 files in EXIF orientations 1 and 6; orientations 3 and 8 use the same
+arithmetic unverified, and other makes are reported as exiftool reads them.
 
 ## Keystone
 

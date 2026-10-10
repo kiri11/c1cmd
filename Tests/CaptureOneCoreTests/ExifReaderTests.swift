@@ -44,6 +44,17 @@ struct ExifReaderTests {
             let recorded = try exif(["FocalLengthIn35mmFormat": 28, "FocalLength35efl": 27.9])
             XCTAssertEqual(recorded.focalLength35mm, 28, "A recorded 35 mm focal length is preferred over exiftool's estimate")
 
+            // Values measured with exiftool on Canon EOS R6 Mark II CR3 frames (issue #30).
+            let pastNinety = try exif(["Orientation": 6, "RollAngle": 94.3, "PitchAngle": 3.0], orientation: 90)
+            XCTAssertEqual(pastNinety.levelRotation, 4.3, "TK7A6608: Canon roll is a full-circle angle that passes 90 in vertical frames")
+            let tiltedUp = try exif(["Orientation": 6, "RollAngle": 91.1, "PitchAngle": 24.3], orientation: 90)
+            XCTAssertEqual(tiltedUp, ExifResult(id: "1", workingRef: nil, levelRotation: 1.1, pitchAngle: 24.3),
+                           "TK7A7071: a 24 degree lens tilt is reported and leaves the roll hint unchanged")
+            let tiltedDown = try exif(["Orientation": 1, "RollAngle": -0.5, "PitchAngle": -45.6])
+            XCTAssertEqual(tiltedDown.levelRotation, -0.5, "TK7A6688: a 45 degree downward tilt leaves the roll hint unchanged")
+            let dutch = try exif(["Orientation": 1, "RollAngle": 49.3, "PitchAngle": 0.5])
+            XCTAssertNil(dutch.levelRotation, "2U6A7294: an intentional 49 degree tilt is beyond the rotation range")
+
             // Without native geometry, EXIF orientation sets the level frame.
             let unreadable = SessionController(executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in nil })
             _ = try exif(["Orientation": 6, "RollAngle": 93.9], orientation: 0)
