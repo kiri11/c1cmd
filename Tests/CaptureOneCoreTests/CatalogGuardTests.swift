@@ -81,21 +81,49 @@ struct CatalogEditingTests {
             func core(_ path: String?) -> SessionController {
                 SessionController(executor: fake, appInstance: { fake.base.generation }, catalogWritePath: path, imageDimensions: { _ in [6000, 4000] })
             }
+            func assertWritesDisabled(_ path: String?, _ reason: WritesDisabledReason, _ detail: String, line: UInt = #line) throws {
+                let denied = core(path)
+                let doc = try denied.getDocumentInfo()
+                XCTAssertFalse(doc.writesEnabled, line: line)
+                XCTAssertEqual(doc.writesDisabledReason, reason, "doc_info", line: line)
+                XCTAssertTrue(OutputFormatter.renderDocumentInfo(doc, format: .human).contains("Writes Disabled: \(reason.rawValue)"), line: line)
+                let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(doc)) as! [String: Any]
+                XCTAssertEqual(json["writesDisabledReason"] as? String, reason.rawValue, line: line)
+                let doctor = try denied.doctor()
+                XCTAssertFalse(doctor.writesEnabled, line: line)
+                XCTAssertEqual(doctor.writesDisabledReason, reason, "doctor", line: line)
+                XCTAssertThrowsError(try denied.cloneVariant(sourceRef: "1"), line: line)
+                XCTAssertThrowsError(try denied.assertSessionWritable(docInfo: doc, operation: "clone"), line: line) { error in
+                    guard case let C1Error.invalidRequest(message) = error else { return XCTFail("Expected invalid-request, got \(error)", line: line) }
+                    for part in ["(\(reason.rawValue))", detail, "own environment", "CLI and the MCP server"] {
+                        XCTAssertTrue(message.contains(part), "\(part) missing from: \(message)", line: line)
+                    }
+                }
+            }
             let enabled = core(package.path)
             let readOnly = core(nil)
             let doc = try enabled.getDocumentInfo()
             XCTAssertEqual(doc.documentPath, package.path)
             XCTAssertTrue(doc.openToken.contains(db.path), "Bind the database file, not package inode")
             XCTAssertTrue(doc.writesEnabled)
+            XCTAssertNil(doc.writesDisabledReason)
+            let enabledJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(doc)) as! [String: Any]
+            XCTAssertNil(enabledJSON["writesDisabledReason"])
             let readOnlyEnabled = try readOnly.getDocumentInfo().writesEnabled
             XCTAssertFalse(readOnlyEnabled)
-            for path in [nil, "", "1", "Main.cocatalog", root.path, root.appendingPathComponent("Other.cocatalog").path] as [String?] {
-                XCTAssertThrowsError(try core(path).cloneVariant(sourceRef: "1"))
-            }
+            try assertWritesDisabled(nil, .unset, "is not set in this process's environment")
+            try assertWritesDisabled("", .unset, "is not set in this process's environment")
+            try assertWritesDisabled("1", .relativePath, "'1' is not an absolute path")
+            try assertWritesDisabled("Main.cocatalog", .relativePath, "'Main.cocatalog' is not an absolute path")
+            try assertWritesDisabled(root.path, .differentCatalog, "resolves to '\(root.path)'")
+            try assertWritesDisabled(root.appendingPathComponent("Other.cocatalog").path, .differentCatalog, "Other.cocatalog'")
             XCTAssertFalse(fake.base.calls.contains("cloneVariant"), "Denied opt-ins never dispatch")
             fake.base.version = "16.9.0"
-            let untestedEnabled = try enabled.getDocumentInfo().writesEnabled
-            XCTAssertFalse(untestedEnabled)
+            let untestedDoc = try enabled.getDocumentInfo()
+            XCTAssertFalse(untestedDoc.writesEnabled)
+            XCTAssertEqual(untestedDoc.writesDisabledReason, .catalogBuildRequired)
+            let untestedDoctor = try enabled.doctor()
+            XCTAssertEqual(untestedDoctor.writesDisabledReason, .catalogBuildRequired)
             XCTAssertThrowsError(try enabled.cloneVariant(sourceRef: "1"))
             fake.base.version = "16.8.5.30"
             let alias = root.appendingPathComponent("alias.cocatalog")
@@ -175,6 +203,9 @@ struct CatalogEditingTests {
             let other = root.appendingPathComponent("Other.cocatalog")
             try fm.createDirectory(at: other, withIntermediateDirectories: true)
             try Data("other".utf8).write(to: other.appendingPathComponent("Other.cocatalogdb"))
+            let otherAlias = root.appendingPathComponent("OtherAlias.cocatalog")
+            try fm.createSymbolicLink(at: otherAlias, withDestinationURL: other)
+            try assertWritesDisabled(otherAlias.path, .differentCatalog, "resolves to '\(other.path)'")
             fake.base.catalogID = other.path
             let otherCatalogEnabled = try enabled.getDocumentInfo().writesEnabled
             XCTAssertFalse(otherCatalogEnabled)
@@ -199,6 +230,7 @@ struct CatalogEditingTests {
             XCTAssertNoThrow(try readOnly.get(ref: "1"))
             let ambiguousAuthorization = try enabled.getDocumentInfo()
             XCTAssertFalse(ambiguousAuthorization.writesEnabled, "Package opt-in cannot select among databases")
+            try assertWritesDisabled(package.path, .databasePathRequired, "name its exact .cocatalogdb database")
             let wrongAuthorization = try core(extra.path).getDocumentInfo()
             XCTAssertFalse(wrongAuthorization.writesEnabled, "Another database in the same package is not authorized")
             let exactRef = try exact.cloneVariant(sourceRef: "1").workingRef
@@ -228,7 +260,7 @@ struct CatalogEditingTests {
                 let plainEnabled = try plainCore.getDocumentInfo().writesEnabled
                 XCTAssertEqual(plainEnabled, optIn == plainDB.path)
                 if optIn == plain.path {
-                    XCTAssertThrowsError(try plainCore.cloneVariant(sourceRef: "1"))
+                    try assertWritesDisabled(optIn, .databasePathRequired, "name its exact .cocatalogdb database")
                     XCTAssertThrowsError(try plainCore.preview(ref: "1"))
                 }
 

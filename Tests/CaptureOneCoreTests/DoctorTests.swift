@@ -17,6 +17,8 @@ struct DoctorTests {
             XCTAssertTrue(clean.allChecksPassed)
             XCTAssertEqual(clean.unresolvedOperationsCount, 0)
             XCTAssertNil(clean.diagnosticError)
+            XCTAssertTrue(clean.writesEnabled)
+            XCTAssertNil(clean.writesDisabledReason)
             XCTAssertEqual(fake.calls, ["getAppAndDocInfo"], "Doctor resolves one coherent discovery response without a second Apple Event")
             let journal = OperationJournal(sessionDirectory: directory)
             try journal.append(entry: OperationRecord(operationType: "set", workingRef: nil, documentPath: directory.path, status: "pending"))
@@ -25,6 +27,8 @@ struct DoctorTests {
             XCTAssertNil(pending.diagnosticError)
             XCTAssertFalse(pending.allChecksPassed)
             XCTAssertFalse(pending.writesEnabled)
+            XCTAssertEqual(pending.writesDisabledReason, .checksFailed)
+            XCTAssertTrue(OutputFormatter.renderDoctorReport(pending, format: .human).contains("Writes Disabled     : checks-failed"))
             identityFailure = true
             let unknown = try core.doctor()
             XCTAssertNil(unknown.unresolvedOperationsCount)
@@ -37,6 +41,7 @@ struct DoctorTests {
             let json = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
             XCTAssertNil(json["unresolvedOperationsCount"], "Unknown is never a fabricated count")
             XCTAssertEqual((json["diagnosticError"] as? [String: Any])?["code"] as? String, "identity-ambiguous")
+            XCTAssertEqual(json["writesDisabledReason"] as? String, "checks-failed")
             XCTAssertTrue(OutputFormatter.renderDoctorReport(unknown, format: .human).contains("Unknown (journal"))
             identityFailure = false
             fake.documentCount = 2

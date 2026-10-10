@@ -31,14 +31,33 @@ struct CatalogLocation {
         self.database = database.resolvingSymlinksInPath()
     }
 
-    func isAuthorized(by configuredPath: String?) -> Bool {
-        guard let configuredPath, configuredPath.hasPrefix("/"),
-              let configured = try? CatalogLocation(nativeID: configuredPath) else { return false }
-        // Ordinary directories require an exact database opt-in, never a broad folder opt-in.
-        if package.pathExtension != "cocatalog" {
-            let configuredURL = URL(fileURLWithPath: configuredPath).resolvingSymlinksInPath()
-            guard configuredURL.pathExtension == "cocatalogdb" else { return false }
+    static func writeDenial(openNativeID: String, configuredPath: String?) throws -> CatalogWriteDenial? {
+        guard let configuredPath, !configuredPath.isEmpty else { return .unset }
+        guard configuredPath.hasPrefix("/") else { return .relativePath }
+        let open = try CatalogLocation(nativeID: openNativeID)
+        let configuredURL = URL(fileURLWithPath: configuredPath).resolvingSymlinksInPath()
+        guard let configured = try? CatalogLocation(nativeID: configuredPath) else {
+            return configuredURL.path == open.package.path ? .databasePathRequired : .differentCatalog(configuredPath: configuredURL.path)
         }
-        return configured.package.path == package.path && configured.database.path == database.path
+        guard configured.database.path == open.database.path else { return .differentCatalog(configuredPath: configuredURL.path) }
+        // Ordinary directories require an exact database opt-in, never a broad folder opt-in.
+        if open.package.pathExtension != "cocatalog", configuredURL.pathExtension != "cocatalogdb" { return .databasePathRequired }
+        return nil
+    }
+}
+
+enum CatalogWriteDenial: Equatable {
+    case unset
+    case differentCatalog(configuredPath: String)
+    case relativePath
+    case databasePathRequired
+
+    var reason: WritesDisabledReason {
+        switch self {
+        case .unset: .unset
+        case .differentCatalog: .differentCatalog
+        case .relativePath: .relativePath
+        case .databasePathRequired: .databasePathRequired
+        }
     }
 }

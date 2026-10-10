@@ -51,6 +51,7 @@ public struct OutputFormatter {
         if let p = r.docPath {
             lines.append("Document Path       : \(p)")
         }
+        if let reason = r.writesDisabledReason { lines.append("Writes Disabled     : \(reason.rawValue)") }
         lines.append("Advisory Lock       : \(r.lockAcquired ? "Available (OK)" : "Contended / Failed (FAIL)")")
         let journalStatus = r.unresolvedOperationsCount.map { $0 == 0 ? "0 (Clean)" : "\($0) (Warning: pending/failed ops in journal)" } ?? "Unknown (journal not inspected successfully)"
         lines.append("Unresolved Ops      : \(journalStatus)")
@@ -81,6 +82,7 @@ public struct OutputFormatter {
         lines.append("Name          : \(info.documentName)")
         lines.append("Type          : \(info.isSession ? "Session (Read/Write)" : "Catalog (\(info.writesEnabled ? "Editing Enabled" : "Read-Only"))")")
         lines.append("Path          : \(info.documentPath)")
+        if let reason = info.writesDisabledReason { lines.append("Writes Disabled: \(reason.rawValue)") }
         if info.isSession || info.writesEnabled {
             lines.append("Capture Folder: \(info.captureFolder)")
             lines.append("Output Folder : \(info.outputFolder)")

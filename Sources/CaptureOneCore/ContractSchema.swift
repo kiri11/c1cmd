@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.6.0"
+    public static let version = "3.7.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -249,14 +249,15 @@ public enum ContractSchema {
         var storedGetProps = observation
         storedGetProps["variant"] = ["type": "object"]; storedGetProps["image"] = ["type": "object"]
         for key in ["storedSettings", "storedMetadata", "storedRetouching"] { storedGetProps[key] = array(["type": "object"]) }
+        let writesDisabledReason: [String: Any] = ["enum": WritesDisabledReason.allCases.map(\.rawValue), "description": "Present only when writesEnabled is false."]
         var responses: [String: Any] = [
             "read_session_begin": readStatus, "read_session_end": readStatus, "read_session_status": readStatus,
             "catalog_get": object(storedGetProps, required: observation.keys.sorted() + ["variant", "storedSettings", "storedMetadata", "storedRetouching"]),
             "catalog_inspect": object(inspectProps, required: inspectProps.keys.sorted()),
             "catalog_snapshot": object(snapshotProps, required: snapshotProps.keys.sorted()),
             "catalog_variants": object(storedVariantProps, required: observation.keys.sorted() + ["variants", "membershipSemantics"]),
-            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),
-            "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
+            "doctor": object(["appRunning": boolean, "appVersion": string, "exactBuildMatched": boolean, "testedBuilds": array(string), "pinnedBuild": string, "hasDocument": boolean, "docName": string, "docPath": string, "isSession": boolean, "writesEnabled": boolean, "writesDisabledReason": writesDisabledReason, "lockAcquired": boolean, "unresolvedOperationsCount": ["type": "integer", "description": "Present only when the journal was inspected successfully."], "diagnosticError": object(["code": string, "message": string, "scriptErrorCode": ["type": "integer"]], required: ["code", "message"]), "allChecksPassed": boolean, "warning": string]),
+            "doc_info": object(["documentId": string, "documentName": string, "documentPath": string, "isSession": boolean, "writesEnabled": boolean, "writesDisabledReason": writesDisabledReason, "openToken": string, "captureFolder": ["type": "string"], "outputFolder": ["type": "string"], "appVersion": string]),
             "request_status": object(requestStatusProperties, required: ["requestId", "tool", "phase", "status", "elapsedMs", "processAlive", "stale"]),
             "capabilities": ["type": "object"], "schema": ["type": "object"],
             "variants_list": array(object(variantProps)), "variant_clone": clone, "variant_baseline": clone,

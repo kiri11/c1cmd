@@ -25,6 +25,7 @@ public struct DoctorReport: Codable, Equatable {
     public let docPath: String?
     public let isSession: Bool
     public var writesEnabled: Bool = false
+    public var writesDisabledReason: WritesDisabledReason? = nil
     public let lockAcquired: Bool
     public let unresolvedOperationsCount: Int?
     public var diagnosticError: C1Error? = nil
@@ -68,6 +69,7 @@ public struct DocumentInfo: Codable, Equatable {
     public let documentPath: String
     public let isSession: Bool
     public var writesEnabled: Bool = false
+    public var writesDisabledReason: WritesDisabledReason? = nil
     public let openToken: String
     public let captureFolder: String
     public let outputFolder: String
@@ -92,6 +94,16 @@ public struct DocumentInfo: Codable, Equatable {
         self.outputFolder = outputFolder
         self.appVersion = appVersion
     }
+}
+
+public enum WritesDisabledReason: String, Codable, CaseIterable {
+    case unset
+    case differentCatalog = "different-catalog"
+    case relativePath = "relative-path"
+    case databasePathRequired = "database-path-required"
+    case unsupportedVersion = "unsupported-version"
+    case catalogBuildRequired = "catalog-build-required"
+    case checksFailed = "checks-failed"
 }
 
 public struct VariantSummary: Codable, Equatable {
@@ -376,14 +388,14 @@ public final class SessionController {
         }
 
         var unresolvedCount: Int?
-        var writesEnabled = false
+        var writesDisabledReason: WritesDisabledReason?
         var identityOK = false
         if hasDoc, let observedInfo {
             do {
                 let doc = try documentInfo(from: observedInfo)
                 identityOK = true
                 docPath = doc.documentPath
-                writesEnabled = doc.writesEnabled
+                writesDisabledReason = doc.writesDisabledReason
                 let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
                 unresolvedCount = try journal.validatedEntries().filter(OperationJournal.isUnresolved).count
             } catch {
@@ -409,7 +421,8 @@ public final class SessionController {
             warning: compat.warning
         )
         report.diagnosticError = diagnosticError
-        report.writesEnabled = writesEnabled && allPassed
+        report.writesDisabledReason = writesDisabledReason ?? (allPassed ? nil : .checksFailed)
+        report.writesEnabled = report.writesDisabledReason == nil
         return report
     }
 
@@ -471,28 +484,38 @@ public final class SessionController {
             outputFolder: outputDir,
             appVersion: info.appVersion
         )
-        document.writesEnabled = (try? assertSessionWritable(docInfo: document, operation: "edit")) != nil
+        document.writesDisabledReason = try writeBlock(document, operation: "edit")?.reason
+        document.writesEnabled = document.writesDisabledReason == nil
         RequestContext.current?.document(document.openToken)
         return document
     }
 
     // MARK: - Mutation Guard
     public func assertSessionWritable(docInfo: DocumentInfo, operation: String) throws {
+        if let block = try writeBlock(docInfo, operation: operation) { throw block.error }
+    }
+
+    private func writeBlock(_ docInfo: DocumentInfo, operation: String) throws -> (reason: WritesDisabledReason, error: C1Error)? {
         let compat = Self.evaluateVersionCompatibility(docInfo.appVersion)
         guard compat.isAllowed else {
-            throw C1Error.unsupportedVersion(
+            return (.unsupportedVersion, .unsupportedVersion(
                 "Running Capture One build '\(docInfo.appVersion)' is not supported (supported: 16.4+ through 16.x; tested: \(Self.testedBuilds.joined(separator: ", "))). Set C1_ALLOW_UNTESTED_BUILD=1 to override."
-            )
+            ))
         }
-        if !docInfo.isSession {
-            guard let location = try? CatalogLocation(nativeID: docInfo.documentId),
-                  location.isAuthorized(by: catalogWritePath) else {
-                throw C1Error.invalidRequest("Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package or database (unpackaged catalogs require the database path). Operation '\(operation)' is blocked for '\(docInfo.documentName)'.")
+        guard !docInfo.isSession else { return nil }
+        if let denial = try CatalogLocation.writeDenial(openNativeID: docInfo.documentId, configuredPath: catalogWritePath) {
+            let detail = switch denial {
+            case .unset: "C1_CATALOG_WRITE_PATH is not set in this process's environment."
+            case .differentCatalog(let configured): "C1_CATALOG_WRITE_PATH resolves to '\(configured)', not the open Catalog."
+            case .relativePath: "C1_CATALOG_WRITE_PATH '\(catalogWritePath ?? "")' is not an absolute path."
+            case .databasePathRequired: "C1_CATALOG_WRITE_PATH names this Catalog's folder; name its exact .cocatalogdb database instead."
             }
-            guard docInfo.appVersion == Self.pinnedBuild else {
-                throw C1Error.unsupportedVersion("Catalog writes require Capture One \(Self.pinnedBuild); the untested-build override does not enable Catalog writes.")
-            }
+            return (denial.reason, .invalidRequest("Catalog writes are disabled (\(denial.reason.rawValue)): \(detail) Catalogs are strictly read-only unless C1_CATALOG_WRITE_PATH names this exact Catalog package or database (unpackaged catalogs require the database path). Each process reads it from its own environment, so the CLI and the MCP server are configured separately. Operation '\(operation)' is blocked for '\(docInfo.documentName)'."))
         }
+        guard docInfo.appVersion == Self.pinnedBuild else {
+            return (.catalogBuildRequired, .unsupportedVersion("Catalog writes require Capture One \(Self.pinnedBuild); the untested-build override does not enable Catalog writes."))
+        }
+        return nil
     }
 
     // MARK: - Variants List

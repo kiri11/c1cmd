@@ -72,7 +72,13 @@ Make a fresh **File → Backup Catalog** first and keep your RAW backups. Then a
 "env": {"C1_CATALOG_WRITE_PATH": "/Users/you/Pictures/Main.cocatalog"}
 ```
 
-Remove the variable to make Catalogs read-only again.
+Each process reads the variable from its own environment, so the server's `env` does not reach the `c1` CLI. To edit with the CLI as well, export it in that shell:
+
+```sh
+export C1_CATALOG_WRITE_PATH=/Users/you/Pictures/Main.cocatalog
+```
+
+Remove the variable to make Catalogs read-only again. When writes stay disabled, `c1 doctor` reports why in `writesDisabledReason`.
 
 ## Development
 

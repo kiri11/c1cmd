@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `3.6.0`; package version is
+AppleScript handlers are reused. Contract version is `3.7.0`; package version is
 `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -35,6 +35,20 @@ originals are blocked. Catalog journals and provenance live in
 `Main.cocatalog/.c1`, and previews in `Main.cocatalog.c1-output/c1-previews/`.
 If the Catalog has no usable default output location, preview sets it to that
 folder. Catalog fault recovery is unqualified.
+
+Each process reads `C1_CATALOG_WRITE_PATH` from its own environment, so the CLI
+and the MCP server are configured separately. When `writesEnabled` is false,
+`doctor` and `doc_info` add `writesDisabledReason`:
+
+| Reason | Meaning |
+|---|---|
+| `unset` | The variable is unset or empty in this process. |
+| `relative-path` | The variable is not an absolute path. |
+| `different-catalog` | It resolves to another Catalog, or to another database inside the open package; the write error names the resolved path. |
+| `database-path-required` | It names an unpackaged Catalog directory or a package with several databases; name the `.cocatalogdb`. |
+| `catalog-build-required` | Catalog writes need Capture One 16.8.5.30. |
+| `unsupported-version` | The running build is outside the supported range. |
+| `checks-failed` | `doctor` only: another check failed. |
 
 ## Tonal adjustments
 

@@ -27,7 +27,8 @@ process or the MCP server's `env`, and the server must restart to see changes:
 | `C1_ALLOW_UNTESTED_BUILD=1` | Allows a Capture One build outside 16.4–16.x; it does not qualify that build. |
 
 Then check the connection: `doctor` must report `allChecksPassed`, `writesEnabled`
-and `exactBuildMatched` before any edit. Capture One 16.8.5.30 is the only
+and `exactBuildMatched` before any edit; otherwise `writesDisabledReason` says
+why ([reasons](docs/reference/editing.md#catalog-editing)). Capture One 16.8.5.30 is the only
 qualified build. `c1 schema` / the MCP `schema` tool is the exact contract.
 
 ## Safety invariants

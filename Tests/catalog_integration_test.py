@@ -133,13 +133,17 @@ def main():
             return
         denied_env = dict(environment)
         denied_env.pop('C1_CATALOG_WRITE_PATH')
-        assert not cli('doc', 'info', env=denied_env)['writesEnabled']
-        for env in [denied_env, dict(environment, C1_CATALOG_WRITE_PATH=str(base / 'wrong.cocatalog'))]:
+        wrong_env = dict(environment, C1_CATALOG_WRITE_PATH=str(base / 'wrong.cocatalog'))
+        for env, reason in [(denied_env, 'unset'), (wrong_env, 'different-catalog')]:
+            info = cli('doc', 'info', env=env)
+            assert not info['writesEnabled'] and info['writesDisabledReason'] == reason, info
+            assert cli('doctor', env=env)['writesDisabledReason'] == reason
             cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=env)
             cli('preview', variants[0]['id'], error='invalid-request', env=env)
         if layout == 'unpackaged':
             directory_env = dict(environment, C1_CATALOG_WRITE_PATH=str(catalog))
-            assert not cli('doc', 'info', env=directory_env)['writesEnabled']
+            info = cli('doc', 'info', env=directory_env)
+            assert not info['writesEnabled'] and info['writesDisabledReason'] == 'database-path-required', info
             cli('variant', 'clone', variants[0]['id'], error='invalid-request', env=directory_env)
         log('default-and-wrong-path-denied', layout=layout)
         client = Client(MCP, env=environment, timeout=150)
