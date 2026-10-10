@@ -313,10 +313,10 @@ struct InventoryTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         fake.ratingResponseIDs = { _ in ["1"] }
-        XCTAssertThrowsError(try core.listVariants(batchSize: 2), "A vanished ID cannot be silently dropped")
+        XCTAssertThrowsError(try core.listVariants(minRating: 0, batchSize: 2), "A vanished ID cannot be silently dropped")
 
         fake.ratingResponseIDs = { _ in ["1", "1"] }
-        XCTAssertThrowsError(try core.listVariants(batchSize: 2), "Duplicate rating records are malformed")
+        XCTAssertThrowsError(try core.listVariants(minRating: 0, batchSize: 2), "Duplicate rating records are malformed")
 
         fake.ratingResponseIDs = nil
         fake.summaryResponseIDs = { _ in ["2"] }

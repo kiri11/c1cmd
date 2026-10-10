@@ -32,7 +32,7 @@ Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash
 
 ### From a stored variant to a live edit
 
-`variantDatabaseID` is the stored field that addresses a live variant: Capture One's native variant ID is the same number, as text. The `catalog` live suite checks this for every stored variant of its owned Catalog fixture, including several variants of one image. `variantUUID` and `imageUUID` are never live references; live `get` and `variants_list` `ids` reject a UUID-shaped ref with `invalid-request` before contacting Capture One.
+`variantDatabaseID` is the stored field that addresses a live variant: Capture One's native variant ID is the same number, as text. The `catalog` live suite checks this for every stored variant of its owned Catalog fixture, including several variants of one image. `variantUUID` and `imageUUID` are never live references; live `get`, `variants_list` `ids` and `dump` `ids` reject a UUID-shaped ref with `invalid-request` before contacting Capture One.
 
 1. Take `variantDatabaseID` from `catalog variants`.
 2. Confirm it live: `variants_list` with `ids` and `fields: summary` (check `name` and `parentImagePath`), or `get --live`. Compare `parentImagePath` with the stored `originalPath` after resolving symlinks in both: the stored path drops a leading `/private` that the live path can keep.
@@ -87,7 +87,7 @@ c1 read-session status --read-workflow <workflowId>
 c1 read-session end --read-workflow <workflowId>
 ```
 
-MCP uses `read_session_begin`, `read_session_status`, `read_session_end`, and the `readWorkflow` argument on `variants_list`, `get`, `dump`, and two-reference `diff`. Begin only while the photographer has handed over control, and end before returning it. A CLI batch may set `C1_READ_WORKFLOW` in its own environment; never export it globally or share the ID with unrelated callers. An abandoned workflow does not affect callers without its ID; start a new baseline after a crash. Ordinary calls remain native, and `--live` / `live: true` bypasses the workflow. Editing/managed references, native-target requests, and inventory calls with a deadline also remain native.
+MCP uses `read_session_begin`, `read_session_status`, `read_session_end`, and the `readWorkflow` argument on `variants_list`, `get`, `dump`, and two-reference `diff`. Begin only while the photographer has handed over control, and end before returning it. A CLI batch may set `C1_READ_WORKFLOW` in its own environment; never export it globally or share the ID with unrelated callers. An abandoned workflow does not affect callers without its ID; start a new baseline after a crash. Ordinary calls remain native, and `--live` / `live: true` bypasses the workflow. Editing/managed references, native-target requests, and inventory or `dump` calls with `ids` or a deadline also remain native.
 
 Workflow output contains `readObservation` with its backend, workflow ID, native confirmation time, and SQL agreement flags. Cached `get`, `dump`, and `diff` have no mutation tokens. Use a fresh native `get --live` before `variant edit`; all mutation preparation, internal reads, verification, and recovery remain native. Workflow CLI output is JSON (or JSONL for `dump --format jsonl`).
 

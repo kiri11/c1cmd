@@ -45,9 +45,16 @@ struct ReadWorkflowTests {
             assertEqual(filtered.count, 1)
             assertEqual(filtered.first?["id"] as? String, "1")
             assertEqual(filtered.first?["rating"] as? Int, 5)
+            let rated = try workflow.dump(collection: nil, selected: false, minRating: 4)!
+            assertEqual(rated.map { $0["id"] as? String }, ["1"], "Dump filters the cached membership after the journal overlay")
+            assertNil(rated.first?["stateHash"])
+            XCTAssertNotNil(rated.first?["readObservation"])
+            assertEqual(fake.calls.filter { $0 == "getAdjustmentsBatch" }.count, reads, "Filtered-out variants are not hydrated")
+            assertEqual(try workflow.dump(collection: nil, selected: false, rating: 3)!.map { $0["id"] as? String }, ["2"])
+            assertEqual(try workflow.dump(collection: nil, selected: false, rating: 4)!.count, 0)
             let changed = try workflow.get(ref: "1")!
             assertEqual((changed["metadata"] as? [String: Any])?["rating"] as? Int, 5)
-            assertEqual(fake.calls.filter { $0 == "getAdjustmentsBatch" }.count, reads)
+            assertEqual(fake.calls.filter { $0 == "getAdjustmentsBatch" }.count, reads + 1)
             var tonal = OperationRecord(operationType: "set", workingRef: "test", documentPath: dir.path, afterAdjustments: Adjustments(exposure: 0.25, contrast: 4, saturation: -3, temperature: 5100, tint: 2), status: "succeeded")
             tonal.appInstance = fake.generation; tonal.documentIdentity = "db-1"; tonal.nativeVariantId = "1"; tonal.parentImagePath = fake.parent
             try journal.append(entry: tonal)

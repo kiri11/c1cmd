@@ -14,7 +14,7 @@ struct RequestContextTests {
 
         let cancelled = RequestContext(tool: "variants_list", progressMode: "quiet", directory: directory)
         fake.beforeReadRatings = { cancelled.cancel() }
-        XCTAssertThrowsError(try cancelled.withCurrent { try core.listVariants() }) { error in
+        XCTAssertThrowsError(try cancelled.withCurrent { try core.listVariants(minRating: 0) }) { error in
             XCTAssertEqual((error as? C1Error)?.errorCode, "request-cancelled")
             cancelled.finish(error: error)
         }
@@ -24,7 +24,7 @@ struct RequestContextTests {
 
         fake.beforeReadRatings = { Thread.sleep(forTimeInterval: 0.03) }
         let deadline = RequestContext(tool: "variants_list", progressMode: "quiet", directory: directory)
-        XCTAssertThrowsError(try deadline.withCurrent { try core.listVariants(deadlineSeconds: 0.01) }) { error in
+        XCTAssertThrowsError(try deadline.withCurrent { try core.listVariants(minRating: 0, deadlineSeconds: 0.01) }) { error in
             XCTAssertEqual((error as? C1Error)?.errorCode, "deadline-exceeded")
             deadline.finish(error: error)
         }
@@ -45,7 +45,7 @@ struct RequestContextTests {
             defer { fake.beforeReadSummaries = nil }
             do {
                 try context.withCurrent {
-                    if tool == "dump" { _ = try core.dump() } else { _ = try core.listVariants(minRating: 0, deadlineSeconds: deadline) }
+                    if tool == "dump" { _ = try core.dump(deadlineSeconds: deadline) } else { _ = try core.listVariants(minRating: 0, deadlineSeconds: deadline) }
                 }
                 XCTFail("\(tool) should stop at a boundary")
                 return (nil, nil)
@@ -55,10 +55,10 @@ struct RequestContextTests {
                 return (body["code"] as? String, body["recoveryAction"] as? String)
             }
         }
-        for (tool, deadline, code) in [("variants_list", nil, "request-cancelled"), ("variants_list", 0.01, "deadline-exceeded"), ("dump", nil, "request-cancelled")] {
+        for (tool, deadline, code) in [("variants_list", nil, "request-cancelled"), ("variants_list", 0.01, "deadline-exceeded"), ("dump", nil, "request-cancelled"), ("dump", 0.01, "deadline-exceeded")] {
             let result = recovery(catalogFake, catalogCore, tool: tool, deadline: deadline)
             XCTAssertEqual(result.code, code)
-            XCTAssertEqual(result.action, "Use catalog_variants with the same filters, naming the collection by exact name (collection) or collectionID, for stored discovery in seconds; stored discovery does not cover selected scopes or smart collections. Then call variants_list with those ids (up to 512 per call) to revalidate the candidates live.", "\(tool) \(code) on a Catalog")
+            XCTAssertEqual(result.action, "Use catalog_variants with the same filters, naming the collection by exact name (collection) or collectionID, for stored discovery in seconds; stored discovery does not cover selected scopes or smart collections. Then call \(tool) with those ids (up to 512 per call) to revalidate the candidates live.", "\(tool) \(code) on a Catalog")
         }
         XCTAssertEqual(recovery(fake, core, tool: "variants_list").action, nil, "Session cancellation keeps no recovery action")
         XCTAssertEqual(recovery(fake, core, tool: "variants_list", deadline: 0.01).action,

@@ -565,8 +565,20 @@ struct DumpCommand: ParsableCommand {
     @Flag(help: "Dump only selected variants.")
     var selected: Bool = false
 
+    @Option(help: "Known native IDs, comma-separated (1–512 unique IDs); revalidated live like variants list --ids.")
+    var ids: String?
+
+    @Option(help: "Exact star rating (0–5; 0 means unrated). Cannot combine with --min-rating.")
+    var rating: Int?
+
+    @Option(help: "Inclusive minimum star rating (0–5). Cannot combine with --rating.")
+    var minRating: Int?
+
     @Option(help: "Chunk size for batched variant queries (1–1000; default 100).")
     var batchSize: Int?
+
+    @Option(help: "Read deadline checked between Apple Events; does not interrupt an outstanding event.")
+    var deadlineSeconds: Double?
 
     @Option(help: "Dump format: jsonl (default), json, or human.")
     var dumpFormat: String = "jsonl"
@@ -576,7 +588,8 @@ struct DumpCommand: ParsableCommand {
         try globals.run("dump", {
             var args: [String: Any] = [:]
             put(&args, "collection", collection); put(&args, "selected", flag(selected)); put(&args, "live", flag(live))
-            put(&args, "batchSize", batchSize); put(&args, "readWorkflow", globals.readWorkflowID)
+            put(&args, "ids", ids?.components(separatedBy: ",")); put(&args, "rating", rating); put(&args, "minRating", minRating)
+            put(&args, "batchSize", batchSize); put(&args, "deadlineSeconds", deadlineSeconds); put(&args, "readWorkflow", globals.readWorkflowID)
             return args
         }) { response in
             switch response {

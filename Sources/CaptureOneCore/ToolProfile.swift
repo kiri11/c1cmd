@@ -42,7 +42,7 @@ public struct ToolDefinition {
     public var destructive: Bool { ["variant_delete", "native_action"].contains(name) }
     public var inputSchema: [String: Any] { ContractSchema.input(name) }
 
-    static let slowInventory = "Set deadlineSeconds below the client's request timeout to get deadline-exceeded instead of no response. On Catalogs, catalog_variants stored discovery is the fast route for large scopes; revalidate its candidates with variants_list ids."
+    static let slowInventory = "Set deadlineSeconds below the client's request timeout to get deadline-exceeded instead of no response. On Catalogs, catalog_variants stored discovery is the fast route for large scopes; revalidate its candidates with ids."
     static let recipe = "Versioned reference recipes and bounded compound edits. Verification requires a managed clone. Inspect status and child operation IDs after failure; never retry automatically."
     /// One entry per `ContractSchema.names` tool; an offline test keeps them in step.
     static let catalog: [String: (description: String, readOnly: Bool)] = {
@@ -75,7 +75,7 @@ public struct ToolDefinition {
             "geometry_set": ("Set crop, rotation, and keystone on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Optional keystone object sets amount, vertical, horizontal, skew, or aspect; omitted controls are preserved. Preserves lens distortion and tilt/shift using native bounds. Dry runs cannot predict keystone changes or corrected rotation crops.", false),
             "reset": ("Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             "diff": ("Compare adjustments between two variants or compare a working variant against its baseline.", true),
-            "dump": ("Batched export of variants, adjustments, and metadata in JSON format. Large scopes can outlast the client's request timeout; bound discovery with variants_list deadlineSeconds, and on Catalogs use catalog_variants stored discovery, the fast route for large scopes.", true),
+            "dump": ("Batched export of variants, adjustments, and metadata in JSON format. Narrow it with the variants_list filters: rating or minRating, or 1–512 known ids revalidated live. \(slowInventory)", true),
             "preview": ("Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data.", false),
             "request_status": ("Read stored request progress and process liveness without contacting Capture One.", true),
             "operation_status": ("Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),

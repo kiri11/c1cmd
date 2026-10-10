@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `4.4.0`; package version is
+AppleScript handlers are reused. Contract version is `4.5.0`; package version is
 `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -108,9 +108,10 @@ managed clones (`isManagedWorkingClone`), can appear.
 
 Filtering runs before full metadata reads. On 16.8.5.30, native rating predicates
 and bulk ID reads select candidates in Sessions and Catalogs; other builds use a
-two-stage rating scan (`C1_INVENTORY_STRATEGY=scan` forces it). Summaries are read
-in sequential batches of `batchSize` / `--batch-size` (default 32, 1–256). A failed
-rating read fails the request. The inventory holds the application lock, rechecks
+two-stage rating scan (`C1_INVENTORY_STRATEGY=scan` forces it); without a rating
+filter the scan skips its separate ratings pass. Summaries are read in sequential
+batches of `batchSize` / `--batch-size` (default 32, 1–256). A failed rating read
+fails the request. The inventory holds the application lock, rechecks
 the document token between batches and compares scope membership before
 returning; it is not an atomic snapshot.
 
@@ -129,6 +130,20 @@ out-of-collection ID fails the request with `variant-not-found`, listing
 omitted. The reader revalidates every row and the document identity before
 returning; drift returns no partial result. `--ids`, `--fields` and
 `--parent-path` are unavailable with `--database`.
+
+`dump` takes the same `rating`, `minRating`, `ids` and `deadlineSeconds` filters,
+in the CLI as `--rating`, `--min-rating`, `--ids` and `--deadline-seconds`:
+
+```sh
+c1 dump --collection Album --rating 5
+c1 dump --ids 101,102 --collection Album
+```
+
+Rating filters apply before adjustments are read. `ids` dumps exactly those
+variants through the subset reader above, so a missing or out-of-collection ID
+fails with `variant-not-found` and nothing is dumped. With `--read-workflow`,
+`rating` and `minRating` filter the cached membership; `ids` and `deadlineSeconds`
+read live.
 
 ## Progress, status and cancellation
 
@@ -163,16 +178,17 @@ boundary. Inventory and `dump` stop between Apple Events and return nothing
 partial. Compound edits stop between steps and return a `failed` report with code
 `request-cancelled`. Other commands finish normally. Repeated signals do not force
 an exit, and `request status` shows `cancelRequested`. `deadlineSeconds` (up to
-86400) applies to inventory. Neither interrupts a dispatched Apple Event; SIGKILL
-ends the process immediately, and an interrupted write follows normal recovery.
+86400) applies to inventory and `dump`. Neither interrupts a dispatched Apple
+Event; SIGKILL ends the process immediately, and an interrupted write follows
+normal recovery.
 
 MCP clients enforce their own request timeout. When it expires, the client cancels
 and the server sends no response, so the agent gets neither a result nor a hint.
 A `deadlineSeconds` below that timeout returns a clear `deadline-exceeded` error
 instead. The CLI has no request timeout. On a Catalog, `catalog_variants` /
 `c1 catalog variants` reads stored membership in seconds; revalidate its
-candidates with `variants_list` `ids`. Inventory `deadline-exceeded` and
-`request-cancelled` errors on a Catalog name that route in `recoveryAction`.
+candidates with `ids` on `variants_list` or `dump`. Inventory `deadline-exceeded`
+and `request-cancelled` errors on a Catalog name that route in `recoveryAction`.
 
 ## Previews
 

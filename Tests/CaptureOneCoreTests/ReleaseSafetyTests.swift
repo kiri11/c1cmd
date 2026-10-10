@@ -40,6 +40,7 @@ final class FakeScript: ScriptExecuting {
     var discoveredVariantIDs: [String]?
     var ratingResponseIDs: (([String]) -> [String])?
     var summaryResponseIDs: (([String]) -> [String])?
+    var adjustmentResponseIDs: (([String]) -> [String])?
     var ratingBatches: [[String]] = []
     var hydrationBatches: [[String]] = []
     var hydrationCounterIDs: [String] { hydrationBatches.flatMap { $0 } }
@@ -159,8 +160,9 @@ final class FakeScript: ScriptExecuting {
             let responseIDs = summaryResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
             result = responseIDs.map(summary)
         case "getAdjustmentsBatch":
-            guard let id = args[1].atIndex(1)?.stringValue, values[id] != nil else { throw C1Error.variantNotFound("missing") }
-            result = [item(id)]
+            let requested = ids(from: args[1])
+            guard let id = requested.first, values[id] != nil else { throw C1Error.variantNotFound("missing") }
+            result = (adjustmentResponseIDs?(requested) ?? requested.filter { values[$0] != nil }).map(item)
         case "cloneVariant", "createBaselineVariant":
             let id = createdIDOverride ?? "\((values.keys.compactMap(Int.init).max() ?? 0) + 1)"
             values[id] = handler == "cloneVariant" ? values[args[1].stringValue!] : [0, 0, 0, 5000, 0]

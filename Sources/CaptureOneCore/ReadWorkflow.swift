@@ -299,11 +299,14 @@ public final class ReadWorkflow {
             return try browsing(state, item)
         }
     }
-    public func dump(collection: String?, selected: Bool, workflowID: String? = nil) throws -> [[String: Any]]? {
-        try route(workflowID: workflowID) { state in
+    public func dump(collection: String?, selected: Bool, rating: Int? = nil, minRating: Int? = nil, workflowID: String? = nil) throws -> [[String: Any]]? {
+        var args: [String: Any] = [:]; if let rating { args["rating"] = rating }; if let minRating { args["minRating"] = minRating }
+        try ContractSchema.validate(tool: "dump", arguments: args)
+        return try route(workflowID: workflowID) { state in
             guard state.collection == collection, state.selected == selected else { return nil }
             var result: [[String: Any]] = []
-            for id in state.items.map({ $0.summary.id }) {
+            let matches = state.items.filter { (rating == nil || $0.summary.rating == rating!) && (minRating == nil || $0.summary.rating >= minRating!) }
+            for id in matches.map({ $0.summary.id }) {
                 try RequestContext.current?.checkReadCancellation()
                 guard let item = try value(id, state: &state) else { return nil }
                 var record = try Self.object(item.summary)

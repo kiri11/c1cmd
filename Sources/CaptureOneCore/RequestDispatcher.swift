@@ -34,7 +34,7 @@ public struct ToolRequest {
         case nativeAction(workingRef: String, target: NativeTarget, ifNativeState: String, action: String,
                           arguments: [String: NativeValue], dryRun: Bool)
         case diff(ref1: String, ref2: String?, live: Bool, readWorkflow: String?)
-        case dump(collection: String?, selected: Bool, live: Bool, readWorkflow: String?, batchSize: Int)
+        case dump(DumpQuery)
         case preview(ref: String, outputDir: String?, timeout: Double, fullFrame: Bool)
         case operationStatus(operationId: String)
         case requestStatus(requestId: String)
@@ -45,6 +45,11 @@ public struct ToolRequest {
         let collection: String?, selected: Bool, live: Bool, readWorkflow: String?
         let ids: [String]?, fields: String, parentPath: String?
         let rating: Int?, minRating: Int?, batchSize: Int, deadlineSeconds: Double?
+    }
+
+    struct DumpQuery {
+        let collection: String?, selected: Bool, live: Bool, readWorkflow: String?
+        let ids: [String]?, rating: Int?, minRating: Int?, batchSize: Int, deadlineSeconds: Double?
     }
 
     /// `profile` defaults to the configured `ToolProfile`; a disabled tool is rejected before validation.
@@ -137,8 +142,9 @@ public struct ToolRequest {
                 ifNativeState: string("ifNativeState")!, action: string("action")!, arguments: try nativeValues("arguments"), dryRun: flag("dryRun"))
         case "diff": command = .diff(ref1: string("ref1")!, ref2: string("ref2"), live: flag("live"), readWorkflow: string("readWorkflow"))
         case "dump":
-            command = .dump(collection: string("collection"), selected: flag("selected"), live: flag("live"),
-                            readWorkflow: string("readWorkflow"), batchSize: int("batchSize") ?? 100)
+            command = .dump(DumpQuery(collection: string("collection"), selected: flag("selected"), live: flag("live"),
+                readWorkflow: string("readWorkflow"), ids: a["ids"] as? [String], rating: int("rating"), minRating: int("minRating"),
+                batchSize: int("batchSize") ?? 100, deadlineSeconds: number("deadlineSeconds")))
         case "preview":
             command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30, fullFrame: flag("fullFrame"))
         case "operation_status": command = .operationStatus(operationId: string("operationId")!)
@@ -226,9 +232,13 @@ public struct ToolRequest {
         case .diff(let ref1, let ref2, let live, let workflow):
             if !live, let result = try browsing.diff(ref1: ref1, ref2: ref2, workflowID: workflow) { return .object(result) }
             return .diff(try core.diff(ref1: ref1, ref2: ref2))
-        case .dump(let collection, let selected, let live, let workflow, let batchSize):
-            if !live, let rows = try browsing.dump(collection: collection, selected: selected, workflowID: workflow) { return .object(rows) }
-            return .dump(try core.dump(collectionName: collection, selectedOnly: selected, batchSize: batchSize))
+        case .dump(let q):
+            if !q.live, q.ids == nil, q.deadlineSeconds == nil, let rows = try browsing.dump(collection: q.collection, selected: q.selected,
+                    rating: q.rating, minRating: q.minRating, workflowID: q.readWorkflow) {
+                return .object(rows)
+            }
+            return .dump(try core.dump(collectionName: q.collection, selectedOnly: q.selected, ids: q.ids, rating: q.rating,
+                                       minRating: q.minRating, batchSize: q.batchSize, deadlineSeconds: q.deadlineSeconds))
         case .preview(let ref, let outputDir, let timeout, let fullFrame):
             return .preview(try core.preview(ref: ref, outputDirOverride: outputDir, timeout: timeout, fullFrame: fullFrame))
         case .operationStatus(let id): return .operation(try core.operationStatus(operationId: id))

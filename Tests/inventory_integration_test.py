@@ -278,6 +278,35 @@ end repeat''', timeout=600)
         print(f"PASS {label}: {default['strategy']} {default['elapsedSeconds']:.3f}s; rating-scan {scan['elapsedSeconds']:.3f}s; "
               f"legacy {self.last_reference_elapsed:.3f}s; matches {len(actual)}", flush=True)
 
+    def dump(self, *flags, allow_error=False):
+        value, _, process = self.cli("dump", "--dump-format", "json", *flags, allow_error=allow_error)
+        return value, process
+
+    def dump_filters(self, records):
+        """Sparse ratings: only the first record is rated 5, every other record is unrated."""
+        ids = [record["id"] for record in records]
+        rated = ids[0]
+        def listed(*flags):
+            value, _ = self.dump(*flags)
+            assert isinstance(value, list), (flags, value)
+            return [record["id"] for record in value]
+        assert listed("--rating", "5") == [rated]
+        assert sorted(listed("--collection", self.document["allVariants"], "--rating", "0")) == sorted(ids[1:])
+        assert sorted(listed("--min-rating", "0")) == sorted(listed()) == sorted(ids)
+        subset = [ids[1], rated]
+        assert listed("--ids", ",".join(subset), "--collection", self.document["allVariants"]) == subset
+        assert listed("--ids", ",".join(subset), "--rating", "5") == [rated]
+        exact, _ = self.dump("--ids", rated)
+        assert exact[0]["rating"] == 5 and "stateHash" in exact[0], exact
+        value, process = self.dump("--ids", f"{rated},missing-dump-id", allow_error=True)
+        assert process.returncode != 0 and value["error"]["code"] == "variant-not-found", value
+        assert value["error"]["missingIds"] == ["missing-dump-id"], value
+        value, process = self.dump("--batch-size", "1", "--deadline-seconds", "0.001", allow_error=True)
+        assert process.returncode != 0 and value["error"]["code"] in {"deadline-exceeded", "request-cancelled", "timeout"}, value
+        self.assert_originals("dump filters")
+        self.evidence.append({"label": "dump-filters", "variants": len(ids), "deadlineErrorCode": value["error"]["code"]})
+        print(f"PASS dump filters on {len(ids)} variants", flush=True)
+
     def deadline_safety(self):
         started = time.time()
         value, elapsed, process = self.cli("variants", "list", "--batch-size", "1", "--deadline-seconds", "0.001",
@@ -305,6 +334,8 @@ end repeat''', timeout=600)
             self.benchmark(f"{count}-document-sparse-exact5", None, False, rating=5)
             self.benchmark(f"{count}-collection-sparse-rating0", album, False, rating=0)
             self.benchmark(f"{count}-selected-sparse-min0", None, True, min_rating=0)
+            if count == SMALL_COUNT:
+                self.dump_filters(records)
             self.set_ratings(records, 5)
             self.set_selection(records, selected_ids)
             self.benchmark(f"{count}-document-dense-min5", None, False, min_rating=5)

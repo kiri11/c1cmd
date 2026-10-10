@@ -98,6 +98,11 @@ def main():
             call('metadata','set',ref,'--if-metadata-state',current['metadataStateHash'],'--rating',5,'--color-tag',2)
             filtered=tool('variants_list',{'readWorkflow':wid,'minRating':4})
             assert [x['id'] for x in filtered]==[native_id] and filtered[0]['rating']==5,filtered
+            cached=tool('dump',{'readWorkflow':wid,'minRating':4})
+            assert [x['id'] for x in cached]==[native_id] and 'readObservation' in cached[0] and 'stateHash' not in cached[0],cached
+            assert tool('dump',{'readWorkflow':wid,'rating':0})==[]
+            fresh=tool('dump',{'readWorkflow':wid,'ids':[native_id]})
+            assert [x['id'] for x in fresh]==[native_id] and 'stateHash' in fresh[0] and 'readObservation' not in fresh[0],fresh
             current=call('get',ref)
             changed=call('set',ref,'--if-state',current['stateHash'],'exposure=0.375','contrast=3','saturation=-4')
             overlaid,profile=cli('get',native_id,'--read-workflow',wid)

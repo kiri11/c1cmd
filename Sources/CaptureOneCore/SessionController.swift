@@ -649,6 +649,8 @@ public final class SessionController {
             // Native predicates/bulk IDs are qualified only on this exact build.
             let native = nativeInventoryEnabled && docInfo.appVersion == Self.pinnedBuild
             context?.inventoryStrategy(native ? "native-filter" : "rating-scan")
+            // Summaries carry the rating, so only a filtered scan needs a separate ratings pass.
+            let direct = native || (rating == nil && minRating == nil)
             func validateDocument() throws {
                 try checkpoint()
                 let current = try getDocumentInfo()
@@ -675,7 +677,7 @@ public final class SessionController {
             }
             context?.update(phase: "discovering", pass: 1)
             let ids = try discover()
-            context?.update(phase: native ? "metadata" : "ratings", total: ids.count, unconfirmed: native ? ids.count : 0)
+            context?.update(phase: direct ? "metadata" : "ratings", total: ids.count, unconfirmed: direct ? ids.count : 0)
             var records: [VariantSummaryRecord] = []
             var scanned = 0
             var matched = 0
@@ -683,7 +685,7 @@ public final class SessionController {
             for offset in stride(from: 0, to: ids.count, by: batchSize) {
                 try validateDocument()
                 let batch = Array(ids[offset..<min(offset + batchSize, ids.count)])
-                if native {
+                if direct {
                     context?.update(phase: "metadata")
                     let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
                     guard summaries.map(\.variantId) == batch, summaries.allSatisfy({ item in
@@ -730,18 +732,22 @@ public final class SessionController {
             }
             try validateDocument()
             context?.update(phase: "confirmed", matches: records.count)
-            let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
-            let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
-            return records.map { rec in
-                let matches = byClone[rec.variantId] ?? []
-                let candidate = matches.count == 1 ? matches.first : nil
-                let prov = candidate.flatMap { record in
-                    (try? DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: rec.parentImagePath)) != nil ? record : nil
-                }
-                return VariantSummary(id: rec.variantId, name: rec.variantName, parentImagePath: rec.parentImagePath,
-                    isSelected: rec.isSelected, rating: rec.starRating, colorTag: rec.colorTagVal,
-                    isManagedWorkingClone: prov != nil, workingRef: prov?.workingRef)
+            return summaries(records, document: docInfo)
+        }
+    }
+
+    private func summaries(_ records: [VariantSummaryRecord], document docInfo: DocumentInfo) -> [VariantSummary] {
+        let provenance = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: docInfo.documentPath))
+        let byClone = Dictionary(grouping: provenance.loadRecords().values, by: \.cloneVariantId)
+        return records.map { rec in
+            let matches = byClone[rec.variantId] ?? []
+            let candidate = matches.count == 1 ? matches.first : nil
+            let prov = candidate.flatMap { record in
+                (try? DocumentIdentity.validate(record: record, document: docInfo, parentImagePath: rec.parentImagePath)) != nil ? record : nil
             }
+            return VariantSummary(id: rec.variantId, name: rec.variantName, parentImagePath: rec.parentImagePath,
+                isSelected: rec.isSelected, rating: rec.starRating, colorTag: rec.colorTagVal,
+                isManagedWorkingClone: prov != nil, workingRef: prov?.workingRef)
         }
     }
 
@@ -1058,11 +1064,32 @@ public final class SessionController {
     public func dump(
         collectionName: String? = nil,
         selectedOnly: Bool = false,
-        batchSize: Int = 100
+        ids: [String]? = nil,
+        rating: Int? = nil,
+        minRating: Int? = nil,
+        batchSize: Int = 100,
+        deadlineSeconds: Double? = nil
     ) throws -> [DumpRecord] {
-        guard (1...1000).contains(batchSize) else { throw C1Error.invalidRequest("batchSize must be between 1 and 1000.") }
+        var args: [String: Any] = ["batchSize": batchSize]
+        if let ids { args["ids"] = ids }
+        if let rating { args["rating"] = rating }
+        if let minRating { args["minRating"] = minRating }
+        if let deadlineSeconds { args["deadlineSeconds"] = deadlineSeconds }
+        try ContractSchema.validate(tool: "dump", arguments: args)
+        let started = ProcessInfo.processInfo.systemUptime
         let docInfo = try getDocumentInfo()
-        let variants = try listVariants(collectionName: collectionName, selectedOnly: selectedOnly)
+        let variants: [VariantSummary]
+        if let ids {
+            let rows = try listVariantSubset(ids: ids, collection: collectionName, selected: selectedOnly, rating: rating, minRating: minRating,
+                                             fields: "summary", deadlineSeconds: deadlineSeconds)
+            variants = summaries(rows.map {
+                VariantSummaryRecord(variantId: $0["id"] as! String, variantName: $0["name"] as! String, parentImagePath: $0["parentImagePath"] as! String,
+                                     isSelected: $0["isSelected"] as! Bool, starRating: $0["rating"] as! Int, colorTagVal: $0["colorTag"] as! Int)
+            }, document: docInfo)
+        } else {
+            variants = try listVariants(collectionName: collectionName, selectedOnly: selectedOnly, rating: rating, minRating: minRating,
+                                        deadlineSeconds: deadlineSeconds)
+        }
         guard !variants.isEmpty else { return [] }
 
         var records: [DumpRecord] = []
@@ -1070,6 +1097,9 @@ public final class SessionController {
 
         for chunkStart in stride(from: 0, to: variants.count, by: max(1, batchSize)) {
             try RequestContext.current?.checkReadCancellation()
+            if let deadlineSeconds, ProcessInfo.processInfo.systemUptime - started >= deadlineSeconds {
+                throw C1Error.deadlineExceeded("Dump deadline reached between Apple Events; no partial dump was returned. An outstanding event cannot be interrupted.")
+            }
             let chunkEnd = min(chunkStart + batchSize, variants.count)
             let chunk = Array(variants[chunkStart..<chunkEnd])
             let idsDesc = NSAppleEventDescriptor(list: chunk.map { NSAppleEventDescriptor(string: $0.id) })
@@ -1085,7 +1115,9 @@ public final class SessionController {
             }
 
             for v in chunk {
-                guard let item = itemMap[v.id] else { continue }
+                guard let item = itemMap[v.id] else {
+                    throw C1Error.stateChanged("Adjustments reply omitted variant \(v.id); no partial dump was returned.")
+                }
                 let adjustments = Adjustments(
                     exposure: item.exposureVal,
                     contrast: item.contrastVal,

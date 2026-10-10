@@ -11,7 +11,7 @@ struct RequestDispatcherTests {
         // Stored variantUUIDs are rejected before any Apple Event; native IDs and c1 references pass.
         let storedUUID = "6F9619FF-8B86-D011-B42D-00C04FC964FF"
         for (tool, arguments) in [("get", ["ref": storedUUID]), ("get", ["ref": storedUUID.lowercased(), "live": true]),
-                                  ("variants_list", ["ids": ["12", storedUUID]])] as [(String, [String: Any])] {
+                                  ("variants_list", ["ids": ["12", storedUUID]]), ("dump", ["ids": ["12", storedUUID]])] as [(String, [String: Any])] {
             XCTAssertThrowsError(try ToolRequest(tool: tool, arguments: arguments, profile: .standard)) { error in
                 XCTAssertEqual((error as? C1Error)?.errorCode, "invalid-request")
                 XCTAssertTrue("\(error)".contains("variantDatabaseID"), "\(error)")

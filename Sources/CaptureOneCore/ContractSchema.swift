@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.4.0"
+    public static let version = "4.5.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -30,6 +30,12 @@ public enum ContractSchema {
     static let rating = integer(VariantMetadata.ratingRange)
     static let deadlineSeconds: [String: Any] = ["type": "number", "exclusiveMinimum": 0, "maximum": 86400,
         "description": "Stop with deadline-exceeded after this many seconds, checked between Apple Events; nothing partial is returned and an outstanding event is not interrupted. Keep it below the MCP client's request timeout, which otherwise ends the call with no response."]
+    static let inventoryFilters: [String: Any] = [
+        "ids": ["type": "array", "items": ["type": "string", "minLength": 1], "minItems": 1, "maxItems": 512, "uniqueItems": true],
+        "deadlineSeconds": deadlineSeconds,
+        "rating": rating.merging(["description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."]) { $1 },
+        "minRating": rating.merging(["description": "Inclusive minimum star rating. Mutually exclusive with rating."]) { $1 }
+    ]
     static let cursor: [String: Any] = ["type": "integer", "minimum": 0]
     static let pageLimit = integer(1...10000)
     static var writableMetadataSchema: [String: Any] {
@@ -78,16 +84,12 @@ public enum ContractSchema {
             return object(["database": string, "tables": tables, "afterPK": cursor, "limit": pageLimit], required: ["database"])
         case "catalog_snapshot": return object(["database": string, "destination": string], required: ["database", "destination"])
         case "variants_list":
-            var result = object([
+            var result = object(inventoryFilters.merging([
                 "collection": string, "selected": boolean, "live": boolean, "readWorkflow": string,
-                "ids": ["type": "array", "items": ["type": "string", "minLength": 1], "minItems": 1, "maxItems": 512, "uniqueItems": true],
                 "fields": ["type": "string", "enum": ["minimal", "summary"]],
                 "parentPath": ["type": "string", "minLength": 1],
-                "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
-                "deadlineSeconds": deadlineSeconds,
-                "rating": rating.merging(["description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."]) { $1 },
-                "minRating": rating.merging(["description": "Inclusive minimum star rating. Mutually exclusive with rating."]) { $1 }
-            ])
+                "batchSize": ["type": "integer", "minimum": 1, "maximum": 256]
+            ]) { $1 })
             result["not"] = ["required": ["rating", "minRating"]]
             return result
         case "variant_edit": return object(["sourceRef": string, "ifState": string, "ifGeometryState": string, "ifDocument": string], required: ["sourceRef", "ifState", "ifDocument"])
@@ -119,7 +121,11 @@ public enum ContractSchema {
             return result
         case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
         case "diff": return object(["ref1": string, "ref2": string, "live": boolean, "readWorkflow": string], required: ["ref1"])
-        case "dump": return object(["collection": string, "selected": boolean, "live": boolean, "readWorkflow": string, "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]])
+        case "dump":
+            var result = object(inventoryFilters.merging(["collection": string, "selected": boolean, "live": boolean, "readWorkflow": string,
+                                                          "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]]) { $1 })
+            result["not"] = ["required": ["rating", "minRating"]]
+            return result
         case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean], required: ["ref"])
         case "request_status": return object(["requestId": string], required: ["requestId"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
@@ -144,21 +150,23 @@ public enum ContractSchema {
         if tool == "get", let targets = arguments["nativeTargets"] {
             _ = try NativeEditing.parseTargets(targets, ref: arguments["ref"] as! String)
         }
-        if tool == "variants_list", arguments["rating"] != nil, arguments["minRating"] != nil {
-            throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
+        if ["variants_list", "dump"].contains(tool) {
+            if arguments["rating"] != nil, arguments["minRating"] != nil {
+                throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
+            }
+            if let ids = arguments["ids"] as? [String], ids.isEmpty || ids.count > 512 || Set(ids).count != ids.count {
+                throw C1Error.invalidRequest("ids must contain 1–512 unique native IDs.")
+            }
         }
         if tool == "variants_list" {
             if (arguments["fields"] != nil || arguments["parentPath"] != nil) && arguments["ids"] == nil {
                 throw C1Error.invalidRequest("fields and parentPath require ids.")
             }
-            if let ids = arguments["ids"] as? [String], ids.isEmpty || ids.count > 512 || Set(ids).count != ids.count {
-                throw C1Error.invalidRequest("ids must contain 1–512 unique native IDs.")
-            }
             if let fields = arguments["fields"] as? String, !["minimal", "summary"].contains(fields) {
                 throw C1Error.invalidRequest("fields must be minimal or summary.")
             }
         }
-        if ["get", "variants_list"].contains(tool),
+        if ["get", "variants_list", "dump"].contains(tool),
            let ref = (arguments["ids"] as? [String] ?? [arguments["ref"] as? String ?? ""]).first(where: { UUID(uuidString: $0) != nil }) {
             throw C1Error.invalidRequest("'\(ref)' is UUID-shaped; a stored variantUUID never addresses a live variant. Use the stored variantDatabaseID and confirm it with variants_list ids or get --live.")
         }
