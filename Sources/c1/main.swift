@@ -842,7 +842,7 @@ struct CatalogSnapshot: ParsableCommand {
 }
 
 struct CatalogVariants: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "variants", abstract: "Discover distinct stored variants through SQLite; explicit memberships only.")
+    static let configuration = CommandConfiguration(commandName: "variants", abstract: "Discover distinct stored variants through SQLite; explicit memberships only. Reports settingsChanged and changedSettings against the stored default layer.")
     @Option var database: String
     @Option var collectionID: Int?
     @Option(help: "Exact name of one stored collection; cannot combine with --collection-id.") var collection: String?

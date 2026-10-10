@@ -30,6 +30,25 @@ Every response includes the canonical database path, device/inode identity, stor
 
 Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash`, document tokens, or any other mutation token, and cannot replace native post-write verification. Stored white balance is not decoded into Kelvin/tint; compound settings remain raw strings. External masks are not reconstructed. Use native `get` and normal editing preconditions immediately before writes.
 
+### Stored photographer edits
+
+`catalog variants` reports whether each variant's stored settings differ from its stored default layer (`ZDEFAULTLAYER`). It compares the combined settings layer (`combinedSettingsID`, `ZCOMBINEDSETTINGS`) with the default layer (`defaultSettingsID`, `ZDEFAULTLAYER`):
+
+- `settingsChanged` is `true` when at least one stored column differs, and `false` when none does.
+- `changedSettings` lists the differing column names, sorted, for example `["ZCROP", "ZROTATION"]`. The row identity and link columns `Z_PK`, `Z_ENT`, `ZINDEX`, `ZVARIANT` and `ZMETADATA` are not compared. Names stay raw; they are not decoded into adjustments.
+- When a variant's default or combined link is null or points to no stored layer, both fields are `null` and `settingsUnavailableReason` is `missing-default-layer` or `missing-combined-layer`. The reader does not guess.
+
+Qualified on Capture One 16.8.5.30 with owned Catalogs in both layouts: a fresh import reports `false`; exposure reports `ZEXPOSURE`; rotation with a 3:2 crop reports `ZCROP` and `ZROTATION`; a rating and color tag change alone reports `false`; an exposure edit followed by c1 `reset` reports `false`. Imports used no auto adjust and no style. The `catalog` live suite repeats these cases.
+
+The signal misses some edits:
+
+- Metadata-only changes are excluded by design. Ratings and color tags are in `rating` and `colorTag`.
+- Local adjustment layers, masks and retouching layers are not qualified. An edit made only there may not appear.
+- Imports with auto adjust or an applied style, and Capture One's own Reset Adjustments, are not qualified.
+- `ZVARIANT.ZISMODIFIED` is not used. The first adjustment sets it, and it stays set after c1 `reset`, so it means "ever modified". `catalog get` still returns it raw.
+
+Stored state lags live state. In one qualification run, acknowledged edits took 41 to 48 seconds to appear in SQLite, and a just-imported variant's layer rows were still replaced after ten quiet seconds. Use the signal as a triage hint, for example to set aside variants that probably carry photographer edits. It is never a mutation precondition and does not replace `get` state tokens ([invariant 2](../../AGENT_GUIDE.md#safety-invariants)). `false` does not prove that a variant is unedited; read a fresh live `get` before preparing any edit.
+
 ### From a stored variant to a live edit
 
 `variantDatabaseID` is the stored field that addresses a live variant: Capture One's native variant ID is the same number, as text. The `catalog` live suite checks this for every stored variant of its owned Catalog fixture, including several variants of one image. `variantUUID` and `imageUUID` are never live references; live `get`, `variants_list` `ids` and `dump` `ids` reject a UUID-shaped ref with `invalid-request` before contacting Capture One.

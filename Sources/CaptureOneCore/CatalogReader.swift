@@ -202,6 +202,7 @@ public final class CatalogReader {
         ("imageMembership", "ZIMAGEINCOLLECTION"), ("variantMembership", "ZVARIANTINCOLLECTION"),
         ("pathLocations", "ZPATHLOCATION"), ("storedSettings", "ZVARIANTLAYER"), ("storedMetadata", "ZVARIANTMETADATA"),
         ("storedRetouching", "ZRETOUCHINGLAYER"), ("documentSettings", "ZDOCUMENTSETTING")]
+    static let layerIdentityColumns: Set = ["Z_PK", "Z_ENT", "ZINDEX", "ZVARIANT", "ZMETADATA"]
 
     public func inspect(tables: [String]? = nil, afterPK: Int? = nil, limit: Int? = nil) throws -> [String: Any] {
         try beginObservation()
@@ -285,21 +286,35 @@ public final class CatalogReader {
         if let rating { predicates.append("m.ZBASIC_RATING=\(rating)") }
         if let minRating { predicates.append("m.ZBASIC_RATING>=\(minRating)") }
         if let afterVariantID { predicates.append("v.Z_PK>\(afterVariantID)") }
+        let changed = try rows("SELECT name FROM pragma_table_info('ZVARIANTLAYER') ORDER BY cid")
+            .compactMap { $0["name"] as? String }.filter { !Self.layerIdentityColumns.contains($0) }
+            .map { "CASE WHEN d.\"\($0)\" IS NOT l.\"\($0)\" THEN ',\($0)' ELSE '' END" }.joined(separator: "||")
         var (records, next) = try page("""
             SELECT v.Z_PK AS variantDatabaseID,v.ZVARIANTUUID AS variantUUID,
                    i.Z_PK AS imageDatabaseID,i.ZIMAGEUUID AS imageUUID,i.ZDISPLAYNAME AS name,
                    i.ZIMAGEFILENAME AS originalFilename,i.ZISINSIDECATALOG AS insideCatalog,
                    i.ZISTRASHED AS trashed,p.ZMACROOT AS macRoot,p.ZRELATIVEPATH AS relativePath,
                    p.ZISRELATIVE AS isRelative,m.ZBASIC_RATING AS rating,
-                   COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,v.ZCOMBINEDSETTINGS AS combinedSettingsID
+                   COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,v.ZCOMBINEDSETTINGS AS combinedSettingsID,
+                   v.ZDEFAULTLAYER AS defaultSettingsID,
+                   CASE WHEN d.Z_PK IS NULL THEN 'missing-default-layer' WHEN l.Z_PK IS NULL THEN 'missing-combined-layer' END AS settingsUnavailableReason,
+                   \(changed) AS changedSettings
             FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
             LEFT JOIN ZPATHLOCATION p ON p.Z_PK=i.ZIMAGELOCATION
             LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
+            LEFT JOIN ZVARIANTLAYER d ON d.Z_PK=v.ZDEFAULTLAYER
             LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA
             WHERE \(predicates.joined(separator: " AND ")) ORDER BY v.Z_PK
             """, key: "variantDatabaseID", limit: limit)
         for index in records.indices {
             let record = records[index]
+            if record["settingsUnavailableReason"] is NSNull {
+                let columns = (record["changedSettings"] as! String).split(separator: ",").map(String.init).sorted()
+                records[index]["settingsUnavailableReason"] = nil
+                records[index]["settingsChanged"] = !columns.isEmpty; records[index]["changedSettings"] = columns
+            } else {
+                records[index]["settingsChanged"] = NSNull(); records[index]["changedSettings"] = NSNull()
+            }
             records[index]["originalPath"] = NSNull()
             if record["insideCatalog"] as? Int64 == 0, record["isRelative"] as? Int64 == 0,
                let root = record["macRoot"] as? String, root.hasPrefix("/"),

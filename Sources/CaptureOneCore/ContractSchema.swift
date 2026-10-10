@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.5.0"
+    public static let version = "4.6.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -270,7 +270,11 @@ public enum ContractSchema {
             inspectProps[key] = array(["type": "object"])
         }
         var storedVariantProps = observation
-        storedVariantProps["variants"] = array(["type": "object"])
+        storedVariantProps["variants"] = array(["type": "object", "required": ["settingsChanged", "changedSettings"], "properties": [
+            "defaultSettingsID": ["type": ["integer", "null"]], "settingsChanged": ["type": ["boolean", "null"]],
+            "changedSettings": ["type": ["array", "null"], "items": string],
+            "settingsUnavailableReason": ["enum": ["missing-default-layer", "missing-combined-layer"],
+                                          "description": "Present only when settingsChanged is null."]]])
         storedVariantProps["membershipSemantics"] = string; storedVariantProps["collectionID"] = ["type": "integer"]
         storedVariantProps["next"] = ["type": "integer"]
         inspectProps["next"] = ["type": "object", "additionalProperties": ["type": "integer"]]

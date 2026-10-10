@@ -387,6 +387,51 @@ class CatalogReaderTests(unittest.TestCase):
         self.db.execute('UPDATE ZCOLLECTION SET ZPARENT=5 WHERE Z_PK=3'); self.db.commit()
         self.assertIn('cycle', self.cli('collections', error=True))
 
+    def settings_cases(self):
+        cases = {11: ({}, {}), 12: ({'ZEXPOSURE': 0.0}, {'ZEXPOSURE': .5}),
+                 13: ({'ZCROP': '0.000000;0.000000;0.000000;0.000000'}, {'ZCROP': '3000.0;2000.0;5704.0;3802.0', 'ZROTATION': 2.0}),
+                 14: ({}, {}), 15: ({}, {}), 16: ({}, {}), 17: ({'ZEXPOSURE': 0.0}, {'ZEXPOSURE': .5, 'ZAIDENOISEAMOUNT': 30.0})}
+        for pk, (default, combined) in cases.items():
+            for layer, ent, values in ((pk * 10, 18, default), (pk * 10 + 2, 20, combined)):
+                row = {'Z_PK': layer, 'Z_ENT': ent, 'ZINDEX': layer, 'ZVARIANT': pk if ent == 18 else None, 'ZMETADATA': layer,
+                       'ZCONTRAST': 4.0, 'ZWHITEBALANCE': 'wb', **values}
+                self.db.execute(f'INSERT INTO ZVARIANTLAYER({",".join(row)}) VALUES({",".join("?" * len(row))})', tuple(row.values()))
+                rating, tag = (3, 2) if pk == 14 and ent == 20 else (0, 0)
+                self.db.execute('INSERT INTO ZVARIANTMETADATA(Z_PK,ZLAYER,ZBASIC_RATING,ZCOLOR_TAG_INDEX) VALUES(?,?,?,?)', (layer, layer, rating, tag))
+            links = {15: (None, pk * 10 + 2), 16: (pk * 10, 999)}.get(pk, (pk * 10, pk * 10 + 2))
+            self.db.execute('INSERT INTO ZVARIANT(Z_PK,ZIMAGE,ZVARIANTUUID,ZDEFAULTLAYER,ZCOMBINEDSETTINGS) VALUES(?,1,?,?,?)', (pk, f'variant-{pk}', *links))
+        self.db.commit()
+
+    def test_settings_changed_compares_default_and_combined_layers(self):
+        self.settings_cases()
+        before = self.path.read_bytes()
+        records = {r['variantDatabaseID']: r for r in self.cli('variants', '--after-variant-id', 10)['variants']}
+        signal = {pk: (r['settingsChanged'], r['changedSettings'], r.get('settingsUnavailableReason')) for pk, r in records.items()}
+        self.assertEqual(signal, {11: (False, [], None), 12: (True, ['ZEXPOSURE'], None), 13: (True, ['ZCROP', 'ZROTATION'], None),
+                                  14: (False, [], None), 15: (None, None, 'missing-default-layer'),
+                                  16: (None, None, 'missing-combined-layer'), 17: (True, ['ZAIDENOISEAMOUNT', 'ZEXPOSURE'], None)})
+        self.assertEqual((records[14]['rating'], records[14]['colorTag']), (3, 2))
+        self.assertEqual((records[11]['defaultSettingsID'], records[11]['combinedSettingsID']), (110, 112))
+        self.assertIsNone(records[15]['defaultSettingsID'])
+        self.assertEqual({r['settingsUnavailableReason'] for r in self.cli()['variants'] if r['variantDatabaseID'] <= 3}, {'missing-default-layer'})
+        pages, after = [], 10
+        while after is not None:
+            page = self.cli('variants', '--limit', 2, '--after-variant-id', after)
+            pages += [(r['variantDatabaseID'], r['changedSettings']) for r in page['variants']]
+            after = page.get('next')
+        self.assertEqual(pages, [(pk, signal[pk][1]) for pk in sorted(signal)])
+        self.assertEqual([r['variantDatabaseID'] for r in self.cli('variants', '--min-rating', 3)['variants']], [3, 14])
+        client = Client(MCP)
+        try:
+            schema = json.loads(client.tool('schema')['content'][0]['text'])
+            data = json.loads(client.tool('catalog_variants', {'database': str(self.path), 'afterVariantID': 10})['content'][0]['text'])
+            validate_response(data, schema['responses']['catalog_variants'])
+            self.assertEqual(data['variants'], list(records.values()))
+        finally:
+            client.close()
+            for stream in (client.process.stdin, client.process.stdout, client.process.stderr): stream.close()
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_cli_database_route(self):
         result=subprocess.run([str(CLI),'variants','list','--database',str(self.path),'--rating','2'],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stderr)

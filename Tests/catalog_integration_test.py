@@ -287,6 +287,68 @@ def main():
         tool('geometry_set', {'workingRef': clone['workingRef'], 'ifGeometryState': current['geometryStateHash'], 'aspectRatio': .75})
         tool('variant_delete', {'workingRef': clone['workingRef']})
         assert {item['id'] for item in cli('variants', 'list')} == set(originals)
+        # One imported copy per qualified case keeps the stored settings cases independent.
+        def tonal(ref, current):
+            cli('set', ref, '--if-state', current['stateHash'], 'exposure=0.5')
+
+        def geometry(ref, current):
+            cli('geometry', 'set', ref, '--if-geometry-state', current['geometryStateHash'], '--rotation', 2, '--aspect-ratio', 1.5)
+
+        def metadata(ref, current):
+            cli('metadata', 'set', ref, '--if-metadata-state', current['metadataStateHash'], '--rating', 3, '--color-tag', 2)
+
+        def reset(ref, current):
+            cli('reset', ref, '--if-state', current['stateHash'])
+
+        signal_cases = {
+            'unchanged': [],
+            'tonal': [(tonal, dict(changedSettings=['ZEXPOSURE']))],
+            'geometry': [(geometry, dict(changedSettings=['ZCROP', 'ZROTATION']))],
+            'metadata-only': [(metadata, dict(changedSettings=[], rating=3, colorTag=2))],
+            'reset-after-tonal': [(tonal, dict(changedSettings=['ZEXPOSURE'])), (reset, dict(changedSettings=[]))],
+        }
+        copies = {name: base / (name + raw.suffix) for name in signal_cases}
+        for copy in copies.values():
+            shutil.copy2(raw, copy)
+            fixture_paths.append(copy)
+            apple(f'import current document source {{"{copy}"}}')
+            apple('set current collection of current document to collection "All Images" of current document')
+            for _ in range(40):
+                imported = {Path(v['parentImagePath']).resolve(): v['id'] for v in cli('variants', 'list')}
+                if copy.resolve() in imported:
+                    break
+                time.sleep(.5)
+            assert copy.resolve() in imported, (copy, imported)
+        signal_ids = {name: imported[copy.resolve()] for name, copy in copies.items()}
+
+        def stored_signal(variant_id, expected):
+            want = dict(expected, variantDatabaseID=int(variant_id), settingsChanged=bool(expected['changedSettings']))
+            deadline = time.monotonic() + 180
+            while time.monotonic() < deadline:
+                page = stored('variants', '--after-variant-id', int(variant_id) - 1, '--limit', 1)
+                record = next(iter(page['variants']), {})
+                if all(record.get(key) == value for key, value in want.items()):
+                    break
+                time.sleep(.5)
+            assert all(record.get(key) == value for key, value in want.items()), (want, record)
+            validate_response(page, contract['responses']['catalog_variants'])
+            return record
+
+        signals = {}
+        for name, steps in signal_cases.items():
+            variant_id = signal_ids[name]
+            signals[name] = [stored_signal(variant_id, dict(changedSettings=[]))]
+            if steps:
+                source = cli('get', variant_id)
+                ref = cli('variant', 'edit', variant_id, '--if-state', source['stateHash'],
+                          '--if-document', cli('doc', 'info')['openToken'])['workingRef']
+                for step, expected in steps:
+                    step(ref, cli('get', ref))
+                    signals[name].append(stored_signal(variant_id, expected))
+        final = {name: stored_signal(signal_ids[name], steps[-1][1] if steps else dict(changedSettings=[])) for name, steps in signal_cases.items()}
+        reset_variant = cli('get', signal_ids['reset-after-tonal'], '--database', database)['variant']
+        assert reset_variant['ZISMODIFIED'] == 1, reset_variant
+        log('stored-settings-signal', layout=layout, ids=signal_ids, signals=signals, final=final)
         journal = [json.loads(line) for line in (catalog / '.c1/journal.jsonl').read_text().splitlines()]
         latest = {entry['operationId']: entry for entry in journal}
         assert all(entry['status'] == 'succeeded' for entry in latest.values()), latest
