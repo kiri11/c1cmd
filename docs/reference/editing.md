@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `4.0.0`; package version is
+AppleScript handlers are reused. Contract version is `4.1.0`; package version is
 `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -165,6 +165,14 @@ partial. Compound edits stop between steps and return a `failed` report with cod
 an exit, and `request status` shows `cancelRequested`. `deadlineSeconds` (up to
 86400) applies to inventory. Neither interrupts a dispatched Apple Event; SIGKILL
 ends the process immediately, and an interrupted write follows normal recovery.
+
+MCP clients enforce their own request timeout. When it expires, the client cancels
+and the server sends no response, so the agent gets neither a result nor a hint.
+A `deadlineSeconds` below that timeout returns a clear `deadline-exceeded` error
+instead. The CLI has no request timeout. On a Catalog, `catalog_variants` /
+`c1 catalog variants` reads stored membership in seconds; revalidate its
+candidates with `variants_list` `ids`. Inventory `deadline-exceeded` and
+`request-cancelled` errors on a Catalog name that route in `recoveryAction`.
 
 ## Previews
 

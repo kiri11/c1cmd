@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.0.0"
+    public static let version = "4.1.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -28,6 +28,8 @@ public enum ContractSchema {
         ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
     }
     static let rating = integer(VariantMetadata.ratingRange)
+    static let deadlineSeconds: [String: Any] = ["type": "number", "exclusiveMinimum": 0, "maximum": 86400,
+        "description": "Stop with deadline-exceeded after this many seconds, checked between Apple Events; nothing partial is returned and an outstanding event is not interrupted. Keep it below the MCP client's request timeout, which otherwise ends the call with no response."]
     static var writableMetadataSchema: [String: Any] {
         object(["rating": rating, "colorTag": integer(VariantMetadata.colorTagRange)], required: ["rating", "colorTag"])
     }
@@ -75,7 +77,7 @@ public enum ContractSchema {
                 "fields": ["type": "string", "enum": ["minimal", "summary"]],
                 "parentPath": ["type": "string", "minLength": 1],
                 "batchSize": ["type": "integer", "minimum": 1, "maximum": 256],
-                "deadlineSeconds": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
+                "deadlineSeconds": deadlineSeconds,
                 "rating": rating.merging(["description": "Exact star rating (0 means unrated). Mutually exclusive with minRating."]) { $1 },
                 "minRating": rating.merging(["description": "Inclusive minimum star rating. Mutually exclusive with rating."]) { $1 }
             ])

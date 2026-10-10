@@ -31,6 +31,39 @@ struct RequestContextTests {
         XCTAssertTrue(fake.hydrationBatches.isEmpty, "A deadline cannot start another batch or publish partial results")
         fake.beforeReadRatings = nil
 
+        // Slow Catalog inventory points to stored discovery; Session inventory keeps its generic recovery.
+        let package = directory.appendingPathComponent("Main.cocatalog")
+        try! FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
+        try! Data("database".utf8).write(to: package.appendingPathComponent("Main.cocatalogdb"))
+        let catalogFake = FakeScript(directory: package)
+        catalogFake.isSession = false
+        catalogFake.catalogID = package.path
+        let catalogCore = SessionController(executor: catalogFake, appInstance: { catalogFake.generation }, databaseIdentity: { _ in "db" })
+        func recovery(_ fake: FakeScript, _ core: SessionController, tool: String, deadline: Double? = nil) -> (code: String?, action: String?) {
+            let context = RequestContext(tool: tool, progressMode: "quiet", directory: directory)
+            fake.beforeReadSummaries = { deadline == nil ? context.cancel() : Thread.sleep(forTimeInterval: 0.03) }
+            defer { fake.beforeReadSummaries = nil }
+            do {
+                try context.withCurrent {
+                    if tool == "dump" { _ = try core.dump() } else { _ = try core.listVariants(minRating: 0, deadlineSeconds: deadline) }
+                }
+                XCTFail("\(tool) should stop at a boundary")
+                return (nil, nil)
+            } catch {
+                context.finish(error: error)
+                let body = context.annotate(ErrorResponse.payload(error))["error"] as? [String: Any] ?? [:]
+                return (body["code"] as? String, body["recoveryAction"] as? String)
+            }
+        }
+        for (tool, deadline, code) in [("variants_list", nil, "request-cancelled"), ("variants_list", 0.01, "deadline-exceeded"), ("dump", nil, "request-cancelled")] {
+            let result = recovery(catalogFake, catalogCore, tool: tool, deadline: deadline)
+            XCTAssertEqual(result.code, code)
+            XCTAssertEqual(result.action, "Use catalog_variants with the same filters (collectionID selects a collection) for stored discovery in seconds, then variants_list with those ids (up to 512 per call) to revalidate the candidates live.", "\(tool) \(code) on a Catalog")
+        }
+        XCTAssertEqual(recovery(fake, core, tool: "variants_list").action, nil, "Session cancellation keeps no recovery action")
+        XCTAssertEqual(recovery(fake, core, tool: "variants_list", deadline: 0.01).action,
+                       "Inspect request status and Capture One responsiveness before another request; a deadline does not stop an Apple Event.")
+
         // A timer on a background queue must run even while the request's thread is blocked.
         let beat = DispatchSemaphore(value: 0)
         let live = RequestContext(tool: "variants_list", progressMode: "quiet", directory: directory,

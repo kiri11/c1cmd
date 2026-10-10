@@ -486,7 +486,7 @@ public final class SessionController {
         )
         document.writesDisabledReason = try writeBlock(document, operation: "edit")?.reason
         document.writesEnabled = document.writesDisabledReason == nil
-        RequestContext.current?.document(document.openToken)
+        RequestContext.current?.document(document)
         return document
     }
 
@@ -540,7 +540,7 @@ public final class SessionController {
             try checkpoint()
             let document = try getDocumentInfo()
             RequestContext.current?.inventoryScope(collection: collection, selected: selected, rating: rating, minRating: minRating)
-            RequestContext.current?.document(document.openToken)
+            RequestContext.current?.document(document)
             RequestContext.current?.inventoryStrategy("id-subset")
             RequestContext.current?.update(phase: "discovering", total: ids.count, pass: 1)
             let doc = NSAppleEventDescriptor(string: document.documentId)
@@ -645,7 +645,7 @@ public final class SessionController {
             try checkpoint()
             context?.update(phase: "validating-document")
             let docInfo = try getDocumentInfo()
-            context?.document(docInfo.openToken)
+            context?.document(docInfo)
             // Native predicates/bulk IDs are qualified only for Sessions on this exact build.
             let native = nativeInventoryEnabled && docInfo.isSession && docInfo.appVersion == Self.pinnedBuild
             context?.inventoryStrategy(native ? "native-filter" : "rating-scan")

@@ -42,6 +42,7 @@ public struct ToolDefinition {
     public var destructive: Bool { ["variant_delete", "native_action"].contains(name) }
     public var inputSchema: [String: Any] { ContractSchema.input(name) }
 
+    static let slowInventory = "Set deadlineSeconds below the client's request timeout to get deadline-exceeded instead of no response. On Catalogs, catalog_variants stored discovery is the fast route for large scopes; revalidate its candidates with variants_list ids."
     static let recipe = "Versioned reference recipes and bounded compound edits. Verification requires a managed clone. Inspect status and child operation IDs after failure; never retry automatically."
     /// One entry per `ContractSchema.names` tool; an offline test keeps them in step.
     static let catalog: [String: (description: String, readOnly: Bool)] = {
@@ -59,7 +60,7 @@ public struct ToolDefinition {
             "doc_info": ("Show current open document info, folders, and open token.", true),
             "capabilities": ("Show capability matrix for the running Capture One build.", true),
             "schema": ("Output JSON Schema for c1 requests and responses.", true),
-            "variants_list": ("List variants, optionally filtered by exact or minimum rating. Supply 1–512 known ids for fresh bounded discovery with minimal fields, optional summary fields and exact parentPath filtering. Subset reads return no mutation tokens.", true),
+            "variants_list": ("List variants, optionally filtered by exact or minimum rating. Supply 1–512 known ids for fresh bounded discovery with minimal fields, optional summary fields and exact parentPath filtering. Subset reads return no mutation tokens. \(slowInventory)", true),
             "variant_edit": ("Prepare editing on an existing variant without cloning. Requires ifDocument from doc_info and ifState from get; optionally check ifGeometryState too. Saves its baseline and returns a c1_edit_ reference for supported adjustments and geometry. Does not authorize deletion.", false),
             "geometry_restore": ("Restore saved crop/rotation/keystone for an editing or clone reference. Requires fresh ifGeometryState; refuses changed lens/orientation context. Never delete an existing variant to reject a crop.", false),
             "variant_clone": ("Clone a source variant and return a c1-managed working reference (c1_wrk_<uuid>). Use variant_edit to edit existing variants.", false),
@@ -73,7 +74,7 @@ public struct ToolDefinition {
             "geometry_set": ("Set crop, rotation, and keystone on a c1_edit_ existing variant or c1_wrk_ clone, requiring ifGeometryState from get. Native rotated canvas pixels with bottom-left origin. aspectRatio fits a centered crop; use explicit crop for composition. Optional keystone object sets amount, vertical, horizontal, skew, or aspect; omitted controls are preserved. Preserves lens distortion and tilt/shift using native bounds. Dry runs cannot predict keystone changes or corrected rotation crops.", false),
             "reset": ("Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             "diff": ("Compare adjustments between two variants or compare a working variant against its baseline.", true),
-            "dump": ("Batched export of variants, adjustments, and metadata in JSON format.", true),
+            "dump": ("Batched export of variants, adjustments, and metadata in JSON format. Large scopes can outlast the client's request timeout; bound discovery with variants_list deadlineSeconds, and on Catalogs use catalog_variants stored discovery, the fast route for large scopes.", true),
             "preview": ("Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data.", false),
             "request_status": ("Read stored request progress and process liveness without contacting Capture One.", true),
             "operation_status": ("Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),

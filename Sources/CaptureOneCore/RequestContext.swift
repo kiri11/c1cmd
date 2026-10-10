@@ -77,6 +77,7 @@ public final class RequestContext: @unchecked Sendable {
     private let start = ProcessInfo.processInfo.systemUptime
     private var lastProgress: Double?
     private var cancelled = false
+    private var catalog = false
     private var timer: DispatchSourceTimer?
     private let directory: URL?
     private let diagnostics: Bool
@@ -151,9 +152,10 @@ public final class RequestContext: @unchecked Sendable {
     public func inventoryStrategy(_ strategy: String) {
         mutex.lock(); state.inventoryStrategy = strategy; mutex.unlock()
     }
-    public func document(_ token: String) {
+    public func document(_ document: DocumentInfo) {
         mutex.lock()
-        state.documentIdentity = SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+        state.documentIdentity = SHA256.hash(data: Data(document.openToken.utf8)).map { String(format: "%02x", $0) }.joined()
+        catalog = !document.isSession
         mutex.unlock()
     }
     public func appleEvent(_ handler: String?, waiting: Bool) {
@@ -203,6 +205,7 @@ public final class RequestContext: @unchecked Sendable {
         var payload = payload
         var error = payload["error"] as? [String: Any] ?? [:]
         let s = snapshot
+        mutex.lock(); let catalog = catalog; mutex.unlock()
         error["requestId"] = s.requestId; error["phase"] = s.phase; error["elapsedMs"] = s.elapsedMs
         if error["operationId"] == nil { error["operationId"] = s.operationId }
         switch error["code"] as? String {
@@ -216,6 +219,9 @@ public final class RequestContext: @unchecked Sendable {
         // A definite refusal: its operation resolved as failed and blocks nothing.
         case "no-people-detected": error["recoveryAction"] = "Nothing was changed; choose another mask for this photo."
         default: break
+        }
+        if catalog, ["variants_list", "dump"].contains(s.tool), ["deadline-exceeded", "request-cancelled"].contains(error["code"] as? String) {
+            error["recoveryAction"] = "Use catalog_variants with the same filters (collectionID selects a collection) for stored discovery in seconds, then variants_list with those ids (up to 512 per call) to revalidate the candidates live."
         }
         if error["operationId"] != nil && error["code"] as? String != "no-people-detected" { error["recoveryAction"] = "Inspect operation status; do not retry the mutation." }
         payload["error"] = error

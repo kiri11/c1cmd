@@ -153,6 +153,10 @@ def run(cli, mcp):
         assert rating_schema['properties']['deadlineSeconds']['type'] == 'number'
         assert rating_schema['properties']['deadlineSeconds']['exclusiveMinimum'] == 0
         assert rating_schema['properties']['deadlineSeconds']['maximum'] == 86400
+        assert 'deadline-exceeded' in rating_schema['properties']['deadlineSeconds']['description']
+        for name in ['variants_list', 'dump']:
+            description = next(t for t in tools if t['name'] == name)['description']
+            assert 'deadlineSeconds' in description and 'catalog_variants' in description, (name, description)
         for name in ['preview', 'operation_status', 'variant_edit', 'geometry_restore']:
             assert next(t for t in tools if t['name'] == name)['annotations']['readOnlyHint'] is False
         assert next(t for t in tools if t['name'] == 'native_action')['annotations']['destructiveHint'] is True

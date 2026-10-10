@@ -15,6 +15,13 @@ struct RequestDispatcherTests {
         // Every schema tool is registered with a description; only the profile removes tools.
         XCTAssertEqual(ToolProfile.standard.tools.map(\.name), ContractSchema.names)
         XCTAssertTrue(ToolProfile.standard.tools.allSatisfy { !$0.description.isEmpty })
+        // Slow inventory names its escape routes before a client request timeout swallows the call.
+        for tool in ToolProfile.standard.tools where ["variants_list", "dump"].contains(tool.name) {
+            XCTAssertTrue(tool.description.contains("deadlineSeconds"), tool.name)
+            XCTAssertTrue(tool.description.contains("catalog_variants"), tool.name)
+        }
+        let deadline = (ContractSchema.input("variants_list")["properties"] as! [String: [String: Any]])["deadlineSeconds"]!
+        XCTAssertTrue((deadline["description"] as? String ?? "").contains("deadline-exceeded"))
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.destructive).map(\.name).sorted(), ["native_action", "variant_delete"])
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.readOnly).map(\.name).sorted(),
                        ["capabilities", "catalog_get", "catalog_inspect", "catalog_variants", "diff", "doc_info", "doctor", "dump",
