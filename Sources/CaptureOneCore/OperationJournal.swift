@@ -104,6 +104,10 @@ public final class OperationJournal {
     }
 
     public func validatedEntries() throws -> [OperationRecord] {
+        try PerformanceTrace.measure("journal_read", handler: "OperationJournal.validatedEntries") { try decodeEntries() }
+    }
+
+    private func decodeEntries() throws -> [OperationRecord] {
         guard FileManager.default.fileExists(atPath: journalFile.path) else { return [] }
         let data = try Data(contentsOf: journalFile)
         guard let content = String(data: data, encoding: .utf8) else {
@@ -136,7 +140,7 @@ public final class OperationJournal {
         defer { try? handle.close() }
         try handle.seekToEnd()
         try handle.write(contentsOf: data)
-        try handle.synchronize()
+        try PerformanceTrace.measure("journal_fsync", handler: "OperationJournal.append") { try handle.synchronize() }
         if entry.status == "pending" { RequestContext.current?.linkOperation(entry.operationId) }
     }
 

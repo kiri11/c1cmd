@@ -85,6 +85,10 @@ public final class PreviewManager {
     }
 
     public func pollForOutputFile(inDirectory dir: URL, timeout: TimeInterval = 30.0) throws -> URL {
+        try PerformanceTrace.measure("preview_poll", handler: "PreviewManager.pollForOutputFile") { try poll(dir, timeout: timeout) }
+    }
+
+    private func poll(_ dir: URL, timeout: TimeInterval) throws -> URL {
         let deadline = Date().addingTimeInterval(timeout)
         let fm = FileManager.default
         var previous: [String: Int64] = [:]

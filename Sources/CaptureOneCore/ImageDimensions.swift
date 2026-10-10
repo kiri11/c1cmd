@@ -5,6 +5,10 @@ import ImageIO
 /// canvas. Bounds must instead use the original file's intrinsic pixel dimensions.
 public enum ImageDimensions {
     public static func read(_ path: String) -> [Double]? {
+        PerformanceTrace.measure("image_dimensions", handler: "ImageDimensions.read") { dimensions(path) }
+    }
+
+    private static func dimensions(_ path: String) -> [Double]? {
         guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,

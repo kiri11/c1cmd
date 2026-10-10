@@ -219,8 +219,15 @@ struct RecipeTests {
             XCTAssertEqual(fake.advanced.count,1)
             XCTAssertEqual(fake.basic[0]["hue change"] as? Double,0)
             XCTAssertEqual(fake.basic[1]["hue change"] as? Double,3)
-            let applied = try workflow.run("edit_apply",arguments:["sourceRef":"1","recipeId":scopedID,"ifState":initial.stateHash,"ifDocument":doc.openToken])
+            var applied: [String:Any] = [:]
+            let profile = profileRecords { XCTAssertNoThrowBlock { applied = try workflow.run("edit_apply",arguments:["sourceRef":"1","recipeId":scopedID,"ifState":initial.stateHash,"ifDocument":doc.openToken]) } }
             XCTAssertEqual(applied["status"] as? String,"succeeded")
+            XCTAssertEqual(profile.filter { $0["phase"] as? String == "step" }.map { $0["handler"] as? String ?? "" },applied["plan"] as? [String] ?? [],"Each planned step is timed once, in order")
+            XCTAssertEqual(profile.last?["phase"] as? String,"compound")
+            XCTAssertEqual(profile.last?["handler"] as? String,"edit_apply")
+            for phase in ["journal_read","journal_fsync","report_write"] {
+                XCTAssertTrue(profile.contains { $0["phase"] as? String == phase && $0["step"] as? String == "settings" },"settings step times " + phase)
+            }
             XCTAssertTrue((applied["plan"] as! [String]).contains("scope-advanced-delete-1"))
             XCTAssertNotNil((applied["resultBundle"] as! [String:Any])["scopedNative"])
             fake.corruptScope = true; fake.corruptAfterWrites = fake.writes
