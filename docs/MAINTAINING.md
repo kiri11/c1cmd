@@ -155,16 +155,24 @@ disposable catalog; the default is `package`. Both layouts include existing-vari
 rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`. The native
 suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people.
 
-For `native` and `recipes`, `QUALIFY_DOCUMENT_KINDS` selects `session` (default),
-`catalog`, or `"session catalog"`. Each mode runs sequentially with separate evidence
-under `native/<mode>` and `recipes/<mode>`; Catalog mode is labelled
-`catalog-package` or `catalog-unpackaged`. Other suites keep their own fixture modes.
-Catalog mode creates a new owned Catalog under `.build`, imports a copied RAW as a
-referenced original outside it, sets the exact fixture write path (the
+For `native`, `recipes` and `inventory`, `QUALIFY_DOCUMENT_KINDS` selects `session`
+(default), `catalog`, or `"session catalog"`. Each mode runs sequentially with separate
+evidence under `native/<mode>`, `recipes/<mode>` and `inventory/<mode>.json`; Catalog
+mode is labelled `catalog-package` or `catalog-unpackaged`. Other suites keep their
+own fixture modes. Catalog mode creates a new owned Catalog under `.build`, imports a
+copied RAW as a referenced original outside it, sets the exact fixture write path (the
 `.cocatalogdb` for unpackaged), and takes a native backup before editing. It asserts
 RAW preservation and the Catalog's `.c1` journal/provenance/result locations and
 sibling `.c1-output/c1-previews` paths. Failed fixtures and evidence are retained.
 The native suite uses a second owned fixture for the successful people-mask cases.
+
+The inventory suite clones one imported variant up to `C1_INVENTORY_SMALL_COUNT`
+(default 12) and `C1_INVENTORY_LARGE_COUNT` (default 120) variants, adds every third
+variant to an album and selects every second one. Each case runs the default
+strategy and `C1_INVENTORY_STRATEGY=scan` across document, album and selection scopes
+with `rating` and `minRating`, and compares both ordered results with the legacy
+enumeration; the evidence keeps both strategies' timings and request status. Set
+`C1_INVENTORY_LARGE_COUNT` to several hundred for a before/after measurement.
 
 ```sh
 make qualify QUALIFY_SUITES="native recipes" QUALIFY_DOCUMENT_KINDS="session catalog" \
@@ -173,9 +181,10 @@ make qualify QUALIFY_SUITES="native recipes" QUALIFY_DOCUMENT_KINDS=catalog \
   C1_TEST_CATALOG_LAYOUT=unpackaged EVIDENCE_DIR=.build/qualification/native-recipes-unpackaged
 ```
 
-When running either script directly, `C1_TEST_DOCUMENT_KIND=session|catalog`
-selects the mode, and `C1_TEST_CATALOG_LAYOUT=package|unpackaged` selects the Catalog
-layout. Keep `C1_NATIVE_EVIDENCE` / `C1_RECIPE_EVIDENCE` distinct for each run.
+When running a script directly, `C1_TEST_DOCUMENT_KIND=session|catalog` selects the
+mode, and `C1_TEST_CATALOG_LAYOUT=package|unpackaged` selects the Catalog layout. Keep
+`C1_NATIVE_EVIDENCE` / `C1_RECIPE_EVIDENCE` / `C1_INVENTORY_EVIDENCE` distinct for
+each run.
 
 Recovery tests keep real 120-second Apple Event timeouts; five timeout cases take
 at least ten minutes before setup, verification and restarts. To save time, select

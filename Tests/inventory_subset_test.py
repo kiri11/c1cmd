@@ -10,7 +10,7 @@ from contract_test import Client
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(records, status_dir):
+def run(records, status_dir, collection, empty_collection):
     cli = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
     env = dict(os.environ, C1_REQUEST_DIR=str(status_dir), C1_PROGRESS='json')
     mcp = Path(os.environ.get('C1_TEST_MCP_BIN', ROOT / '.build/debug/c1-mcp'))
@@ -59,7 +59,7 @@ def run(records, status_dir):
     summaries = read('summary', '--fields', 'summary')
     for row in summaries:
         assert row == {key: by_id[row['id']][key] for key in row}
-    assert read('collection', '--collection', 'Capture') == rows
+    assert read('collection', '--collection', collection) == rows
     selected = read('selection', '--selected')
     assert [r['id'] for r in selected] == [i for i in ids if by_id[i]['isSelected']]
     client = Client(mcp, timeout=120)
@@ -73,8 +73,8 @@ def run(records, status_dir):
         assert bad_error['code'] == 'variant-not-found' and bad_error['missingIds'] == ['missing-subset-id'], bad_error
     finally:
         client.close()
-    # A fresh session's Selects collection is empty, so every present ID is outside it.
-    outside = read('out-of-scope', '--collection', 'Selects', error=True)
+    # The empty collection holds no variants, so every present ID is outside it.
+    outside = read('out-of-scope', '--collection', empty_collection, error=True)
     assert outside['code'] == 'variant-not-found' and outside['missingIds'] == [] and outside['outOfScopeIds'] == ids, outside
     ids.append('missing-subset-id')
     missing = read('missing', error=True)
