@@ -157,7 +157,7 @@ public final class RecipeWorkflow {
               before.metadata == after.metadata, before.parentImagePath == after.parentImagePath,
               zip(before.nativeSnapshots!,after.nativeSnapshots!).allSatisfy({ $0.values == $1.values && $0.layers == $1.layers && $0.unavailable == $1.unavailable }),
               try core.getDocumentInfo().openToken == doc.openToken else { throw C1Error.stateChanged("Reference changed while exporting preview.") }
-        let bytes = try Data(contentsOf:URL(fileURLWithPath:preview.outputPath))
+        let bytes = try Data(contentsOf:URL(fileURLWithPath:preview.previewPath))
         let checksum = SHA256.hash(data:bytes).map { String(format:"%02x",$0) }.joined()
         let bundle: [String:Any] = ["version":2,"scopedNative":try scopeAfter.evidence(),"document":try Recipes.object(doc),"observed":try Recipes.object(after),"preview":try Recipes.object(preview),"previewFileSha256":checksum,
             "coverage":["capturedScopes":["adjustments","lens","variant","basicColor","advancedColor"],"maskPixels":"unsupported","skinTone":"unsupported","layerSettings":"not-captured","colorEditorElements":"captured-image-scope","rawBytes":"not-included","profileAssets":"names-only-bytes-not-captured","atomicSnapshot":false],"createdAt":ISO8601DateFormatter().string(from:Date())]

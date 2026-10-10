@@ -135,7 +135,7 @@ def main():
         if not args.dry_run:
             print(f"  Rendering preview...")
             prev_res = run_c1(["preview", wref], c1_bin)
-            preview_path = prev_res["outputPath"]
+            preview_path = prev_res["previewPath"]
             print(f"  Preview ready: {preview_path} ({prev_res['width']}x{prev_res['height']} px)")
 
         # e. Save decision record sidecar

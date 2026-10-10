@@ -158,7 +158,7 @@ struct CatalogEditingTests {
             XCTAssertTrue(fake.pendingBeforeWrite)
             XCTAssertThrowsError(try enabled.geometrySet(workingRef: ref, ifGeometryState: tonal.geometryStateHash!, rotation: 3))
             let preview = try enabled.preview(ref: ref)
-            XCTAssertTrue(preview.outputPath.contains("/Main.cocatalog.c1-output/c1-previews/"), "Actual: \(preview.outputPath); expected package: \(package.path)")
+            XCTAssertTrue(preview.previewPath.contains("/Main.cocatalog.c1-output/c1-previews/"), "Actual: \(preview.previewPath); expected package: \(package.path)")
             let originalGeometryHash = try enabled.get(ref: "1").geometryStateHash
             XCTAssertEqual(originalGeometryHash, source.geometryStateHash)
             let proposalGeometryHash = try enabled.get(ref: ref).geometryStateHash

@@ -114,7 +114,7 @@ class EditingFixture:
             preview_dir = self.base / (self.document.name + '.c1-output') / 'c1-previews'
             assert previews, 'Catalog qualification must retain a preview'
             for preview in previews:
-                path = Path(preview['outputPath']).resolve()
+                path = Path(preview['previewPath']).resolve()
                 assert path.is_relative_to(preview_dir) and path.is_file(), path
             assert list(self.backup.rglob('*.cocatalogdb'))
         self.log('fixture-verified', dict(self.details(), operations=len(latest), originalsUnchanged=True,

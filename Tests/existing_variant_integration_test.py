@@ -196,7 +196,7 @@ def main():
             assert example_result['workingRef'].startswith('c1_edit_') and len(cli('variants', 'list')) == 1
             review = json.loads(Path(example_result['reviewRecord']).read_text())
             assert review['mode'] == 'existing' and review['reviewStatus'] == 'unreviewed' and 'clone' not in review
-            assert Path(review['applied']['evidencePath']).is_file() and Path(review['afterPreview']['outputPath']).is_file()
+            assert Path(review['applied']['evidencePath']).is_file() and Path(review['afterPreview']['previewPath']).is_file()
             example_state = cli('get', example_result['workingRef'])
             tool('geometry_restore', {'workingRef': example_result['workingRef'], 'ifGeometryState': example_state['geometryStateHash']})
             process = subprocess.run([sys.executable, '-B', str(grade), '--c1-bin', str(CLI)],

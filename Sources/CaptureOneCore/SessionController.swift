@@ -1182,7 +1182,7 @@ public final class SessionController {
                 }
                 let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
                 pending.update { $0.previewOutputPath = file.path }
-                return .confirmed(PreviewResult(operationId: opId, workingRef: current.workingRef, outputPath: file.path,
+                return .confirmed(PreviewResult(operationId: opId, workingRef: current.workingRef, previewPath: file.path,
                     fileSizeBytes: size, width: image.width, height: image.height, pixelSha256: image.pixelSha256,
                     stateHash: current.stateHash, nativeVariantId: current.id, geometry: current.geometry, geometryStateHash: current.geometryStateHash))
             }).value

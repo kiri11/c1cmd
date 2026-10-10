@@ -163,7 +163,7 @@ def main():
             tool('geometry_set', {'workingRef': ref, 'ifGeometryState': state['geometryStateHash'], 'rotation': 1}, error='state-changed')
             preview, image = tool('preview', {'ref': ref})
             assert any(block['type'] == 'image' for block in image['content'])
-            assert Path(preview['outputPath']).resolve().is_relative_to(base / (catalog.name + '.c1-output/c1-previews'))
+            assert Path(preview['previewPath']).resolve().is_relative_to(base / (catalog.name + '.c1-output/c1-previews'))
             assert abs(preview['width'] / preview['height'] - 1.5) < .003
             initialized_output = json.loads(apple('return POSIX path of (output of current document as alias)'))
             assert Path(initialized_output).resolve() == (base / (catalog.name + '.c1-output')).resolve()
@@ -186,7 +186,7 @@ def main():
             after = cli('get', source['id'])
             assert after['stateHash'] == source['stateHash'] and after['geometryStateHash'] == source['geometryStateHash']
             retained_preview = evidence / (source['id'] + '-preview.jpg')
-            shutil.copy2(preview['outputPath'], retained_preview)
+            shutil.copy2(preview['previewPath'], retained_preview)
             log('clone-edit-preview-diff-delete', sourceID=source['id'], imagePath=source['parentImagePath'], preview=preview, retainedPreview=str(retained_preview))
         # Existing-variant ratings use fresh metadata tokens and preserve the photo's look.
         source = cli('get', variants[0]['id'])

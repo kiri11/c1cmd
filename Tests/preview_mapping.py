@@ -27,8 +27,8 @@ def pixels(path):
 
 
 def check_mapping(context, cropped):
-    cw, ch, cp = pixels(context['outputPath'])
-    pw, ph, pp = pixels(cropped['outputPath'])
+    cw, ch, cp = pixels(context['previewPath'])
+    pw, ph, pp = pixels(cropped['previewPath'])
     outer, inner = context['geometry']['crop'], cropped['geometry']['crop']
     left, top = outer['centerX']-outer['width']/2, outer['centerY']+outer['height']/2
     def error(dx=0, dy=0, scale=1):

@@ -61,7 +61,7 @@ def main():
         template = cli('get',edit['workingRef'],'--native-targets','[{"scope":"advancedColor","element":1}]')['nativeSnapshots'][0]['values']
         capture = recipe('capture',dict(ref=source['id'],ifDocument=doc['openToken'],ifState=source['stateHash']))
         assert capture['bundle']['coverage']['maskPixels'] == 'unsupported'
-        assert sha(Path(capture['bundle']['preview']['outputPath'])) == capture['bundle']['previewFileSha256']
+        assert sha(Path(capture['bundle']['preview']['previewPath'])) == capture['bundle']['previewFileSha256']
         client = Client(MCP,env=owned.environment,timeout=240)
         schema = json.loads(client.tool("schema")["content"][0]["text"])
         payload = dict(version=1,referenceId=capture['referenceId'],settings={
@@ -83,7 +83,7 @@ def main():
         current = cli('get',clone['workingRef'])
         verified = recipe('verify',dict(recipeId=identifier,workingRef=clone['workingRef'],ifDocument=doc['openToken'],ifState=current['stateHash']))
         assert verified['status'] == 'succeeded'
-        assert verified['resultBundle']['preview']['outputPath']
+        assert verified['resultBundle']['preview']['previewPath']
         assert verified['resultBundle']['provenance']['mode'] == 'recipe-verification'
         cli('variant','delete',clone['workingRef'])
         request.update(overrides={'clarity amount':7,'rgb curve':[0,0,50,57,100,100],'film grain type':'soft','vignetting method':'circular on crop'},exposure=dict(mode='absolute',value=.25),
@@ -129,7 +129,7 @@ def main():
         assert bundle['coverage']['maskPixels'] == 'unsupported'
         assert bundle['coverage']['atomicSnapshot'] is False
         assert bundle['preview'] == next(s['result'] for s in value['completed'] if s['step'] == 'preview')
-        assert Path(bundle['preview']['outputPath']).is_file()
+        assert Path(bundle['preview']['previewPath']).is_file()
         assert observed['nativeSnapshots'][0]['values']['clarity amount'] == 7
         assert abs(observed['adjustments']['exposure']-.25) < .001
         assert abs(observed['adjustments']['temperature']-5200) < 1

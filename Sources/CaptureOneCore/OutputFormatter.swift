@@ -255,7 +255,7 @@ public struct OutputFormatter {
         lines.append("------------------------")
         lines.append("Operation ID: \(res.operationId)")
         lines.append("Working Ref : \(res.workingRef ?? "(none/native)")")
-        lines.append("Output Path : \(res.outputPath)")
+        lines.append("Preview Path: \(res.previewPath)")
         lines.append("File Size   : \(res.fileSizeBytes) bytes")
         lines.append("Dimensions  : \(res.width) x \(res.height) px")
         lines.append("Pixel SHA256: \(res.pixelSha256)")

@@ -299,8 +299,8 @@ struct ReleaseSafetyTests {
             try FakeScript.jpeg().write(to: old)
             let preview = try core.preview(ref: "1", outputDirOverride: custom.path)
             XCTAssertEqual(fake.previewRoot, custom.path)
-            XCTAssertTrue(preview.outputPath.contains("/c1-previews/\(preview.operationId)/"))
-            XCTAssertNotEqual(preview.outputPath, old.path)
+            XCTAssertTrue(preview.previewPath.contains("/c1-previews/\(preview.operationId)/"))
+            XCTAssertNotEqual(preview.previewPath, old.path)
             XCTAssertNotNil(preview.stateHash)
             XCTAssertEqual(preview.nativeVariantId, "1")
             // A partial JPEG is not a completed output, even if nonempty.

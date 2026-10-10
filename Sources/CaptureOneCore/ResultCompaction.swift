@@ -40,12 +40,12 @@ public enum ResultCompaction {
             if let unavailable = after["unavailable"] as? [String: Any], !unavailable.isEmpty { result["unavailable"] = unavailable }
             return result
         case "preview":
-            return pick(["operationId", "workingRef", "outputPath", "width", "height", "stateHash", "geometryStateHash",
+            return pick(["operationId", "workingRef", "previewPath", "width", "height", "stateHash", "geometryStateHash",
                          "nativeVariantId", "contextSourceRef"])
         case "reference_capture":
             guard let bundle = full["bundle"] as? [String: Any] else { return nil }
             var result = pick(["referenceId"])
-            result["previewPath"] = (bundle["preview"] as? [String: Any])?["outputPath"]
+            result["previewPath"] = (bundle["preview"] as? [String: Any])?["previewPath"]
             result["coverage"] = bundle["coverage"]
             return result
         case "recipe_register": return pick(["recipeId", "status"])
@@ -59,7 +59,7 @@ public enum ResultCompaction {
             result["finalHashes"] = provenance["finalHashes"]
             result["diff"] = bundle["diff"]
             result["coverage"] = bundle["coverage"]
-            if let preview = bundle["preview"] as? [String: Any] { result["previewPath"] = preview["outputPath"] }
+            if let preview = bundle["preview"] as? [String: Any] { result["previewPath"] = preview["previewPath"] }
             if let scoped = bundle["scopedNative"] as? [String: Any] { result["scopedDiff"] = scoped["diff"] }
             return result
         }
@@ -89,9 +89,9 @@ public enum ResultCompaction {
             "reset": compact("reset", tonal, required: tonal),
             "metadata_set": compact("metadata_set", ["operationId", "workingRef", "diff", "metadataStateHash", "isDryRun"],
                                     required: ["operationId", "workingRef", "diff", "metadataStateHash", "isDryRun"]),
-            "preview": compact("preview", ["operationId", "workingRef", "outputPath", "width", "height", "stateHash",
+            "preview": compact("preview", ["operationId", "workingRef", "previewPath", "width", "height", "stateHash",
                                            "geometryStateHash", "nativeVariantId", "contextSourceRef"],
-                               required: ["operationId", "outputPath", "width", "height"]),
+                               required: ["operationId", "previewPath", "width", "height"]),
             "reference_capture": compact("reference_capture", ["referenceId"], extra: ["previewPath": string, "coverage": open],
                                          required: ["referenceId", "coverage"]),
             "recipe_register": compact("recipe_register", ["recipeId", "status"], required: ["recipeId", "status"]),

@@ -48,10 +48,10 @@ struct ResultCompactionTests {
         XCTAssertEqual(nativeSummary?["unavailable"] as? [String: String], ["hue": "missing"])
 
         // Preview: the path and tokens stay; geometry moves to evidence.
-        let preview = PreviewResult(operationId: "op3", workingRef: "c1_edit_a", outputPath: "/x/p.jpg", fileSizeBytes: 10, width: 3, height: 2,
+        let preview = PreviewResult(operationId: "op3", workingRef: "c1_edit_a", previewPath: "/x/p.jpg", fileSizeBytes: 10, width: 3, height: 2,
                                     pixelSha256: "s", stateHash: "h2", geometryStateHash: "g2")
         let previewSummary = compacted("preview", .preview(preview))
-        XCTAssertEqual(previewSummary?["outputPath"] as? String, "/x/p.jpg")
+        XCTAssertEqual(previewSummary?["previewPath"] as? String, "/x/p.jpg")
         XCTAssertNil(previewSummary?["pixelSha256"])
         if case .preview = ResultCompaction.compact(.preview(preview), tool: "preview", documentPath: document.path).complete {} else { XCTFail("complete lost the preview") }
 
@@ -59,7 +59,7 @@ struct ResultCompactionTests {
         let coverage: [String: Any] = ["geometry": "compared", "nativeTarget": NSNull(), "nativeComparedFields": ["brightness"], "nativeNotComparedFields": ["hue"],
             "nativeUnavailableBefore": [:], "nativeUnavailableAfter": ["hue": "missing"], "maskPixels": "unsupported", "layerSettings": "not-compared",
             "colorEditorElements": "not-compared", "nativeLensAndVariantSettings": "not-compared", "atomicSnapshot": false]
-        let bundle: [String: Any] = ["version": 1, "observed": [:], "preview": ["outputPath": "/x/c.jpg"], "coverage": coverage,
+        let bundle: [String: Any] = ["version": 1, "observed": [:], "preview": ["previewPath": "/x/c.jpg"], "coverage": coverage,
             "diff": ["adjustments": ["exposure": ["before": 0, "after": 1, "beforePresent": true, "afterPresent": true, "delta": 1]],
                      "geometry": [:], "metadata": [:], "nativeAdjustments": [:]],
             "provenance": ["workingRef": "c1_edit_b", "operations": [["step": "native", "operationId": "op4"]],

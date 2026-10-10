@@ -32,8 +32,8 @@ def preview_pixels(path):
 
 
 def restored_preview_error(before, restored):
-    size, a = preview_pixels(before['outputPath'])
-    restored_size, b = preview_pixels(restored['outputPath'])
+    size, a = preview_pixels(before['previewPath'])
+    restored_size, b = preview_pixels(restored['previewPath'])
     assert size == restored_size
     differences = [abs(x-y) for x, y in zip(a, b)]
     metrics = {'meanAbsoluteChannelError':sum(differences)/len(differences),

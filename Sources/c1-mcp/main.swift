@@ -92,7 +92,7 @@ struct C1MCPServer {
                             let response = try request.dispatch()
                             var content = [textContent(response.json)]
                             if case .preview(let preview) = response.complete {
-                                let image = try Data(contentsOf: URL(fileURLWithPath: preview.outputPath))
+                                let image = try Data(contentsOf: URL(fileURLWithPath: preview.previewPath))
                                 content.append(imageContent(base64: image.base64EncodedString(), mimeType: "image/jpeg"))
                             }
                             return CallTool.Result(content: content, isError: response.reportsFailure)

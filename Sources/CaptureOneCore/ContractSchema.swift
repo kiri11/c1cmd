@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "3.7.0"
+    public static let version = "4.0.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -269,7 +269,7 @@ public enum ContractSchema {
             "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
-            "preview": object(["operationId": string, "workingRef": string, "outputPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
+            "preview": object(["operationId": string, "workingRef": string, "previewPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
             "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
         for (name,schema) in Recipes.responses(responses) { responses[name] = schema }

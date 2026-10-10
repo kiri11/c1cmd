@@ -247,7 +247,7 @@ def main():
         print(f"\n[Step 11] Testing c1 preview on working variant {working_ref}...")
         code, prev_res = run_c1(["preview", working_ref])
         assert code == 0, f"preview failed: {prev_res}"
-        preview_file = Path(prev_res["outputPath"])
+        preview_file = Path(prev_res["previewPath"])
         assert preview_file.exists(), f"Preview file does not exist: {preview_file}"
         assert preview_file.stat().st_size > 0, "Preview file is empty"
         assert prev_res["width"] > 0 and prev_res["height"] > 0
@@ -260,8 +260,8 @@ def main():
         shutil.copy2(preview_file, stale)
         code, custom_preview = run_c1(["preview", working_ref, "--output-dir", str(custom_dir)])
         assert code == 0, custom_preview
-        assert Path(custom_preview["outputPath"]).is_relative_to(custom_dir / "c1-previews")
-        assert custom_preview["outputPath"] != str(stale)
+        assert Path(custom_preview["previewPath"]).is_relative_to(custom_dir / "c1-previews")
+        assert custom_preview["previewPath"] != str(stale)
         assert custom_preview["nativeVariantId"] == clone_id
         assert custom_preview["stateHash"] == after_add_hash
         print("PASS: custom output routing ignores stale JPEG and associates variant/state")

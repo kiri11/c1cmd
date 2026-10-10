@@ -71,7 +71,7 @@ def main():
             else:words+=['--aspect-ratio',1.5 if proposal['orientation']=='landscape' else .75]
             record['applied']=run(*words);save()
             record['afterPreview']=run('preview',ref);save()
-            print(json.dumps({'reviewRecord':str(path),'workingRef':ref,'before':record['beforePreview']['outputPath'],'after':record['afterPreview']['outputPath']}))
+            print(json.dumps({'reviewRecord':str(path),'workingRef':ref,'before':record['beforePreview']['previewPath'],'after':record['afterPreview']['previewPath']}))
         except BaseException as e:
             record['error']=str(e);record['reviewStatus']='needs-attention';save();raise
 

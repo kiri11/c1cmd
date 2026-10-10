@@ -9,7 +9,7 @@ public struct PreviewResult: Codable, Equatable {
     public var geometryStateHash: String? = nil
     public let operationId: String
     public let workingRef: String?
-    public let outputPath: String
+    public let previewPath: String
     public let fileSizeBytes: Int64
     public let width: Int
     public let height: Int
@@ -20,7 +20,7 @@ public struct PreviewResult: Codable, Equatable {
     public init(
         operationId: String,
         workingRef: String?,
-        outputPath: String,
+        previewPath: String,
         fileSizeBytes: Int64,
         width: Int,
         height: Int,
@@ -35,7 +35,7 @@ public struct PreviewResult: Codable, Equatable {
         self.nativeVariantId = nativeVariantId
         self.operationId = operationId
         self.workingRef = workingRef
-        self.outputPath = outputPath
+        self.previewPath = previewPath
         self.fileSizeBytes = fileSizeBytes
         self.width = width
         self.height = height
