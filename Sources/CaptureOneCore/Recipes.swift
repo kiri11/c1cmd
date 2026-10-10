@@ -41,9 +41,11 @@ public enum Recipes {
             "request":object,"initial":existing["get"]!,"activeStep":["type":["string","null"]],
             "scopedBefore":RecipeScopes.evidenceSchema,"scopedObserved":RecipeScopes.evidenceSchema,"resultBundle":CompoundResultBundle.schema(existing),"observed":existing["get"]!,"error":object,"unattempted":strings,"referencesExpired":ContractSchema.boolean,
             "childOperations":["type":"array","items":existing["operation_status"]!]],required:["compoundId","recipeId","status","completed","plan"])
+        var status = report; status["properties"] = (report["properties"] as! [String:Any]).merging(["verified":ContractSchema.boolean,"verificationPath":str]) { $1 }
+        var verification = status; verification["required"] = (report["required"] as! [String]) + ["verified"]
         return ["reference_capture":ContractSchema.object(["referenceId":str,"bundle":object],required:["referenceId","bundle"]),
                 "recipe_register":ContractSchema.object(["recipeId":str,"status":["enum":["unverified"]],"recipe":recipe],required:["recipeId","status","recipe"]),
-                "recipe_verify":report,"edit_apply":report,"edit_status":report]
+                "recipe_verify":verification,"edit_apply":report,"edit_status":status]
     }
     public static func validate(_ tool: String, _ args: [String:Any]) throws {
         try ContractSchema.validateValue(args, schema:input(tool), path:tool)
@@ -233,6 +235,7 @@ public final class RecipeWorkflow {
         if verify || args["preview"] as? Bool == true { plan.append("preview") }
         plan.append("observe")
         var report: [String:Any] = ["compoundId":compoundId,"recipeId":id,"status":"running","documentToken":doc.openToken,"sourceRef":sourceRef,"journalOffset":journalOffset,"plan":plan,"completed":[],"request":args,"initial":try Recipes.object(initial)]
+        if verify { report["verified"] = false }
         if let scopeBefore { report["scopedBefore"] = try scopeBefore.evidence() }
         var completed: [[String:Any]] = [], ref = sourceRef, step = "prepare"
         try Recipes.write(report,to:path)
@@ -352,13 +355,18 @@ public final class RecipeWorkflow {
                 bundle["coverage"] = coverage
                 report["resultBundle"] = bundle
             }
-            report["status"] = "succeeded"; report["observed"] = try Recipes.object(observed); report["activeStep"] = NSNull(); try Recipes.write(report,to:path)
+            report["status"] = "succeeded"; report["observed"] = try Recipes.object(observed); report["activeStep"] = NSNull()
             if verify {
-                try Recipes.write(["recipeId":id,"build":doc.appVersion,"status":"verified","compoundId":compoundId,"reportHash":try Recipes.digest(report),"coverage":Recipes.oracleFields,"scopedCoverage":scoped ? ["camera","lens","basicColor","advancedColor"] : [],"maskPixels":"excluded","visualReview":"required"],to:Recipes.file(doc,"verified-recipes",id))
+                // Evidence lands before the report it hashes, so a durable `verified: true` always has its file.
+                let evidence = Recipes.file(doc,"verified-recipes",id)
+                report["verified"] = true; report["verificationPath"] = evidence.path
+                try Recipes.write(["recipeId":id,"build":doc.appVersion,"status":"verified","compoundId":compoundId,"reportHash":try Recipes.digest(report),"coverage":Recipes.oracleFields,"scopedCoverage":scoped ? ["camera","lens","basicColor","advancedColor"] : [],"maskPixels":"excluded","visualReview":"required"],to:evidence)
             }
+            try Recipes.write(report,to:path)
             return report
         } catch {
             report.removeValue(forKey:"resultBundle")
+            if verify { report["verified"] = false; report.removeValue(forKey:"verificationPath") }
             report["status"] = error is OperationFailure ? "outcome-unknown" : "failed"
             report["error"] = ErrorResponse.payload(error)["error"]
             report["completed"] = completed; report["activeStep"] = step

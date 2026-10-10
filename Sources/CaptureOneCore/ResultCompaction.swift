@@ -53,7 +53,7 @@ public enum ResultCompaction {
             // Failed, uncertain and interrupted compound edits keep every field.
             guard full["status"] as? String == "succeeded", let bundle = full["resultBundle"] as? [String: Any],
                   let provenance = bundle["provenance"] as? [String: Any] else { return nil }
-            var result = pick(["compoundId", "recipeId", "status"])
+            var result = pick(["compoundId", "recipeId", "status", "verified", "verificationPath"])
             result["workingRef"] = provenance["workingRef"]
             result["operations"] = provenance["operations"]
             result["finalHashes"] = provenance["finalHashes"]
@@ -79,11 +79,13 @@ public enum ResultCompaction {
         let bundle = CompoundResultBundle.schema(responses)["properties"] as! [String: Any]
         let provenance = (bundle["provenance"] as! [String: Any])["properties"] as! [String: Any]
         let changes: [String: Any] = ["type": "object", "additionalProperties": open]
-        let report = compact("edit_apply", ["compoundId", "recipeId", "status"],
+        let report = compact("edit_status", ["compoundId", "recipeId", "status", "verified", "verificationPath"],
             extra: ["status": ["enum": ["succeeded"]], "workingRef": string, "operations": provenance["operations"]!,
                     "finalHashes": provenance["finalHashes"]!, "diff": bundle["diff"]!, "coverage": bundle["coverage"]!,
                     "previewPath": string, "scopedDiff": open],
             required: ["compoundId", "recipeId", "status", "workingRef", "operations", "finalHashes", "diff", "coverage"])
+        var apply = report; apply["properties"] = (report["properties"] as! [String: Any]).filter { !["verified", "verificationPath"].contains($0.key) }
+        var verification = report; verification["required"] = (report["required"] as! [String]) + ["verified", "verificationPath"]
         var result: [String: Any] = [
             "set": compact("set", tonal, required: tonal), "add": compact("add", tonal, required: tonal),
             "reset": compact("reset", tonal, required: tonal),
@@ -95,7 +97,7 @@ public enum ResultCompaction {
             "reference_capture": compact("reference_capture", ["referenceId"], extra: ["previewPath": string, "coverage": open],
                                          required: ["referenceId", "coverage"]),
             "recipe_register": compact("recipe_register", ["recipeId", "status"], required: ["recipeId", "status"]),
-            "recipe_verify": report, "edit_apply": report, "edit_status": report,
+            "recipe_verify": verification, "edit_apply": apply, "edit_status": report,
         ]
         let geometry = ["operationId", "workingRef", "diff", "geometryStateHash", "isDryRun"]
         result["geometry_set"] = compact("geometry_set", geometry + ["exposedCorners"], required: geometry)

@@ -110,8 +110,11 @@ The native highlight-recovery alias is checked as the negative of highlight
 adjustment; it is not treated as an unrelated omitted field.
 
 Verification evidence is bound to the recipe hash, exact build and durable report
-hash. A failed verification never authorizes reuse. The clone remains for preview
-review and explicit deletion; nothing is restored automatically.
+hash. A successful report carries `verified: true` and `verificationPath`, the
+evidence file `.c1/verified-recipes/<recipeId>.json`; a failed, uncertain or
+interrupted verification reports `verified: false` and no path. A failed
+verification never authorizes reuse. The clone remains for preview review and
+explicit deletion; nothing is restored automatically.
 
 ### Apply one photo
 
@@ -238,8 +241,10 @@ Successful `edit_apply` and `recipe_verify` reports include `resultBundle`
   flags and a numeric `delta` when applicable. Differences reflect exact observed
   values, including native normalization, rather than requested patches.
 - `provenance`: document and photo identity, immutable recipe payload and reference
-  ID, prior verification evidence, effective per-photo policies, initial/final
-  hashes, working reference and per-step operation IDs.
+  ID, effective per-photo policies, initial/final hashes, working reference and
+  per-step operation IDs. `provenance.verification` is the prior evidence an
+  `edit_apply` relied on; it is `null` for a `recipe_verify` report, whose own
+  outcome is the top-level `verified`.
 - `preview`: the exported preview result, or `null` when none was requested.
 - `coverage`: compared and unavailable native fields and explicit exclusions for
   masks, layers, color-editor elements and native lens/variant snapshots.

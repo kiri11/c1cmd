@@ -69,6 +69,20 @@ struct ResultCompactionTests {
         XCTAssertEqual(compound?["previewPath"] as? String, "/x/c.jpg")
         XCTAssertEqual((compound?["coverage"] as? [String: Any])?["nativeNotComparedFields"] as? [String], ["hue"])
         XCTAssertEqual((compound?["operations"] as? [[String: String]])?.first?["operationId"], "op4")
+        XCTAssertNil(compound?["verified"])
+
+        // Succeeded verification: the outcome and its evidence file stay; a failed or uncertain one is complete and still says so.
+        var verification = report; verification["verified"] = true; verification["verificationPath"] = "/x/.c1/verified-recipes/r1.json"
+        let verified = compacted("recipe_verify", .compound(verification))
+        XCTAssertEqual(verified?["verified"] as? Bool, true)
+        XCTAssertEqual(verified?["verificationPath"] as? String, "/x/.c1/verified-recipes/r1.json")
+        for status in ["failed", "outcome-unknown"] {
+            var unverified = report; unverified["status"] = status; unverified["verified"] = false; unverified.removeValue(forKey: "resultBundle")
+            let response = ResultCompaction.compact(.compound(unverified), tool: "recipe_verify", documentPath: document.path)
+            if case .compact = response { XCTFail("\(status) verification was compacted") }
+            XCTAssertTrue(response.reportsFailure)
+            XCTAssertEqual(json(response.json)["verified"] as? Bool, false)
+        }
 
         // Unfinished compound edits and results without writable evidence are returned complete.
         let before = (try? FileManager.default.contentsOfDirectory(atPath: document.appendingPathComponent(".c1/results").path))?.count

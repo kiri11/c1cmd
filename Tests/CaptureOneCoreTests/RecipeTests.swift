@@ -146,12 +146,19 @@ struct RecipeTests {
             let clone = try core.cloneVariant(sourceRef:"1")
             let verification = try workflow.run("recipe_verify",arguments:["workingRef":clone.workingRef,"ifState":try core.get(ref:clone.workingRef).stateHash,"ifDocument":doc.openToken,"recipeId":id])
             XCTAssertEqual(verification["status"] as? String,"succeeded")
+            let evidence = directory.appendingPathComponent(".c1/verified-recipes/" + id + ".json")
+            XCTAssertEqual(verification["verified"] as? Bool,true)
+            XCTAssertEqual(verification["verificationPath"] as? String,evidence.path)
+            XCTAssertTrue(FileManager.default.fileExists(atPath:evidence.path))
+            let verificationStatus = try workflow.run("edit_status",arguments:["compoundId":verification["compoundId"]!])
+            XCTAssertEqual(verificationStatus["verified"] as? Bool,true)
             fake.properties["clarity amount"] = 1
             fake.properties["noise reduction single pixel"] = 0.0
             fake.properties["rgb curve"] = [0.0,0,100,100]
             fake.properties["film grain type"] = "fine"
             let result = try workflow.run("edit_apply",arguments:request)
             XCTAssertEqual(result["status"] as? String,"succeeded")
+            XCTAssertNil(result["verified"],"Only verification reports carry an outcome")
             XCTAssertNotNil(result["observed"])
             let bundle = result["resultBundle"] as! [String:Any]
             let diff = bundle["diff"] as! [String:[String:Any]]
@@ -190,6 +197,8 @@ struct RecipeTests {
             fake.corruptOracle = true
             let rejected = try workflow.run("recipe_verify",arguments:["recipeId":otherID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken])
             XCTAssertEqual(rejected["status"] as? String,"failed")
+            XCTAssertEqual(rejected["verified"] as? Bool,false)
+            XCTAssertNil(rejected["verificationPath"])
             XCTAssertFalse(FileManager.default.fileExists(atPath:directory.appendingPathComponent(".c1/verified-recipes/" + otherID + ".json").path))
             for key in ["rgb curve","film grain type","vignetting amount","noise reduction single pixel"] {
                 fake.corruptField = key
@@ -227,7 +236,6 @@ struct RecipeTests {
             XCTAssertThrowsError(try workflow.run("recipe_verify",arguments:["recipeId":wrongID,"workingRef":otherClone.workingRef,"ifState":try core.get(ref:otherClone.workingRef).stateHash,"ifDocument":doc.openToken]))
             XCTAssertEqual(fake.writes,writesBeforeMismatch)
             // Corrupt verified evidence must fail before mutation.
-            let evidence = directory.appendingPathComponent(".c1/verified-recipes/" + id + ".json")
             let saved = try Data(contentsOf:evidence)
             try Data("{}".utf8).write(to:evidence)
             let count = fake.writes
@@ -286,6 +294,38 @@ struct RecipeTests {
         }
         scopeFault(ignoreDelete:false)
         scopeFault(ignoreDelete:true)
+        verifyFault()
+    }
+    /// A verification whose child write is lost reports `outcome-unknown` and `verified: false`,
+    /// and so does its durable report, whether read back or left interrupted.
+    static func verifyFault() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = RecipeFake(directory), base = fake.geometry.base
+        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let workflow = RecipeWorkflow(core:core)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let reference = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":source.stateHash])
+            let recipe: [String:Any] = ["version":1,"referenceId":reference["referenceId"]!,"settings":["clarity amount":5],"exposure":["mode":"preserve"],"whiteBalance":["mode":"preserve"],"cropPolicy":"preserve"]
+            let id = try workflow.run("recipe_register",arguments:["recipe":recipe])["recipeId"] as! String
+            let clone = try core.cloneVariant(sourceRef:"1")
+            fake.fault = "native"
+            let unknown = try workflow.run("recipe_verify",arguments:["recipeId":id,"workingRef":clone.workingRef,"ifDocument":doc.openToken,"ifState":try core.get(ref:clone.workingRef).stateHash])
+            XCTAssertEqual(unknown["status"] as? String,"outcome-unknown")
+            XCTAssertEqual(unknown["verified"] as? Bool,false)
+            XCTAssertNil(unknown["verificationPath"])
+            XCTAssertFalse(FileManager.default.fileExists(atPath:directory.appendingPathComponent(".c1/verified-recipes/" + id + ".json").path))
+            let compoundId = unknown["compoundId"] as! String
+            let saved = try workflow.run("edit_status",arguments:["compoundId":compoundId])
+            XCTAssertEqual(saved["verified"] as? Bool,false)
+            var interrupted = unknown; interrupted["status"] = "running"
+            try JSONSerialization.data(withJSONObject:interrupted).write(to:directory.appendingPathComponent(".c1/compounds/" + compoundId + ".json"))
+            let status = try workflow.run("edit_status",arguments:["compoundId":compoundId])
+            XCTAssertEqual(status["status"] as? String,"interrupted")
+            XCTAssertEqual(status["verified"] as? Bool,false)
+        }
     }
     static func scopeFault(ignoreDelete: Bool) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

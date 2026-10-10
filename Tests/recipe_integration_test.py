@@ -83,6 +83,9 @@ def main():
         current = cli('get',clone['workingRef'])
         verified = recipe('verify',dict(recipeId=identifier,workingRef=clone['workingRef'],ifDocument=doc['openToken'],ifState=current['stateHash']))
         assert verified['status'] == 'succeeded'
+        verification = Path(verified['verificationPath'])
+        assert verified['verified'] is True and verification.is_file(), verified
+        assert verification.parent.name == 'verified-recipes' and verification.name == identifier + '.json', verification
         assert verified['resultBundle']['preview']['previewPath']
         assert verified['resultBundle']['provenance']['mode'] == 'recipe-verification'
         cli('variant','delete',clone['workingRef'])
