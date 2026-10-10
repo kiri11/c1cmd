@@ -54,13 +54,7 @@ class EditingFixture:
                 apple(f'open POSIX file {json.dumps(str(databases[0]))}')
             self.fixture = self.base / ('referenced' + self.raw.suffix)
             shutil.copy2(self.raw, self.fixture)
-            self.assert_current()
-            apple('set destination type of import settings of current document to current location\n'
-                  'set import naming format of import settings of current document to "[Image Name]"\n'
-                  'set exclude duplicates of import settings of current document to false\n'
-                  'set backup of import settings of current document to false\n'
-                  'set auto adjust of import settings of current document to false\n'
-                  f'import current document source {{{json.dumps(str(self.fixture))}}}')
+            self.import_referenced(self.fixture)
         else:
             self.fixture = self.document / 'Capture' / self.raw.name
             shutil.copy2(self.raw, self.fixture)
@@ -89,6 +83,15 @@ class EditingFixture:
             assert list(self.backup.rglob('*.cocatalogdb')), 'Native Catalog backup missing'
         self.log('fixture', self.details())
         return variants
+
+    def import_referenced(self, path):
+        self.assert_current()
+        apple('set destination type of import settings of current document to current location\n'
+              'set import naming format of import settings of current document to "[Image Name]"\n'
+              'set exclude duplicates of import settings of current document to false\n'
+              'set backup of import settings of current document to false\n'
+              'set auto adjust of import settings of current document to false\n'
+              f'import current document source {{{json.dumps(str(path))}}}')
 
     def details(self):
         return dict(documentKind=self.kind, layout=self.layout if self.kind == 'catalog' else None,

@@ -300,12 +300,14 @@ each measurement; a local comparison does not establish general scaling.
 | `scripts/benchmark-scoped-get.py --mcp ... --ref ID --samples 5 --conditions '...' --output FILE` | Single-scope against combined `nativeTargets` reads in one MCP process |
 | `scripts/benchmark-catalog.py`, `scripts/qualify-catalog-reader.py` | Stored SQLite reads against native reads on a matching disposable Catalog |
 | `scripts/probe-catalog-freshness.py --cli ... --raw ... --evidence NEW_DIR` | How long committed SQLite data lags native acknowledgements, on a new disposable Catalog |
+| `scripts/probe-variant-modified.py --raw ... [--evidence FILE]` | What `ZISMODIFIED` and the default/combined stored layers record after import, tonal, geometry, rating/tag-only and reset edits, on a new owned Catalog (`C1_TEST_CATALOG_LAYOUT` selects the layout) |
 | `scripts/qualify-upgraded-schema.py` | Read-only upgraded-schema stored reads; no Capture One calls |
 
 Benchmarks alternate order, exclude one warmup pair, and stop on changed payloads,
 errors or timeouts while keeping partial evidence. The freshness probe backs up
 its Catalog, restores saved values on success and keeps the fixture on any
-failure. Regenerate the native editing allowlist with
+failure. The variant-modified probe keeps its edits, closes its owned Catalog on
+success and leaves it open on failure. Regenerate the native editing allowlist with
 `python3 scripts/generate-native-editing.py`; `make check` detects drift from the
 retained SDEF. Store reports under `.build/benchmarks` or `.build/qualification`.
 
