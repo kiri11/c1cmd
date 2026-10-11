@@ -141,6 +141,7 @@ struct C1: ParsableCommand {
             VariantCommand.self,
             GetCommand.self,
             ExifCommand.self,
+            ThumbCommand.self,
             SetCommand.self,
             AddCommand.self,
             ResetCommand.self,
@@ -419,6 +420,26 @@ struct ExifCommand: ParsableCommand {
     var ref: String
 
     mutating func run() throws { try globals.run("exif", { ["ref": ref] }) }
+}
+
+// MARK: - Thumb
+struct ThumbCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "thumb", abstract: "Extract the camera's embedded JPEG from a variant's original with exiftool, for triage; it shows no Capture One edits.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Native variant ID or working reference.")
+    var ref: String
+
+    @Option(help: "Fit the long edge within this many pixels; never enlarges.")
+    var maxSize: Int?
+
+    mutating func run() throws {
+        try globals.run("thumb", {
+            var args: [String: Any] = ["ref": ref]
+            put(&args, "maxSize", maxSize)
+            return args
+        })
+    }
 }
 
 /// A JSON flag value, decoded into the arguments object unchanged.

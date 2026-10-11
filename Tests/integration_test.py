@@ -188,6 +188,29 @@ def main():
             assert code != 0 and exif_res.get("error", {}).get("code") == "dependency-missing", exif_res
             print("PASS: exif reports dependency-missing without exiftool")
 
+        # 5c. c1 thumb extracts the camera's embedded JPEG into c1's cache without a journal entry.
+        print(f"\n[Step 5c] Testing c1 thumb on original variant {source_id}...")
+        journal = SESSION_DIR / ".c1" / "journal.jsonl"
+        journal_before = journal.read_bytes() if journal.exists() else b""
+        code, thumb_res = run_c1(["thumb", source_id, "--max-size", "800"])
+        if exiftool:
+            assert code == 0, f"thumb failed: {thumb_res}"
+            thumb_path = Path(thumb_res["thumbPath"])
+            assert thumb_path.parent == Path.home() / "Library/Caches/c1/thumbs", thumb_path
+            size = json.loads(subprocess.check_output([exiftool, "-j", "-ImageWidth", "-ImageHeight", str(thumb_path)], text=True))[0]
+            assert (size["ImageWidth"], size["ImageHeight"]) == (thumb_res["width"], thumb_res["height"]), (size, thumb_res)
+            assert max(thumb_res["width"], thumb_res["height"]) <= 800 and thumb_res["cameraRendering"] is True, thumb_res
+            recorded = json.loads(subprocess.check_output([exiftool, "-j", "-Orientation#", str(fixture_raw)], text=True))[0]
+            assert thumb_res["exifOrientation"] == recorded.get("Orientation", 1), (thumb_res, recorded)
+            if fixture_raw.suffix.upper() == ".CR3":
+                assert thumb_res["embeddedTag"] == "JpgFromRaw", "A CR3's largest embedded JPEG is the full-size JpgFromRaw"
+            assert compute_sha256(fixture_raw) == baseline_raw_sha, "thumb must not modify the original"
+            assert (journal.read_bytes() if journal.exists() else b"") == journal_before, "thumb must not journal"
+            print(f"PASS: thumb {thumb_res['width']}x{thumb_res['height']} from {thumb_res['embeddedTag']} at {thumb_path}")
+        else:
+            assert code != 0 and thumb_res.get("error", {}).get("code") == "dependency-missing", thumb_res
+            print("PASS: thumb reports dependency-missing without exiftool")
+
         # 6. c1 variant clone
         print(f"\n[Step 6] Testing c1 variant clone {source_id}...")
         code, clone_res = run_c1(["variant", "clone", source_id])

@@ -38,16 +38,8 @@ public enum ExifReader {
 
     /// Reads the original behind `get`; `geometry.orientation` sets the level frame when known.
     public static func read(_ source: GetResult, executable: String? = locate()) throws -> ExifResult {
-        guard let path = source.parentImagePath, path.hasPrefix("/") else {
-            throw C1Error.invalidRequest("Capture One did not report an absolute original path for '\(source.id)'.")
-        }
-        guard FileManager.default.isReadableFile(atPath: path) else {
-            throw C1Error.invalidRequest("The original image is offline or unreadable: \(path)")
-        }
-        guard let executable else {
-            throw C1Error.dependencyMissing("exiftool was not found. Install it (brew install exiftool) or set C1_EXIFTOOL to its path.")
-        }
-        let tags = try run(executable, path: path)
+        let (path, executable) = try original(source, executable: executable)
+        let tags = try run(executable, arguments: arguments, path: path)
         let orientation: Int?
         if let geometry = source.geometry {
             orientation = geometry.flip == "none" ? geometry.orientation : nil
@@ -87,7 +79,21 @@ public enum ExifReader {
 
     static func rounded(_ value: Double) -> Double { (value * 100).rounded() / 100 }
 
-    static func run(_ executable: String, path: String) throws -> [String: Any] {
+    /// The variant's original, checked before exiftool runs, and the exiftool to read it with.
+    static func original(_ source: GetResult, executable: String?) throws -> (path: String, executable: String) {
+        guard let path = source.parentImagePath, path.hasPrefix("/") else {
+            throw C1Error.invalidRequest("Capture One did not report an absolute original path for '\(source.id)'.")
+        }
+        guard FileManager.default.isReadableFile(atPath: path) else {
+            throw C1Error.invalidRequest("The original image is offline or unreadable: \(path)")
+        }
+        guard let executable else {
+            throw C1Error.dependencyMissing("exiftool was not found. Install it (brew install exiftool) or set C1_EXIFTOOL to its path.")
+        }
+        return (path, executable)
+    }
+
+    static func run(_ executable: String, arguments: [String], path: String) throws -> [String: Any] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments + [path]

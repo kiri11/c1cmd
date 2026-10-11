@@ -16,6 +16,7 @@ Capture One is a trademark of Capture One A/S. This independent project is not a
 - **Expanded native editing** (experimental): most adjustment properties, curves, lens corrections, layers and masks.
 - **Reference recipes** (experimental): capture a look from a reference photo, verify it on a disposable copy, then apply it to other photos.
 - **Browsing**: filter by rating, collection and selection, and read closed Catalogs directly from their database.
+- **Fast triage previews**: the JPEG the camera embedded in each original, without a Capture One export. It shows the camera's rendering, not your edits. Needs exiftool.
 - **Camera level hints**: a suggested leveling rotation and lens tilt from the camera's level sensor, read from the original file. Needs [exiftool](https://exiftool.org) (`brew install exiftool`).
 
 RAW files are never modified. Every edit is checked against the photo's current state and recorded in a journal beside your document before it is sent, so an interrupted edit can be investigated instead of guessed at. Catalogs are read-only unless you enable editing for one specific Catalog.

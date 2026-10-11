@@ -97,7 +97,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 37
+        assert len(tools) == 38
         assert "native_get" not in cli_schema["requests"]
         removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
         assert removed.get('isError'), removed
@@ -286,7 +286,7 @@ def run(cli, mcp):
         for name in ['recipe_verify', 'edit_apply']:
             assert cli_schema['requests'][name]['properties']['previewSize'] == cli_schema['requests']['preview']['properties']['size'], name
         assert cli_schema['responses']['operation_status']['properties']['previewSize'] == {'type': 'integer'}
-        print('PASS: shared CLI/MCP schemas, 37 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 38 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
@@ -392,6 +392,8 @@ ACCEPTED = [
     ('variant_baseline', ['variant', 'baseline', '1'], {'sourceRef': '1'}),
     ('get', ['get', '1', '--live', '--native-targets', '[{"scope": "lens"}]'], {'ref': '1', 'live': True, 'nativeTargets': [{'scope': 'lens'}]}),
     ('exif', ['exif', 'c1_edit_x'], {'ref': 'c1_edit_x'}),
+    ('thumb', ['thumb', 'c1_edit_x'], {'ref': 'c1_edit_x'}),
+    ('thumb', ['thumb', '1', '--max-size', '1500'], {'ref': '1', 'maxSize': 1500}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '5', '--color-tag', '0', '--dry-run'],
      {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 5, 'colorTag': 0, 'dryRun': True}),
     ('set', ['set', 'x', '--if-state', 'h', 'exposure=0.5', 'kelvin=5400'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 0.5, 'kelvin': 5400}}),
@@ -461,6 +463,7 @@ REJECTED = [
     ('get', ['get', '6f9619ff-8b86-d011-b42d-00c04fc964ff', '--live'], {'ref': '6f9619ff-8b86-d011-b42d-00c04fc964ff', 'live': True}),
     ('variants_list', ['variants', 'list', '--ids', '1,6F9619FF-8B86-D011-B42D-00C04FC964FF'], {'ids': ['1', '6F9619FF-8B86-D011-B42D-00C04FC964FF']}),
     ('exif', ['exif', ' '], {'ref': ' '}),
+    ('thumb', ['thumb', '1', '--max-size', '0'], {'ref': '1', 'maxSize': 0}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '6'], {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 6}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--color-tag', '8'], {'workingRef': 'x', 'ifMetadataState': 'h', 'colorTag': 8}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h'], {'workingRef': 'x', 'ifMetadataState': 'h'}),

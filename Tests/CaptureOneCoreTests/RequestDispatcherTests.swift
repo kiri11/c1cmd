@@ -37,14 +37,14 @@ struct RequestDispatcherTests {
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.destructive).map(\.name).sorted(), ["native_action", "variant_delete"])
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.readOnly).map(\.name).sorted(),
                        ["capabilities", "catalog_collections", "catalog_get", "catalog_inspect", "catalog_variants", "diff", "doc_info", "doctor", "dump",
-                        "edit_status", "exif", "get", "read_session_status", "request_status", "schema", "variants_list"])
+                        "edit_status", "exif", "get", "read_session_status", "request_status", "schema", "thumb", "variants_list"])
 
         // The composition profile is transport-neutral: ToolRequest enforces it for the CLI and MCP alike.
         let blocked = ["set", "add", "reset", "variant_baseline", "metadata_set", "native_set", "native_action",
                        "reference_capture", "recipe_register", "recipe_verify", "edit_apply"]
         let composition = Set(ToolProfile.composition.tools.map(\.name))
         XCTAssertEqual(Set(ContractSchema.names).subtracting(composition), Set(blocked))
-        XCTAssertTrue(composition.isSuperset(of: ["variant_edit", "geometry_set", "geometry_restore", "get", "preview", "edit_status"]))
+        XCTAssertTrue(composition.isSuperset(of: ["variant_edit", "geometry_set", "geometry_restore", "get", "exif", "thumb", "preview", "edit_status"]))
         for tool in blocked {
             XCTAssertThrowsError(try ToolRequest(tool: tool, arguments: [:], profile: .composition)) { error in
                 XCTAssertEqual(error as? C1Error, .invalidRequest("Tool is not enabled in the composition profile: \(tool)"))

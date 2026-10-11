@@ -81,7 +81,9 @@ their only statement; the reference docs link here.
    `exactBuildMatched`. Run `doc_info` and keep `openToken`.
 2. List intended variants with `rating` or `minRating` (integers 0–5) and any
    collection/selection scope. Verify parent-image paths against the requested
-   folder; one image can have several variants.
+   folder; one image can have several variants. For fast visual triage, `thumb`
+   returns the camera's embedded JPEG; it shows no Capture One edits and never
+   replaces the `preview` in step 5.
 3. `get` each source, then `variant_edit` with `sourceRef`, `ifState`, `ifDocument`
    and, for crop proposals, `ifGeometryState`. Keep the returned `workingRef` and
    baselines. No variant is created.

@@ -12,9 +12,9 @@ response schemas and the error envelope. Every CLI command except `version` maps
 its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
-cancellation, and attaches preview images; it stays long-lived so compiled
-AppleScript handlers are reused. Contract version is `4.6.0`; package version is
-`0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
+cancellation, and attaches `preview` and `thumb` images; it stays long-lived so
+compiled AppleScript handlers are reused. Contract version is `4.9.0`; package
+version is `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
 
@@ -224,6 +224,31 @@ reconfigures it before every export, so do not use these recipes for your own
 exports. Capture One renders from the RAW at every size, so a smaller size makes a
 smaller file but may not save much export time.
 
+## Embedded camera previews
+
+`c1 thumb <ref>` / `thumb` returns the JPEG the camera embedded in the variant's
+original, for fast visual triage of many photos without a Capture One export. It
+reads the original with [exiftool](https://exiftool.org), installed separately as
+for [`exif`](geometry.md#camera-level), and takes the largest decodable
+`JpgFromRaw` or `PreviewImage`. On Canon CR3 files that is the full-size
+`JpgFromRaw`. The pixels are turned to the original's EXIF orientation
+(`exifOrientation`, 1 when unrecorded), and `maxSize` / `--max-size` fits the long
+edge within that many pixels without enlarging. The result names the file in
+`thumbPath` with its `width` and `height`; MCP also attaches the image.
+
+The result is the camera's rendering: it shows no Capture One adjustments, crop,
+rotation or orientation change, and it states so in `cameraRendering` and
+`limitation`. It is a triage aid and never review evidence for an edit or a recipe
+([invariant 8](../../AGENT_GUIDE.md#safety-invariants)); review edits with
+`preview`. Use it to sort and pick photos, or to see what a crop placement keeps
+of the full frame before preparing an edit.
+
+`thumb` only reads the original. It writes no journal entry, needs no write opt-in,
+returns no state tokens and is available in the composition profile. The JPEG is
+written to `~/Library/Caches/c1/thumbs`, outside the document, so a read-only
+Catalog stays untouched. Each original and `maxSize` has one file, named after
+the original, which the next call replaces; macOS may purge the folder at any time.
+
 ## Compact results
 
 `set`, `add`, `reset`, `metadata_set`, `geometry_set`, `geometry_restore`,
@@ -254,9 +279,9 @@ corrupt journal requires manual inspection.
 
 `C1_TOOL_PROFILE=composition` (older alias `C1_MCP_PROFILE`) hides and rejects
 `set`, `add`, `reset`, `variant_baseline`, `metadata_set`, native mutations and
-recipe capture/register/verify/apply. Preparation, geometry, inspection, cloning,
-clone deletion, preview and recovery remain. An unknown value, or two names that
-disagree, rejects every request.
+recipe capture/register/verify/apply. Preparation, geometry, inspection
+(including `exif` and `thumb`), cloning, clone deletion, preview and recovery
+remain. An unknown value, or two names that disagree, rejects every request.
 
 ## Error codes
 
@@ -275,6 +300,6 @@ disagree, rejects every request.
 | `request-cancelled` | Stopped at a safe boundary; a compound report lists completed steps. Never resume it automatically. |
 | `deadline-exceeded` | Inventory passed its deadline at a boundary. |
 | `no-people-detected` | A people mask found nobody and readback confirmed no change; the operation failed and blocks nothing. |
-| `dependency-missing` | An optional local tool, such as exiftool for `exif`, is not installed or cannot start. Nothing was changed. |
+| `dependency-missing` | An optional local tool, such as exiftool for `exif` and `thumb`, is not installed or cannot start. Nothing was changed. |
 | `capture-one-busy` | The advisory lock timed out; check for hung processes. |
 | `permission-denied` | Allow the host app under **Privacy & Security → Automation**. |

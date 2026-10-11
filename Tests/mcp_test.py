@@ -221,7 +221,7 @@ def main():
         tools = client.send_request("tools/list", {}).get("result", {}).get("tools", [])
         schema = parse_text_content(client.call_tool("schema").get("content", []))
         client.contract = schema
-        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 37, [t["name"] for t in tools]
+        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 38, [t["name"] for t in tools]
         for t in tools:
             assert t.get("description"), f"Tool {t['name']} missing description"
             assert t["inputSchema"] == schema["requests"][t["name"]], t["name"]
@@ -279,6 +279,21 @@ def main():
         del_data = parse_text_content(client.call_tool("variant_delete", {"workingRef": working_ref}).get("content", []))
         assert del_data.get("deleted") is True, f"Delete failed: {del_data}"
         print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content with a compact result; clone deleted")
+
+        print("\n[Step 4b] Embedded camera JPEG as image content...")
+        thumb_res = client.call_tool("thumb", {"ref": source_id, "maxSize": 400})
+        thumb_data = parse_text_content(thumb_res.get("content", []))
+        if shutil.which("exiftool") or Path("/opt/homebrew/bin/exiftool").exists():
+            assert thumb_res.get("isError") is not True, f"Thumb failed: {thumb_res}"
+            validate_response(thumb_data, schema["responses"]["thumb"], "thumb")
+            assert max(thumb_data["width"], thumb_data["height"]) <= 400 and thumb_data["cameraRendering"] is True, thumb_data
+            img_block = find_image_content(thumb_res.get("content", []))
+            assert img_block is not None and img_block.get("mimeType") == "image/jpeg", thumb_res
+            assert base64.b64decode(img_block["data"]) == Path(thumb_data["thumbPath"]).read_bytes(), "The image block is the thumb file"
+            print(f"  ✓ Thumb returned {thumb_data['width']}x{thumb_data['height']} from {thumb_data['embeddedTag']} as image content")
+        else:
+            assert thumb_res.get("isError") is True and thumb_data["error"]["code"] == "dependency-missing", thumb_res
+            print("  ✓ Thumb reports dependency-missing without exiftool")
 
         client.close()
         trace.close()

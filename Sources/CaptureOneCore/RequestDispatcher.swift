@@ -24,6 +24,7 @@ public struct ToolRequest {
         case variantClone(sourceRef: String), variantBaseline(sourceRef: String), variantDelete(workingRef: String)
         case get(ref: String, live: Bool, readWorkflow: String?, nativeTargets: [NativeTarget]?)
         case exif(ref: String)
+        case thumb(ref: String, maxSize: Int?)
         case adjust(workingRef: String, ifState: String, adjustments: Adjustments, delta: Bool, dryRun: Bool)
         case reset(workingRef: String, ifState: String, fields: [String], dryRun: Bool)
         case metadataSet(workingRef: String, ifMetadataState: String, rating: Int?, colorTag: Int?, dryRun: Bool)
@@ -113,6 +114,7 @@ public struct ToolRequest {
             command = .get(ref: ref, live: flag("live"), readWorkflow: string("readWorkflow"),
                            nativeTargets: try a["nativeTargets"].map { try NativeEditing.parseTargets($0, ref: ref) })
         case "exif": command = .exif(ref: string("ref")!)
+        case "thumb": command = .thumb(ref: string("ref")!, maxSize: int("maxSize"))
         case "set", "add":
             let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
             let values = a["adjustments"] as? [String: Any] ?? a.filter { !controls.contains($0.key) }
@@ -215,6 +217,7 @@ public struct ToolRequest {
             if !live, let result = try browsing.get(ref: ref, workflowID: workflow) { return .object(result) }
             return .get(try core.get(ref: ref))
         case .exif(let ref): return .value(try ExifReader.read(try core.get(ref: ref)))
+        case .thumb(let ref, let maxSize): return .thumb(try EmbeddedPreview.extract(try core.get(ref: ref), maxSize: maxSize))
         case .adjust(let workingRef, let ifState, let adjustments, let delta, let dryRun):
             return .mutation(try core.mutate(workingRefString: workingRef, ifState: ifState, setAdjustments: delta ? nil : adjustments,
                                              addAdjustments: delta ? adjustments : nil, isDryRun: dryRun))
@@ -262,6 +265,7 @@ public enum ToolResponse {
     case diff(DiffResult)
     case dump([DumpRecord])
     case preview(PreviewResult)
+    case thumb(ThumbResult)
     case operation(OperationRecord)
     case clone(CloneResult)
     case delete(DeleteResult)
@@ -289,6 +293,7 @@ public enum ToolResponse {
         case .diff(let v): return OutputFormatter.formatJson(v)
         case .dump(let v): return OutputFormatter.formatJson(v)
         case .preview(let v): return OutputFormatter.formatJson(v)
+        case .thumb(let v): return OutputFormatter.formatJson(v)
         case .operation(let v): return OutputFormatter.formatJson(v)
         case .clone(let v): return OutputFormatter.formatJson(v)
         case .delete(let v): return OutputFormatter.formatJson(v)
@@ -296,6 +301,15 @@ public enum ToolResponse {
         case .compound(let v): return (try? ReadWorkflow.json(v)) ?? "{}"
         case .object(let v): return (try? ReadWorkflow.json(v)) ?? "{}"
         case .compact(let v, _): return (try? ReadWorkflow.json(v)) ?? "{}"
+        }
+    }
+
+    /// A JPEG the result describes, which a transport can attach.
+    public var imagePath: String? {
+        switch complete {
+        case .preview(let v): return v.previewPath
+        case .thumb(let v): return v.thumbPath
+        default: return nil
         }
     }
 
