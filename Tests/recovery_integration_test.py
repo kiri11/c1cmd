@@ -35,7 +35,7 @@ SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
 LOOKUP_DRIVER = '''
 
 on run argv
-    set rows to my lookupVariantIdentities(item 1 of argv, rest of argv)
+    set rows to my lookupVariantIdentities({item 1 of argv, missing value}, rest of argv)
     set output to {}
     repeat with r in rows
         set end of output to (variantId of r) & tab & ((isPresent of r) as text) & tab & (parentImagePath of r)
