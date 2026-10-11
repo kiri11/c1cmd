@@ -204,7 +204,17 @@ def run(cli, mcp):
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'aspectRatio':0}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'width':3}}),
             ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'centerX':10,'centerY':10,'width':3,'height':2},'aspectRatio':1.5}),
+            *[('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'aspectRatio':.75, 'anchor':value})
+              for value in [{'x':-.1,'y':0}, {'x':.5,'y':1.1}, {'x':.5}, {'x':'0','y':0}, [.5, 0], {'x':.5,'y':0,'z':1}]],
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'rotation':1, 'anchor':{'x':.5,'y':0}}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'crop':{'centerX':10,'centerY':10,'width':3,'height':2}, 'anchor':{'x':.5,'y':0}}),
+            ('geometry_set', {'workingRef':'x', 'ifGeometryState':'h', 'aspectRatio':.75, 'anchor':{'x':.5,'y':0}, 'keystone':{'vertical':5}}),
             ('preview', {'ref':'x','fullFrame':'yes'}),
+            ('preview', {'ref':'x','aspectRatio':.75,'anchors':[{'x':.5,'y':0}]}),
+            ('preview', {'ref':'x','fullFrame':True,'anchors':[{'x':.5,'y':0}]}),
+            ('preview', {'ref':'x','fullFrame':True,'aspectRatio':.75}),
+            ('preview', {'ref':'x','fullFrame':True,'aspectRatio':.75,'anchors':[]}),
+            ('preview', {'ref':'x','fullFrame':True,'aspectRatio':.75,'anchors':[{'x':.5,'y':0}]*10}),
             ('reset', {'workingRef': 'x', 'ifState': 'h', 'fields': [123]}),
             ('reset', {'workingRef': 'x', 'ifState': 'h', 'fields': 'exposure'}),
             ('set', {'workingRef': 'x', 'ifState': 'h', 'exposure': 'oops', 'contrast': 1}),
@@ -250,6 +260,11 @@ def run(cli, mcp):
             result = subprocess.run([str(cli), 'geometry', 'set', 'x', '--if-geometry-state', 'h', '--crop', crop, '--format', 'json'], capture_output=True, text=True, timeout=15)
             assert result.returncode != 0
             assert_error_payload(json.loads(result.stderr), cli_schema)
+        for anchor in ['0.5', '0.5,0,1', 'top,0', '0.5,', 'nan,0', '0.5,2']:
+            for command in (['geometry', 'set', 'x', '--if-geometry-state', 'h', '--aspect-ratio', '0.75'], ['preview', 'x', '--full-frame', '--aspect-ratio', '0.75']):
+                result = subprocess.run([str(cli), *command, '--anchor', anchor, '--format', 'json'], capture_output=True, text=True, timeout=15)
+                assert result.returncode != 0, (command, anchor)
+                assert_error_payload(json.loads(result.stderr), cli_schema)
         for flags in [['--rating=-1'], ['--rating', '6'], ['--min-rating=-1'],
                       ['--min-rating', '6'], ['--rating', '5', '--min-rating', '4'],
                       ['--batch-size', '0'], ['--batch-size', '257'], ['--batch-size=-1'],
@@ -376,6 +391,8 @@ ACCEPTED = [
      {'workingRef': 'x', 'ifGeometryState': 'h', 'crop': {'centerX': 10, 'centerY': 20, 'width': 30, 'height': 40}, 'rotation': 1.5, 'keystone': {'vertical': 10}}),
     ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--aspect-ratio', '1.5', '--dry-run'],
      {'workingRef': 'x', 'ifGeometryState': 'h', 'aspectRatio': 1.5, 'dryRun': True}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--aspect-ratio', '0.75', '--anchor', '0.5,0', '--rotation', '2', '--dry-run'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'aspectRatio': 0.75, 'anchor': {'x': 0.5, 'y': 0}, 'rotation': 2, 'dryRun': True}),
     ('geometry_restore', ['geometry', 'restore', 'x', '--if-geometry-state', 'h', '--dry-run'], {'workingRef': 'x', 'ifGeometryState': 'h', 'dryRun': True}),
     ('reset', ['reset', 'x', '--if-state', 'h', 'exposure', 'contrast'], {'workingRef': 'x', 'ifState': 'h', 'fields': ['exposure', 'contrast']}),
     ('diff', ['diff', 'a', 'b', '--live'], {'ref1': 'a', 'ref2': 'b', 'live': True}),
@@ -384,12 +401,16 @@ ACCEPTED = [
      {'ids': ['1', '2'], 'collection': 'C', 'minRating': 4, 'deadlineSeconds': 9}),
     ('dump', ['dump', '--rating', '0', '--read-workflow', 'w1'], {'rating': 0, 'readWorkflow': 'w1'}),
     ('preview', ['preview', 'x', '--timeout', '60', '--full-frame', '--output-dir', '/x/o'], {'ref': 'x', 'timeout': 60, 'fullFrame': True, 'outputDir': '/x/o'}),
+    ('preview', ['preview', 'x', '--full-frame', '--aspect-ratio', '0.75', '--anchor', '0.5,0', '--anchor', '0.5,1'],
+     {'ref': 'x', 'fullFrame': True, 'aspectRatio': 0.75, 'anchors': [{'x': 0.5, 'y': 0}, {'x': 0.5, 'y': 1}]}),
     ('operation_status', ['operation', 'status', 'op1'], {'operationId': 'op1'}),
     ('request_status', ['request', 'status', 'req-1'], {'requestId': 'req-1'}),
     ('reference_capture', ['recipe', 'capture'], {'ref': '1', 'ifDocument': 'd', 'ifState': 's'}),
     ('recipe_register', ['recipe', 'register'], {'recipe': RECIPE}),
     ('recipe_verify', ['recipe', 'verify'], {'recipeId': HEX, 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's'}),
     ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's'}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'ifGeometryState': 'g',
+                                         'geometry': {'aspectRatio': 0.75, 'anchor': {'x': 0.5, 'y': 0}}}),
     ('edit_status', ['recipe', 'status'], {'compoundId': HEX}),
     # `full` selects the complete result; CLI --full maps to the same argument.
     ('set', ['set', 'x', '--if-state', 'h', '--full', 'exposure=1'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 1}, 'full': True}),
@@ -452,6 +473,13 @@ REJECTED = [
     ('recipe_register', ['recipe', 'register'], {'recipe': dict(RECIPE, exposure={'mode': 'magic'})}),
     ('recipe_verify', ['recipe', 'verify'], {'recipeId': 'short', 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's'}),
     ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'geometry': {'rotation': 1}}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'ifGeometryState': 'g',
+                                         'geometry': {'rotation': 1, 'anchor': {'x': 0.5, 'y': 0}}}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--rotation', '1', '--anchor', '0.5,0'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'rotation': 1, 'anchor': {'x': 0.5, 'y': 0}}),
+    ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'h', '--aspect-ratio', '0.75', '--anchor', '0.5,1.5'],
+     {'workingRef': 'x', 'ifGeometryState': 'h', 'aspectRatio': 0.75, 'anchor': {'x': 0.5, 'y': 1.5}}),
+    ('preview', ['preview', 'x', '--aspect-ratio', '0.75', '--anchor', '0.5,0'], {'ref': 'x', 'aspectRatio': 0.75, 'anchors': [{'x': 0.5, 'y': 0}]}),
     ('edit_status', ['recipe', 'status'], {'compoundId': '../escape'}),
 ]
 # Tools without arguments have no CLI-expressible invalid request.

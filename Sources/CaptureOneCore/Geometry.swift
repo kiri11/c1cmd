@@ -14,6 +14,40 @@ public struct CropRect: Codable, Equatable {
     public var aspectRatio: Double { width / height }
 }
 
+/// Where an `aspectRatio` fit sits inside its planning rectangle, as viewed: `x` runs
+/// from 0 (left edge) to 1 (right edge) and `y` from 0 (top edge) to 1 (bottom edge).
+/// The canvas has a bottom-left origin, so `y` 0 is the largest canvas `y`.
+public struct CropAnchor: Codable, Equatable {
+    public let x: Double
+    public let y: Double
+    /// The centred fit; requests with this anchor take the unanchored path unchanged.
+    public static let center = CropAnchor(validX: 0.5, y: 0.5)
+    static let usage = "anchor requires aspectRatio and cannot be combined with crop or keystone."
+
+    public init(x: Double, y: Double) throws {
+        guard (0...1).contains(x), (0...1).contains(y) else { throw C1Error.invalidRequest("anchor x and y must each be within 0...1.") }
+        self.init(validX: x, y: y)
+    }
+    private init(validX x: Double, y: Double) { self.x = x; self.y = y }
+    public init(from decoder: Decoder) throws {
+        enum Keys: String, CodingKey { case x, y }
+        let container = try decoder.container(keyedBy: Keys.self)
+        try self.init(x: container.decode(Double.self, forKey: .x), y: container.decode(Double.self, forKey: .y))
+    }
+
+    /// Moves a fit of unchanged size from the centre of `bounds` toward this anchor.
+    /// Off-centre positions round toward the centre, so an edge placed on the bounds
+    /// stays inside them; the centre keeps the centred fit's rounding.
+    func position(_ fit: CropRect, in bounds: CropRect) -> CropRect {
+        func place(_ center: Double, _ offset: Double) -> Double {
+            offset > 0 ? floor(center + offset) : offset < 0 ? ceil(center + offset) : center.rounded()
+        }
+        return CropRect(centerX: place(bounds.centerX, (x - 0.5) * (bounds.width - fit.width)),
+                        centerY: place(bounds.centerY, (0.5 - y) * (bounds.height - fit.height)),
+                        width: fit.width, height: fit.height)
+    }
+}
+
 /// Exact containment of an axis-aligned crop in an uncorrected rotated image. The
 /// canvas is the bounding box of the oriented `width` × `height` image rotated
 /// clockwise by `rotation` degrees about its centre; a crop corner is exposed when
@@ -158,15 +192,25 @@ public struct Geometry: Codable, Equatable {
         return "geometry-v1:" + digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    public func target(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?) throws -> Geometry {
-        guard let reason = unsupportedReason else { return try validatedTarget(crop: requested, rotation: angle, aspectRatio: aspectRatio) }
+    /// `anchor` positions the `aspectRatio` fit inside the planning rectangle; nil centres it.
+    public func target(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?, anchor: CropAnchor? = nil) throws -> Geometry {
+        guard let reason = unsupportedReason else { return try validatedTarget(crop: requested, rotation: angle, aspectRatio: aspectRatio, anchor: anchor) }
         throw C1Error.invalidRequest(reason)
     }
-    private func validatedTarget(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?) throws -> Geometry {
+    private func validatedTarget(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?, anchor: CropAnchor?) throws -> Geometry {
         guard requested != nil || angle != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
         guard requested == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
+        guard anchor == nil || aspectRatio != nil else { throw C1Error.invalidRequest(CropAnchor.usage) }
         let angle = angle ?? rotation
         guard angle.isFinite, abs(angle) <= Geometry.maximumRotation else { throw Geometry.rotationOutOfRange }
+        if anchor != nil {
+            guard !hasPerspectiveOrMovements else {
+                throw C1Error.invalidRequest("anchor is unavailable with keystone or lens movements, where Capture One normalizes ratio fits itself. Choose an explicit crop.")
+            }
+            guard !requiresNativeBounds || angle == rotation else {
+                throw C1Error.invalidRequest("On lens-corrected geometry, anchor applies at the current rotation. Set the rotation first, then the anchored aspectRatio.")
+            }
+        }
         guard !requiresNativeBounds || angle == rotation else {
             throw C1Error.invalidRequest("Corrected geometry bounds at a new rotation require native execution; a dry run cannot predict them.")
         }
@@ -177,6 +221,7 @@ public struct Geometry: Codable, Equatable {
             guard ratio.isFinite, ratio > 0 else { throw C1Error.invalidRequest("aspectRatio must be finite and positive.") }
             let w = min(bounds.width, bounds.height * ratio)
             rect = CropRect(centerX: bounds.centerX.rounded(), centerY: bounds.centerY.rounded(), width: floor(w), height: floor(w / ratio))
+            if let anchor { rect = anchor.position(rect, in: bounds) }
         }
         guard rect.values.allSatisfy({ $0.isFinite }), rect.width >= 1, rect.height >= 1 else { throw C1Error.invalidRequest("Crop dimensions must be positive finite pixels.") }
         if requiresNativeBounds {
@@ -254,6 +299,8 @@ public struct GeometryMutationResult: Codable {
     /// Observed crop corners outside an uncorrected rotated image, such as
     /// Capture One's automatic crop after a rotation-only change. Never accepted silently.
     public var exposedCorners: [CropContainment.Corner]? = nil
+    /// The rectangle chosen for a request with `anchor`: predicted by a dry run, observed after a write.
+    public var anchoredCrop: CropRect? = nil
 }
 
 /// Bridge keys deliberately avoid Capture One's reserved AppleScript property names.

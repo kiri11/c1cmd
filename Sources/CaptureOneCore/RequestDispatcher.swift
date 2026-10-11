@@ -28,14 +28,14 @@ public struct ToolRequest {
         case reset(workingRef: String, ifState: String, fields: [String], dryRun: Bool)
         case metadataSet(workingRef: String, ifMetadataState: String, rating: Int?, colorTag: Int?, dryRun: Bool)
         case geometrySet(workingRef: String, ifGeometryState: String, crop: CropRect?, rotation: Double?,
-                         aspectRatio: Double?, keystone: KeystoneAdjustments?, dryRun: Bool)
+                         aspectRatio: Double?, anchor: CropAnchor?, keystone: KeystoneAdjustments?, dryRun: Bool)
         case geometryRestore(workingRef: String, ifGeometryState: String, dryRun: Bool)
         case nativeSet(workingRef: String, target: NativeTarget, ifNativeState: String, patch: [String: NativeValue], dryRun: Bool)
         case nativeAction(workingRef: String, target: NativeTarget, ifNativeState: String, action: String,
                           arguments: [String: NativeValue], dryRun: Bool)
         case diff(ref1: String, ref2: String?, live: Bool, readWorkflow: String?)
         case dump(DumpQuery)
-        case preview(ref: String, outputDir: String?, timeout: Double, fullFrame: Bool)
+        case preview(ref: String, outputDir: String?, timeout: Double, fullFrame: Bool, aspectRatio: Double?, anchors: [CropAnchor])
         case operationStatus(operationId: String)
         case requestStatus(requestId: String)
         case recipe
@@ -130,7 +130,7 @@ public struct ToolRequest {
         case "geometry_set":
             command = .geometrySet(workingRef: string("workingRef")!, ifGeometryState: string("ifGeometryState")!,
                                    crop: try decoded("crop"), rotation: number("rotation"), aspectRatio: number("aspectRatio"),
-                                   keystone: try decoded("keystone"), dryRun: flag("dryRun"))
+                                   anchor: try decoded("anchor"), keystone: try decoded("keystone"), dryRun: flag("dryRun"))
         case "geometry_restore":
             command = .geometryRestore(workingRef: string("workingRef")!, ifGeometryState: string("ifGeometryState")!, dryRun: flag("dryRun"))
         case "native_set":
@@ -146,7 +146,8 @@ public struct ToolRequest {
                 readWorkflow: string("readWorkflow"), ids: a["ids"] as? [String], rating: int("rating"), minRating: int("minRating"),
                 batchSize: int("batchSize") ?? 100, deadlineSeconds: number("deadlineSeconds")))
         case "preview":
-            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30, fullFrame: flag("fullFrame"))
+            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30, fullFrame: flag("fullFrame"),
+                               aspectRatio: number("aspectRatio"), anchors: try decoded("anchors") ?? [])
         case "operation_status": command = .operationStatus(operationId: string("operationId")!)
         case "request_status": command = .requestStatus(requestId: string("requestId")!)
         default:
@@ -220,9 +221,9 @@ public struct ToolRequest {
             return .mutation(try core.reset(workingRefString: workingRef, ifState: ifState, fields: fields, isDryRun: dryRun))
         case .metadataSet(let workingRef, let token, let rating, let colorTag, let dryRun):
             return .value(try core.metadataSet(workingRef: workingRef, ifMetadataState: token, rating: rating, colorTag: colorTag, dryRun: dryRun))
-        case .geometrySet(let workingRef, let token, let crop, let rotation, let aspectRatio, let keystone, let dryRun):
+        case .geometrySet(let workingRef, let token, let crop, let rotation, let aspectRatio, let anchor, let keystone, let dryRun):
             return .value(try core.geometrySet(workingRef: workingRef, ifGeometryState: token, crop: crop, rotation: rotation,
-                                               aspectRatio: aspectRatio, keystone: keystone, dryRun: dryRun))
+                                               aspectRatio: aspectRatio, anchor: anchor, keystone: keystone, dryRun: dryRun))
         case .geometryRestore(let workingRef, let token, let dryRun):
             return .value(try core.geometryRestore(workingRef: workingRef, ifGeometryState: token, dryRun: dryRun))
         case .nativeSet(let workingRef, let target, let token, let patch, let dryRun):
@@ -239,8 +240,9 @@ public struct ToolRequest {
             }
             return .dump(try core.dump(collectionName: q.collection, selectedOnly: q.selected, ids: q.ids, rating: q.rating,
                                        minRating: q.minRating, batchSize: q.batchSize, deadlineSeconds: q.deadlineSeconds))
-        case .preview(let ref, let outputDir, let timeout, let fullFrame):
-            return .preview(try core.preview(ref: ref, outputDirOverride: outputDir, timeout: timeout, fullFrame: fullFrame))
+        case .preview(let ref, let outputDir, let timeout, let fullFrame, let aspectRatio, let anchors):
+            return .preview(try core.preview(ref: ref, outputDirOverride: outputDir, timeout: timeout, fullFrame: fullFrame,
+                                             aspectRatio: aspectRatio, anchors: anchors))
         case .operationStatus(let id): return .operation(try core.operationStatus(operationId: id))
         case .requestStatus(let id): return .value(try RequestContext.status(requestId: id))
         case .recipe: return .compound(try RecipeWorkflow(core: core).run(tool, arguments: arguments))

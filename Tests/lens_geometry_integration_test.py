@@ -190,6 +190,27 @@ set crop of v to (maximum crop v apply false)''')
             cropped = cli('preview', ref)
             metrics = check_mapping(context, cropped)
             log('preview-mapping', case=index, context=context, cropped=cropped, metrics=metrics)
+        if index == 1:
+            # Corrected vertical canvas: the anchored 3:4 fit is planned in maximumCrop at the
+            # current rotation and journaled as an explicit crop; a new rotation is refused.
+            keys = ['centerX', 'centerY', 'width', 'height']
+            fresh = cli('get', ref)
+            bounds = fresh['geometryUsableBounds']
+            cli('geometry', 'set', ref, '--if-geometry-state', fresh['geometryStateHash'], '--rotation=-3',
+                '--aspect-ratio', .75, '--anchor', '0.5,0', error='invalid-request')
+            dry = cli('geometry', 'set', ref, '--if-geometry-state', fresh['geometryStateHash'],
+                      '--aspect-ratio', .75, '--anchor', '0.5,0', '--dry-run')
+            assert dry['isDryRun'] and dry['anchoredCrop'] == dry['after']['crop'], dry
+            top = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': fresh['geometryStateHash'],
+                                       'aspectRatio': .75, 'anchor': {'x': .5, 'y': 0}})
+            assert all(abs(top['after']['crop'][k]-dry['anchoredCrop'][k]) <= 2 for k in keys), (dry, top)
+            assert abs(top['after']['crop']['centerY']+top['after']['crop']['height']/2
+                       - (bounds['centerY']+bounds['height']/2)) <= 3, ('top-aligned in maximumCrop', bounds, top)
+            assert top['after']['lensGeometry'] == before['geometry']['lensGeometry']
+            operation = tool('operation_status', {'operationId': top['operationId']})
+            assert operation['status'] == 'succeeded' and operation['requestedGeometry'].get('aspectRatio') is None
+            assert operation['requestedGeometry']['crop'] == dry['anchoredCrop'], operation
+            log('anchored-corrected', case=index, bounds=bounds, dryRun=dry, result=top, operation=operation)
         current = cli('get', ref)
         diff = tool('diff', {'ref1': ref})
         assert diff['geometryDiff']

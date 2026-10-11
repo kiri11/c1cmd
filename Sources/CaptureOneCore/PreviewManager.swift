@@ -7,6 +7,12 @@ public struct PreviewResult: Codable, Equatable {
     public var contextSourceRef: String? = nil
     public var geometry: Geometry? = nil
     public var geometryStateHash: String? = nil
+    /// Full-frame only: the source variant's crop in this preview's pixels.
+    public var currentCrop: PreviewRect? = nil
+    /// Full-frame only: the requested candidate anchors.
+    public var candidateCrops: [CandidateCrop]? = nil
+    static let candidateUsage = "anchors (1–\(maximumCandidates)) and aspectRatio go together and require fullFrame."
+    static let maximumCandidates = 9
     public let operationId: String
     public let workingRef: String?
     public let previewPath: String
@@ -41,6 +47,33 @@ public struct PreviewResult: Codable, Equatable {
         self.height = height
         self.pixelSha256 = pixelSha256
     }
+}
+
+/// Preview pixels with a top-left origin, as image tools address them, to a tenth of a
+/// pixel. A crop larger than the rendered context extends past the preview edges.
+public struct PreviewRect: Codable, Equatable {
+    public let left: Double
+    public let top: Double
+    public let width: Double
+    public let height: Double
+
+    /// Maps a canvas `crop` into a preview that renders the canvas rectangle `context`
+    /// at `width` × `height` pixels.
+    public init(_ crop: CropRect, context: CropRect, width: Int, height: Int) {
+        let scaleX = Double(width) / context.width, scaleY = Double(height) / context.height
+        func tenth(_ value: Double) -> Double { (value * 10).rounded() / 10 }
+        left = tenth((crop.centerX - crop.width/2 - (context.centerX - context.width/2)) * scaleX)
+        top = tenth((context.centerY + context.height/2 - (crop.centerY + crop.height/2)) * scaleY)
+        self.width = tenth(crop.width * scaleX)
+        self.height = tenth(crop.height * scaleY)
+    }
+}
+
+public struct CandidateCrop: Codable, Equatable {
+    public let anchor: CropAnchor
+    /// The canvas crop a `geometry_set` dry run returns for this anchor and aspectRatio at the current rotation.
+    public let crop: CropRect
+    public let preview: PreviewRect
 }
 
 public final class PreviewManager {

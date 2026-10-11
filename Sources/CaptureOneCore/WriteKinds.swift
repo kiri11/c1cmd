@@ -173,6 +173,8 @@ struct GeometryWrite: WriteKind {
     let crop: CropRect?
     let rotation: Double?
     let aspectRatio: Double?
+    /// An off-centre position for the `aspectRatio` fit; the centre arrives as nil.
+    var anchor: CropAnchor? = nil
     let keystone: KeystoneAdjustments?
     let restore: Bool
     private var registry: FieldRegistry { .shared }
@@ -206,10 +208,17 @@ struct GeometryWrite: WriteKind {
             restored.crop = baseline.crop; restored.rotation = baseline.rotation; restored.keystone = baseline.keystone
             return Intended(target: restored, request: nil, context: context)
         }
+        var crop = self.crop, aspectRatio = self.aspectRatio
+        if let anchor, before.requiresNativeBounds {
+            // Native bounds are known at the current rotation, so the positioned fit
+            // travels the corrected path as an explicit crop.
+            crop = try before.target(crop: nil, rotation: rotation, aspectRatio: aspectRatio, anchor: anchor).crop
+            aspectRatio = nil
+        }
         // Rotation-only changes keep Capture One's automatic crop, as on corrected geometry.
         let rotationOnly = crop == nil && aspectRatio == nil && keystone == nil && rotation != nil && rotation != before.rotation
         guard before.requiresNativeBounds || keystone != nil || rotationOnly else {
-            return Intended(target: try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio), request: nil, context: context)
+            return Intended(target: try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio, anchor: anchor), request: nil, context: context)
         }
         if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
         guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }

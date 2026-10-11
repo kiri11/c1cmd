@@ -115,6 +115,14 @@ func put(_ arguments: inout [String: Any], _ key: String, _ value: Any?) {
 
 func flag(_ value: Bool) -> Bool? { value ? true : nil }
 
+/// Parses an `x,y` crop anchor; the shared schema checks the range.
+func anchor(_ text: String) throws -> [String: Double] {
+    let parts = text.split(separator: ",", omittingEmptySubsequences: false)
+    let values = parts.compactMap { Double($0) }
+    guard parts.count == 2, values.count == 2 else { throw C1Error.invalidRequest("anchor requires x,y.") }
+    return ["x": values[0], "y": values[1]]
+}
+
 @main
 struct C1: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -627,10 +635,18 @@ struct PreviewCommand: ParsableCommand {
     @Flag(help: "Render full-frame context using a temporary managed clone.")
     var fullFrame: Bool = false
 
+    @Option(help: "With --full-frame and --anchor: the width/height ratio of the candidate crops.")
+    var aspectRatio: Double?
+
+    @Option(name: .customLong("anchor"), help: "With --full-frame: a candidate x,y anchor to report in preview pixels; repeat for several.")
+    var anchorPositions: [String] = []
+
     mutating func run() throws {
         try globals.run("preview", full: result, {
             var args: [String: Any] = ["ref": ref]
             put(&args, "outputDir", outputDir); put(&args, "timeout", timeout); put(&args, "fullFrame", flag(fullFrame))
+            put(&args, "aspectRatio", aspectRatio)
+            if !anchorPositions.isEmpty { args["anchors"] = try anchorPositions.map(anchor) }
             return args
         })
     }
@@ -666,7 +682,8 @@ struct GeometrySetCommand: ParsableCommand {
     @Option(help: "geometryStateHash from get, independent of the tonal stateHash.") var ifGeometryState: String
     @Option(help: "centerX,centerY,width,height in rotated-canvas pixels, bottom-left origin.") var crop: String?
     @Option(help: "Absolute rotation in degrees (-45 to 45).") var rotation: Double?
-    @Option(help: "Width/height ratio for a centered crop fitted inside safe bounds (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
+    @Option(help: "Width/height ratio for a crop fitted inside safe bounds, centered unless --anchor is given (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
+    @Option(name: .customLong("anchor"), help: "x,y position of the --aspect-ratio fit, each 0 to 1 as viewed: 0.5,0 is top-aligned, 0.5,0.5 centered.") var anchorPosition: String?
     @Option(help: "Keystone amount (integer 10 to 120).") var keystoneAmount: Double?
     @Option(help: "Absolute vertical keystone (-75 to 75).") var keystoneVertical: Double?
     @Option(help: "Absolute horizontal keystone (-75 to 75).") var keystoneHorizontal: Double?
@@ -683,6 +700,7 @@ struct GeometrySetCommand: ParsableCommand {
                 args["crop"] = ["centerX": values[0], "centerY": values[1], "width": values[2], "height": values[3]]
             }
             put(&args, "rotation", rotation); put(&args, "aspectRatio", aspectRatio); put(&args, "dryRun", flag(dryRun))
+            put(&args, "anchor", try anchorPosition.map(anchor))
             var keystone: [String: Any] = [:]
             for (name, value) in zip(KeystoneAdjustments.fields, [keystoneAmount, keystoneVertical, keystoneHorizontal, keystoneSkew, keystoneAspect]) {
                 put(&keystone, name, value)

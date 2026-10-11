@@ -27,9 +27,29 @@ MCP takes `workingRef`, `ifGeometryState`, optional `dryRun`, and any of
 `crop: {centerX, centerY, width, height}`, `rotation` and `aspectRatio`. `crop` and
 `aspectRatio` are mutually exclusive. Rotation is absolute native degrees
 (positive clockwise), −45 to +45. `aspectRatio` fits a centered crop inside the
-usable bounds; choose an explicit crop when centering weakens the composition. A
-dry run predicts values without dispatch; its token is the current precondition,
-not a predicted post-write token.
+usable bounds. A dry run predicts values without dispatch; its token is the current
+precondition, not a predicted post-write token.
+
+### Positioned ratio fits
+
+`anchor: {x, y}` / `--anchor x,y` moves the `aspectRatio` fit away from the center.
+Each value is 0 to 1, measured on the image as viewed: `x` 0 is the left edge and 1
+the right, `y` 0 is the top edge and 1 the bottom. The fit keeps its centered size
+and moves inside the usable bounds. `0.5,0` aligns its top edge with the top of the
+bounds, `0,1` puts it in the bottom-left corner, and `0.5,0.5` is the centered fit,
+which c1 handles exactly as an omitted anchor. The result adds `anchoredCrop`, the
+rectangle c1 chose. A dry run returns it without dispatch, so compare positions
+with dry runs before writing. `anchor` requires `aspectRatio` and cannot be
+combined with `crop` or `keystone`. Choose an explicit crop for any composition an
+anchor cannot express.
+
+```sh
+c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> --aspect-ratio 0.75 --anchor 0.5,0 --dry-run
+```
+
+```json
+{"workingRef":"c1_edit_...","ifGeometryState":"geometry-v1:...","aspectRatio":0.75,"anchor":{"x":0.5,"y":0.2}}
+```
 
 `c1 geometry restore` / `geometry_restore` restores the saved crop, rotation and
 all five keystone controls with a fresh geometry token, and refuses a changed
@@ -44,6 +64,12 @@ a normalized preview point `(u, v)` measured from the top left:
 the current rotated canvas, not sensor coordinates, so render again after changing
 rotation.
 
+Anchors use a top-left convention on the same canvas: `y` 0 places the crop's top
+edge on the top of the bounds, which is the largest canvas `y`. The canvas is
+already oriented, so this holds for every orientation. An off-center position
+rounds its center toward the middle of the bounds by less than a pixel, so an edge
+placed on the bounds stays inside them.
+
 Bounds use the original file's intrinsic pixel size read through ImageIO, because
 Capture One can report rotated first-variant dimensions as the parent image's. If
 the size cannot be read, geometry is unavailable and tonal editing still works.
@@ -53,6 +79,26 @@ current rotation through a temporary managed clone, then deletes it.
 `contextSourceRef` names the source; `workingRef` and `nativeVariantId` name the
 temporary clone. On failure the clone and journal are kept for recovery. The
 source crop is never reset.
+
+The full-frame result adds `currentCrop`: the source crop in preview pixels with a
+top-left origin, as image tools address them, given as `left`, `top`, `width` and
+`height` to a tenth of a pixel. With the context rectangle `geometry.crop` of the
+result rendered at `width` × `height` pixels,
+`left = (crop left − context left) × width ÷ context width` and
+`top = (context top − crop top) × height ÷ context height`, where canvas left and
+top are `centerX − width/2` and `centerY + height/2`. A crop outside the context
+extends past the preview edges.
+
+With `aspectRatio` and 1–9 `anchors` (`--aspect-ratio` and a repeated `--anchor
+x,y`), the result also adds `candidateCrops`. Each entry holds the `anchor`, the
+canvas `crop` that a `geometry_set` dry run with that anchor returns, and its
+`preview` rectangle. c1 computes candidates from the source geometry before it
+creates the temporary clone, so a request it cannot predict fails before any
+write. c1 draws no overlay image.
+
+```sh
+c1 preview <working-ref> --full-frame --aspect-ratio 0.75 --anchor 0.5,0 --anchor 0.5,0.5 --anchor 0.5,1
+```
 
 ## Bounds
 
@@ -74,6 +120,16 @@ rotation, inside the journaled operation, then fits `aspectRatio` or validates t
 explicit crop. With lens or perspective corrections, `dryRun` rejects rotation
 changes and ratio fits because native results cannot be predicted; explicit-crop
 dry runs at the current rotation remain.
+
+**Anchored fits** use the same planning rectangle and the same validation as
+centered fits. On an uncorrected image, a rotation and an anchor can share one
+call, because c1 computes the bounds at the new rotation. On a lens-corrected image, c1 plans the anchored fit in
+`maximumCrop` at the current rotation and dispatches it as an explicit crop, which
+the journal records in `requestedGeometry.crop`. An anchor together with a
+rotation change is refused there, because the new bounds exist only after the
+native rotation: set the rotation first, then the anchored ratio. With keystone or
+lens movements, Capture One normalizes ratio fits itself, so anchors are refused;
+choose an explicit crop.
 
 **Rotation-only requests** on either kind of image keep Capture One's automatic
 crop: the native rotation runs inside the journaled operation and the observed crop

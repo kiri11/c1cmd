@@ -5,6 +5,7 @@ Requires C1_TEST_RAW_FIXTURE and zero open documents. Evidence retained in C1_GE
 import hashlib, importlib.util, json, math, os, re, shutil, subprocess, sys, tempfile, time, uuid
 from pathlib import Path
 from contract_test import Client, validate_response, complete, complete_args
+from preview_mapping import check_mapping
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN',ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN',ROOT / '.build/debug/c1-mcp'))
@@ -128,6 +129,50 @@ try:
         assert result['after']['orientation']==orientation
         pr,_=tool('preview',{'ref':ref}); assert abs(pr['width']/pr['height']-ratio)<.003
         log('orientation',orientation=orientation,result=result,preview=pr)
+    spec=importlib.util.spec_from_file_location('contained_crop',ROOT/'scripts/propose-contained-crop.py')
+    planner=importlib.util.module_from_spec(spec);spec.loader.exec_module(planner)
+    # Positioned 3:4 crops on the rotated vertical clone (orientation 270, 2 degrees): a CLI dry run
+    # predicts each MCP write, and each crop is contained and aligned in the usable bounds as viewed.
+    current=cli('get',ref);g=current['geometry']
+    assert g['orientation']==270 and abs(g['rotation']-2)<.001,g
+    usable=current['geometryUsableBounds'];ow,oh=g['imageHeight'],g['imageWidth']
+    plain=cli('geometry','set',ref,'--if-geometry-state',current['geometryStateHash'],'--aspect-ratio',.75,'--dry-run')
+    assert 'anchoredCrop' not in plain,plain
+    anchored={}
+    for label,y in (('top',0),('center',.5),('bottom',1)):
+        current=cli('get',ref)
+        dry=cli('geometry','set',ref,'--if-geometry-state',current['geometryStateHash'],'--aspect-ratio',.75,'--anchor',f'0.5,{y}','--dry-run')
+        assert dry['isDryRun'] and dry['anchoredCrop']==dry['after']['crop'],dry
+        if label=='center': assert dry['anchoredCrop']==plain['after']['crop'],('0.5/0.5 is the centred fit',dry,plain)
+        applied,_=tool('geometry_set',{'workingRef':ref,'ifGeometryState':current['geometryStateHash'],'aspectRatio':.75,'anchor':{'x':.5,'y':y}})
+        crop=applied['after']['crop']
+        assert all(abs(crop[k]-dry['anchoredCrop'][k])<=2 for k in KEYS),(dry,applied)
+        assert abs(crop['width']/crop['height']-.75)<.001 and 'exposedCorners' not in applied,applied
+        assert not planner.exposed_corners(crop,g['rotation'],ow,oh),('contained',crop)
+        anchored[label]=crop
+        log('anchored-crop',anchor=y,dryRun=dry,result=applied)
+    assert anchored['top']['centerY']>anchored['center']['centerY']>anchored['bottom']['centerY'],anchored
+    assert abs(anchored['top']['centerY']+anchored['top']['height']/2-(usable['centerY']+usable['height']/2))<=3,('top edge',anchored,usable)
+    assert abs(anchored['bottom']['centerY']-anchored['bottom']['height']/2-(usable['centerY']-usable['height']/2))<=3,('bottom edge',anchored,usable)
+    # Full-frame report: the bottom-anchored crop is current; candidates use the same anchors.
+    context,_=tool('preview',{'ref':ref,'fullFrame':True,'aspectRatio':.75,'anchors':[{'x':.5,'y':y} for y in (0,.5,1)]})
+    outer=context['geometry']['crop'];sx,sy=context['width']/outer['width'],context['height']/outer['height']
+    def in_preview(rect):
+        return dict(left=(rect['centerX']-rect['width']/2-(outer['centerX']-outer['width']/2))*sx,
+                    top=(outer['centerY']+outer['height']/2-(rect['centerY']+rect['height']/2))*sy,width=rect['width']*sx,height=rect['height']*sy)
+    def near(a,b,tolerance): return all(abs(a[k]-b[k])<=tolerance for k in b)
+    current=cli('get',ref)
+    assert near(context['currentCrop'],in_preview(current['geometry']['crop']),.1),(context['currentCrop'],current['geometry']['crop'])
+    candidates=context['candidateCrops']
+    assert [c['anchor']['y'] for c in candidates]==[0,.5,1],candidates
+    for candidate,label in zip(candidates,('top','center','bottom')):
+        assert near(candidate['crop'],anchored[label],2),(candidate,anchored[label])
+        assert near(candidate['preview'],in_preview(candidate['crop']),.1),candidate
+    first,last=candidates[0]['preview'],candidates[-1]['preview']
+    assert abs(first['top'])<=1 and abs(last['top']+last['height']-context['height'])<=1,('candidates span the context height',first,last,context)
+    cropped,_=tool('preview',{'ref':ref})
+    metrics=check_mapping(context,cropped)
+    log('full-frame-rectangles',context=context,cropped=cropped,metrics=metrics)
     for angle in [-45,-10,0,10,45]:
         current=cli('get',ref)
         result,_=tool('geometry_set',{'workingRef':ref,'ifGeometryState':current['geometryStateHash'],'rotation':angle,'aspectRatio':.75})
@@ -137,8 +182,6 @@ try:
         log('rotation-boundary',angle=angle,result=result)
     # Exact containment on uncorrected images: the rotated-image model decides, and
     # Capture One's own normalization of native crops is recorded as the oracle.
-    spec=importlib.util.spec_from_file_location('contained_crop',ROOT/'scripts/propose-contained-crop.py')
-    planner=importlib.util.module_from_spec(spec);spec.loader.exec_module(planner)
     native_fixture('orientation-reset','set orientation of adjustments of v to 0')
     g=cli('get',ref)['geometry'];w,h=g['imageWidth'],g['imageHeight']
     full=dict(centerX=w/2,centerY=h/2,width=w,height=h)
@@ -197,7 +240,7 @@ try:
     log('passed',originalUnchanged=True,rawSHA256=sha(fixture))
     shutil.copy2(journal,EVIDENCE/'journal.jsonl')
     apple('close current document')
-    print('PASS: geometry CLI/MCP, ratios, rotations, off-center crop, exact containment, rotation-only, full-frame context, orientation, original/RAW preservation')
+    print('PASS: geometry CLI/MCP, ratios, anchored crops, rotations, off-center crop, exact containment, rotation-only, full-frame context and rectangles, orientation, original/RAW preservation')
     print(EVIDENCE)
 except BaseException as e:
     log('failed',error=str(e));raise

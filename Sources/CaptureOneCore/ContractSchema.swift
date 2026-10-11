@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.6.0"
+    public static let version = "4.7.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -42,6 +42,15 @@ public enum ContractSchema {
         object(["rating": rating, "colorTag": integer(VariantMetadata.colorTagRange)], required: ["rating", "colorTag"])
     }
     static var cropSchema: [String: Any] { object(["centerX": number, "centerY": number, "width": ["type":"number", "exclusiveMinimum":0], "height": ["type":"number", "exclusiveMinimum":0]], required:["centerX","centerY","width","height"]) }
+    static var anchorSchema: [String: Any] {
+        let unit: [String: Any] = ["type": "number", "minimum": 0, "maximum": 1]
+        var result = object(["x": unit, "y": unit], required: ["x", "y"])
+        result["description"] = "Position of the aspectRatio fit inside the usable bounds, as viewed: x 0 is the left edge and 1 the right, y 0 the top edge and 1 the bottom. 0.5/0.5 is the centered fit."
+        return result
+    }
+    static var previewRectSchema: [String: Any] {
+        object(["left": number, "top": number, "width": number, "height": number], required: ["left", "top", "width", "height"])
+    }
     static var keystoneSchema: [String: Any] {
         var properties: [String: Any] = [:]
         for (index, name) in KeystoneAdjustments.fields.enumerated() {
@@ -115,9 +124,10 @@ public enum ContractSchema {
             result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
             return result
         case "geometry_set":
-            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-Geometry.maximumRotation, "maximum":Geometry.maximumRotation], "aspectRatio":["type":"number", "exclusiveMinimum":0], "dryRun":boolean], required:["workingRef","ifGeometryState"])
+            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-Geometry.maximumRotation, "maximum":Geometry.maximumRotation], "aspectRatio":["type":"number", "exclusiveMinimum":0], "anchor":anchorSchema, "dryRun":boolean], required:["workingRef","ifGeometryState"])
             result["anyOf"] = ["crop", "rotation", "aspectRatio", "keystone"].map { ["required": [$0]] }
-            result["not"] = ["required": ["crop", "aspectRatio"]]
+            result["not"] = ["anyOf": [["required": ["crop", "aspectRatio"]], ["required": ["anchor", "keystone"]]]]
+            result["dependentRequired"] = ["anchor": ["aspectRatio"]]
             return result
         case "reset": return object(["workingRef": string, "ifState": string, "fields": array(string), "dryRun": boolean], required: ["workingRef", "ifState"])
         case "diff": return object(["ref1": string, "ref2": string, "live": boolean, "readWorkflow": string], required: ["ref1"])
@@ -126,7 +136,14 @@ public enum ContractSchema {
                                                           "batchSize": ["type": "integer", "minimum": 1, "maximum": 1000]]) { $1 })
             result["not"] = ["required": ["rating", "minRating"]]
             return result
-        case "preview": return object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean], required: ["ref"])
+        case "preview":
+            var anchors = array(anchorSchema)
+            anchors["minItems"] = 1; anchors["maxItems"] = PreviewResult.maximumCandidates
+            anchors["description"] = "Candidate positions to report in candidateCrops; requires fullFrame and aspectRatio."
+            var result = object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "fullFrame":boolean,
+                                 "aspectRatio": ["type": "number", "exclusiveMinimum": 0], "anchors": anchors], required: ["ref"])
+            result["dependentRequired"] = ["anchors": ["aspectRatio", "fullFrame"], "aspectRatio": ["anchors"]]
+            return result
         case "request_status": return object(["requestId": string], required: ["requestId"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
         default: return object([:])
@@ -199,6 +216,15 @@ public enum ContractSchema {
         if tool == "geometry_set" {
             guard ["crop", "rotation", "aspectRatio", "keystone"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
                 throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, or keystone; crop and aspectRatio are mutually exclusive.")
+            }
+            if arguments["anchor"] != nil, arguments["aspectRatio"] == nil || arguments["keystone"] != nil {
+                throw C1Error.invalidRequest(CropAnchor.usage)
+            }
+        }
+        if tool == "preview", arguments["anchors"] != nil || arguments["aspectRatio"] != nil {
+            let anchors = arguments["anchors"] as? [Any] ?? []
+            guard arguments["aspectRatio"] != nil, (1...PreviewResult.maximumCandidates).contains(anchors.count), arguments["fullFrame"] as? Bool == true else {
+                throw C1Error.invalidRequest(PreviewResult.candidateUsage)
             }
         }
         if tool == "reset", let fields = arguments["fields"] as? [String] {
@@ -307,10 +333,11 @@ public enum ContractSchema {
                 "after": writableMetadataSchema, "diff": diffs, "metadataStateHash": string, "isDryRun": boolean],
                 required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
             "get": get, "exif": exifSchema, "set": mutation, "add": mutation, "reset": mutation,
-            "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
+            "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners,"anchoredCrop":cropSchema], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),
-            "preview": object(["operationId": string, "workingRef": string, "previewPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string]),
+            "preview": object(["operationId": string, "workingRef": string, "previewPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string, "currentCrop":previewRectSchema,
+                "candidateCrops":array(object(["anchor":anchorSchema, "crop":cropSchema, "preview":previewRectSchema], required:["anchor", "crop", "preview"]))]),
             "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
         for (name,schema) in Recipes.responses(responses) { responses[name] = schema }

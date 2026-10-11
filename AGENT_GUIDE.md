@@ -110,7 +110,9 @@ it against the preview on a horizon or a line facing the camera, not on a vertic
 that converges under a tilted lens. Preserve interesting
 composition; do not level natural diagonals. Flag ambiguous perspective and ratio
 exceptions for review; an unchanged proposal is not acceptance. After rotation or
-keystone, inspect a fresh preview before choosing an explicit crop. Never disable
+keystone, inspect a fresh preview before choosing an explicit crop. When a
+centered fit cuts heads or faces, position it with `anchor` and compare the
+candidates of a `--full-frame` preview first. Never disable
 lens correction to pass a bounds check. See the [geometry reference](docs/reference/geometry.md).
 
 ## Compact results

@@ -20,7 +20,10 @@ final class GeometryFake: ScriptExecuting {
             "sourceDimensions":[6000.0,4000], "maximumValues":[3000.0,2000,6000,4000], "flipName":"none", "ratioName":"",
             "keystoneValues":[100.0,0,0,0,0], "lensValues":[0.0,35,0,0,0,0,0,0], "profileName":"fixture", "hiddenAreas":true, "outsideAllowed":false]
     }
+    /// Every Apple Event the fake received, in order.
+    var handlers: [String] = []
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
+        handlers.append(handler)
         var result: Any
         switch handler {
         case "getAdjustmentsBatch":
@@ -90,6 +93,9 @@ struct GeometryTests {
         testRotationOnly()
         testCorrectedLens()
         testKeystone()
+        testAnchorMaths()
+        testAnchoredWrites()
+        testFullFrameRectangles()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
@@ -441,6 +447,245 @@ struct GeometryTests {
                 fake.records["1"] = source
             }
         }
+    }
+}
+
+extension GeometryTests {
+    private static func isInvalidRequest(_ error: Error) -> Bool {
+        if case .invalidRequest = error as? C1Error { return true }
+        return false
+    }
+
+    /// An anchored fit keeps the centred fit's size and lies inside `bounds` within a
+    /// pixel. With room to move, the anchored edge sits on the bounds as viewed, so
+    /// y 0 touches the top: the largest canvas y.
+    private static func assertPlaced(_ crop: CropRect, centred: CropRect, in bounds: CropRect, anchor: CropAnchor, _ label: String) {
+        XCTAssertEqual(crop.width, centred.width, label); XCTAssertEqual(crop.height, centred.height, label)
+        let left = crop.centerX - crop.width/2, right = crop.centerX + crop.width/2
+        let bottom = crop.centerY - crop.height/2, top = crop.centerY + crop.height/2
+        let minX = bounds.centerX - bounds.width/2, maxX = bounds.centerX + bounds.width/2
+        let minY = bounds.centerY - bounds.height/2, maxY = bounds.centerY + bounds.height/2
+        XCTAssertTrue(left >= minX - 1 && right <= maxX + 1 && bottom >= minY - 1 && top <= maxY + 1, "inside bounds: \(label)")
+        let roomX = bounds.width - crop.width >= 1, roomY = bounds.height - crop.height >= 1
+        if roomY && anchor.y == 0 { XCTAssertTrue(top <= maxY && top > maxY - 1, "top-aligned: \(label)") }
+        if roomY && anchor.y == 1 { XCTAssertTrue(bottom >= minY && bottom < minY + 1, "bottom-aligned: \(label)") }
+        if roomX && anchor.x == 0 { XCTAssertTrue(left >= minX && left < minX + 1, "left-aligned: \(label)") }
+        if roomX && anchor.x == 1 { XCTAssertTrue(right <= maxX && right > maxX - 1, "right-aligned: \(label)") }
+    }
+
+    /// The canvas is already oriented, so every orientation anchors in the same canvas
+    /// terms; orientation only changes the oriented size the bounds come from.
+    private static func testAnchorMaths() {
+        let anchors = [(0.0, 0.0), (0.5, 0), (0.5, 1), (1, 1), (0, 0.5), (1, 0.5), (0.25, 0.75)].map { try! CropAnchor(x: $0.0, y: $0.1) }
+        func fit(_ g: Geometry, _ angle: Double, _ ratio: Double, _ anchor: CropAnchor?) throws -> CropRect {
+            try g.target(crop: nil, rotation: angle, aspectRatio: ratio, anchor: anchor).crop
+        }
+        XCTAssertNoThrowBlock {
+            let landscape = Geometry.fixture(width: 6000, height: 4000)
+            var vertical = landscape; vertical.orientation = 90
+            let pinned: [(CropRect, CropRect, String)] = [
+                (try fit(landscape, 0, 0.75, nil), CropRect(centerX: 3000, centerY: 2000, width: 3000, height: 4000), "Unanchored fit unchanged"),
+                (try fit(vertical, 0, 0.75, nil), CropRect(centerX: 2000, centerY: 3000, width: 4000, height: 5333), "Unanchored fit unchanged"),
+                (try fit(vertical, 0, 0.75, CropAnchor(x: 0.5, y: 0)), CropRect(centerX: 2000, centerY: 3333, width: 4000, height: 5333),
+                 "Top-aligned on the vertical canvas: top edge 5999.5 of 6000"),
+                (try fit(vertical, 0, 0.75, CropAnchor(x: 0.5, y: 1)), CropRect(centerX: 2000, centerY: 2667, width: 4000, height: 5333),
+                 "Bottom-aligned: bottom edge 0.5"),
+                (try fit(landscape, 0, 0.75, CropAnchor(x: 0, y: 0.5)), CropRect(centerX: 1500, centerY: 2000, width: 3000, height: 4000), "Left-aligned"),
+            ]
+            for (got, expected, label) in pinned { XCTAssertEqual(got, expected, label) }
+            for orientation in [0, 90, 180, 270] {
+                var g = landscape; g.orientation = orientation
+                for angle in [-10.0, 0, 3, 10] {
+                    let bounds = try g.safeBounds(rotation: angle)
+                    for ratio in [0.75, 1.5] {
+                        let centred = try fit(g, angle, ratio, nil), centreAnchored = try fit(g, angle, ratio, .center)
+                        XCTAssertEqual(centreAnchored, centred, "0.5/0.5 is the centred fit")
+                        for anchor in anchors {
+                            let label = "orientation \(orientation), \(angle) degrees, ratio \(ratio), anchor \(anchor.x)/\(anchor.y)"
+                            let crop = try fit(g, angle, ratio, anchor)
+                            assertPlaced(crop, centred: centred, in: bounds, anchor: anchor, label)
+                            XCTAssertEqual(g.exposedCorners(of: crop, rotation: angle), [], "exact containment: \(label)")
+                        }
+                    }
+                }
+            }
+            // Corrected geometry plans in Capture One's maximumCrop, off-centre and fractional here.
+            var corrected = landscape; corrected.lensGeometry[0] = 50
+            corrected.maximumCrop = CropRect(centerX: 3002.5, centerY: 1999.5, width: 5801, height: 3901)
+            for ratio in [0.75, 1.5] {
+                let centred = try fit(corrected, 0, ratio, nil), centreAnchored = try fit(corrected, 0, ratio, .center)
+                XCTAssertEqual(centreAnchored, centred)
+                for anchor in anchors {
+                    assertPlaced(try fit(corrected, 0, ratio, anchor), centred: centred, in: corrected.maximumCrop, anchor: anchor,
+                                 "corrected ratio \(ratio), anchor \(anchor.x)/\(anchor.y)")
+                }
+            }
+            XCTAssertThrowsError(try fit(corrected, 3, 0.75, anchors[1]), "Corrected bounds at a new rotation exist only natively")
+            var perspective = corrected; perspective.keystone[1] = 10
+            XCTAssertNoThrowBlock { _ = try fit(perspective, 0, 0.75, nil) }
+            XCTAssertThrowsError(try fit(perspective, 0, 0.75, anchors[1]), "Capture One normalizes perspective ratio fits")
+            XCTAssertThrowsError(try landscape.target(crop: nil, rotation: 2, aspectRatio: nil, anchor: anchors[0]), "anchor requires aspectRatio")
+            XCTAssertThrowsError(try landscape.target(crop: landscape.crop, rotation: nil, aspectRatio: nil, anchor: anchors[0]), "anchor excludes crop")
+            for (x, y) in [(-0.01, 0.5), (0.5, 1.01), (Double.nan, 0.5), (0.5, Double.infinity)] {
+                XCTAssertThrowsError(try CropAnchor(x: x, y: y)) { XCTAssertTrue(isInvalidRequest($0)) }
+            }
+            XCTAssertThrowsError(try JSONDecoder().decode(CropAnchor.self, from: Data(#"{"x":2,"y":0}"#.utf8)))
+        }
+    }
+
+    private static func testAnchoredWrites() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        var vertical = fake.record("1")
+        vertical["orientationDegrees"] = 90; vertical["cropValues"] = [2000.0,3000,4000,6000]; vertical["maximumValues"] = [2000.0,3000,4000,6000]
+        fake.records["1"] = vertical
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "anchor-db"}, imageDimensions:{_ in [6000,4000]})
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
+            let ref = try core.editVariant(sourceRef:"1",ifState:source.stateHash,ifDocument:doc.openToken).workingRef
+            let token = source.geometryStateHash!
+            let top = try CropAnchor(x:0.5,y:0), bottom = try CropAnchor(x:0.5,y:1)
+            fake.handlers = []
+            let invalid: [() throws -> GeometryMutationResult] = [
+                { try core.geometrySet(workingRef:ref,ifGeometryState:token,rotation:2,anchor:top) },
+                { try core.geometrySet(workingRef:ref,ifGeometryState:token,rotation:2,anchor:.center) },
+                { try core.geometrySet(workingRef:ref,ifGeometryState:token,crop:source.geometry!.crop,anchor:top) },
+                { try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:0.75,anchor:top,keystone:KeystoneAdjustments(vertical:5)) },
+            ]
+            for call in invalid { XCTAssertThrowsError(try call()) { XCTAssertTrue(isInvalidRequest($0)) } }
+            XCTAssertEqual(fake.handlers, [], "Invalid anchors fail before any Apple Event")
+
+            let dry = try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:0.75,anchor:top,dryRun:true)
+            let topCrop = CropRect(centerX:2000,centerY:3333,width:4000,height:5333)
+            XCTAssertTrue(dry.isDryRun); XCTAssertEqual(fake.writeCount,0)
+            XCTAssertEqual(dry.anchoredCrop,topCrop); XCTAssertEqual(dry.after.crop,topCrop)
+            let plain = try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:0.75,dryRun:true)
+            XCTAssertNil(plain.anchoredCrop)
+            XCTAssertFalse(OutputFormatter.formatJson(plain).contains("anchoredCrop"), "No anchor, no new field")
+            let centred = try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:0.75,anchor:.center,dryRun:true)
+            XCTAssertEqual(centred.after,plain.after); XCTAssertEqual(centred.anchoredCrop,plain.after.crop)
+            if case .compact(let summary, _) = ResultCompaction.compact(.value(dry), tool:"geometry_set", documentPath:directory.path) {
+                XCTAssertNotNil(summary["anchoredCrop"], "Compact results report the chosen rectangle")
+            } else { XCTFail("geometry_set results are compact") }
+            if case .compact(let summary, _) = ResultCompaction.compact(.value(plain), tool:"geometry_set", documentPath:directory.path) {
+                XCTAssertNil(summary["anchoredCrop"])
+            } else { XCTFail("geometry_set results are compact") }
+
+            let applied = try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:0.75,anchor:top)
+            XCTAssertEqual(applied.after.crop,topCrop); XCTAssertEqual(applied.anchoredCrop,topCrop)
+            let record = journal.find(operationId:applied.operationId)!
+            XCTAssertEqual(record.intendedGeometry?.crop,topCrop)
+            XCTAssertNil(record.requestedGeometry,"Uncorrected positioned crops take the exact geometry path")
+            XCTAssertEqual(fake.handlers.filter { $0.hasPrefix("apply") },["applyGeometry"])
+            // Uncorrected bounds at a new rotation are known before dispatch, so rotation and anchor combine.
+            let rotated = try core.geometrySet(workingRef:ref,ifGeometryState:applied.geometryStateHash,rotation:3,aspectRatio:0.75,anchor:bottom)
+            let expected = try source.geometry!.target(crop:nil,rotation:3,aspectRatio:0.75,anchor:bottom).crop
+            XCTAssertEqual(rotated.after.crop,expected); XCTAssertEqual(rotated.after.rotation,3)
+            let centredAtThree = try source.geometry!.target(crop:nil,rotation:3,aspectRatio:0.75).crop
+            XCTAssertTrue(expected.centerY < centredAtThree.centerY,"Bottom-aligned sits below centre")
+
+            var corrected = fake.record("1")
+            corrected["orientationDegrees"] = 0; corrected["rotationDegrees"] = 0.0; corrected["cropValues"] = [3000.0,2000,6000,4000]
+            corrected["lensValues"] = [100.0,35,0,0,0,0,0,0]; corrected["maximumValues"] = [3150.0,2300,5000,3400]
+            fake.records["1"] = corrected
+            let lens = try core.get(ref:"1")
+            let lensRef = try core.editVariant(sourceRef:"1",ifState:lens.stateHash,ifDocument:try core.getDocumentInfo().openToken,ifGeometryState:lens.geometryStateHash).workingRef
+            let left = try CropAnchor(x:0,y:0.5)
+            let lensDry = try core.geometrySet(workingRef:lensRef,ifGeometryState:lens.geometryStateHash!,aspectRatio:0.75,anchor:left,dryRun:true)
+            XCTAssertEqual(lensDry.anchoredCrop,CropRect(centerX:1925,centerY:2300,width:2550,height:3400),"Left edge on the native bounds at 650")
+            let lensApplied = try core.geometrySet(workingRef:lensRef,ifGeometryState:lens.geometryStateHash!,aspectRatio:0.75,anchor:left)
+            XCTAssertEqual(lensApplied.after.crop,lensDry.anchoredCrop)
+            XCTAssertEqual(fake.requestedBeforeWrite?.crop,lensDry.anchoredCrop,"Journaled as an explicit crop before dispatch")
+            XCTAssertNil(fake.requestedBeforeWrite?.aspectRatio)
+            XCTAssertEqual(lensApplied.after.lensGeometry,lens.geometry!.lensGeometry)
+            var writes = fake.writeCount
+            XCTAssertThrowsError(try core.geometrySet(workingRef:lensRef,ifGeometryState:lensApplied.geometryStateHash,rotation:3,aspectRatio:0.75,anchor:left)) {
+                XCTAssertTrue(isInvalidRequest($0))
+            }
+            XCTAssertEqual(fake.writeCount,writes,"Corrected bounds at a new rotation are unknown before dispatch")
+            let centredLens = try core.geometrySet(workingRef:lensRef,ifGeometryState:lensApplied.geometryStateHash,rotation:3,aspectRatio:0.75,anchor:.center)
+            XCTAssertEqual(fake.requestedBeforeWrite?.aspectRatio,0.75,"The centre keeps the native ratio fit")
+            XCTAssertNil(fake.requestedBeforeWrite?.crop)
+            XCTAssertEqual(centredLens.anchoredCrop,centredLens.after.crop)
+
+            var perspective = corrected; perspective["keystoneValues"] = [100.0,10,0,0,0]
+            fake.records["1"] = perspective
+            let tilted = try core.get(ref:"1")
+            let tiltedRef = try core.editVariant(sourceRef:"1",ifState:tilted.stateHash,ifDocument:try core.getDocumentInfo().openToken).workingRef
+            writes = fake.writeCount
+            XCTAssertThrowsError(try core.geometrySet(workingRef:tiltedRef,ifGeometryState:tilted.geometryStateHash!,aspectRatio:0.75,anchor:left)) {
+                XCTAssertTrue(isInvalidRequest($0))
+            }
+            XCTAssertEqual(fake.writeCount,writes)
+        }
+    }
+
+    private static func testFullFrameRectangles() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "frame-db"}, imageDimensions:{_ in [6000,4000]})
+        func values(_ r: PreviewRect?) -> [Double] { r.map { [$0.left, $0.top, $0.width, $0.height] } ?? [] }
+        XCTAssertNoThrowBlock {
+            let cloned = try core.cloneVariant(sourceRef:"1")
+            let initial = try core.get(ref:cloned.workingRef)
+            let crop = CropRect(centerX:2400,centerY:2200,width:2400,height:1600)
+            let set = try core.geometrySet(workingRef:cloned.workingRef,ifGeometryState:initial.geometryStateHash!,crop:crop)
+            let anchors = [try CropAnchor(x:0,y:0.5), .center, try CropAnchor(x:1,y:0.5)]
+            let variants = fake.base.values.count
+            // The 6000×4000 context renders at 120×80: 50 canvas pixels per preview pixel.
+            let context = try core.preview(ref:cloned.workingRef,fullFrame:true,aspectRatio:0.75,anchors:anchors)
+            XCTAssertEqual(context.width,120); XCTAssertEqual(context.height,80)
+            XCTAssertEqual(values(context.currentCrop),[24,20,48,32],"Top-left origin: the crop top, 1000 px below the canvas top, is 20 px down")
+            let candidates = context.candidateCrops ?? []
+            XCTAssertEqual(candidates.map(\.anchor),anchors)
+            let dryRuns = try anchors.map { try core.geometrySet(workingRef:cloned.workingRef,ifGeometryState:set.geometryStateHash,aspectRatio:0.75,anchor:$0,dryRun:true).anchoredCrop }
+            XCTAssertEqual(candidates.map(\.crop),dryRuns,"Candidates are the crops a dry run returns")
+            XCTAssertEqual(candidates.map { values($0.preview) },[[0,0,60,80],[30,0,60,80],[60,0,60,80]])
+            XCTAssertEqual(fake.base.values.count,variants,"Context clone deleted")
+            let bare = try core.preview(ref:cloned.workingRef,fullFrame:true)
+            XCTAssertEqual(values(bare.currentCrop),[24,20,48,32]); XCTAssertNil(bare.candidateCrops)
+            let plain = try core.preview(ref:cloned.workingRef)
+            XCTAssertNil(plain.currentCrop); XCTAssertNil(plain.candidateCrops)
+            fake.handlers = []
+            XCTAssertThrowsError(try core.preview(ref:cloned.workingRef,aspectRatio:0.75,anchors:anchors)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertThrowsError(try core.preview(ref:cloned.workingRef,fullFrame:true,anchors:anchors)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertThrowsError(try core.preview(ref:cloned.workingRef,fullFrame:true,aspectRatio:0.75)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertThrowsError(try core.preview(ref:cloned.workingRef,fullFrame:true,aspectRatio:0.75,anchors:Array(repeating:.center,count:10))) {
+                XCTAssertTrue(isInvalidRequest($0))
+            }
+            XCTAssertEqual(fake.handlers,[],"Invalid candidate requests fail before any Apple Event")
+            var tilted = fake.record(cloned.cloneVariantId); tilted["keystoneValues"] = [100.0,10,0,0,0]
+            fake.records[cloned.cloneVariantId] = tilted
+            XCTAssertThrowsError(try core.preview(ref:cloned.workingRef,fullFrame:true,aspectRatio:0.75,anchors:anchors)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertFalse(fake.handlers.contains("cloneVariant"),"Unpredictable candidates fail before the context clone")
+        }
+        func rejects(_ tool: String, _ arguments: [String: Any], _ label: String) {
+            XCTAssertThrowsError(try ToolRequest(tool:tool,arguments:arguments,profile:.standard),label) { XCTAssertTrue(isInvalidRequest($0),label) }
+        }
+        let geometry: [String: Any] = ["workingRef":"c1_edit_x","ifGeometryState":"g"]
+        func with(_ base: [String: Any], _ extra: [String: Any]) -> [String: Any] { base.merging(extra) { $1 } }
+        let top: [String: Any] = ["x":0.5,"y":0]
+        XCTAssertNoThrow(try ToolRequest(tool:"geometry_set",arguments:with(geometry,["aspectRatio":0.75,"anchor":top,"dryRun":true]),profile:.standard))
+        rejects("geometry_set",with(geometry,["aspectRatio":0.75,"anchor":["x":1.01,"y":0]]),"x above 1")
+        rejects("geometry_set",with(geometry,["aspectRatio":0.75,"anchor":["x":0.5,"y":-0.1]]),"y below 0")
+        rejects("geometry_set",with(geometry,["aspectRatio":0.75,"anchor":["x":0.5]]),"missing y")
+        rejects("geometry_set",with(geometry,["rotation":2,"anchor":top]),"anchor without aspectRatio")
+        rejects("geometry_set",with(geometry,["crop":["centerX":10,"centerY":10,"width":4,"height":3],"anchor":top]),"anchor with crop")
+        rejects("geometry_set",with(geometry,["aspectRatio":0.75,"anchor":top,"keystone":["vertical":5]]),"anchor with keystone")
+        let preview: [String: Any] = ["ref":"c1_edit_x"]
+        XCTAssertNoThrow(try ToolRequest(tool:"preview",arguments:with(preview,["fullFrame":true,"aspectRatio":0.75,"anchors":[top]]),profile:.standard))
+        rejects("preview",with(preview,["aspectRatio":0.75,"anchors":[top]]),"anchors without fullFrame")
+        rejects("preview",with(preview,["fullFrame":false,"aspectRatio":0.75,"anchors":[top]]),"anchors with fullFrame false")
+        rejects("preview",with(preview,["fullFrame":true,"anchors":[top]]),"anchors without aspectRatio")
+        rejects("preview",with(preview,["fullFrame":true,"aspectRatio":0.75]),"aspectRatio without anchors")
+        rejects("preview",with(preview,["fullFrame":true,"aspectRatio":0.75,"anchors":[[String: Any]]()]),"empty anchors")
+        rejects("preview",with(preview,["fullFrame":true,"aspectRatio":0.75,"anchors":Array(repeating:top,count:10)]),"ten anchors")
+        rejects("preview",with(preview,["fullFrame":true,"aspectRatio":0.75,"anchors":[["x":2,"y":0]]]),"anchor out of range")
     }
 }
 

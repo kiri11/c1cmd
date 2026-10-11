@@ -976,10 +976,16 @@ public final class SessionController {
 
     // MARK: - Crop, rotation, and keystone
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
-                            rotation: Double? = nil, aspectRatio: Double? = nil, keystone: KeystoneAdjustments? = nil, dryRun: Bool = false,
+                            rotation: Double? = nil, aspectRatio: Double? = nil, anchor: CropAnchor? = nil,
+                            keystone: KeystoneAdjustments? = nil, dryRun: Bool = false,
                             observed: CurrentObservation? = nil) throws -> GeometryMutationResult {
-        try geometryWrite(GeometryWrite(crop: crop, rotation: rotation, aspectRatio: aspectRatio, keystone: keystone, restore: false),
-                          workingRef: workingRef, expected: expected, dryRun: dryRun, observed: observed)
+        guard anchor == nil || (aspectRatio != nil && crop == nil && keystone == nil) else { throw C1Error.invalidRequest(CropAnchor.usage) }
+        // The centre is the unanchored fit, so it takes that path on every geometry, native fits included.
+        var result = try geometryWrite(GeometryWrite(crop: crop, rotation: rotation, aspectRatio: aspectRatio,
+                                                     anchor: anchor == .center ? nil : anchor, keystone: keystone, restore: false),
+                                       workingRef: workingRef, expected: expected, dryRun: dryRun, observed: observed)
+        if anchor != nil { result.anchoredCrop = result.after.crop }
+        return result
     }
 
     public func geometryRestore(workingRef: String, ifGeometryState expected: String, dryRun: Bool = false) throws -> GeometryMutationResult {
@@ -1171,11 +1177,18 @@ public final class SessionController {
         try preview(ref: workingRefString, outputDirOverride: outputDirOverride, timeout: timeout)
     }
 
-    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, fullFrame: Bool = false) throws -> PreviewResult {
+    /// A full-frame preview reports the source crop in its pixels, plus the crop each
+    /// candidate `anchor` would apply with `aspectRatio` at the current rotation.
+    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, fullFrame: Bool = false,
+                        aspectRatio: Double? = nil, anchors: [CropAnchor] = []) throws -> PreviewResult {
         guard timeout.isFinite && timeout > 0 && timeout <= 300 else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
+        guard (aspectRatio == nil) == anchors.isEmpty, anchors.isEmpty || fullFrame, anchors.count <= PreviewResult.maximumCandidates else {
+            throw C1Error.invalidRequest(PreviewResult.candidateUsage)
+        }
         if fullFrame {
             let source = try get(ref: ref)
             guard let geometry = source.geometry, geometry.unsupportedReason == nil else { throw C1Error.invalidRequest("Full-frame mapping is unavailable for this geometry.") }
+            let candidates = try anchors.map { ($0, try geometry.target(crop: nil, rotation: nil, aspectRatio: aspectRatio, anchor: $0).crop) }
             let clone = try cloneVariant(sourceRef: ref)
             let current = try get(ref: clone.workingRef)
             guard let cloneState = current.geometryStateHash, cloneState == source.geometryStateHash else { throw C1Error.stateChanged("Context clone differs from source; inspect managed clone \(clone.workingRef).") }
@@ -1189,6 +1202,11 @@ public final class SessionController {
             guard try get(ref: ref).geometryStateHash == source.geometryStateHash else { throw C1Error.stateChanged("Source changed during context preview; discard preview.") }
             _ = try deleteVariant(workingRefString: clone.workingRef)
             result.contextSourceRef = ref
+            if let context = result.geometry?.crop {
+                func mapped(_ crop: CropRect) -> PreviewRect { PreviewRect(crop, context: context, width: result.width, height: result.height) }
+                result.currentCrop = mapped(geometry.crop)
+                if !candidates.isEmpty { result.candidateCrops = candidates.map { CandidateCrop(anchor: $0, crop: $1, preview: mapped($1)) } }
+            }
             return result
         }
         return try guarded("preview") { doc in
