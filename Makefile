@@ -51,6 +51,7 @@ check-built-core:
 	python3 -B scripts/generate-native-editing.py --check
 	python3 -B Tests/recovery_harness_test.py
 	python3 -B Tests/recipe_harness_test.py
+	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" python3 -B Tests/apply_plan_test.py
 	python3 -B Tests/release_runner_test.py
 	python3 -B Tests/editing_fixture_test.py
 	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" C1_TEST_MCP_BIN="$(abspath $(TEST_BUILD_DIR))/c1-mcp" python3 -B Tests/catalog_reader_test.py

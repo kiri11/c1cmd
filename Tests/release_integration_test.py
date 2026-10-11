@@ -94,6 +94,7 @@ def run(archive, suites, document_kinds=("session",)):
                            C1_TEST_BIN=str(root / 'bin/c1'), C1_TEST_MCP_BIN=str(root / 'bin/c1-mcp'),
                            C1_TEST_CROP_EXAMPLE=str(root / 'examples/crop-proposals.py'),
                            C1_TEST_GRADE_EXAMPLE=str(root / 'examples/grade-folder.py'),
+                           C1_TEST_PLAN_EXAMPLE=str(root / 'examples/apply-plan.py'),
                            C1_READ_WORKFLOW_EVIDENCE=os.environ.get('C1_READ_WORKFLOW_EVIDENCE', str(Path(tmp) / 'read-workflow-evidence')))
         previous_directory = Path.cwd()
         moved = False

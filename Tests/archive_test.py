@@ -43,6 +43,7 @@ def check_package(root):
         assert not (root / name).exists(), 'Developer documentation shipped: ' + name
     broken = broken_links(root, root.rglob('*.md'))
     assert not broken, 'Shipped docs link outside the archive: ' + '; '.join(broken)
+    assert (root / 'examples/apply-plan.py').is_file()
     assert (root / 'examples/crop-proposals.py').is_file()
     assert (root / 'examples/grade-folder.py').is_file()
     assert (root / 'examples/presets/daylight.json').is_file()

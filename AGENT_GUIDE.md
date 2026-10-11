@@ -98,7 +98,9 @@ Use `variant_clone` only when a separate comparison variant is wanted, and delet
 it with `variant_delete` after review. For long browsing batches, the optional
 [read workflow](docs/reference/catalog-reader.md#controlled-browsing-workflow)
 serves cached reads; it never supplies mutation tokens, so read `get --live`
-before preparing an edit.
+before preparing an edit. To apply verified recipes to many photos, use
+[apply-plan.py](examples/apply-plan.py), a resumable per-photo runner
+([details](docs/reference/recipes.md#partial-completion-and-recovery)).
 
 ## Crop policy
 

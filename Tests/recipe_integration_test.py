@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from catalog_integration_test import apple, sha, CLI, MCP, ROOT
 from contract_test import Client, validate_response, complete, complete_args
 from editing_fixture import EditingFixture, document_mode
@@ -225,6 +226,18 @@ def main():
         current = cli('get',source['id'])
         cleared = recipe('apply',dict(recipeId=clear_id,sourceRef=source['id'],ifDocument=doc['openToken'],ifState=current['stateHash']))
         assert cleared['status'] == 'succeeded' and cleared['scopedObserved']['advancedColor'] == []
+        # The shipped plan runner parses the real compact result; a rerun skips the logged entry.
+        plan = base / 'plan.json'
+        plan.write_text(json.dumps([dict(sourceRef=source['id'],recipeId=sparse_id,preview=True,previewSize=800)]))
+        runner = Path(os.environ.get('C1_TEST_PLAN_EXAMPLE', ROOT/'examples/apply-plan.py'))
+        for run in ['apply-plan','apply-plan-rerun']:
+            r = subprocess.run([sys.executable,str(runner),str(plan),'--c1-bin',str(CLI)],env=owned.environment,capture_output=True,text=True,timeout=600)
+            log(run,dict(code=r.returncode,stdout=r.stdout,stderr=r.stderr))
+            assert r.returncode == 0, r.stderr
+        records = [json.loads(line) for line in (base/'plan.log.jsonl').read_text().splitlines()]
+        assert [r['status'] for r in records] == ['started','succeeded'], records
+        assert records[1]['workingRef'].startswith('c1_edit_') and Path(records[1]['previewPath']).is_file() and Path(records[1]['evidencePath']).is_file()
+        assert recipe('status',dict(compoundId=records[1]['compoundId']))['status'] == 'succeeded'
         assert len(cli('variants','list')) == 1, 'Compound edits must not duplicate variants'
         assert sha(raw) == sha(fixture) == original
         owned.verify([capture['bundle']['preview'], verified['resultBundle']['preview'], bundle['preview'], composed['resultBundle']['preview']], [compact_value['evidencePath']])

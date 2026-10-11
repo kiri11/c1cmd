@@ -289,3 +289,15 @@ do not prove the interrupted compound completed.
 Each operation handles one photo per call. Multi-photo scheduling, automatic
 resume, native style installation, mask reconstruction and generalized native
 recipe transfer are intentionally outside this contract.
+
+The example [apply-plan.py](../../examples/apply-plan.py) schedules many photos
+outside the contract. It runs a JSON plan of per-photo `edit_apply` requests one
+photo at a time, each with a fresh `doc info` and `get --live`. Before the first
+write it checks the plan and each recipe's verification evidence; `--dry-run`
+also reads every source and writes nothing. An append-only log next to the plan
+records each photo's compound ID, status, working reference, preview path and
+evidence path. A rerun skips entries logged as succeeded. A stop file or a signal
+ends the run between photos, never inside a compound. The run stops at the first
+result that is not `succeeded` and prints the recovery steps. Such an entry blocks
+every later run until you have recovered it and pass `--release INDEX`; the
+runner never retries or resumes a compound itself.
