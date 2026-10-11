@@ -6,7 +6,7 @@ The plan is a JSON list. Each entry names one photo and its per-photo policies:
   {"sourceRef": "123", "recipeId": "<recipe SHA-256>",
    "exposure": {"mode": "relative", "value": 0.3},
    "whiteBalance": {"mode": "preserve"}, "overrides": {"clarity amount": 7},
-   "geometry": {"aspectRatio": 1.5}, "preview": true, "previewSize": 800}
+   "geometry": {"aspectRatio": 1.5}, "preview": true, "previewSize": 800, "previewTimeout": 120}
 
 Only sourceRef and recipeId are required. For every entry the runner reads a fresh
 `doc info` and `get --live`, then runs one `c1 recipe apply` with those tokens.
@@ -38,7 +38,7 @@ import subprocess
 import sys
 import tempfile
 
-ENTRY_KEYS = {'sourceRef', 'recipeId', 'exposure', 'whiteBalance', 'overrides', 'geometry', 'preview', 'previewSize'}
+ENTRY_KEYS = {'sourceRef', 'recipeId', 'exposure', 'whiteBalance', 'overrides', 'geometry', 'preview', 'previewSize', 'previewTimeout'}
 PREVIEW_SIZES = {400, 800, 1200, 1500}
 UNCERTAIN_CODES = {'outcome-unknown', 'timeout', 'partial-failure', 'readback-mismatch'}
 EXIT_DONE, EXIT_INVALID, EXIT_STOPPED, EXIT_ATTENTION = 0, 1, 2, 3
@@ -93,6 +93,8 @@ def entry_problems(entry):
         problems.append('preview must be true or false')
     if 'previewSize' in entry and (entry.get('preview') is not True or entry['previewSize'] not in PREVIEW_SIZES):
         problems.append(f'previewSize needs preview: true and one of {sorted(PREVIEW_SIZES)}')
+    if 'previewTimeout' in entry and (entry.get('preview') is not True or not is_number(entry['previewTimeout']) or not 0 < entry['previewTimeout'] <= 300):
+        problems.append('previewTimeout needs preview: true and seconds in (0, 300]')
     return problems
 
 

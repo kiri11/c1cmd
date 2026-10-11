@@ -168,11 +168,11 @@ def test_reopened_document_stops_before_next_write():
 
 def test_invalid_plan_writes_nothing():
     with tempfile.TemporaryDirectory() as tmp:
-        plan = entries('101') + [dict(sourceRef='102', recipeId='not-a-hash', previewSize=800, exposure={'mode': 'relative'})]
+        plan = entries('101') + [dict(sourceRef='102', recipeId='not-a-hash', previewSize=800, previewTimeout=400, exposure={'mode': 'relative'})]
         f = Fixture(tmp, ['101', '102'], plan)
         result = f.run()
         assert result.returncode == 1, result
-        for problem in ['entry 1: recipeId', 'entry 1: exposure', 'entry 1: previewSize']:
+        for problem in ['entry 1: recipeId', 'entry 1: exposure', 'entry 1: previewSize', 'entry 1: previewTimeout']:
             assert problem in result.stderr, (problem, result.stderr)
         assert f.calls() == [] and not f.log.exists(), 'an invalid plan contacts nothing and writes no log'
     with tempfile.TemporaryDirectory() as tmp:
