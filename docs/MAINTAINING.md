@@ -296,7 +296,7 @@ clock). Phases nest: `script_compile` (cache-miss compilation), `script_lookup`,
 and `descriptor_decode`. Diagnostic write failures are ignored.
 
 Work outside AppleScript has its own phases, with the Swift function as `handler`:
-`journal_read` (decoding the whole journal), `journal_fsync`, `report_write`
+`journal_read` (validating the journal), `journal_fsync`, `report_write`
 (recipe, reference, verification and compound report files, with their syncs), `image_dimensions` and `preview_poll` (waiting
 for and decoding the exported file). `recipe_verify` and `edit_apply` emit one
 `compound` record for the request and one `step` record per compound step, with
@@ -304,6 +304,13 @@ the step name as `handler`. Every record measured inside a step carries that nam
 in `step`, so time not covered by `handler_total` and the other phases is the
 step's own overhead. Records are written when a measure ends, so a step's record
 follows the records it contains.
+
+`journal_read` decodes the whole journal on a process's first read. Later reads
+in the same process decode only the bytes appended since, as long as the file
+keeps its inode and its last 4 KB before the decoded offset. Any other change
+makes the next read decode the whole file again. A rewrite in place that keeps
+the inode, at least the decoded length and those 4 KB is detected only at the
+next process start.
 
 Benchmarks need one disposable Session or Catalog left untouched while they run,
 and a new output file each run. Record screen-lock, build and load conditions with

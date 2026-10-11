@@ -104,23 +104,9 @@ public final class OperationJournal {
     }
 
     public func validatedEntries() throws -> [OperationRecord] {
-        try PerformanceTrace.measure("journal_read", handler: "OperationJournal.validatedEntries") { try decodeEntries() }
-    }
-
-    private func decodeEntries() throws -> [OperationRecord] {
-        guard FileManager.default.fileExists(atPath: journalFile.path) else { return [] }
-        let data = try Data(contentsOf: journalFile)
-        guard let content = String(data: data, encoding: .utf8) else {
-            throw C1Error.invalidRequest("Journal is not UTF-8; preserve it for recovery.")
+        try PerformanceTrace.measure("journal_read", handler: "OperationJournal.validatedEntries") {
+            try JournalCache.shared.read(journalFile)
         }
-        var latest: [String: OperationRecord] = [:]
-        var order: [String] = []
-        for line in content.split(separator: "\n") {
-            let record = try JSONDecoder().decode(OperationRecord.self, from: Data(line.utf8))
-            if latest[record.operationId] == nil { order.append(record.operationId) }
-            latest[record.operationId] = record
-        }
-        return order.compactMap { latest[$0] }
     }
 
     public func loadEntries() -> [OperationRecord] { (try? validatedEntries()) ?? [] }
@@ -153,5 +139,86 @@ public final class OperationJournal {
         if let entry = try validatedEntries().first(where: Self.isUnresolved) {
             throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. Restart Capture One to end in-flight work, then inspect operation status."))
         }
+    }
+}
+
+/// The reduced journal as of `decodedOffset`, which always follows a newline. Each process
+/// validates the whole file on its first read; later reads decode only appended bytes while
+/// the file identity and the bytes before the offset are unchanged. An in-place rewrite that
+/// keeps the inode, the length up to the offset and those last bytes goes unnoticed until the
+/// next process start.
+private struct JournalView {
+    static let tailLength = 4096
+
+    let device: UInt64
+    let inode: UInt64
+    var decodedOffset = 0
+    var tail = Data()
+    var entries: [OperationRecord] = []
+    var position: [String: Int] = [:]
+
+    /// Folds `bytes` through their last newline and returns the entries including any
+    /// unterminated last line, which stays outside the view to be decoded again. A throw
+    /// leaves the view partly folded, so the caller must discard it.
+    mutating func fold(_ bytes: Data) throws -> [OperationRecord] {
+        let end = bytes.lastIndex(of: 0x0a).map { $0 + 1 } ?? bytes.startIndex
+        let complete = bytes[..<end]
+        try apply(complete)
+        decodedOffset += complete.count
+        tail = Data(tail.suffix(max(0, Self.tailLength - complete.count)) + complete.suffix(Self.tailLength))
+        let trailing = bytes[end...]
+        if trailing.isEmpty { return entries }
+        var withTrailing = self
+        try withTrailing.apply(trailing)
+        return withTrailing.entries
+    }
+
+    private mutating func apply(_ bytes: Data) throws {
+        guard let content = String(data: bytes, encoding: .utf8) else {
+            throw C1Error.invalidRequest("Journal is not UTF-8; preserve it for recovery.")
+        }
+        for line in content.split(separator: "\n") {
+            let record = try JSONDecoder().decode(OperationRecord.self, from: Data(line.utf8))
+            if let index = position[record.operationId] {
+                entries[index] = record
+            } else {
+                position[record.operationId] = entries.count
+                entries.append(record)
+            }
+        }
+    }
+}
+
+private final class JournalCache {
+    static let shared = JournalCache()
+    private let lock = NSLock()
+    private var views: [String: JournalView] = [:]
+
+    func read(_ file: URL) throws -> [OperationRecord] {
+        let key = file.standardizedFileURL.path
+        guard FileManager.default.fileExists(atPath: key) else { return [] }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var info = stat()
+        guard fstat(handle.fileDescriptor, &info) == 0 else {
+            throw C1Error.invalidRequest("Cannot inspect the operation journal; preserve it for recovery.")
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        let fresh = JournalView(device: UInt64(info.st_dev), inode: UInt64(info.st_ino))
+        // Removed rather than copied, so folding mutates the only reference instead of copying history.
+        var view = views.removeValue(forKey: key).flatMap { $0.device == fresh.device && $0.inode == fresh.inode ? $0 : nil } ?? fresh
+        try handle.seek(toOffset: UInt64(view.decodedOffset - view.tail.count))
+        var bytes = try handle.readToEnd() ?? Data()
+        if bytes.prefix(view.tail.count) == view.tail {
+            bytes = bytes.dropFirst(view.tail.count)
+        } else {
+            view = fresh
+            try handle.seek(toOffset: 0)
+            bytes = try handle.readToEnd() ?? Data()
+        }
+        let entries = try view.fold(bytes)
+        views[key] = view
+        return entries
     }
 }
