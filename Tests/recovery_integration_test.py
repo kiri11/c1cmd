@@ -44,8 +44,8 @@ on run argv
     return output as text
 end run
 '''
-RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'mcp-death')
-RECIPE_CASES = ('native', 'native-action', 'lens', 'layer-color', 'tonal', 'geometry', 'preview', 'mcp-death')
+RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'late-preview', 'mcp-death')
+RECIPE_CASES = ('native', 'native-action', 'lens', 'layer-color', 'tonal', 'geometry', 'preview', 'late-preview', 'mcp-death')
 RECIPE_PREFIX = 'recipe:'
 ALL_CASES = (*RECOVERY_CASES, *(RECIPE_PREFIX + case for case in RECIPE_CASES))
 
@@ -200,6 +200,9 @@ class Run:
         lines = self.journal.read_bytes().split(b'\n')[:-1]
         return [json.loads(line) for line in lines if line]
 
+    def latest(self, operation):
+        return [r for r in self.records() if r['operationId'] == operation][-1]
+
     def pid(self):
         pids = subprocess.check_output(['pgrep', '-x', 'Capture One'], text=True).split()
         assert len(pids) == 1, pids
@@ -300,11 +303,13 @@ class Run:
             assert variant['parentImagePath'] == str(self.raw), (
                 'Native image path differs from the fixture path; stop before further mutations', variant)
 
-    def recovery(self, operation, clone, label):
+    def recovery(self, operation, clone, label, status_before_restart=True):
         before = self.identities()
         self.log('recovery-inventory', case=label, phase='before-restart', identities=before)
         count = len(self.records())
-        state = self.cli('operation', 'status', operation)
+        # Status could resolve a landed preview without a restart; preview cases that
+        # qualify the restart path read the journal instead.
+        state = self.cli('operation', 'status', operation) if status_before_restart else self.latest(operation)
         assert state['status'] in ('pending', 'outcome-unknown')
         blocked = self.cli('variant', 'clone', self.source, ok=False)
         assert blocked['error']['code'] == 'outcome-unknown', blocked
@@ -481,12 +486,63 @@ set keystone horizontal of adjustments of v to -5
         result = self.cli('preview', clone['workingRef'], '--timeout', '0.001', ok=False)
         assert result['error']['code'] == 'timeout', result
         operation = result['error']['operationId']
-        entry = self.cli('operation', 'status', operation)
+        folder = Path(self.latest(operation)['previewOutputPath'])
+        file = wait_for(lambda: next(folder.glob('*.jpg'), None), 60)
+        wait_for(lambda: file.read_bytes().endswith(b'\xff\xd9'), 60)
+        self.log('output-observed-after-timeout', path=str(file), bytes=file.stat().st_size, sha256=sha(file))
+        self.recovery(operation, clone, 'preview-timeout-with-eventual-output', status_before_restart=False)
+
+    def blocked_by(self, operation):
+        count = len(self.records())
+        blocked = self.cli('variant', 'clone', self.source, ok=False)
+        assert blocked['error']['code'] == 'outcome-unknown' and blocked['error']['operationId'] == operation, blocked
+        assert len(self.records()) == count, 'Blocked operation must not dispatch or append'
+
+    def resolve_late_preview(self, operation, pid):
+        """Waits for the late JPEG, then requires status to resolve it in the same process."""
+        entry = self.latest(operation)
+        assert entry['status'] == 'outcome-unknown' and entry['operationType'] == 'preview', entry
+        self.blocked_by(operation)
         folder = Path(entry['previewOutputPath'])
         file = wait_for(lambda: next(folder.glob('*.jpg'), None), 60)
         wait_for(lambda: file.read_bytes().endswith(b'\xff\xd9'), 60)
         self.log('output-observed-after-timeout', path=str(file), bytes=file.stat().st_size, sha256=sha(file))
-        self.recovery(operation, clone, 'preview-timeout-with-eventual-output')
+        count = len(self.records())
+        resolved = self.cli('operation', 'status', operation)
+        assert resolved['status'] == 'succeeded' and resolved['resolution'] == 'late-preview', resolved
+        assert Path(resolved['previewOutputPath']).resolve() == file.resolve(), resolved
+        assert len(self.records()) == count + 1, 'Resolution appends exactly one snapshot'
+        assert self.cli('operation', 'status', operation) == resolved and len(self.records()) == count + 1
+        assert self.pid() == pid, 'Late preview resolution must not restart Capture One'
+        doctor = self.cli('doctor')
+        assert doctor['unresolvedOperationsCount'] == 0 and doctor['writesEnabled'] and doctor['allChecksPassed'], doctor
+        return resolved
+
+    def resume_after_late_preview(self, ref, clone, before):
+        """No restart happened, so the faulted reference still takes a fresh write."""
+        fresh = self.cli('get', ref)
+        self.cli('set', ref, '--if-state', fresh['stateHash'], 'exposure=0.125')
+        self.cli('variant', 'delete', clone['workingRef'])
+        assert self.identities() == [i for i in before if i[0] != clone['cloneVariantId']]
+        original_now = self.cli('get', self.source)
+        assert original_now['stateHash'] == self.original['stateHash']
+        assert original_now.get('geometry') == self.original.get('geometry')
+        assert sha(self.raw) == self.raw_hash
+
+    def late_preview(self):
+        clone, current = self.clone()
+        before = self.identities()
+        pid = self.pid()
+        # The poll times out long before the export lands; no Apple Event is paused.
+        result = self.cli('preview', clone['workingRef'], '--timeout', '0.001', ok=False)
+        assert result['error']['code'] == 'timeout' and '-1712' not in result['error']['message'], result
+        operation = result['error']['operationId']
+        entry = self.latest(operation)
+        assert (entry['preconditionStateHash'], entry['preconditionGeometryStateHash']) == (current['stateHash'], current['geometryStateHash']), entry
+        resolved = self.resolve_late_preview(operation, pid)
+        self.resume_after_late_preview(clone['workingRef'], clone, before)
+        self.log('case-passed', case='preview-late-output-resolved-without-restart', operationId=operation,
+                 observations=resolved, pid=pid, rawSHA256=sha(self.raw))
 
     def mcp_death(self):
         clone, _ = self.clone()
@@ -627,6 +683,8 @@ set keystone horizontal of adjustments of v to -5
                     self.apple_event_timeout(geometry=True, rotation_only=True)
             elif case == 'preview':
                 self.preview_timeout()
+            elif case == 'late-preview':
+                self.late_preview()
             elif case == 'mcp-death':
                 self.mcp_death()
 

@@ -148,7 +148,7 @@ public struct ToolRequest {
                 readWorkflow: string("readWorkflow"), ids: a["ids"] as? [String], rating: int("rating"), minRating: int("minRating"),
                 batchSize: int("batchSize") ?? 100, deadlineSeconds: number("deadlineSeconds")))
         case "preview":
-            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30,
+            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? PreviewManager.defaultTimeout,
                                size: try int("size").map(PreviewSize.init) ?? .standard, fullFrame: flag("fullFrame"),
                                aspectRatio: number("aspectRatio"), anchors: try decoded("anchors") ?? [])
         case "operation_status": command = .operationStatus(operationId: string("operationId")!)

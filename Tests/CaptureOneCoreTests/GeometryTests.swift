@@ -6,6 +6,9 @@ final class GeometryFake: ScriptExecuting {
     var records: [String: [String: Any]] = [:]
     var failure: String?
     var changeDuringPreview = false
+    /// Capture One accepting an export whose JPEG lands only when `landHeldPreview` writes it.
+    var holdPreview = false
+    var heldPreview: (recipe: String, file: URL, aspect: Double)?
     var writeCount = 0
     var dimensionsFollowRotation = false
     var pendingBeforeWrite = false
@@ -19,6 +22,11 @@ final class GeometryFake: ScriptExecuting {
         records[id] ?? ["cropValues":[3000.0,2000,6000,4000], "rotationDegrees":0.0, "orientationDegrees":0,
             "sourceDimensions":[6000.0,4000], "maximumValues":[3000.0,2000,6000,4000], "flipName":"none", "ratioName":"",
             "keystoneValues":[100.0,0,0,0,0], "lensValues":[0.0,35,0,0,0,0,0,0], "profileName":"fixture", "hiddenAreas":true, "outsideAllowed":false]
+    }
+    /// Writes the held export, by default at the crop's aspect and the recipe's long edge.
+    func landHeldPreview(aspect: Double? = nil) throws {
+        let held = heldPreview!
+        try base.previewJPEG(recipe:held.recipe, aspect:aspect ?? held.aspect).write(to:held.file)
     }
     /// Every Apple Event the fake received, in order.
     var handlers: [String] = []
@@ -38,7 +46,8 @@ final class GeometryFake: ScriptExecuting {
             let id = args[1].stringValue!
             let r = record(id), crop = r["cropValues"] as! [Double]
             let url = URL(fileURLWithPath:args[3].stringValue!).appendingPathComponent(args[4].stringValue!).appendingPathComponent("preview.jpg")
-            try base.previewJPEG(recipe:args[2].stringValue!, aspect:crop[2]/crop[3]).write(to:url)
+            if holdPreview { heldPreview = (args[2].stringValue!, url, crop[2]/crop[3]) }
+            else { try base.previewJPEG(recipe:args[2].stringValue!, aspect:crop[2]/crop[3]).write(to:url) }
             if changeDuringPreview { var changed = r; changed["rotationDegrees"] = 1.0; records[id] = changed }
             result = ["jobId":"geometry-job"]
         case "applyGeometry", "applyCorrectedGeometry":

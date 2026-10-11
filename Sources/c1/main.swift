@@ -650,7 +650,7 @@ struct PreviewCommand: ParsableCommand {
     @Option(help: "Custom output directory.")
     var outputDir: String?
 
-    @Option(help: "Timeout in seconds for preview render (default 30).")
+    @Option(help: "Seconds to wait for the exported JPEG, up to \(Int(PreviewManager.maximumTimeout)) (default \(Int(PreviewManager.defaultTimeout))).")
     var timeout: Double?
 
     @Option(help: "Long edge in pixels, one of \(PreviewSize.allowed.map(String.init).joined(separator: ", ")) (default \(PreviewSize.standard.longEdge)).")

@@ -312,6 +312,7 @@ struct RecipeTests {
         scopeFault(ignoreDelete:true)
         verifyFault()
         previewSizes()
+        latePreviews()
         appleEventBudget()
     }
     /// Per-step handler calls of one `edit_apply` with the #25 profile's recipe shape.
@@ -428,6 +429,63 @@ struct RecipeTests {
             XCTAssertEqual(base.previewRecipeCalls.map(\.name),["c1-preview-800","c1-preview-400"])
             let previews = try journal.validatedEntries().filter { $0.operationType == "preview" }
             XCTAssertEqual(previews.suffix(2).map(\.previewSize),[800,400])
+        }
+    }
+    /// Compounds pass `previewTimeout` to their preview step. A late JPEG resolves the child
+    /// and lifts the write block, while the parent report keeps its uncertain status.
+    static func latePreviews() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = RecipeFake(directory), base = fake.geometry.base
+        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let workflow = RecipeWorkflow(core:core)
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let reference = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":source.stateHash])
+            let recipe: [String:Any] = ["version":1,"referenceId":reference["referenceId"]!,"settings":["clarity amount":5],"exposure":["mode":"preserve"],"whiteBalance":["mode":"preserve"],"cropPolicy":"preserve"]
+            let id = try workflow.run("recipe_register",arguments:["recipe":recipe])["recipeId"] as! String
+            func verifyArgs() throws -> [String:Any] {
+                let clone = try core.cloneVariant(sourceRef:"1")
+                return ["recipeId":id,"workingRef":clone.workingRef,"ifDocument":doc.openToken,"ifState":try core.get(ref:clone.workingRef).stateHash]
+            }
+            let checked = try verifyArgs()
+            func applyArgs() throws -> [String:Any] { ["recipeId":id,"sourceRef":"1","ifDocument":doc.openToken,"ifState":try core.get(ref:"1").stateHash,"preview":true] }
+            for (tool,args,message) in [("edit_apply",try applyArgs().merging(["preview":false,"previewTimeout":5]) { $1 },"previewTimeout requires preview: true."),
+                                        ("edit_apply",try applyArgs().merging(["previewTimeout":0]) { $1 },"previewTimeout"),
+                                        ("recipe_verify",checked.merging(["previewTimeout":301]) { $1 },"previewTimeout")] {
+                let calls = base.calls.count, entries = try journal.validatedEntries().count
+                XCTAssertThrowsError(try workflow.run(tool,arguments:args),tool) { XCTAssertTrue("\($0)".contains("invalid-request") && "\($0)".contains(message),"Actual: \($0)") }
+                XCTAssertEqual(base.calls.count,calls,"Invalid previewTimeout sends no Apple Event")
+                let after = try journal.validatedEntries().count
+                XCTAssertEqual(after,entries,"Invalid previewTimeout writes no journal entry")
+            }
+            let verified = try workflow.run("recipe_verify",arguments:checked)
+            XCTAssertEqual(verified["status"] as? String,"succeeded")
+            fake.geometry.holdPreview = true
+            for (tool,args) in [("edit_apply",try applyArgs()),("recipe_verify",try verifyArgs())] {
+                let start = Date()
+                let report = try workflow.run(tool,arguments:args.merging(["previewTimeout":0.3]) { $1 })
+                XCTAssertTrue(Date().timeIntervalSince(start) < 10,"\(tool) passes previewTimeout to its preview")
+                XCTAssertEqual(report["status"] as? String,"outcome-unknown",tool)
+                XCTAssertEqual(report["activeStep"] as? String,"preview",tool)
+                XCTAssertEqual((report["error"] as? [String:Any])?["code"] as? String,"timeout",tool)
+                let compoundId = report["compoundId"] as! String
+                let child = try journal.validatedEntries().last { $0.compoundId == compoundId && $0.operationType == "preview" }!
+                XCTAssertThrowsError(try journal.assertReady(),"\(tool): the uncertain preview blocks writes")
+                try fake.geometry.landHeldPreview()
+                let resolved = try core.operationStatus(operationId:child.operationId)
+                XCTAssertEqual([resolved.status,resolved.resolution],["succeeded","late-preview"],tool)
+                XCTAssertNoThrow(try journal.assertReady(),"\(tool): the resolved preview lifts the block")
+                let status = try workflow.run("edit_status",arguments:["compoundId":compoundId])
+                XCTAssertEqual(status["status"] as? String,"outcome-unknown","\(tool): child resolution never promotes the parent")
+                if tool == "recipe_verify" { XCTAssertEqual(status["verified"] as? Bool,false) }
+                let children = status["childOperations"] as? [[String:Any]] ?? []
+                let reported = children.first { $0["operationId"] as? String == child.operationId }
+                XCTAssertEqual(reported?["status"] as? String,"succeeded",tool)
+                XCTAssertEqual(reported?["resolution"] as? String,"late-preview",tool)
+            }
         }
     }
     static func scopeFault(ignoreDelete: Bool) {

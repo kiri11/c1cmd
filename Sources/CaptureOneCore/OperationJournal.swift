@@ -30,6 +30,8 @@ public struct OperationRecord: Codable, Equatable {
     public let workingRef: String?
     public let documentPath: String
     public let preconditionStateHash: String?
+    /// Preview only: the geometry token a late export must still match to resolve without a restart.
+    public var preconditionGeometryStateHash: String?
     public var intendedAdjustments: Adjustments?
     public let beforeAdjustments: Adjustments?
     public var afterAdjustments: Adjustments?
@@ -45,7 +47,9 @@ public struct OperationRecord: Codable, Equatable {
     public var requestedGeometry: GeometryRequest?
     public var afterGeometry: Geometry?
     public var diff: [String: DoubleDiff]?
-    public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown"
+    public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"
+    /// How operation status ended the operation without a restart; only `late-preview`.
+    public var resolution: String?
     public var error: String?
     public var previewOutputPath: String?
     public var previewSize: Int?
@@ -138,7 +142,10 @@ public final class OperationJournal {
     }
     public func assertReady() throws {
         if let entry = try validatedEntries().first(where: Self.isUnresolved) {
-            throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. Restart Capture One to end in-flight work, then inspect operation status."))
+            let action = entry.operationType == "preview"
+                ? "Inspect operation status once its JPEG has landed; a complete preview resolves without a restart, otherwise restart Capture One first."
+                : "Restart Capture One to end in-flight work, then inspect operation status."
+            throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. " + action))
         }
     }
 }

@@ -1173,15 +1173,15 @@ public final class SessionController {
     }
 
     // MARK: - Preview
-    public func preview(workingRefString: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0) throws -> PreviewResult {
+    public func preview(workingRefString: String, outputDirOverride: String? = nil, timeout: TimeInterval = PreviewManager.defaultTimeout) throws -> PreviewResult {
         try preview(ref: workingRefString, outputDirOverride: outputDirOverride, timeout: timeout)
     }
 
     /// A full-frame preview reports the source crop in its pixels, plus the crop each
     /// candidate `anchor` would apply with `aspectRatio` at the current rotation.
-    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, size: PreviewSize = .standard,
+    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = PreviewManager.defaultTimeout, size: PreviewSize = .standard,
                         fullFrame: Bool = false, aspectRatio: Double? = nil, anchors: [CropAnchor] = []) throws -> PreviewResult {
-        guard timeout.isFinite && timeout > 0 && timeout <= 300 else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
+        guard timeout.isFinite && timeout > 0 && timeout <= PreviewManager.maximumTimeout else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
         guard (aspectRatio == nil) == anchors.isEmpty, anchors.isEmpty || fullFrame, anchors.count <= PreviewResult.maximumCandidates else {
             throw C1Error.invalidRequest(PreviewResult.candidateUsage)
         }
@@ -1221,6 +1221,7 @@ public final class SessionController {
                 documentPath: doc.documentPath, preconditionStateHash: current.stateHash,
                 beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path, beforeGeometry: current.geometry)
             entry.previewSize = size.longEdge
+            entry.preconditionGeometryStateHash = current.geometryStateHash
             // Exports change no adjustments, so every failed check leaves the outcome unknown.
             return try journaled(entry, doc: doc, source: current, dispatch: {
                 let args = [NSAppleEventDescriptor(string: doc.documentId),
@@ -1239,8 +1240,7 @@ public final class SessionController {
                 let after = try get(ref: ref)
                 guard after.stateHash == current.stateHash, after.geometryStateHash == current.geometryStateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
                 if let geometry = current.geometry {
-                    let ratio = geometry.crop.aspectRatio
-                    guard abs(Double(image.width) - Double(image.height)*ratio) <= max(2,ratio*2) else {
+                    guard PreviewManager.matchesCrop(width: image.width, height: image.height, ratio: geometry.crop.aspectRatio) else {
                         throw C1Error.readbackMismatch("Preview dimensions do not match the crop aspect ratio.")
                     }
                 }
@@ -1271,6 +1271,7 @@ public final class SessionController {
     // MARK: - Operation Status & Reconciliation
     /// A restarted app cannot still execute an Apple Event from its previous process.
     /// Reconciliation records observations, never retries an uncertain mutation or rebinds a reference.
+    /// The one resolution without a restart is a late preview export (`latePreview`).
     public func operationStatus(operationId: String) throws -> OperationRecord {
         return try lock.withLock {
             let doc = try getDocumentInfo()
@@ -1280,7 +1281,12 @@ public final class SessionController {
                 throw C1Error.invalidRequest("Operation ID '\(operationId)' not found in journal.")
             }
             guard OperationJournal.isUnresolved(entry) else { return entry }
-            guard let originalInstance = entry.appInstance, originalInstance != (try appInstance()) else { return entry }
+            let instance = try appInstance()
+            guard let originalInstance = entry.appInstance, originalInstance != instance else {
+                guard entry.appInstance == instance, let resolved = try latePreview(entry, doc: doc) else { return entry }
+                try journal.append(entry: resolved)
+                return resolved
+            }
             guard entry.documentIdentity == (try databaseIdentity(databasePath(doc))) else {
                 throw C1Error.documentChanged("Cannot reconcile against a replaced database.")
             }
@@ -1328,6 +1334,36 @@ public final class SessionController {
             try journal.append(entry: entry)
             return entry
         }
+    }
+
+    /// An export changes no settings, so a timed-out preview whose JPEG landed later is
+    /// confirmed by the readback its dispatch would have made, in the same application
+    /// process and database. Nil leaves the operation unresolved; an error from the
+    /// identity check or the fresh read propagates and also leaves it unresolved.
+    private func latePreview(_ entry: OperationRecord, doc: DocumentInfo) throws -> OperationRecord? {
+        guard entry.operationType == "preview", entry.status == "outcome-unknown",
+              let id = entry.nativeVariantId, let parent = entry.parentImagePath,
+              let longEdge = entry.previewSize, let ratio = entry.beforeGeometry?.crop.aspectRatio,
+              let stateHash = entry.preconditionStateHash, let geometryHash = entry.preconditionGeometryStateHash,
+              let folder = entry.previewOutputPath.map({ URL(fileURLWithPath: $0, isDirectory: true) }),
+              folder.lastPathComponent == entry.operationId, folder.deletingLastPathComponent().lastPathComponent == "c1-previews",
+              entry.documentIdentity == (try databaseIdentity(databasePath(doc))) else { return nil }
+        let jpegs = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles))?
+            .filter { ["jpg", "jpeg"].contains($0.pathExtension.lowercased()) } ?? []
+        guard jpegs.count == 1, let file = try? previewMgr.pollForOutputFile(inDirectory: folder, timeout: 2),
+              let image = try? previewMgr.verifyAndDecodeImage(atPath: file.path),
+              max(image.width, image.height) == longEdge,
+              PreviewManager.matchesCrop(width: image.width, height: image.height, ratio: ratio) else { return nil }
+        let current = try get(ref: id, document: doc)
+        try checkedDocument(doc, writes: false)
+        guard current.id == id, current.parentImagePath == parent,
+              current.stateHash == stateHash, current.geometryStateHash == geometryHash else { return nil }
+        var resolved = entry
+        resolved.status = "succeeded"
+        resolved.resolution = "late-preview"
+        resolved.error = nil
+        resolved.previewOutputPath = file.path
+        return resolved
     }
 
     // MARK: - Expanded native editing

@@ -5,7 +5,8 @@ Run through recovery_integration_test.py with recipe:-prefixed cases.
 
 Exercises real Apple Event timeouts in compound native, lens, tonal, geometry and
 preview steps, plus layer color deletion through the shared native path.
-mcp-death kills a compound MCP caller after an observed completed mutation step.
+late-preview lets a short previewTimeout expire and resolves the late JPEG without
+a restart. mcp-death kills a compound MCP caller after an observed completed mutation step.
 No faults are retried. Production binaries have no test hooks.
 """
 import json
@@ -94,6 +95,7 @@ class RecipeRun(harness.Run):
 
     def compound_fault(self, kind):
         if kind == "layer-color": return self.layer_color_fault()
+        if kind == "late-preview": return self.late_preview_compound()
         recipe_id = self.setup_recipe({'clarity amount':5,'rgb curve':[0,0,50,55,100,100],
             'film grain type':'silver rich','film grain impact':25,'film grain granularity':30,
             'vignetting method':'circular','vignetting amount':-.5} if kind in ('native','mcp-death') else {}, kind)
@@ -165,9 +167,31 @@ class RecipeRun(harness.Run):
                 watchdog.terminate(); watchdog.wait(timeout=5)
             if self.child and self.child.poll() is None:
                 self.child.kill(); self.child.wait()
-        self.recovery(pending['operationId'],dict(clone,workingRef=result['workingRef']),'compound-' + kind + '-timeout')
+        # A paused export can still land; reading status first could resolve it without the restart under test.
+        self.recovery(pending['operationId'],dict(clone,workingRef=result['workingRef']),'compound-' + kind + '-timeout',status_before_restart=kind != 'preview')
         final = self.recipe_request('status',dict(compoundId=result['compoundId']),ok=False)
         assert final['status'] == 'outcome-unknown', 'Child reconciliation must not promote parent completion'
+
+    def late_preview_compound(self):
+        recipe_id = self.setup_recipe({}, 'late-preview')
+        clone, state = self.clone()
+        before = self.identities()
+        doc = self.cli('doc','info')
+        pid = self.pid()
+        args = dict(recipeId=recipe_id,sourceRef=clone['cloneVariantId'],ifDocument=doc['openToken'],ifState=state['stateHash'],preview=True,previewTimeout=0.001)
+        result = self.recipe_request('apply',args,ok=False)
+        assert result['status'] == 'outcome-unknown' and result['activeStep'] == 'preview', result
+        assert result['error']['code'] == 'timeout' and '-1712' not in result['error']['message'], result
+        operation = result['error']['operationId']
+        assert self.latest(operation)['compoundId'] == result['compoundId']
+        resolved = self.resolve_late_preview(operation,pid)
+        report = self.recipe_request('status',dict(compoundId=result['compoundId']),ok=False)
+        assert report['status'] == 'outcome-unknown', 'Child resolution must not promote parent completion'
+        child = next(r for r in report['childOperations'] if r['operationId'] == operation)
+        assert (child['status'],child['resolution']) == ('succeeded','late-preview'), child
+        self.resume_after_late_preview(result['workingRef'],clone,before)
+        self.log('case-passed',case='compound-preview-late-output-resolved-without-restart',compoundId=result['compoundId'],
+                 operationId=operation,observations=resolved,pid=pid,rawSHA256=harness.sha(self.raw))
 
     def layer_color_fault(self):
         # Exercise the shared native readback/reconciliation context on a layer,

@@ -56,7 +56,11 @@ their only statement; the reference docs link here.
    `operation_status <operationId>`. Restart Capture One, reopen the same database
    and check status again. Never retry, undo, resume or adopt a candidate clone
    automatically. `reconciled` records observations; it does not mean the write
-   succeeded. Old references stay invalid, so prepare a fresh one.
+   succeeded. Old references stay invalid, so prepare a fresh one. The one
+   exception is a timed-out `preview` whose JPEG has since landed: `operation_status`
+   resolves it without a restart, as `succeeded` with `resolution: late-preview`,
+   when the [late-preview checks](docs/reference/editing.md#late-preview-resolution)
+   pass. Any failed check leaves it under this rule.
 5. **Catalog writes require the exact-path opt-in and the exact build, with a
    native backup taken first.** `C1_CATALOG_WRITE_PATH` must name the exact open
    Catalog and Capture One must be 16.8.5.30; only online referenced originals

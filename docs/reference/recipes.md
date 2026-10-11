@@ -52,7 +52,7 @@ is exactly the corresponding MCP argument object:
 | `register` | `recipe_register` | Validate and save an immutable content-addressed payload |
 | `verify` | `recipe_verify` | Apply to an explicitly supplied managed clone; independently verify |
 | `apply` | `edit_apply` | Prepare and edit one existing photo, returning observed results |
-| `status` | `edit_status` | Inspect the durable compound report and interrupted child operations |
+| `status` | `edit_status` | Inspect the durable compound report and its interrupted or uncertain child operations |
 
 Use `c1 schema` for exact request and response schemas. The composition tool
 profile excludes capture, registration, verification and compound application;
@@ -99,8 +99,8 @@ preserve those folders with the manifests. New payload contents produce a new ID
 
 Explicitly create a disposable managed clone using `variant clone`, then read
 its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument`,
-`ifState` and an optional `previewSize`, the preview's long edge (see
-[Previews](editing.md#previews)). It never chooses or creates a clone silently and rejects existing
+`ifState` and optional `previewSize` and `previewTimeout`, the preview's long edge
+and how many seconds it waits for the JPEG (see [Previews](editing.md#previews)). It never chooses or creates a clone silently and rejects existing
 editing references and bare native IDs.
 
 Verification applies the payload, checks all 39 supported image settings (numbers, enums
@@ -131,12 +131,13 @@ explicit deletion; nothing is restored automatically.
   "ifGeometryState": "GEOMETRY_HASH",
   "geometry": {"aspectRatio": 1.5},
   "preview": true,
-  "previewSize": 800
+  "previewSize": 800,
+  "previewTimeout": 180
 }
 ```
 
-`previewSize` requires `preview: true` and takes the same sizes as `preview`
-`size`; it defaults to 1500.
+`previewSize` and `previewTimeout` require `preview: true` and take the same values
+as `preview` `size` and `timeout`; they default to 1500 px and 120 seconds.
 
 Settings overrides replace recipe fields before dispatch. Exposure is explicitly
 `preserve`, `absolute` or `relative`; non-preserve modes require a value. Relative
@@ -281,8 +282,12 @@ state, and read freshly again before a later independent mutation.
 
 `edit_status` accepts `compoundId`. A parent left running by process death is
 reported as interrupted with exactly its linked child journal records. It does
-not infer completion, retry, resume or reconcile. For an uncertain child, follow
-`operation status CHILD_ID` and the normal restart/reconciliation procedure.
+not infer completion, retry, resume or reconcile. A parent that ended
+`outcome-unknown` also lists its child records, with their current status. For an
+uncertain child, follow `operation status CHILD_ID` and the normal
+restart/reconciliation procedure; a timed-out preview child can
+[resolve without a restart](editing.md#late-preview-resolution) and lift the write
+block, while the parent stays `outcome-unknown`.
 Restart invalidates old editing references. Even reconciled child observations
 do not prove the interrupted compound completed.
 

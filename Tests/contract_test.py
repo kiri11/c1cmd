@@ -285,7 +285,12 @@ def run(cli, mcp):
         assert recipe['recipeNames'] == {'400': 'c1-preview-400', '800': 'c1-preview-800', '1200': 'c1-preview-1200', '1500': 'c1-preview'}, recipe
         for name in ['recipe_verify', 'edit_apply']:
             assert cli_schema['requests'][name]['properties']['previewSize'] == cli_schema['requests']['preview']['properties']['size'], name
-        assert cli_schema['responses']['operation_status']['properties']['previewSize'] == {'type': 'integer'}
+            assert cli_schema['requests'][name]['properties']['previewTimeout'] == cli_schema['requests']['preview']['properties']['timeout'], name
+        timeout = cli_schema['requests']['preview']['properties']['timeout']
+        assert (timeout['exclusiveMinimum'], timeout['maximum']) == (0, 300) and 'default 120' in timeout['description'], timeout
+        status = cli_schema['responses']['operation_status']['properties']
+        assert status['previewSize'] == {'type': 'integer'} and status['preconditionGeometryStateHash'] == status['preconditionStateHash']
+        assert status['resolution']['enum'] == ['late-preview'], status['resolution']
         print('PASS: shared CLI/MCP schemas, 38 tool schemas, invalid requests, server survival')
     finally:
         client.close()

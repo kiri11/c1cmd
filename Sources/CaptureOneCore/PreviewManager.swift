@@ -99,6 +99,14 @@ public struct PreviewSize: Equatable {
 
 public final class PreviewManager {
     public static let shared = PreviewManager()
+    /// Long enough for the slow exports seen in batches, where a JPEG landed about 90 s after dispatch.
+    public static let defaultTimeout: TimeInterval = 120
+    public static let maximumTimeout: TimeInterval = 300
+
+    /// Whether a `width` × `height` image renders a crop of `ratio` within the readback tolerance.
+    static func matchesCrop(width: Int, height: Int, ratio: Double) -> Bool {
+        abs(Double(width) - Double(height) * ratio) <= max(2, ratio * 2)
+    }
 
     private init() {}
 
@@ -137,7 +145,7 @@ public final class PreviewManager {
         return (width, height, hashStr)
     }
 
-    public func pollForOutputFile(inDirectory dir: URL, timeout: TimeInterval = 30.0) throws -> URL {
+    public func pollForOutputFile(inDirectory dir: URL, timeout: TimeInterval = defaultTimeout) throws -> URL {
         try PerformanceTrace.measure("preview_poll", handler: "PreviewManager.pollForOutputFile") { try poll(dir, timeout: timeout) }
     }
 

@@ -52,6 +52,10 @@ public enum ContractSchema {
         ["type": "integer", "enum": PreviewSize.allowed,
          "description": "Preview long edge in pixels (default \(PreviewSize.standard.longEdge)). Each size exports through its own reserved recipe."]
     }
+    static var previewTimeoutSchema: [String: Any] {
+        ["type": "number", "exclusiveMinimum": 0, "maximum": PreviewManager.maximumTimeout,
+         "description": "Seconds to wait for the exported JPEG (default \(Int(PreviewManager.defaultTimeout))). A timeout leaves the preview outcome-unknown; operation_status resolves it without a restart once a matching JPEG lands."]
+    }
     static func validatePreviewSize(_ value: Any?) throws {
         if let size = value as? NSNumber { _ = try PreviewSize(size.intValue) }
     }
@@ -154,7 +158,7 @@ public enum ContractSchema {
             var anchors = array(anchorSchema)
             anchors["minItems"] = 1; anchors["maxItems"] = PreviewResult.maximumCandidates
             anchors["description"] = "Candidate positions to report in candidateCrops; requires fullFrame and aspectRatio."
-            var result = object(["ref": string, "outputDir": string, "timeout": ["type": "number", "exclusiveMinimum": 0, "maximum": 300], "size": previewSizeSchema, "fullFrame":boolean,
+            var result = object(["ref": string, "outputDir": string, "timeout": previewTimeoutSchema, "size": previewSizeSchema, "fullFrame":boolean,
                                  "aspectRatio": ["type": "number", "exclusiveMinimum": 0], "anchors": anchors], required: ["ref"])
             result["dependentRequired"] = ["anchors": ["aspectRatio", "fullFrame"], "aspectRatio": ["anchors"]]
             return result
@@ -353,7 +357,7 @@ public enum ContractSchema {
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "previewPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "size": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string, "currentCrop":previewRectSchema,
                 "candidateCrops":array(object(["anchor":anchorSchema, "crop":cropSchema, "preview":previewRectSchema], required:["anchor", "crop", "preview"]))]),
-            "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "error": string, "previewOutputPath": string, "previewSize": ["type": "integer"], "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
+            "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "preconditionGeometryStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "resolution": ["enum": ["late-preview"], "description": "Present when operation_status, not the dispatch, confirmed the outcome: late-preview is a timed-out preview whose JPEG and state matched the journal without a restart."], "error": string, "previewOutputPath": string, "previewSize": ["type": "integer"], "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
         for (name,schema) in Recipes.responses(responses) { responses[name] = schema }
         responses["native_set"] = NativeEditing.mutationSchema

@@ -35,7 +35,14 @@ class RecipeHarnessTests(unittest.TestCase):
 
     def test_case_list_is_shared_with_the_campaign(self):
         self.assertIs(RecipeRun.CASES, CASES)
-        self.assertEqual(len(CASES), 8)
+        self.assertEqual(len(CASES), 9)
+
+    def test_late_preview_runs_its_own_compound_case(self):
+        runner = RecipeRun.__new__(RecipeRun)
+        runner.late_preview_compound = Mock()
+        runner.setup_recipe = Mock(side_effect=AssertionError('the paused-timeout path must not run'))
+        runner.compound_fault('late-preview')
+        runner.late_preview_compound.assert_called_once_with()
 
     def test_failure_stops_campaign(self):
         runner = RecipeRun.__new__(RecipeRun)

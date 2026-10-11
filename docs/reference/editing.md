@@ -21,7 +21,7 @@ Multi-process workflows are unqualified.
 MCP adjustment keys may be flat (`{"workingRef": "...", "ifState": "...",
 "exposure": 0.3}`) or grouped under `adjustments`. Mixed forms, duplicate aliases,
 unknown fields and wrong types are rejected. `dump.batchSize` is 1–1000; preview
-timeout is greater than zero and at most 300 seconds.
+timeout is greater than zero and at most 300 seconds, with 120 as the default.
 
 ## Catalog editing
 
@@ -204,7 +204,11 @@ and `request-cancelled` errors on a Catalog name that route in `recoveryAction`.
 
 `preview` exports into a unique `c1-previews/<operationId>` folder beneath the
 Session's `Output` or a supplied directory, and waits for a stable, decodable
-JPEG. MCP returns the image plus JSON metadata; other tools return JSON text.
+JPEG for up to `timeout` / `--timeout` seconds: more than zero, at most 300,
+default 120. Exports in long batches have landed about 90 seconds after dispatch,
+so the default leaves margin over that. `edit_apply` and `recipe_verify` take the
+same value as `previewTimeout`. A timeout leaves the preview `outcome-unknown`
+until [late preview resolution](#late-preview-resolution) or a restart. MCP returns the image plus JSON metadata; other tools return JSON text.
 Metadata includes the native variant ID and state tokens, which are checked across
 rendering. Tokens do not cover every layer, curve or render setting, so preview
 caching by token is unsupported. Preview counts as a mutating tool.
@@ -265,15 +269,46 @@ describes compact shapes; `responses` describes complete ones.
 
 Errors after dispatch carry `operationId`. `c1 operation status <operationId>` /
 `operation_status` reports whether the operation is resolved. While the original
-Capture One process runs, it stays unresolved: a timeout does not cancel the Apple
-Event. After a restart and reopening the same database, status reconciliation
-records observed adjustments or candidate clone IDs and ends the write block.
+Capture One process runs, the operation stays unresolved, because a timeout does
+not cancel the Apple Event; a late preview is the one exception. After a restart and reopening the same
+database, status reconciliation records observed adjustments or candidate clone
+IDs and ends the write block.
 `doctor` reports `unresolvedOperationsCount` only after reading the journal; an
 absent count means unknown and `diagnosticError` explains why.
 
 Journals, provenance and baselines live in the document's `.c1` folder (for a
 Catalog, inside the package). A missing identity record, replaced database or
 corrupt journal requires manual inspection.
+
+### Late preview resolution
+
+An export changes no settings, so a timed-out `preview` is the one operation that
+`operation_status` resolves without a restart. Every condition must hold:
+
+- The operation is a `preview` with status `outcome-unknown`, and Capture One is
+  still the process that started it.
+- The open document's database identity matches the journal.
+- The journaled `c1-previews/<operationId>` folder holds exactly one JPEG, and it
+  is complete, stable and decodable.
+- Its long edge equals the journaled `previewSize`, and its aspect matches the
+  journaled crop ratio within the readback tolerance.
+- A fresh read of the journaled native variant returns the same parent image,
+  `preconditionStateHash` and `preconditionGeometryStateHash`.
+
+Status then appends a snapshot with `status: succeeded`,
+`resolution: late-preview` and `previewOutputPath` naming the JPEG, and the write
+block lifts.
+No restart happened, so references stay valid. A failed check appends nothing and
+leaves the operation unresolved; ask again after the JPEG lands, or restart and
+reconcile. After a restart, normal reconciliation records `reconciled` even for a
+complete JPEG. Journal entries written before contract 4.9.0
+lack `preconditionGeometryStateHash` and always need the restart.
+
+A saved compound report never changes after the fact. When the preview step of
+`edit_apply` or `recipe_verify` resolves late, `edit_status` still reports
+`outcome-unknown` and lists the resolved child in `childOperations`. The steps
+before the preview completed, `observe` never ran, and a verification stays
+`verified: false`. Read fresh tokens before the next write.
 
 ## Tool profiles
 

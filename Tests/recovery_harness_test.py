@@ -19,7 +19,7 @@ class HarnessTests(unittest.TestCase):
     def test_case_selection_rejects_invalid_before_setup(self):
         self.assertEqual(harness.parse_args(['archive', 'evidence']).cases,
                          (list(harness.RECOVERY_CASES), list(harness.RECIPE_CASES)))
-        self.assertEqual(len(harness.ALL_CASES), 19)
+        self.assertEqual(len(harness.ALL_CASES), 21)
         self.assertEqual(harness.selected_cases(['preview', 'clone-readback']), ['clone-readback', 'preview'])
         self.assertEqual(harness.parse_args(['archive', 'evidence', '--cases', 'recipe:lens', 'tonal', 'recipe:native']).cases,
                          (['tonal'], ['native', 'lens']))
@@ -99,6 +99,7 @@ class HarnessTests(unittest.TestCase):
             {'variantId': '1', 'isPresent': True, 'parentImagePath': str(self.run.raw)}])
         self.run.apple_event_timeout = lambda **kw: calls.append(('timeout', kw))
         self.run.preview_timeout = lambda: calls.append(('preview', {}))
+        self.run.late_preview = lambda: calls.append(('late-preview', {}))
         self.run.mcp_death = lambda: calls.append(('mcp-death', {}))
         self.run.run_cases(['all'])
         self.assertEqual(self.run.clone.call_count, 10)
@@ -108,7 +109,7 @@ class HarnessTests(unittest.TestCase):
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),
-                               ('preview', {}), ('mcp-death', {})])
+                               ('preview', {}), ('late-preview', {}), ('mcp-death', {})])
 
     def test_known_id_lookup_reports_absence_and_fails_on_other_errors(self):
         self.run.handlers = self.root / 'Handlers.applescript'
@@ -380,6 +381,62 @@ class HarnessTests(unittest.TestCase):
         self.run.cli.assert_any_call('get', 'old-reference', ok=False)
         self.run.cli.assert_any_call('variant', 'delete', 'fresh')
         self.run.clone.assert_called_once()
+
+    def test_preview_restart_path_reads_the_journal_before_restart(self):
+        self.configure_recovery()
+        self.run.records = Mock(return_value=[{'operationId': 'operation', 'status': 'outcome-unknown'}])
+        self.run.recovery('operation', {'workingRef': 'old-reference'}, 'test', status_before_restart=False)
+        status = [c for c in self.run.cli.call_args_list if c.args[:2] == ('operation', 'status')]
+        self.assertEqual(len(status), 1, 'Status runs only after the restart, so a landed JPEG cannot resolve first')
+        self.run.records = Mock(return_value=[{'operationId': 'operation', 'status': 'succeeded'}])
+        with self.assertRaises(AssertionError):
+            self.run.recovery('operation', {'workingRef': 'old-reference'}, 'test', status_before_restart=False)
+
+    def configure_late_preview(self, resolution=None, pid=100, unresolved=0):
+        folder = self.root / 'Output/c1-previews/op'
+        folder.mkdir(parents=True)
+        (folder / 'preview.jpg').write_bytes(b'\xff\xd8offline\xff\xd9')
+        records = [{'operationId': 'op', 'operationType': 'preview', 'status': 'outcome-unknown', 'previewOutputPath': str(folder)}]
+        resolved = dict({'status': 'succeeded', 'resolution': 'late-preview', 'previewOutputPath': str(folder / 'preview.jpg')}, **(resolution or {}))
+        self.run.source = '1'
+        self.run.records = Mock(side_effect=lambda: list(records))
+        self.run.pid = Mock(return_value=pid)
+        def cli(*args, **kwargs):
+            if args[:2] == ('variant', 'clone'):
+                return {'error': {'code': 'outcome-unknown', 'operationId': 'op'}}
+            if args[:2] == ('operation', 'status'):
+                if resolved['status'] != 'outcome-unknown' and len(records) == 1:
+                    records.append(dict(records[0], **resolved))
+                return resolved
+            if args == ('doctor',):
+                return {'unresolvedOperationsCount': unresolved, 'writesEnabled': not unresolved, 'allChecksPassed': not unresolved}
+        self.run.cli = Mock(side_effect=cli)
+        def observed(predicate, seconds=30):
+            value = predicate()
+            if not value:
+                raise TimeoutError('offline deadline')
+            return value
+        patcher = patch.object(harness, 'wait_for', observed)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_late_preview_resolves_in_the_same_process(self):
+        self.configure_late_preview()
+        resolved = self.run.resolve_late_preview('op', 100)
+        self.assertEqual(resolved['resolution'], 'late-preview')
+        calls = [c.args[:2] for c in self.run.cli.call_args_list]
+        self.assertLess(calls.index(('variant', 'clone')), calls.index(('operation', 'status')), 'The block is observed before status resolves it')
+
+    def test_late_preview_fails_without_resolution_or_with_a_restart(self):
+        for label, options in [('unresolved', {'resolution': {'status': 'outcome-unknown'}}),
+                               ('reconciled', {'resolution': {'status': 'reconciled', 'resolution': None}}),
+                               ('restarted', {'pid': 200}),
+                               ('still blocked', {'unresolved': 1})]:
+            with self.subTest(label), tempfile.TemporaryDirectory() as directory:
+                self.root = Path(directory)
+                self.configure_late_preview(**options)
+                with self.assertRaises(AssertionError):
+                    self.run.resolve_late_preview('op', 100)
 
     def test_keystone_reconciliation_accepts_observed_partial_write_and_preserves_ids(self):
         for observed in [[100,0,0,0,0], [100,12,0,0,0], [100,12,-7,0,0]]:
