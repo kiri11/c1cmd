@@ -44,6 +44,8 @@ final class FakeScript: ScriptExecuting {
     var ratingBatches: [[String]] = []
     var hydrationBatches: [[String]] = []
     var hydrationCounterIDs: [String] { hydrationBatches.flatMap { $0 } }
+    /// The collection each per-ID read addressed, as "handler@collection"; "handler@" is the document.
+    var readScopes: [String] = []
     private var discoverCount = 0
     var preparedBeforeDispatch = true
     var previewRoot: String?
@@ -145,6 +147,7 @@ final class FakeScript: ScriptExecuting {
             guard parentOf(anchor) == args[2].stringValue else { throw C1Error.identityAmbiguous("Variant parent image changed.") }
             result = values.keys.sorted().filter { parentOf($0) == parentOf(anchor) }
         case "readVariantRatings":
+            readScopes.append("\(handler)@\(args[2].stringValue ?? "")")
             beforeReadRatings?()
             documentDrift?()
             let requested = ids(from: args[1])
@@ -152,6 +155,7 @@ final class FakeScript: ScriptExecuting {
             let responseIDs = ratingResponseIDs?(requested) ?? requested
             result = responseIDs.map { ["variantId": $0, "starRating": ratings[$0] ?? 0] as [String: Any] }
         case "readVariantSummaries":
+            readScopes.append("\(handler)@\(args[2].stringValue ?? "")")
             beforeReadSummaries?()
             documentDrift?()
             ratingDrift?()
@@ -160,6 +164,7 @@ final class FakeScript: ScriptExecuting {
             let responseIDs = summaryResponseIDs?(requested) ?? requested.filter { values[$0] != nil }
             result = responseIDs.map(summary)
         case "getAdjustmentsBatch":
+            readScopes.append("\(handler)@\(args[2].stringValue ?? "")")
             let requested = ids(from: args[1])
             guard let id = requested.first, values[id] != nil else { throw C1Error.variantNotFound("missing") }
             result = (adjustmentResponseIDs?(requested) ?? requested.filter { values[$0] != nil }).map(item)

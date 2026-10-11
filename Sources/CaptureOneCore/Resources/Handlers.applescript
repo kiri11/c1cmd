@@ -124,12 +124,22 @@ on discoverVariantIDs(docName, collectionName, selectedOnly)
     end tell
 end discoverVariantIDs
 
-on readVariantRatings(docName, variantIDs)
+-- Capture One resolves "variant id X of document" only inside the current collection,
+-- in Sessions and Catalogs alike; a named collection resolves its own members.
+on variantScope(d, collectionName)
+    tell application "/Applications/Capture One.app"
+        if collectionName is missing value or collectionName is "" then return d
+        return collection collectionName of d
+    end tell
+end variantScope
+
+on readVariantRatings(docName, variantIDs, collectionName)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
+        set scope to my variantScope(d, collectionName)
         set results to {}
         repeat with requestedID in variantIDs
-            set v to variant id (requestedID as text) of d
+            set v to variant id (requestedID as text) of scope
             -- A read failure is not an unrated image. Fail rather than silently omit a match.
             set end of results to {variantId:(id of v as text), starRating:(rating of v as integer)}
         end repeat
@@ -137,15 +147,22 @@ on readVariantRatings(docName, variantIDs)
     end tell
 end readVariantRatings
 
-on readVariantSummaries(docName, variantIDs)
+-- isSelected comes from the scope's own selection filter, the one the selected filter
+-- uses; the selected property of a variant can report another collection's selection.
+on readVariantSummaries(docName, variantIDs, collectionName)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
+        set scope to my variantScope(d, collectionName)
+        set selectedIDs to {}
+        repeat with selectedID in (get id of (every variant of scope whose selected is true))
+            set end of selectedIDs to selectedID as text
+        end repeat
         set results to {}
         repeat with requestedID in variantIDs
-            set v to variant id (requestedID as text) of d
+            set v to variant id (requestedID as text) of scope
             set vId to (id of v as text)
             set vName to (name of v as text)
-            set vSel to (selected of v as boolean)
+            set vSel to selectedIDs contains vId
             set vRating to (rating of v as integer)
             set vTag to 0
             try
@@ -196,12 +213,13 @@ on deleteVariant(docName, variantId, expectedPath, sourceId)
     end tell
 end deleteVariant
 
-on getAdjustmentsBatch(docName, variantIds)
+on getAdjustmentsBatch(docName, variantIds, collectionName)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
+        set scope to my variantScope(d, collectionName)
         set results to {}
         repeat with vid in variantIds
-            set v to variant id (vid as text) of d
+            set v to variant id (vid as text) of scope
             set adj to adjustments of v
             
             set expVal to (exposure of adj as real)
@@ -503,8 +521,13 @@ on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
     set d to my checkedDocument(docName)
     tell application "/Applications/Capture One.app"
         set scoped to collectionName is not missing value and collectionName is not ""
-        set scope to d
-        if scoped then set scope to collection collectionName of d
+        set scope to my variantScope(d, collectionName)
+        set selectedIDs to {}
+        if selectedOnly then
+            repeat with selectedID in (get id of (every variant of scope whose selected is true))
+                set end of selectedIDs to selectedID as text
+            end repeat
+        end if
         set results to {}
         repeat with requestedID in variantIDs
             set idText to requestedID as text
@@ -519,7 +542,7 @@ on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
             if isPresent then
                 set v to variant id foundID of scope
                 set selectedValue to true
-                if selectedOnly then set selectedValue to selected of v as boolean
+                if selectedOnly then set selectedValue to selectedIDs contains foundID
                 set end of results to {variantId:foundID, presence:"present", starRating:(rating of v as integer), parentImagePath:(POSIX path of (path of parent image of v as text)), inSelection:selectedValue}
             else
                 set presence to "missing"

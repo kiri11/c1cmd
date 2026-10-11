@@ -27,6 +27,7 @@ struct InventoryTests {
         testTerminalErrorsAreRedacted()
         testFiltersBeforeHydration()
         testCatalogStrategyGate()
+        testScopedReadsAddressTheCollection()
         testDuplicateAndSharedParentIDs()
         testMalformedAndVanishedResponsesFailClosed()
         testRatingAndMembershipDriftFailClosed()
@@ -290,6 +291,34 @@ struct InventoryTests {
             XCTAssertEqual(status.matchesFound, 3, label)
             XCTAssertEqual(status.summariesCompleted, 3, label)
             XCTAssertEqual(status.phase, "confirmed", label)
+        }
+    }
+
+    /// Capture One resolves a document-level variant ID only inside the current collection,
+    /// so every per-ID read of a collection-scoped request names that collection.
+    private static func testScopedReadsAddressTheCollection() {
+        for native in [true, false] {
+            let (fake, core, dir) = fixture(6, native: native)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let label = "native=\(native)"
+            XCTAssertNoThrowBlock {
+                _ = try core.listVariants(collectionName: "Album", minRating: 3, batchSize: 2)
+                _ = try core.listVariants(collectionName: "Album", batchSize: 4)
+                _ = try core.listVariantSubset(ids: ["3", "4"], collection: "Album", fields: "summary")
+                _ = try core.dump(collectionName: "Album", batchSize: 4)
+                _ = try core.dump(collectionName: "Album", ids: ["5"])
+            }
+            XCTAssertFalse(fake.readScopes.isEmpty, label)
+            XCTAssertEqual(fake.readScopes.filter { !$0.hasSuffix("@Album") }, [], label)
+            XCTAssertEqual(fake.readScopes.contains("readVariantRatings@Album"), !native, label)
+            XCTAssertTrue(fake.readScopes.contains("getAdjustmentsBatch@Album"), label)
+            fake.readScopes = []
+            XCTAssertNoThrowBlock {
+                _ = try core.listVariants(batchSize: 4)
+                _ = try core.dump(batchSize: 4)
+                _ = try core.get(ref: "1")
+            }
+            XCTAssertEqual(Set(fake.readScopes), ["readVariantSummaries@", "getAdjustmentsBatch@"], label)
         }
     }
 

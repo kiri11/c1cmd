@@ -104,7 +104,6 @@ class Harness:
         self.last_reference_elapsed = None
         self.album_ids = []
         self.album_membership = {}
-        self.selected_ids = set()
 
     def cli(self, *args, progress=True, allow_error=False, timeout=300, strategy=None):
         env = dict(self.environment, C1_REQUEST_DIR=str(self.status_dir), C1_DIAGNOSTICS="1")
@@ -213,7 +212,6 @@ end repeat''', timeout=600)
 
     def set_selection(self, records, selected_ids):
         selected_ids = set(selected_ids)
-        self.selected_ids = selected_ids
         variants = ", ".join(f'variant id {apple_literal(record["id"])} of d' for record in records if record["id"] in selected_ids)
         osa('set d to first document\nselect d variants {' + variants + '}')
         time.sleep(.5)
@@ -248,11 +246,10 @@ end repeat''', timeout=600)
             members = {record["id"] for record in reference}
             assert set(self.album_ids) <= members, (label, self.album_ids, reference)
             self.album_membership[label] = {"added": self.album_ids, "listed": sorted(members, key=int)}
-            if selected:
-                reference = self.reference(collection, True)
-            else:
-                # Summaries report the current collection's selection; the legacy handler reports the album's.
-                reference = [dict(record, isSelected=record["id"] in self.selected_ids) for record in reference]
+            # isSelected reports the collection's own selection, the one --selected filters by.
+            in_selection = {record["id"] for record in self.reference(collection, True)}
+            reference = [dict(record, isSelected=record["id"] in in_selection) for record in reference
+                         if not selected or record["id"] in in_selection]
         expected = [record for record in reference
                     if (rating is None or record["rating"] == rating)
                     and (min_rating is None or record["rating"] >= min_rating)]
@@ -277,6 +274,32 @@ end repeat''', timeout=600)
                               "referenceElapsedSeconds": self.last_reference_elapsed, "default": default, "scan": scan})
         print(f"PASS {label}: {default['strategy']} {default['elapsedSeconds']:.3f}s; rating-scan {scan['elapsedSeconds']:.3f}s; "
               f"legacy {self.last_reference_elapsed:.3f}s; matches {len(actual)}", flush=True)
+
+    def non_current(self, records, album):
+        """Read collections that are not current: Capture One resolves a document-level variant ID only in the current one."""
+        current = "c1-inventory-current"
+        self.album(current, [])
+        osa(f'set current collection of first document to collection {apple_literal(current)} of first document')
+        time.sleep(.5)
+        try:
+            for collection in [self.document["allVariants"], album]:
+                self.benchmark(f"non-current-{collection}", collection, False)
+                self.benchmark(f"non-current-{collection}-selected", collection, True)
+                listed, _, _ = self.cli("variants", "list", "--collection", collection)
+                selected, _, _ = self.cli("variants", "list", "--collection", collection, "--selected")
+                assert [r["id"] for r in listed if r["isSelected"]] == [r["id"] for r in selected], (collection, listed, selected)
+                ids = [record["id"] for record in records[:2]]
+                subset, _, _ = self.cli("variants", "list", "--ids", ",".join(ids), "--collection", collection, "--fields", "summary")
+                assert [r["id"] for r in subset] == ids and all("isSelected" in r for r in subset), subset
+                dumped, _ = self.dump("--collection", collection)
+                assert sorted(r["id"] for r in dumped) == sorted(r["id"] for r in listed), (collection, dumped)
+            assert osa("get name of current collection of first document") == current, "inventory changed the current collection"
+            self.evidence.append({"label": "non-current-collections", "current": current,
+                                  "collections": [self.document["allVariants"], album]})
+            print("PASS non-current collections", flush=True)
+        finally:
+            osa(f'set current collection of first document to collection {apple_literal(self.document["allVariants"])} of first document')
+            time.sleep(.5)
 
     def dump(self, *flags, allow_error=False):
         value, _, process = self.cli("dump", "--dump-format", "json", *flags, allow_error=allow_error)
@@ -336,6 +359,7 @@ end repeat''', timeout=600)
             self.benchmark(f"{count}-selected-sparse-min0", None, True, min_rating=0)
             if count == SMALL_COUNT:
                 self.dump_filters(records)
+                self.non_current(records, album)
             self.set_ratings(records, 5)
             self.set_selection(records, selected_ids)
             self.benchmark(f"{count}-document-dense-min5", None, False, min_rating=5)

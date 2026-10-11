@@ -604,7 +604,8 @@ public final class SessionController {
                     try validateDocument()
                     let batch = Array(matches[offset..<min(offset + batchSize, matches.count)])
                     let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc,
-                        NSAppleEventDescriptor(list: batch.map { NSAppleEventDescriptor(string: $0.variantId) })])
+                        NSAppleEventDescriptor(list: batch.map { NSAppleEventDescriptor(string: $0.variantId) }),
+                        collection.map(NSAppleEventDescriptor.init(string:)) ?? .missingValue()])
                     guard summaries.map(\.variantId) == batch.map(\.variantId),
                           summaries.map(\.starRating) == batch.map(\.starRating),
                           summaries.map(\.parentImagePath) == batch.map(\.parentImagePath),
@@ -687,7 +688,7 @@ public final class SessionController {
                 let batch = Array(ids[offset..<min(offset + batchSize, ids.count)])
                 if direct {
                     context?.update(phase: "metadata")
-                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
+                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:))), col])
                     guard summaries.map(\.variantId) == batch, summaries.allSatisfy({ item in
                         VariantMetadata.ratingRange.contains(item.starRating) &&
                         (rating.map { item.starRating == $0 } ?? true) &&
@@ -702,7 +703,7 @@ public final class SessionController {
                     continue
                 }
                 context?.update(phase: "ratings")
-                let ratings: [RatingRecord] = try executor.executeAndDecode(handler: "readVariantRatings", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:)))])
+                let ratings: [RatingRecord] = try executor.executeAndDecode(handler: "readVariantRatings", args: [doc, NSAppleEventDescriptor(list: batch.map(NSAppleEventDescriptor.init(string:))), col])
                 guard ratings.map(\.variantId) == batch, ratings.allSatisfy({ VariantMetadata.ratingRange.contains($0.starRating) }) else {
                     throw C1Error.stateChanged("Inventory rating IDs or values changed; no partial inventory was returned.")
                 }
@@ -714,7 +715,7 @@ public final class SessionController {
                 try checkpoint()
                 if !matches.isEmpty {
                     context?.update(phase: "metadata")
-                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: matches.map { NSAppleEventDescriptor(string: $0.variantId) })])
+                    let summaries: [VariantSummaryRecord] = try executor.executeAndDecode(handler: "readVariantSummaries", args: [doc, NSAppleEventDescriptor(list: matches.map { NSAppleEventDescriptor(string: $0.variantId) }), col])
                     guard summaries.map(\.variantId) == matches.map(\.variantId),
                           summaries.map(\.starRating) == matches.map(\.starRating),
                           !selectedOnly || summaries.allSatisfy(\.isSelected) else {
@@ -882,7 +883,7 @@ public final class SessionController {
 
         let results: [AdjustmentBatchItemRecord] = try executor.executeAndDecode(
             handler: "getAdjustmentsBatch",
-            args: [docNameDesc, idListDesc]
+            args: [docNameDesc, idListDesc, .missingValue()]
         )
 
         guard let first = results.first else {
@@ -1106,7 +1107,7 @@ public final class SessionController {
 
             let batchItems: [AdjustmentBatchItemRecord] = try executor.executeAndDecode(
                 handler: "getAdjustmentsBatch",
-                args: [docNameDesc, idsDesc]
+                args: [docNameDesc, idsDesc, collectionName.map(NSAppleEventDescriptor.init(string:)) ?? .missingValue()]
             )
 
             var itemMap: [String: AdjustmentBatchItemRecord] = [:]

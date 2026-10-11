@@ -106,6 +106,16 @@ MCP `variants_list` takes `rating` or `minRating` (not both), plus `collection` 
 returns an empty list. Results are variants: several edits of one photo, including
 managed clones (`isManagedWorkingClone`), can appear.
 
+Without `collection`, the scope is Capture One's current collection, not the whole
+document. A named collection need not be current: inventory and `dump` read its
+variants through it and leave the current collection unchanged. `isSelected` and
+`selected` both use that collection's own selection, which can differ from the
+selection shown in the current collection. Adding some variants of a photo to an
+album makes the album list every variant of that photo. `get` and edits resolve a
+native ID only inside the current collection, so a variant listed from another
+collection fails with `script-error` (-1728) until the photographer makes a
+collection holding it current.
+
 Filtering runs before full metadata reads. On 16.8.5.30, native rating predicates
 and bulk ID reads select candidates in Sessions and Catalogs; other builds use a
 two-stage rating scan (`C1_INVENTORY_STRATEGY=scan` forces it); without a rating
