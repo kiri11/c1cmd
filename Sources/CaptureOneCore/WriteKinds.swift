@@ -19,7 +19,7 @@ struct MetadataWrite: WriteKind {
 
     func dispatch(_ intended: VariantMetadata, before: Observed<VariantMetadata>, to target: WriteTarget) throws -> Reply {
         try target.executor.executeAndDecode(handler: "applyMetadata", args: [
-            NSAppleEventDescriptor(string: target.documentId), NSAppleEventDescriptor(string: target.variantId),
+            target.document, NSAppleEventDescriptor(string: target.variantId),
             rating.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
             colorTag.map { NSAppleEventDescriptor(int32: Int32($0)) } ?? .missingValue(),
             NSAppleEventDescriptor(int32: Int32(before.state.rating)), NSAppleEventDescriptor(int32: Int32(before.state.colorTag)),
@@ -109,7 +109,7 @@ struct TonalWrite: WriteKind {
     func dispatch(_ intended: Intended, before: Observed<Adjustments>, to target: WriteTarget) throws -> ApplyAdjustmentsResult {
         let patch = intended.patch
         return try target.executor.executeAndDecode(handler: "applyAdjustments", args: [
-            NSAppleEventDescriptor(string: target.documentId), NSAppleEventDescriptor(string: target.variantId)]
+            target.document, NSAppleEventDescriptor(string: target.variantId)]
             + [patch.exposure, patch.contrast, patch.saturation, patch.temperature, patch.tint].map {
                 $0.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue()
             }
@@ -243,7 +243,7 @@ struct GeometryWrite: WriteKind {
     func dispatch(_ intended: Intended, before: Observed<State>, to target: WriteTarget) throws -> Geometry {
         let geometry = before.state.geometry
         let arguments = [
-            NSAppleEventDescriptor(string: target.documentId), NSAppleEventDescriptor(string: target.variantId),
+            target.document, NSAppleEventDescriptor(string: target.variantId),
             NSAppleEventDescriptor(string: target.parentImagePath), geometry.eventSnapshot,
             NSAppleEventDescriptor(list: registry.supportedAdjustmentFields.map { NSAppleEventDescriptor(double: before.observation.adjustments.value(for: $0.name)!) })]
         guard let request = intended.request else {
@@ -346,7 +346,7 @@ struct NativeWrite: WriteKind {
     func dispatch(_ values: [String: NativeValue], before: Observed<NativeSnapshot>, to destination: WriteTarget) throws -> Bool {
         let snapshot = before.state
         let fields = snapshot.values.keys.sorted(), keys = action == nil ? NativeEditing.orderedPatchKeys(patch, target: target) : arguments.keys.sorted()
-        var args = [NSAppleEventDescriptor(string: destination.documentId), .init(string: destination.variantId)] + target.descriptors + [
+        var args = [destination.document, .init(string: destination.variantId)] + target.descriptors + [
             .init(string: destination.parentImagePath), .init(list: fields.map { .init(string: $0) }),
             .init(list: fields.map { snapshot.values[$0]!.descriptor }), .init(list: snapshot.layers.map { .init(list:[.init(string:$0.nativeName), .init(string:$0.nativeKind), .init(int32:Int32($0.nativeOpacity)), .init(boolean:$0.nativeEnabled)]) })]
         if let action { args.append(.init(string: action)) }

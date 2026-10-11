@@ -111,9 +111,16 @@ document. A named collection need not be current: inventory and `dump` read its
 variants through it and leave the current collection unchanged. `isSelected` and
 `selected` both use that collection's own selection, which can differ from the
 selection shown in the current collection. Adding some variants of a photo to an
-album makes the album list every variant of that photo. `get` and edits resolve a
-native ID only inside the current collection, so a variant listed from another
-collection fails with `script-error` (-1728) until the photographer makes a
+album makes the album list every variant of that photo.
+
+`get`, edits, previews, clones and deletes find a native ID outside the current
+collection and leave the current collection unchanged. Capture One resolves an ID
+only through a collection that holds it, so a Catalog goes through All Images, whose
+ID c1 reads from the Catalog's stored root collection, and a Session goes through its
+folder favorites: Capture, Selects, Output and Trash, then the photographer's own.
+The current collection is the last route, and the only one when a Catalog's stored ID
+cannot be read. A variant that no route holds, such as one in a Session subfolder that
+is not a favorite, fails with `variant-not-found` until the photographer makes a
 collection holding it current.
 
 Filtering runs before full metadata reads. On 16.8.5.30, native rating predicates
@@ -326,7 +333,7 @@ remain. An unknown value, or two names that disagree, rejects every request.
 | `no-document` | Open a Session or Catalog. |
 | `unsupported-version` | Build outside 16.4–16.x; `C1_ALLOW_UNTESTED_BUILD=1` overrides compatibility only. |
 | `unmanaged-variant` | Write without an editing reference, or deletion of an existing variant. |
-| `variant-not-found` | An ID does not resolve; known-ID lists report `missingIds` and `outOfScopeIds`. |
+| `variant-not-found` | An ID does not resolve through any route; known-ID lists report `missingIds` and `outOfScopeIds`. |
 | `state-changed` | A token is stale; read again and reconcile. |
 | `document-changed` | Document count, identity or application lifetime changed. |
 | `readback-mismatch` | Capture One returned values outside tolerance. |

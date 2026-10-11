@@ -62,7 +62,8 @@ public struct CurrentObservation {
 
 /// The resolved native destination of one write and the saved baseline of its reference.
 struct WriteTarget {
-    let documentId: String
+    /// `SessionController.scriptDocument` of the checked document.
+    let document: NSAppleEventDescriptor
     let workingRef: String
     let variantId: String
     let parentImagePath: String
@@ -203,7 +204,7 @@ extension SessionController {
             guard let state = kind.read(current) else { throw kind.unavailable(current) }
             guard kind.token(state) == precondition else { throw C1Error.stateChanged(kind.staleMessage) }
             let before = Observed(observation: current, state: state)
-            let target = WriteTarget(documentId: doc.documentId, workingRef: resolved.workingRef, variantId: resolved.variantId,
+            let target = WriteTarget(document: scriptDocument(doc), workingRef: resolved.workingRef, variantId: resolved.variantId,
                 parentImagePath: current.parentImagePath ?? "", baselineAdjustments: resolved.baselineAdjustments,
                 baselineGeometry: resolved.baselineGeometry, executor: executor)
             let intended = try kind.plan(from: state, target: target, dryRun: dryRun)

@@ -18,6 +18,8 @@ final class FakeScript: ScriptExecuting {
     var catalogID: String?
     var version = "16.8.5.30"
     var calls: [String] = []
+    /// Each handler call's document argument, in call order.
+    var documentArguments: [(handler: String, document: NSAppleEventDescriptor)] = []
     var fail: String?
     var mutatePatch: [Bool] = []
     var parentOverride: String?
@@ -106,6 +108,7 @@ final class FakeScript: ScriptExecuting {
         if Self.mutationHandlers.contains(handler) { beforeApply?() }
     }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {
+        if let document = args.first { documentArguments.append((handler, document)) }
         try intercept(handler)
         let result: Any
         switch handler {

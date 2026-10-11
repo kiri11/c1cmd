@@ -126,9 +126,8 @@ emit('''on nativeLayers(v)
     return layerValues
 end nativeLayers
 
-on nativeRead(docName, variantId, scopeName, layerNumber, elementNumber, expectedPath)
-    set d to my checkedDocument(docName)
-    tell application "/Applications/Capture One.app" to set v to variant id variantId of d
+on nativeRead(docRef, variantId, scopeName, layerNumber, elementNumber, expectedPath)
+    set v to my documentVariant(docRef, variantId)
     my assertParent(v, expectedPath)
     set t to my nativeTarget(v, scopeName, layerNumber, elementNumber)
     set rows to {}
@@ -184,9 +183,8 @@ on nativeEqual(a, b)
     return a is b
 end nativeEqual
 
-on nativeApply(docName, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, patchKeys, patchValues)
-    set d to my checkedDocument(docName)
-    tell application "/Applications/Capture One.app" to set v to variant id variantId of d
+on nativeApply(docRef, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, patchKeys, patchValues)
+    set v to my documentVariant(docRef, variantId)
     my assertParent(v, expectedPath)
     set actualLayerNames to {}
     repeat with l in my nativeLayers(v)

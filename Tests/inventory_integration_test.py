@@ -276,7 +276,7 @@ end repeat''', timeout=600)
               f"legacy {self.last_reference_elapsed:.3f}s; matches {len(actual)}", flush=True)
 
     def non_current(self, records, album):
-        """Read collections that are not current: Capture One resolves a document-level variant ID only in the current one."""
+        """Read and edit through collections that are not current: Capture One resolves `variant id X of document` only in the current one."""
         current = "c1-inventory-current"
         self.album(current, [])
         osa(f'set current collection of first document to collection {apple_literal(current)} of first document')
@@ -293,6 +293,7 @@ end repeat''', timeout=600)
                 assert [r["id"] for r in subset] == ids and all("isSelected" in r for r in subset), subset
                 dumped, _ = self.dump("--collection", collection)
                 assert sorted(r["id"] for r in dumped) == sorted(r["id"] for r in listed), (collection, dumped)
+            self.edit_outside_current(records[1]["id"])
             assert osa("get name of current collection of first document") == current, "inventory changed the current collection"
             self.evidence.append({"label": "non-current-collections", "current": current,
                                   "collections": [self.document["allVariants"], album]})
@@ -300,6 +301,35 @@ end repeat''', timeout=600)
         finally:
             osa(f'set current collection of first document to collection {apple_literal(self.document["allVariants"])} of first document')
             time.sleep(.5)
+
+    def edit_outside_current(self, target):
+        """get, a tonal edit, a clone, its preview and its deletion reach a variant the empty current collection lacks."""
+        def run(*args):
+            return self.cli(*args, progress=False)[0]
+        source = run("get", target)
+        assert source["id"] == target, source
+        edit = run("variant", "edit", target, "--if-state", source["stateHash"], "--if-document", run("doc", "info")["openToken"])
+        ref, exposure = edit["workingRef"], source["adjustments"]["exposure"]
+        run("set", ref, "--if-state", source["stateHash"], f"exposure={exposure + 0.25}")
+        changed = run("get", ref)
+        assert abs(changed["adjustments"]["exposure"] - (exposure + 0.25)) < 1e-4, changed["adjustments"]
+        run("set", ref, "--if-state", changed["stateHash"], f"exposure={exposure}")
+        assert abs(run("get", target)["adjustments"]["exposure"] - exposure) < 1e-4
+        clone = run("variant", "clone", target)
+        preview = run("preview", clone["workingRef"])
+        assert Path(preview["previewPath"]).is_file(), preview
+        assert run("variant", "delete", clone["workingRef"])["deleted"]
+        siblings = osa(f'get id of every variant of parent image of variant id {apple_literal(target)} of '
+                       f'collection {apple_literal(self.document["allVariants"])} of first document')
+        siblings = [value.strip().strip('"') for value in siblings.split(",")]
+        assert target in siblings and clone["cloneVariantId"] not in siblings, ("clone left on its image", siblings)
+        missing, _, process = self.cli("get", "999999", progress=False, allow_error=True)
+        assert process.returncode != 0 and missing["error"]["code"] == "variant-not-found", missing
+        assert "current collection" in missing["error"]["message"], missing
+        self.assert_originals("edit outside the current collection")
+        self.evidence.append({"label": "edit-outside-current", "variant": target, "editingRef": ref,
+                              "clone": clone["cloneVariantId"], "preview": preview["previewPath"]})
+        print(f"PASS get, edit, clone, preview and delete outside the current collection ({target})", flush=True)
 
     def dump(self, *flags, allow_error=False):
         value, _, process = self.cli("dump", "--dump-format", "json", *flags, allow_error=allow_error)

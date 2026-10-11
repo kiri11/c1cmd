@@ -276,6 +276,8 @@ public final class SessionController {
     let databaseIdentity: (String) throws -> String
     private let catalogWritePath: String?
     private let imageDimensions: (String) -> [Double]?
+    private let allImagesCollection: (String) -> String?
+    private let allImagesCache: AllImagesCache
     let lock = CaptureOneLock.shared
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
@@ -287,6 +289,7 @@ public final class SessionController {
                 databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
                 catalogWritePath: String? = ProcessInfo.processInfo.environment["C1_CATALOG_WRITE_PATH"],
                 imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read,
+                allImagesCollection: @escaping (String) -> String? = { try? CatalogReader(database: $0).allImagesCollectionID() },
                 nativeInventoryEnabled: Bool = ProcessInfo.processInfo.environment["C1_INVENTORY_STRATEGY"] != "scan",
                 isAppRunning: @escaping () -> Bool = { !NSRunningApplication.runningApplications(withBundleIdentifier: "com.captureone.captureone16").isEmpty }) {
         self.isAppRunning = isAppRunning
@@ -296,6 +299,8 @@ public final class SessionController {
         self.databaseIdentity = databaseIdentity
         self.catalogWritePath = catalogWritePath
         self.imageDimensions = imageDimensions
+        self.allImagesCollection = allImagesCollection
+        self.allImagesCache = AllImagesCache()
         self.compoundId = nil
     }
 
@@ -307,6 +312,8 @@ public final class SessionController {
         databaseIdentity = base.databaseIdentity
         catalogWritePath = base.catalogWritePath
         imageDimensions = base.imageDimensions
+        allImagesCollection = base.allImagesCollection
+        allImagesCache = base.allImagesCache
         self.compoundId = compoundId
     }
 
@@ -320,6 +327,18 @@ public final class SessionController {
         return doc.isSession && !doc.documentId.hasSuffix(".cosessiondb")
             ? URL(fileURLWithPath: doc.documentPath).appendingPathComponent(doc.documentName).path
             : doc.documentId
+    }
+
+    /// The document argument of every handler. Capture One resolves `variant id X of document`
+    /// only inside the current collection, so Catalog handlers address variants through
+    /// All Images, whose ID the stored root collection names. Without it they fall back
+    /// to the current collection.
+    func scriptDocument(_ doc: DocumentInfo) -> NSAppleEventDescriptor {
+        let allImages = doc.isSession ? nil : allImagesCache.id(for: doc.openToken) {
+            (try? databasePath(doc)).flatMap(allImagesCollection)
+        }
+        return NSAppleEventDescriptor(list: [NSAppleEventDescriptor(string: doc.documentId),
+                                             allImages.map(NSAppleEventDescriptor.init(string:)) ?? .missingValue()])
     }
 
     func checkedDocument(_ expected: DocumentInfo, writes: Bool = true) throws {
@@ -543,7 +562,7 @@ public final class SessionController {
             RequestContext.current?.document(document)
             RequestContext.current?.inventoryStrategy("id-subset")
             RequestContext.current?.update(phase: "discovering", total: ids.count, pass: 1)
-            let doc = NSAppleEventDescriptor(string: document.documentId)
+            let doc = scriptDocument(document)
             func validateDocument() throws {
                 try checkpoint()
                 let current = try getDocumentInfo()
@@ -660,7 +679,7 @@ public final class SessionController {
                 }
                 try checkpoint()
             }
-            let doc = NSAppleEventDescriptor(string: docInfo.documentId)
+            let doc = scriptDocument(docInfo)
             let col = collectionName.map(NSAppleEventDescriptor.init(string:)) ?? NSAppleEventDescriptor.missingValue()
             func discover() throws -> [String] {
                 try checkpoint()
@@ -787,13 +806,13 @@ public final class SessionController {
             let store = ProvenanceStore(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
             _ = try store.validatedRecords()
             let ref = WorkingRef().rawValue
-            let lookup = VariantLookup(executor: executor)
-            let siblings = try lookup.siblings(of: source.id, parent: parent, in: doc)
+            let lookup = VariantLookup(executor: executor, document: scriptDocument(doc))
+            let siblings = try lookup.siblings(of: source.id, parent: parent)
             var entry = OperationRecord(operationType: operation, workingRef: ref,
                 documentPath: doc.documentPath, beforeAdjustments: source.adjustments)
             entry.variantIdsBefore = siblings
             return try journaled(entry, doc: doc, source: source, dispatch: {
-                let args = [NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: source.id)]
+                let args = [scriptDocument(doc), NSAppleEventDescriptor(string: source.id)]
                 if baseline {
                     let result: CreateBaselineVariantResult = try executor.executeAndDecode(handler: "createBaselineVariant", args: args)
                     return result.baselineId
@@ -806,7 +825,7 @@ public final class SessionController {
                 }
                 let created = try get(ref: id)
                 guard created.parentImagePath == parent else { return .mismatch(.identityAmbiguous("Created variant has the wrong parent image.")) }
-                guard try lookup.siblings(of: source.id, parent: parent, in: doc).contains(id) else {
+                guard try lookup.siblings(of: source.id, parent: parent).contains(id) else {
                     return .mismatch(.identityAmbiguous("Created variant is not a sibling of its source."))
                 }
                 try store.register(record: ProvenanceRecord(workingRef: ref, sourceVariantId: source.id,
@@ -831,7 +850,7 @@ public final class SessionController {
                 documentPath: doc.documentPath, beforeAdjustments: current.adjustments)
             return try journaled(entry, doc: doc, source: current, dispatch: { () -> DeleteVariantResult in
                 try executor.executeAndDecode(handler: "deleteVariant", args: [
-                    NSAppleEventDescriptor(string: doc.documentId), NSAppleEventDescriptor(string: record.cloneVariantId),
+                    scriptDocument(doc), NSAppleEventDescriptor(string: record.cloneVariantId),
                     NSAppleEventDescriptor(string: record.parentImagePath!), NSAppleEventDescriptor(string: record.sourceVariantId)])
             }, readback: { _, result in
                 guard result.deleted && !result.existsNow else { return .mismatch(.readbackMismatch("Deleted variant still exists.")) }
@@ -882,7 +901,7 @@ public final class SessionController {
             workingRefStr = record.workingRef
         }
 
-        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
+        let docNameDesc = scriptDocument(docInfo)
         let idListDesc = NSAppleEventDescriptor(list: [NSAppleEventDescriptor(string: nativeId)])
 
         let results: [AdjustmentBatchItemRecord] = try executor.executeAndDecode(
@@ -1108,7 +1127,7 @@ public final class SessionController {
         guard !variants.isEmpty else { return [] }
 
         var records: [DumpRecord] = []
-        let docNameDesc = NSAppleEventDescriptor(string: docInfo.documentId)
+        let docNameDesc = scriptDocument(docInfo)
 
         for chunkStart in stride(from: 0, to: variants.count, by: max(1, batchSize)) {
             try RequestContext.current?.checkReadCancellation()
@@ -1224,7 +1243,7 @@ public final class SessionController {
             entry.preconditionGeometryStateHash = current.geometryStateHash
             // Exports change no adjustments, so every failed check leaves the outcome unknown.
             return try journaled(entry, doc: doc, source: current, dispatch: {
-                let args = [NSAppleEventDescriptor(string: doc.documentId),
+                let args = [scriptDocument(doc),
                             NSAppleEventDescriptor(string: size.recipeName), NSAppleEventDescriptor(string: root.path)]
                 let _: PreviewRecipeResult = try executor.executeAndDecode(handler: "ensurePreviewRecipe",
                     args: args + [NSAppleEventDescriptor(int32: Int32(size.longEdge))])
@@ -1297,7 +1316,7 @@ public final class SessionController {
                 // Any still-present known sibling finds the parent image; a whole-document
                 // inventory remains only for when every known sibling is gone.
                 let anchors = [entry.nativeVariantId].compactMap { $0 } + before
-                let siblings = try VariantLookup(executor: executor).siblings(anchoredBy: anchors, parent: parent, in: doc)
+                let siblings = try VariantLookup(executor: executor, document: scriptDocument(doc)).siblings(anchoredBy: anchors, parent: parent)
                     ?? listVariants().filter { $0.parentImagePath == parent }.map(\.id)
                 try checkedDocument(doc, writes: false)
                 entry.observedVariantIds = siblings.filter { !before.contains($0) }
@@ -1309,7 +1328,7 @@ public final class SessionController {
                     throw C1Error.identityAmbiguous("Operation lacks a recorded parent image for its native variant.")
                 }
                 // Resolve only the recorded ID; a lookup error propagates and leaves the operation unresolved.
-                let outcome = try VariantLookup(executor: executor).resolve(id, expectedParent: parent, in: doc)
+                let outcome = try VariantLookup(executor: executor, document: scriptDocument(doc)).resolve(id, expectedParent: parent)
                 try checkedDocument(doc, writes: false)
                 switch outcome {
                 case .parentChanged(let observed):
@@ -1378,7 +1397,7 @@ public final class SessionController {
             guard doc.appVersion == Self.pinnedBuild else { throw C1Error.invalidRequest("Native editing requires Capture One " + Self.pinnedBuild) }
             let source = try get(ref: ref, document: doc)
             let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
-                [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
+                [scriptDocument(doc), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
             try checkedDocument(doc, writes: false)
             let revision = try OperationJournal(sessionDirectory: URL(fileURLWithPath:doc.documentPath)).validatedEntries().last(where: { $0.nativeVariantId == source.id })?.operationId
             var result = source
@@ -1409,7 +1428,7 @@ public final class SessionController {
                     continue
                 }
                 let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
-                    [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
+                    [scriptDocument(doc), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
                 snapshots.append(try nativeSnapshot(ref: ref, target: target, doc: doc, source: source, wire: wire, revision: revision))
             }
             // Reject observable source drift instead of returning a partial/mixed bundle.
@@ -1472,7 +1491,7 @@ public final class SessionController {
         try lock.withLock {
             let doc = try getDocumentInfo(), source = try get(ref:ref, document:doc)
             try checkedDocument(doc, writes:false)
-            let values: [NativeValue] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+            let values: [NativeValue] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[scriptDocument(doc),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
             guard values.count == Recipes.oracleFields.count else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
             try checkedDocument(doc,writes:false)
             let observation = Dictionary(uniqueKeysWithValues:zip(Recipes.oracleFields,values))
@@ -1487,7 +1506,7 @@ public final class SessionController {
         try lock.withLock {
             let doc = try getDocumentInfo(), source = try get(ref:ref, document:doc)
             try checkedDocument(doc,writes:false)
-            let wire: RecipeScopes.Wire = try executor.executeAndDecode(handler:"nativeRecipeScopesOracle",args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
+            let wire: RecipeScopes.Wire = try executor.executeAndDecode(handler:"nativeRecipeScopesOracle",args:[scriptDocument(doc),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
             try checkedDocument(doc,writes:false)
             return try RecipeScopes.Observation(wire)
         }

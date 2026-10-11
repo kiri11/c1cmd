@@ -357,6 +357,18 @@ public final class CatalogReader {
         return try JSONDecoder().decode([Projection].self, from: JSONSerialization.data(withJSONObject: records))
     }
 
+    /// The native collection ID of All Images, which the root collection names; its localized
+    /// name and its kind, shared with Trash and In Catalog, cannot identify it.
+    public func allImagesCollectionID() throws -> String? {
+        try beginObservation(); defer { endObservation() }
+        let id = try rows("""
+            SELECT a.Z_PK AS id FROM ZDOCUMENTCONTENT d JOIN ZCOLLECTION r ON r.Z_PK=d.ZROOTCOLLECTION
+            JOIN ZCOLLECTION a ON a.Z_PK=r.ZALLIMAGESCOLLECTION JOIN ZENTITIES e ON e.Z_ENT=a.Z_ENT
+            WHERE e.ZNAME='CatalogAllImagesCollection'
+            """).first?["id"] as? Int64
+        return id.map(String.init)
+    }
+
     /// Offline inspection: no Capture One lookup, native token, or warm-up required.
     public func get(variantID: Int) throws -> [String: Any] {
         guard variantID > 0 else { throw C1Error.invalidRequest("variantID must be positive.") }

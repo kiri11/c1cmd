@@ -1,9 +1,8 @@
 -- Explicit editing commands. No arbitrary script or object specifier is accepted.
-on nativeAction(docName, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, actionName, argNames, argValues)
+on nativeAction(docRef, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, actionName, argNames, argValues)
     -- Reuse the immediate state check without issuing a property write.
-    my nativeApply(docName, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, {}, {})
-    set d to my checkedDocument(docName)
-    tell application "/Applications/Capture One.app" to set v to variant id variantId of d
+    my nativeApply(docRef, variantId, scopeName, layerNumber, elementNumber, expectedPath, expectedFields, expectedValues, expectedLayerNames, {}, {})
+    set v to my documentVariant(docRef, variantId)
     set t to my nativeTarget(v, scopeName, layerNumber, elementNumber)
     set amountValue to my nativeArgument("amount", argNames, argValues, 0)
     set nameValue to my nativeArgument("name", argNames, argValues, "")
@@ -81,10 +80,9 @@ end nativeArgument
 -- Intentionally separate from generated nativeReadField and nativeApply.
 -- Keep this explicit order matched to Recipes.oracleFields; live tests compare
 -- every supported field against both paths before registering a payload.
-on nativeRecipeOracle(docName, variantId, expectedParent)
+on nativeRecipeOracle(docRef, variantId, expectedParent)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set v to variant id variantId of d
+        set v to my documentVariant(docRef, variantId)
         if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
         set a to adjustments of v
         set observed to {exposure of a as real, temperature of a as real, tint of a as real, brightness of a as real, contrast of a as real, saturation of a as real, highlight adjustment of a as real, shadow recovery of a as real, white recovery of a as real, black recovery of a as real, clarity amount of a as real, clarity structure of a as real, sharpening amount of a as real, sharpening radius of a as real, sharpening threshold of a as real, noise reduction luminance of a as real, noise reduction color of a as real, noise reduction single pixel of a as real}
@@ -123,10 +121,9 @@ on nativeRecipeOracle(docName, variantId, expectedParent)
 end nativeRecipeOracle
 
 -- Independent scoped reader; bulk color property records avoid indexed-object aliasing.
-on nativeRecipeScopesOracle(docName, variantId, expectedParent)
+on nativeRecipeScopesOracle(docRef, variantId, expectedParent)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set v to variant id variantId of d
+        set v to my documentVariant(docRef, variantId)
         if (POSIX path of (path of parent image of v as text)) is not expectedParent then error "Recipe parent image changed."
         set recipeCameraValues to {color profile of adjustments of v as text, film curve of adjustments of v as text}
         set recipeLensRecord to properties of lens correction of v

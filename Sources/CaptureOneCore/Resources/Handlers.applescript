@@ -1,14 +1,53 @@
 -- Handlers.applescript: Central AppleScript handlers for Capture One 16.8.5.30
 -- Returns user-defined records exclusively with non-reserved key names.
 
-on checkedDocument(expectedId)
+-- docRef is {document ID, ID of the Catalog's stored All Images collection or missing value}.
+on checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         if (count of documents) is not 1 then error "Exactly one open document is required." number -27001
         set d to first document
-        if (id of d as text) is not expectedId then error "Active document changed before dispatch." number -27001
+        if (id of d as text) is not item 1 of docRef then error "Active document changed before dispatch." number -27001
         return d
     end tell
 end checkedDocument
+
+-- Capture One resolves "variant id X of document" only inside the current collection.
+-- Variants resolve through All Images when the Catalog's stored ID names it, otherwise
+-- through folder favorites (a Session's system folders come first), then through the
+-- current collection. Deleting through All Images or a folder removes the variant;
+-- deleting through an album only removes it from the album.
+on variantRoutes(docRef, d)
+    tell application "/Applications/Capture One.app"
+        set allImagesId to item 2 of docRef
+        if allImagesId is not missing value then
+            -- One whose query confirms the stored ID in a single Apple Event.
+            if exists (first collection of d whose id is allImagesId and kind is smart album and user is false) then return {collection id allImagesId of d, d}
+            return {d}
+        end if
+        return (every collection of d whose kind is favorite) & {d}
+    end tell
+end variantRoutes
+
+-- The variant through the first route that holds it, or missing value.
+on foundVariant(routes, variantId)
+    tell application "/Applications/Capture One.app"
+        repeat with route in routes
+            if exists variant id variantId of (contents of route) then return variant id variantId of (contents of route)
+        end repeat
+    end tell
+    return missing value
+end foundVariant
+
+on requiredVariant(routes, variantId)
+    set v to my foundVariant(routes, variantId)
+    if v is missing value then error "Variant " & variantId & " is in neither the Catalog's All Images collection, a Session folder favorite nor the current collection." number -27004
+    return v
+end requiredVariant
+
+on documentVariant(docRef, variantId)
+    set d to my checkedDocument(docRef)
+    return my requiredVariant(my variantRoutes(docRef, d), variantId as text)
+end documentVariant
 
 on assertParent(v, expectedPath)
     tell application "/Applications/Capture One.app"
@@ -66,8 +105,8 @@ end getAppAndDocInfo
 
 -- Qualified by the independent legacy enumeration for Session and Catalog document,
 -- album and selected scopes on 16.8.5.30. Every ID stays paired with its own summary.
-on discoverFilteredVariantIDs(docName, collectionName, selectedOnly, exactRating, minimumRating)
-    set d to my checkedDocument(docName)
+on discoverFilteredVariantIDs(docRef, collectionName, selectedOnly, exactRating, minimumRating)
+    set d to my checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         if collectionName is missing value or collectionName is "" then
             set scope to d
@@ -103,8 +142,8 @@ end discoverFilteredVariantIDs
 
 -- Discovery remains a single application enumeration; its internal progress is unknown.
 -- Keep IDs paired with ratings in bounded reads, avoiding unqualified bulk/whose-rating behavior.
-on discoverVariantIDs(docName, collectionName, selectedOnly)
-    set d to my checkedDocument(docName)
+on discoverVariantIDs(docRef, collectionName, selectedOnly)
+    set d to my checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         if collectionName is not missing value and collectionName is not "" then
             set scope to collection collectionName of d
@@ -124,8 +163,8 @@ on discoverVariantIDs(docName, collectionName, selectedOnly)
     end tell
 end discoverVariantIDs
 
--- Capture One resolves "variant id X of document" only inside the current collection,
--- in Sessions and Catalogs alike; a named collection resolves its own members.
+-- Inventory without a collection lists the current collection; a named collection
+-- resolves its own members without becoming current.
 on variantScope(d, collectionName)
     tell application "/Applications/Capture One.app"
         if collectionName is missing value or collectionName is "" then return d
@@ -133,8 +172,8 @@ on variantScope(d, collectionName)
     end tell
 end variantScope
 
-on readVariantRatings(docName, variantIDs, collectionName)
-    set d to my checkedDocument(docName)
+on readVariantRatings(docRef, variantIDs, collectionName)
+    set d to my checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         set scope to my variantScope(d, collectionName)
         set results to {}
@@ -149,8 +188,8 @@ end readVariantRatings
 
 -- isSelected comes from the scope's own selection filter, the one the selected filter
 -- uses; the selected property of a variant can report another collection's selection.
-on readVariantSummaries(docName, variantIDs, collectionName)
-    set d to my checkedDocument(docName)
+on readVariantSummaries(docRef, variantIDs, collectionName)
+    set d to my checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         set scope to my variantScope(d, collectionName)
         set selectedIDs to {}
@@ -178,10 +217,9 @@ on readVariantSummaries(docName, variantIDs, collectionName)
     end tell
 end readVariantSummaries
 
-on cloneVariant(docName, sourceId)
+on cloneVariant(docRef, sourceId)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set c to clone variant (variant id sourceId of d)
+        set c to clone variant (my documentVariant(docRef, sourceId))
         -- Capture One can return a collection-scoped reference before its ID
         -- becomes readable. Retry only that exact reference's read, never clone.
         repeat with attempt from 1 to 20
@@ -194,32 +232,45 @@ on cloneVariant(docName, sourceId)
                 end if
             end try
             delay 0.1
-            set d to my checkedDocument(docName)
+            my checkedDocument(docRef)
         end repeat
     end tell
 end cloneVariant
 
-on deleteVariant(docName, variantId, expectedPath, sourceId)
+on deleteVariant(docRef, variantId, expectedPath, sourceId)
+    set d to my checkedDocument(docRef)
+    set routes to my variantRoutes(docRef, d)
+    set v to my requiredVariant(routes, variantId)
+    my assertParent(v, expectedPath)
+    if sourceId is variantId then error "Cannot delete the source variant." number -27003
+    set sourceVariant to my foundVariant(routes, sourceId)
+    if sourceVariant is missing value then error "Source variant is absent; refusing deletion." number -27003
+    my assertParent(sourceVariant, expectedPath)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        my assertParent(variant id variantId of d, expectedPath)
-        if sourceId is variantId then error "Cannot delete the source variant." number -27003
-        if not (exists variant id sourceId of d) then error "Source variant is absent; refusing deletion." number -27003
-        my assertParent(variant id sourceId of d, expectedPath)
-        if (count of variants of parent image of variant id variantId of d) < 2 then error "Cannot delete the last variant of an image." number -27003
-        delete variant id variantId of d
-        set existsAfter to (exists variant id variantId of d)
+        if (count of variants of parent image of v) < 2 then error "Cannot delete the last variant of an image." number -27003
+        delete v
+        -- Ask the image: a delete that only removed the variant from an album leaves it there.
+        set existsAfter to false
+        repeat with siblingID in (get id of every variant of parent image of sourceVariant)
+            if (siblingID as text) is variantId then set existsAfter to true
+        end repeat
         return {deleted:(not existsAfter), existsNow:existsAfter}
     end tell
 end deleteVariant
 
-on getAdjustmentsBatch(docName, variantIds, collectionName)
+on getAdjustmentsBatch(docRef, variantIds, collectionName)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
+        set d to my checkedDocument(docRef)
+        set scoped to collectionName is not missing value and collectionName is not ""
         set scope to my variantScope(d, collectionName)
+        if not scoped then set routes to my variantRoutes(docRef, d)
         set results to {}
         repeat with vid in variantIds
-            set v to variant id (vid as text) of scope
+            if scoped then
+                set v to variant id (vid as text) of scope
+            else
+                set v to my requiredVariant(routes, vid as text)
+            end if
             set adj to adjustments of v
             
             set expVal to (exposure of adj as real)
@@ -275,10 +326,9 @@ on getAdjustmentsBatch(docName, variantIds, collectionName)
     end tell
 end getAdjustmentsBatch
 
-on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVal, expectedValues, expectedPath)
+on applyAdjustments(docRef, variantId, expVal, contVal, satVal, tempVal, tintVal, expectedValues, expectedPath)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set v to variant id (variantId as text) of d
+        set v to my documentVariant(docRef, variantId)
         set adj to adjustments of v
         
         -- Read before state
@@ -323,9 +373,9 @@ on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVa
     end tell
 end applyAdjustments
 
-on ensurePreviewRecipe(docName, recipeName, outputFolder, longEdge)
+on ensurePreviewRecipe(docRef, recipeName, outputFolder, longEdge)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
+        set d to my checkedDocument(docRef)
         -- Catalog processing validates its default output even with a custom recipe.
         -- Preserve a usable default; initialize only a missing/unavailable location.
         if kind of d is catalog then
@@ -358,24 +408,23 @@ on ensurePreviewRecipe(docName, recipeName, outputFolder, longEdge)
     end tell
 end ensurePreviewRecipe
 
-on processPreview(docName, variantId, recipeName, outputFolder, outputSubFolder, outputName)
+on processPreview(docRef, variantId, recipeName, outputFolder, outputSubFolder, outputName)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
+        set d to my checkedDocument(docRef)
         set r to recipe recipeName of d
         set root folder location of r to POSIX file outputFolder
         set root folder type of r to custom location
         set output sub folder of r to outputSubFolder
         set output name format of r to outputName
         
-        set jobId to process (variant id (variantId as text) of d) recipe recipeName
+        set jobId to process (my requiredVariant(my variantRoutes(docRef, d), variantId as text)) recipe recipeName
         return {jobId:(jobId as text)}
     end tell
 end processPreview
 
-on createBaselineVariant(docName, sourceId)
+on createBaselineVariant(docRef, sourceId)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set srcVar to (variant id (sourceId as text) of d)
+        set srcVar to my documentVariant(docRef, sourceId)
         set img to parent image of srcVar
         set beforeIds to {}
         repeat with itemV in (every variant of img)
@@ -422,10 +471,9 @@ on geometrySnapshot(v)
     return {cropValues of g, rotationDegrees of g, orientationDegrees of g, flipName of g, ratioName of g, keystoneValues of g, lensValues of g, profileName of g, hiddenAreas of g, outsideAllowed of g}
 end geometrySnapshot
 
-on checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
+on checkedGeometryVariant(docRef, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set v to variant id (variantId as text) of d
+        set v to my documentVariant(docRef, variantId)
         my assertParent(v, expectedPath)
         if my geometrySnapshot(v) is not equal to expectedGeometry then error "Geometry changed before dispatch." number -27002
         set a to adjustments of v
@@ -452,8 +500,8 @@ on applyKeystone(v, targetKeystone)
     end tell
 end applyKeystone
 
-on applyGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation, targetKeystone)
-    set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
+on applyGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation, targetKeystone)
+    set v to my checkedGeometryVariant(docRef, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
         my applyKeystone(v, targetKeystone)
@@ -468,8 +516,8 @@ end applyGeometry
 -- reuse bounds from another rotation. Uncorrected rotation-only changes also come
 -- here to keep Capture One's automatic crop. The caller journals the request before
 -- entering this handler; any error after dispatch keeps the write block.
-on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone)
-    set v to my checkedGeometryVariant(docName, variantId, expectedPath, expectedGeometry, expectedTone)
+on applyCorrectedGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone)
+    set v to my checkedGeometryVariant(docRef, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
         my applyKeystone(v, targetKeystone)
@@ -502,10 +550,9 @@ on applyCorrectedGeometry(docName, variantId, expectedPath, expectedGeometry, ex
 end applyCorrectedGeometry
 
 -- Classification writes are a patch and compare both values immediately before dispatch.
-on applyMetadata(docName, variantId, ratingValue, tagValue, expectedRating, expectedTag, expectedPath)
+on applyMetadata(docRef, variantId, ratingValue, tagValue, expectedRating, expectedTag, expectedPath)
     tell application "/Applications/Capture One.app"
-        set d to my checkedDocument(docName)
-        set v to variant id (variantId as text) of d
+        set v to my documentVariant(docRef, variantId)
         my assertParent(v, expectedPath)
         if (rating of v as integer) is not expectedRating or (color tag of v as integer) is not expectedTag then error "Metadata changed immediately before write." number -27002
         if ratingValue is not missing value then set rating of v to (ratingValue as integer)
@@ -517,8 +564,8 @@ end applyMetadata
 -- Resolve only explicitly requested IDs. Only Capture One's no-such-object reply
 -- (-1728) classifies an ID as missing or out of scope; every other error propagates.
 -- The caller fails the whole request when any ID is not present.
-on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
-    set d to my checkedDocument(docName)
+on readVariantSubset(docRef, collectionName, selectedOnly, variantIDs)
+    set d to my checkedDocument(docRef)
     tell application "/Applications/Capture One.app"
         set scoped to collectionName is not missing value and collectionName is not ""
         set scope to my variantScope(d, collectionName)
@@ -546,14 +593,7 @@ on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
                 set end of results to {variantId:foundID, presence:"present", starRating:(rating of v as integer), parentImagePath:(POSIX path of (path of parent image of v as text)), inSelection:selectedValue}
             else
                 set presence to "missing"
-                if scoped then
-                    try
-                        get id of variant id idText of d
-                        set presence to "out-of-scope"
-                    on error errorMessage number errorNumber
-                        if errorNumber is not -1728 then error errorMessage number errorNumber
-                    end try
-                end if
+                if my foundVariant(my variantRoutes(docRef, d), idText) is not missing value then set presence to "out-of-scope"
                 set end of results to {variantId:idText, presence:presence, starRating:0, parentImagePath:"", inSelection:false}
             end if
         end repeat
@@ -561,25 +601,19 @@ on readVariantSubset(docName, collectionName, selectedOnly, variantIDs)
     end tell
 end readVariantSubset
 
--- Known-ID lookup without enumerating the document. Only Capture One's
--- no-such-object reply (-1728) for the exact ID reports absence; every other
--- error propagates so callers cannot mistake a failed lookup for an absent variant.
-on lookupVariantIdentities(docName, variantIDs)
-    set d to my checkedDocument(docName)
+-- Known-ID lookup without enumerating the document. Only an ID that no route
+-- holds reports absence; every error propagates so callers cannot mistake a
+-- failed lookup for an absent variant.
+on lookupVariantIdentities(docRef, variantIDs)
+    set d to my checkedDocument(docRef)
+    set routes to my variantRoutes(docRef, d)
     tell application "/Applications/Capture One.app"
         set results to {}
         repeat with requestedID in variantIDs
-            set isPresent to true
-            -- An explicit get is required: coercing an unresolved reference reports -1700, not -1728.
-            try
-                set foundID to (get id of variant id (requestedID as text) of d) as text
-            on error errorMessage number errorNumber
-                if errorNumber is not -1728 then error errorMessage number errorNumber
-                set isPresent to false
-            end try
-            if isPresent then
-                set parentPath to POSIX path of (path of parent image of variant id foundID of d as text)
-                set end of results to {variantId:foundID, isPresent:true, parentImagePath:parentPath}
+            set v to my foundVariant(routes, requestedID as text)
+            if v is not missing value then
+                set parentPath to POSIX path of (path of parent image of v as text)
+                set end of results to {variantId:(id of v as text), isPresent:true, parentImagePath:parentPath}
             else
                 set end of results to {variantId:(requestedID as text), isPresent:false, parentImagePath:""}
             end if
@@ -590,10 +624,9 @@ end lookupVariantIdentities
 
 -- Every variant ID of one known variant's parent image, without enumerating
 -- the document. The anchor's parent must still be the expected image.
-on readParentSiblings(docName, anchorID, expectedPath)
-    set d to my checkedDocument(docName)
+on readParentSiblings(docRef, anchorID, expectedPath)
+    set v to my documentVariant(docRef, anchorID)
     tell application "/Applications/Capture One.app"
-        set v to variant id (anchorID as text) of d
         my assertParent(v, expectedPath)
         -- One bulk property read; per-variant reads cost an Apple Event each.
         set rawIDs to id of every variant of (parent image of v)

@@ -170,23 +170,25 @@ public final class AppleScriptExecutor: ScriptExecuting {
 
             if let err = errorDict {
                 let msg = err[NSAppleScript.errorMessage] as? String ?? "Unknown execution error"
-                let num = err[NSAppleScript.errorNumber] as? Int
-                if num == -27001 { throw C1Error.documentChanged(msg) }
-                if num == -27002 { throw C1Error.stateChanged(msg) }
-                if num == -27003 { throw C1Error.identityAmbiguous(msg) }
-                if num == -1712 {
-                    throw C1Error.timeout("Capture One Apple Event timed out (-1712): \(msg)")
-                }
-                if num == -1743 || num == -1744 {
-                    throw C1Error.permissionDenied("Automation permission denied (-1743): \(msg)")
-                }
-                if num == -600 || num == -609 {
-                    throw C1Error.appNotRunning("Capture One is not running (\(num ?? 0)): \(msg)")
-                }
-                throw C1Error.scriptError(msg, code: num)
+                throw Self.error(msg, number: err[NSAppleScript.errorNumber] as? Int)
             }
 
             return result
+        }
+    }
+
+    /// The typed error for a handler's AppleScript error number; -27001...-27004 are raised by the handlers.
+    public static func error(_ msg: String, number: Int?) -> C1Error {
+        switch number {
+        case -27001: return .documentChanged(msg)
+        case -27002: return .stateChanged(msg)
+        case -27003: return .identityAmbiguous(msg)
+        case -27004:
+            return .variantNotFound("\(msg) Capture One resolves a variant only through a collection that holds it; make such a collection current and retry.")
+        case -1712: return .timeout("Capture One Apple Event timed out (-1712): \(msg)")
+        case -1743, -1744: return .permissionDenied("Automation permission denied (-1743): \(msg)")
+        case -600, -609: return .appNotRunning("Capture One is not running (\(number!)): \(msg)")
+        default: return .scriptError(msg, code: number)
         }
     }
 
