@@ -5,6 +5,10 @@ public final class CaptureOneLock {
 
     private let ownershipKey = "c1.lock." + UUID().uuidString
     public let lockPath: String
+    /// Advances on each outermost acquisition and each dispatched write, so another
+    /// process can only have written in an earlier epoch.
+    private(set) var epoch = 0
+    func advanceEpoch() { epoch += 1 }
 
     public init(lockPath: String = "/private/tmp/c1-application.lock") {
         self.lockPath = lockPath
@@ -43,6 +47,7 @@ public final class CaptureOneLock {
         }
 
         RequestContext.current?.update(phase: "lock-acquired")
+        advanceEpoch()
         Thread.current.threadDictionary[ownershipKey] = true
         defer { Thread.current.threadDictionary.removeObject(forKey: ownershipKey) }
         return try body()

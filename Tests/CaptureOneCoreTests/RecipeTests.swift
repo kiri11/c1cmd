@@ -90,6 +90,15 @@ private final class RecipeFake: ScriptExecuting {
     }
 }
 
+/// Times every handler as `handler_total` inside the active profile step, as the live executor does.
+private final class ProfiledExecutor: ScriptExecuting {
+    let inner: ScriptExecuting
+    init(_ inner: ScriptExecuting) { self.inner = inner }
+    func executeAndDecode<T:Decodable>(handler: String,args: [NSAppleEventDescriptor]) throws -> T {
+        try PerformanceTrace.measure("handler_total",handler:handler) { try inner.executeAndDecode(handler:handler,args:args) }
+    }
+}
+
 struct RecipeTests {
     static func run() {
         print("Running RecipeTests...")
@@ -302,6 +311,50 @@ struct RecipeTests {
         scopeFault(ignoreDelete:false)
         scopeFault(ignoreDelete:true)
         verifyFault()
+        appleEventBudget()
+    }
+    /// Per-step handler calls of one `edit_apply` with the #25 profile's recipe shape.
+    static func appleEventBudget() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = RecipeFake(directory), base = fake.geometry.base
+        let core = SessionController(executor:ProfiledExecutor(fake),appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let workflow = RecipeWorkflow(core:core)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let reference = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":source.stateHash])
+            let recipe: [String:Any] = ["version":2,"referenceId":reference["referenceId"]!,"settings":[:] as [String:Any],
+                "exposure":["mode":"absolute","value":0.3],"whiteBalance":["mode":"absolute","temperature":5200,"tint":2],"cropPolicy":"per-photo",
+                "scopes":["basicColor":[["index":2,"name":"band-2","settings":["hue change":3]]]]]
+            let id = try workflow.run("recipe_register",arguments:["recipe":recipe])["recipeId"]!
+            let clone = try core.cloneVariant(sourceRef:"1")
+            let verified = try workflow.run("recipe_verify",arguments:["recipeId":id,"workingRef":clone.workingRef,"ifDocument":doc.openToken,"ifState":try core.get(ref:clone.workingRef).stateHash])
+            XCTAssertEqual(verified["status"] as? String,"succeeded")
+            var applied: [String:Any] = [:]
+            let profile = profileRecords { XCTAssertNoThrowBlock {
+                applied = try workflow.run("edit_apply",arguments:["recipeId":id,"sourceRef":"1","ifDocument":doc.openToken,"ifState":source.stateHash,
+                    "ifGeometryState":source.geometryStateHash!,"geometry":["rotation":1.5,"aspectRatio":1.5],"preview":true])
+            } }
+            XCTAssertEqual(applied["status"] as? String,"succeeded",String(describing:applied["error"]))
+            var calls: [String:[String:Int]] = [:]
+            for record in profile where record["phase"] as? String == "handler_total" {
+                calls[record["step"] as? String ?? "-",default:[:]][record["handler"] as! String,default:0] += 1
+            }
+            let info = "getAppAndDocInfo", batch = "getAdjustmentsBatch", oracle = "nativeRecipeOracle", scopes = "nativeRecipeScopesOracle"
+            let expected: [(String,[String:Int])] = [
+                ("-",[info:7,batch:2,"nativeRead":1,scopes:1]),
+                ("prepare",[info:7,batch:2,oracle:1]),
+                ("scope-basic-2",[info:7,batch:2,"nativeRead":2,"nativeApply":1]),
+                ("tonal",[info:5,batch:2,"applyAdjustments":1]),
+                ("geometry",[info:5,batch:2,"applyGeometry":1]),
+                ("verify",[info:8,batch:3,"nativeRead":1,oracle:1,scopes:1]),
+                ("preview",[info:5,batch:2,"ensurePreviewRecipe":1,"processPreview":1]),
+                ("observe",[info:6,batch:2,"nativeRead":1,scopes:1]),
+            ]
+            XCTAssertEqual(applied["plan"] as? [String] ?? [],expected.dropFirst().map(\.0))
+            for (step,handlers) in expected { XCTAssertEqual(calls[step] ?? [:],handlers,"Apple Events in " + step) }
+        }
     }
     /// A verification whose child write is lost reports `outcome-unknown` and `verified: false`,
     /// and so does its durable report, whether read back or left interrupted.

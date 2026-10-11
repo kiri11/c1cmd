@@ -851,7 +851,11 @@ public final class SessionController {
 
     // MARK: - Get
     public func get(ref: String) throws -> GetResult {
-        let docInfo = try getDocumentInfo()
+        try get(ref: ref, document: getDocumentInfo())
+    }
+
+    /// `docInfo` must be read under the caller's lock with no event since.
+    func get(ref: String, document docInfo: DocumentInfo) throws -> GetResult {
         var nativeId = ref
         var workingRefStr: String?
         var managedRecord: ProvenanceRecord?
@@ -947,17 +951,19 @@ public final class SessionController {
         ifState expectedHash: String,
         setAdjustments: Adjustments?,
         addAdjustments: Adjustments?,
-        isDryRun: Bool = false
+        isDryRun: Bool = false,
+        observed: CurrentObservation? = nil
     ) throws -> MutationResult {
         guard (setAdjustments != nil) != (addAdjustments != nil), (setAdjustments ?? addAdjustments)?.hasAnyField == true else {
             throw C1Error.invalidRequest("Provide exactly one nonempty set or add adjustment patch.")
         }
         let change: TonalWrite.Change = setAdjustments.map { .set($0) } ?? .add(addAdjustments!)
-        return try tonalWrite(change, workingRef: workingRefString, ifState: expectedHash, dryRun: isDryRun)
+        return try tonalWrite(change, workingRef: workingRefString, ifState: expectedHash, dryRun: isDryRun, observed: observed)
     }
 
-    private func tonalWrite(_ change: TonalWrite.Change, workingRef: String, ifState: String, dryRun: Bool) throws -> MutationResult {
-        let outcome = try write(TonalWrite(change: change), workingRef: workingRef, precondition: ifState, dryRun: dryRun)
+    private func tonalWrite(_ change: TonalWrite.Change, workingRef: String, ifState: String, dryRun: Bool,
+                            observed: CurrentObservation? = nil) throws -> MutationResult {
+        let outcome = try write(TonalWrite(change: change), workingRef: workingRef, precondition: ifState, dryRun: dryRun, observed: observed)
         let before = outcome.before.state
         guard let after = outcome.after else {
             let target = outcome.intended.target
@@ -970,9 +976,10 @@ public final class SessionController {
 
     // MARK: - Crop, rotation, and keystone
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
-                            rotation: Double? = nil, aspectRatio: Double? = nil, keystone: KeystoneAdjustments? = nil, dryRun: Bool = false) throws -> GeometryMutationResult {
+                            rotation: Double? = nil, aspectRatio: Double? = nil, keystone: KeystoneAdjustments? = nil, dryRun: Bool = false,
+                            observed: CurrentObservation? = nil) throws -> GeometryMutationResult {
         try geometryWrite(GeometryWrite(crop: crop, rotation: rotation, aspectRatio: aspectRatio, keystone: keystone, restore: false),
-                          workingRef: workingRef, expected: expected, dryRun: dryRun)
+                          workingRef: workingRef, expected: expected, dryRun: dryRun, observed: observed)
     }
 
     public func geometryRestore(workingRef: String, ifGeometryState expected: String, dryRun: Bool = false) throws -> GeometryMutationResult {
@@ -980,8 +987,9 @@ public final class SessionController {
                           workingRef: workingRef, expected: expected, dryRun: dryRun)
     }
 
-    private func geometryWrite(_ kind: GeometryWrite, workingRef: String, expected: String, dryRun: Bool) throws -> GeometryMutationResult {
-        let outcome = try write(kind, workingRef: workingRef, precondition: expected, dryRun: dryRun)
+    private func geometryWrite(_ kind: GeometryWrite, workingRef: String, expected: String, dryRun: Bool,
+                               observed: CurrentObservation? = nil) throws -> GeometryMutationResult {
+        let outcome = try write(kind, workingRef: workingRef, precondition: expected, dryRun: dryRun, observed: observed)
         let before = outcome.before.state
         guard let after = outcome.after else {
             guard let target = outcome.intended.target else { throw C1Error.invalidRequest("Dry runs cannot predict this geometry change.") }
@@ -1309,7 +1317,7 @@ public final class SessionController {
         return try lock.withLock {
             let doc = try getDocumentInfo()
             guard doc.appVersion == Self.pinnedBuild else { throw C1Error.invalidRequest("Native editing requires Capture One " + Self.pinnedBuild) }
-            let source = try get(ref: ref)
+            let source = try get(ref: ref, document: doc)
             let wire: NativeWireSnapshot = try executor.executeAndDecode(handler: "nativeRead", args:
                 [.init(string: doc.documentId), .init(string: source.id)] + target.descriptors + [.init(string: source.parentImagePath ?? "")])
             try checkedDocument(doc, writes: false)
@@ -1381,21 +1389,21 @@ public final class SessionController {
     }
 
     public func nativeSet(workingRef: String, target: NativeTarget, ifNativeState: String,
-                          patch: [String:NativeValue], dryRun: Bool = false) throws -> NativeMutationResult {
+                          patch: [String:NativeValue], dryRun: Bool = false, observed: CurrentObservation? = nil) throws -> NativeMutationResult {
         try NativeEditing.validate(patch, target: target)
-        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: patch, action: nil, arguments: [:], dryRun: dryRun)
+        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: patch, action: nil, arguments: [:], dryRun: dryRun, observed: observed)
     }
 
     public func nativeAction(workingRef: String, target: NativeTarget, ifNativeState: String,
-                             action: String, arguments: [String:NativeValue] = [:], dryRun: Bool = false) throws -> NativeMutationResult {
+                             action: String, arguments: [String:NativeValue] = [:], dryRun: Bool = false, observed: CurrentObservation? = nil) throws -> NativeMutationResult {
         try NativeEditing.validateAction(action, target: target, arguments: arguments)
-        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: [:], action: action, arguments: arguments, dryRun: dryRun)
+        return try nativeMutate(workingRef: workingRef, target: target, expected: ifNativeState, patch: [:], action: action, arguments: arguments, dryRun: dryRun, observed: observed)
     }
 
     private func nativeMutate(workingRef: String, target: NativeTarget, expected: String, patch: [String:NativeValue],
-                              action: String?, arguments: [String:NativeValue], dryRun: Bool) throws -> NativeMutationResult {
+                              action: String?, arguments: [String:NativeValue], dryRun: Bool, observed: CurrentObservation?) throws -> NativeMutationResult {
         let outcome = try write(NativeWrite(target: target, patch: patch, action: action, arguments: arguments),
-                                workingRef: workingRef, precondition: expected, dryRun: dryRun)
+                                workingRef: workingRef, precondition: expected, dryRun: dryRun, observed: observed)
         let before = outcome.before.state
         return NativeMutationResult(operationId: outcome.operationId, before: before, after: outcome.after?.state ?? before, dryRun: outcome.isDryRun)
     }
@@ -1403,7 +1411,7 @@ public final class SessionController {
     /// Independent direct-property reader: does not call nativeRead/nativeReadField.
     func recipeOracle(ref: String) throws -> [String:NativeValue] {
         try lock.withLock {
-            let doc = try getDocumentInfo(), source = try get(ref:ref)
+            let doc = try getDocumentInfo(), source = try get(ref:ref, document:doc)
             try checkedDocument(doc, writes:false)
             let values: [NativeValue] = try executor.executeAndDecode(handler:"nativeRecipeOracle", args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
             guard values.count == Recipes.oracleFields.count else { throw C1Error.readbackMismatch("Invalid independent recipe observation.") }
@@ -1418,7 +1426,7 @@ public final class SessionController {
     /// never provide write tokens. Indexed color objects must remain unevaluated.
     func recipeScopesOracle(ref: String) throws -> RecipeScopes.Observation {
         try lock.withLock {
-            let doc = try getDocumentInfo(), source = try get(ref:ref)
+            let doc = try getDocumentInfo(), source = try get(ref:ref, document:doc)
             try checkedDocument(doc,writes:false)
             let wire: RecipeScopes.Wire = try executor.executeAndDecode(handler:"nativeRecipeScopesOracle",args:[.init(string:doc.documentId),.init(string:source.id),.init(string:source.parentImagePath ?? "")])
             try checkedDocument(doc,writes:false)

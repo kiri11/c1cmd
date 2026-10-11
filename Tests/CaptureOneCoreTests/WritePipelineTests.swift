@@ -106,6 +106,50 @@ struct WritePipelineTests {
         for kind in kinds {
             for fault in faults(kind) { check(kind, fault) }
         }
+        currentObservation()
+    }
+
+    /// A caller's precondition read replaces the pipeline's own read only under the same
+    /// lock hold and until another write dispatches.
+    static func currentObservation() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fake = FakeScript(directory: directory)
+        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" },
+                                     imageDimensions: { _ in [6000, 4000] })
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref: "1")
+            let ref = try core.editVariant(sourceRef: "1", ifState: source.stateHash, ifDocument: doc.openToken).workingRef
+            func count(_ handler: String) -> Int { fake.calls.filter { $0 == handler }.count }
+            func setExposure(_ value: Double, ifState: String, observed: CurrentObservation?) throws {
+                _ = try core.mutate(workingRefString: ref, ifState: ifState, setAdjustments: Adjustments(exposure: value), addAdjustments: nil, observed: observed)
+            }
+            try CaptureOneLock.shared.withLock {
+                let observed = try core.observeCurrent { try core.get(ref: ref) }
+                let reads = count("getAdjustmentsBatch")
+                try setExposure(1, ifState: observed.result.stateHash, observed: observed)
+                XCTAssertEqual(count("getAdjustmentsBatch") - reads, 1, "A current observation replaces the precondition read; only the readback reads")
+            }
+            try CaptureOneLock.shared.withLock {
+                let observed = try core.observeCurrent { try core.get(ref: ref) }
+                try setExposure(2, ifState: observed.result.stateHash, observed: nil)
+                let dispatches = count("applyAdjustments"), reads = count("getAdjustmentsBatch")
+                XCTAssertThrowsError(try setExposure(3, ifState: observed.result.stateHash, observed: observed),
+                                     "A write dispatched since the observation makes it stale") { error in
+                    XCTAssertEqual((ErrorResponse.payload(error)["error"] as? [String: Any])?["code"] as? String, "state-changed")
+                }
+                XCTAssertEqual(count("getAdjustmentsBatch") - reads, 1, "A stale observation forces the pipeline's own read")
+                XCTAssertEqual(count("applyAdjustments"), dispatches, "A stale observation never authorizes a dispatch")
+            }
+            XCTAssertEqual(fake.values["1"]![0], 2)
+            // Another process may write while the lock is free.
+            let unlocked = try core.observeCurrent { try core.get(ref: ref) }
+            let reads = count("getAdjustmentsBatch")
+            try setExposure(4, ifState: unlocked.result.stateHash, observed: unlocked)
+            XCTAssertEqual(count("getAdjustmentsBatch") - reads, 2, "An observation from outside the write's lock hold forces the pipeline's own read")
+            XCTAssertEqual(fake.values["1"]![0], 4)
+        }
     }
 
     static func check(_ kind: Kind, _ fault: Fault) {

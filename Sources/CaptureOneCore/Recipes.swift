@@ -251,56 +251,57 @@ public final class RecipeWorkflow {
             try PerformanceTrace.step(name) { step = name; try save(); return try body() }
         }
         do {
-            let (oracleBefore, nativeBefore) = try perform("prepare") { () throws -> ([String:NativeValue], NativeSnapshot?) in
+            // Nothing has been dispatched since `initial`, so its image snapshot is still current.
+            let nativeBefore = initial.nativeSnapshots![0]
+            let oracleBefore = try perform("prepare") { () throws -> [String:NativeValue] in
                 let oracleBefore = (verify || scoped) ? try linked.recipeOracle(ref:sourceRef) : [:]
-                let nativeBefore = (verify || scoped) ? try linked.get(ref:sourceRef,nativeTargets:[NativeTarget()]).nativeSnapshots![0] : nil
                 if verify {
                     // Existing mutation guards validate clone provenance before dispatch.
-                    let snapshot = try linked.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
-                    guard let contrast = snapshot.values["contrast"], contrast != .unset else { throw C1Error.invalidRequest("Verification target has no readable contrast.") }
-                    _ = try linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:snapshot.nativeStateHash,patch:["contrast":contrast],dryRun:true)
+                    guard let contrast = nativeBefore.values["contrast"], contrast != .unset else { throw C1Error.invalidRequest("Verification target has no readable contrast.") }
+                    _ = try linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:nativeBefore.nativeStateHash,patch:["contrast":contrast],dryRun:true)
                     try finish(["workingRef":ref])
                 } else {
                     let edit = try linked.editVariant(sourceRef:sourceRef,ifState:initial.stateHash,ifDocument:doc.openToken,ifGeometryState:args["ifGeometryState"] as? String)
                     ref = edit.workingRef; report["workingRef"] = ref; try finish(Recipes.object(edit))
                 }
-                return (oracleBefore, nativeBefore)
+                return oracleBefore
             }
             report["workingRef"] = ref
             for scopedStep in scopeSteps {
                 try perform(scopedStep.name) {
-                    let fresh = try linked.get(ref:ref,nativeTargets:[scopedStep.target]).nativeSnapshots![0]
+                    let fresh = try linked.observeCurrent { try linked.get(ref:ref,nativeTargets:[scopedStep.target]) }
+                    let token = fresh.result.nativeSnapshots![0].nativeStateHash
                     let result: NativeMutationResult
                     if let action = scopedStep.action {
-                        result = try linked.nativeAction(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,action:action)
+                        result = try linked.nativeAction(workingRef:ref,target:scopedStep.target,ifNativeState:token,action:action,observed:fresh)
                     } else {
-                        result = try linked.nativeSet(workingRef:ref,target:scopedStep.target,ifNativeState:fresh.nativeStateHash,patch:scopedStep.patch)
+                        result = try linked.nativeSet(workingRef:ref,target:scopedStep.target,ifNativeState:token,patch:scopedStep.patch,observed:fresh)
                     }
                     try finish(Recipes.object(result))
                 }
             }
             if !patch.isEmpty {
                 try perform("settings") {
-                    let fresh = try linked.get(ref:ref,nativeTargets:[NativeTarget()]).nativeSnapshots![0]
-                    try finish(Recipes.object(linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:fresh.nativeStateHash,patch:nativePatch)))
+                    let fresh = try linked.observeCurrent { try linked.get(ref:ref,nativeTargets:[NativeTarget()]) }
+                    try finish(Recipes.object(linked.nativeSet(workingRef:ref,target:NativeTarget(),ifNativeState:fresh.result.nativeSnapshots![0].nativeStateHash,patch:nativePatch,observed:fresh)))
                 }
             }
             if let adjustments {
                 try perform("tonal") {
-                    let fresh = try linked.get(ref:ref)
+                    let fresh = try linked.observeCurrent { try linked.get(ref:ref) }
                     // Relative exposure is computed again from the immediately observed state.
                     var actual = adjustments
-                    if exposure["mode"] as? String == "relative" { actual.exposure = fresh.adjustments.exposure! + (exposure["value"] as! NSNumber).doubleValue }
-                    try finish(Recipes.object(linked.mutate(workingRefString:ref,ifState:fresh.stateHash,setAdjustments:actual,addAdjustments:nil)))
+                    if exposure["mode"] as? String == "relative" { actual.exposure = fresh.result.adjustments.exposure! + (exposure["value"] as! NSNumber).doubleValue }
+                    try finish(Recipes.object(linked.mutate(workingRefString:ref,ifState:fresh.result.stateHash,setAdjustments:actual,addAdjustments:nil,observed:fresh)))
                 }
             }
             if let geometry = args["geometry"] as? [String:Any] {
                 try perform("geometry") {
-                    let fresh = try linked.get(ref:ref)
-                    guard let token = fresh.geometryStateHash else { throw C1Error.invalidRequest("Geometry unavailable.") }
+                    let fresh = try linked.observeCurrent { try linked.get(ref:ref) }
+                    guard let token = fresh.result.geometryStateHash else { throw C1Error.invalidRequest("Geometry unavailable.") }
                     let crop = try geometry["crop"].map { try JSONDecoder().decode(CropRect.self,from:Recipes.data($0)) }
                     let keystone = try geometry["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self,from:Recipes.data($0)) }
-                    try finish(Recipes.object(linked.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,keystone:keystone)))
+                    try finish(Recipes.object(linked.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,keystone:keystone,observed:fresh)))
                 }
             }
             if verify || scoped {
@@ -326,8 +327,8 @@ public final class RecipeWorkflow {
                         guard nativeAfter.values["highlight recovery"] == .number(-highlight) else { throw C1Error.readbackMismatch("Coupled highlight recovery differs from adjustment.") }
                         changedKeys.insert("highlight recovery")
                     }
-                    guard nativeBefore!.layers == nativeAfter.layers, nativeBefore!.unavailable == nativeAfter.unavailable else { throw C1Error.readbackMismatch("Recipe changed native coverage or layers.") }
-                    for (key,value) in nativeBefore!.values where !changedKeys.contains(key) {
+                    guard nativeBefore.layers == nativeAfter.layers, nativeBefore.unavailable == nativeAfter.unavailable else { throw C1Error.readbackMismatch("Recipe changed native coverage or layers.") }
+                    for (key,value) in nativeBefore.values where !changedKeys.contains(key) {
                         guard let actual = nativeAfter.values[key], NativeEditing.matchesReadback(field:key,expected:value,actual:actual) else { throw C1Error.readbackMismatch("Recipe changed omitted field: " + key) }
                     }
                     let after = fullAfter

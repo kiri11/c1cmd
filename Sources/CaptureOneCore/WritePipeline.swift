@@ -52,6 +52,14 @@ struct Observed<State> {
     let state: State
 }
 
+/// A precondition read a caller hands to the next write. The pipeline uses it in place
+/// of its own read only within the lock epoch it was taken in: under the same hold of
+/// the application lock, with no write dispatched since.
+public struct CurrentObservation {
+    public let result: GetResult
+    let epoch: Int
+}
+
 /// The resolved native destination of one write and the saved baseline of its reference.
 struct WriteTarget {
     let documentId: String
@@ -114,6 +122,12 @@ struct PendingWrite {
 }
 
 extension SessionController {
+    /// Takes `read`, which must be the read the next write's kind would make, as that write's precondition read.
+    public func observeCurrent(_ read: () throws -> GetResult) rethrows -> CurrentObservation {
+        let epoch = lock.epoch
+        return CurrentObservation(result: try read(), epoch: epoch)
+    }
+
     /// The guards every write shares before reading its target: the application
     /// lock, one active writable document on an allowed build, and no unresolved operation.
     func guarded<T>(_ operation: String, pinned requirement: String? = nil, dryRun: Bool = false,
@@ -139,6 +153,7 @@ extension SessionController {
                                  readback: (inout PendingWrite, Reply) throws -> Readback<Value>,
                                  refusal: (Error) -> C1Error? = { _ in nil },
                                  unchanged: (inout PendingWrite) throws -> Bool = { _ in false }) throws -> (operationId: String, value: Value) {
+        lock.advanceEpoch()
         var prepared = entry
         prepared.compoundId = compoundId
         prepared.appInstance = try appInstance()
@@ -171,10 +186,13 @@ extension SessionController {
     }
 
     /// The whole guard sequence of one mutation of an editing reference or managed clone.
-    func write<Kind: WriteKind>(_ kind: Kind, workingRef: String, precondition: String, dryRun: Bool) throws -> WriteOutcome<Kind> {
+    /// `observed` replaces the pipeline's precondition read while it is still current.
+    func write<Kind: WriteKind>(_ kind: Kind, workingRef: String, precondition: String, dryRun: Bool,
+                                observed: CurrentObservation? = nil) throws -> WriteOutcome<Kind> {
         try guarded(kind.operationType, pinned: kind.pinnedBuildRequirement, dryRun: dryRun) { doc in
             let resolved = try adjustmentTarget(workingRef, document: doc)
-            let current = try kind.observe(workingRef, afterDispatch: false, with: self)
+            let current = try observed.flatMap { $0.epoch == lock.epoch ? $0.result : nil }
+                ?? kind.observe(workingRef, afterDispatch: false, with: self)
             try assertWritableImage(doc: doc, source: current)
             guard current.id == resolved.variantId else {
                 throw C1Error.identityAmbiguous("The reference resolved to a different native variant than its record.")
