@@ -139,7 +139,7 @@ public enum NativeEditing {
         guard !patch.isEmpty else { throw C1Error.invalidRequest("Native patch must not be empty.") }
         for (name, value) in patch {
             guard let field = fields[target.scope]?.first(where: { $0.name == name }), field.writable else {
-                throw C1Error.invalidRequest("Field '\(name)' is unknown or read-only here. Use geometry_set for guarded crop/rotation/keystone edits; orientation and flip remain blocked.")
+                throw C1Error.invalidRequest("Field '\(name)' is unknown or read-only here. Use geometry_set for guarded orientation/crop/rotation/keystone edits; flip remains blocked.")
             }
             var valid = false
             switch value {

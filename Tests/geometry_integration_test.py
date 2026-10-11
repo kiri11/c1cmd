@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Crop/rotation CLI + MCP qualification in a disposable Session; originals preserved.
+"""Crop/rotation/orientation CLI + MCP qualification in a disposable Session; originals preserved.
 Requires C1_TEST_RAW_FIXTURE and zero open documents. Evidence retained in C1_GEOMETRY_EVIDENCE.
+C1_TEST_PORTRAIT_FIXTURE optionally names a RAW whose EXIF orientation is 6 (rotate 90 CW).
 """
 import hashlib, importlib.util, json, math, os, re, shutil, subprocess, sys, tempfile, time, uuid
 from pathlib import Path
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN',ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN',ROOT / '.build/debug/c1-mcp'))
 RAW = Path(os.environ['C1_TEST_RAW_FIXTURE'])
+PORTRAIT = Path(os.environ['C1_TEST_PORTRAIT_FIXTURE']) if os.environ.get('C1_TEST_PORTRAIT_FIXTURE') else None
 EVIDENCE = Path(os.environ.get('C1_GEOMETRY_EVIDENCE', tempfile.mkdtemp(prefix='c1-geometry-evidence-',dir='/private/tmp')))
 EVIDENCE.mkdir(parents=True,exist_ok=True)
 KEYS=('centerX','centerY','width','height')
@@ -234,13 +236,88 @@ try:
     assert 'exposedCorners' not in rotated and not planner.exposed_corners(rotated['after']['crop'],3,w,h),rotated
     pr,_=tool('preview',{'ref':ref});log('preview-rotation-only',result=pr)
     reset()
+    def turned(a,b):
+        return all(abs(a[x]-b[y])<=2 for x,y in (('width','height'),('height','width')))
+    def oriented_preview(ref,portrait,ratio=None):
+        pr,_=tool('preview',{'ref':ref})
+        assert (pr['height']>pr['width'])==portrait,pr
+        if ratio: assert abs(pr['width']/pr['height']-ratio)<.003,pr
+        return pr
+    # Orientation through geometry_set on a fresh clone: absolute, journaled, set before rotation and crop,
+    # read back independently, and restored with the saved crop.
+    oriented_clone=cli('variant','clone',original['id']);oref=oriented_clone['workingRef']
+    base_geometry=cli('get',oref)
+    assert base_geometry['geometry']['orientation']==0,base_geometry['geometry']
+    cli('geometry','set',oref,'--if-geometry-state',base_geometry['geometryStateHash'],'--orientation',90,'--dry-run',error='invalid-request')
+    cli('geometry','set',oref,'--if-geometry-state',base_geometry['geometryStateHash'],'--orientation',45,error='invalid-request')
+    previous=base_geometry
+    for value in (90,180,270,0,270,90,0):
+        result,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':previous['geometryStateHash'],'orientation':value})
+        readback=cli('get',oref)
+        assert readback['geometry']['orientation']==value==result['after']['orientation'],(value,result)
+        assert readback['geometryStateHash']==result['geometryStateHash'],(value,result)
+        if (value-previous['geometry']['orientation'])%180==90: assert turned(readback['geometry']['crop'],previous['geometry']['crop']),(value,readback)
+        operation=cli('operation','status',result['operationId'])
+        assert operation['status']=='succeeded' and operation['requestedGeometry']['orientation']==value,operation
+        assert operation['beforeGeometry']['orientation']==previous['geometry']['orientation'] and operation['afterGeometry']['orientation']==value,operation
+        oriented_preview(oref,value in (90,270))
+        log('orientation-transition',orientation=value,result=result,operation=operation)
+        previous=readback
+    # With a stored off-centre crop, rotation and keystone: orientation alone turns them rigidly.
+    current=cli('get',oref)
+    framed,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':current['geometryStateHash'],'rotation':2,'crop':dict(centerX=2800,centerY=1900,width=3600,height=2400)})
+    keyed,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':framed['geometryStateHash'],'keystone':{'vertical':10}})
+    turned_keyed,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':keyed['geometryStateHash'],'orientation':90})
+    assert turned_keyed['after']['orientation']==90 and abs(turned_keyed['after']['rotation']-2)<.001,turned_keyed
+    assert turned_keyed['after']['keystone']==keyed['after']['keystone'] and turned(turned_keyed['after']['crop'],keyed['after']['crop']),turned_keyed
+    back,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':turned_keyed['geometryStateHash'],'orientation':0})
+    assert all(abs(back['after']['crop'][k]-keyed['after']['crop'][k])<=2 for k in KEYS),('0 to 90 to 0 restores the crop',back,keyed)
+    log('orientation-with-crop-rotation-keystone',framed=framed,keystone=keyed,turned=turned_keyed,back=back)
+    # Orientation, rotation and a 3:4 ratio in one request: the ratio fits the oriented canvas.
+    cleared,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':back['geometryStateHash'],'keystone':{'vertical':0}})
+    portrait,_=tool('geometry_set',{'workingRef':oref,'ifGeometryState':cleared['geometryStateHash'],'orientation':270,'rotation':-2,'aspectRatio':.75})
+    assert portrait['after']['orientation']==270 and 'exposedCorners' not in portrait,portrait
+    assert not planner.exposed_corners(portrait['after']['crop'],-2,base_geometry['geometry']['imageHeight'],base_geometry['geometry']['imageWidth']),portrait
+    oriented_preview(oref,True,.75)
+    restored=cli('geometry','restore',oref,'--if-geometry-state',portrait['geometryStateHash'])
+    assert restored['after']['orientation']==0 and restored['after']['crop']==base_geometry['geometry']['crop'] and restored['after']['rotation']==base_geometry['geometry']['rotation'],restored
+    assert cli('get',oref)['geometryStateHash']==base_geometry['geometryStateHash'],'restore returns the saved geometry'
+    oriented_preview(oref,False)
+    log('orientation-ratio-and-restore',portrait=portrait,restored=restored)
+    cli('variant','delete',oref)
+    if PORTRAIT:
+        # A vertical frame tagged EXIF 6 imports at 90 and shows upright there; 0 is the sensor frame.
+        portrait_sha=sha(PORTRAIT);portrait_copy=session/'Capture'/('portrait-'+PORTRAIT.name);shutil.copy2(PORTRAIT,portrait_copy)
+        for _ in range(40):
+            tagged=[v for v in cli('variants','list') if Path(v['parentImagePath']).name==portrait_copy.name]
+            if tagged: break
+            time.sleep(.5)
+        tagged=cli('get',tagged[0]['id'])
+        assert tagged['geometry']['orientation']==90 and tagged['geometry']['crop']['height']>tagged['geometry']['crop']['width'],tagged['geometry']
+        level=subprocess.run([str(CLI),'exif',tagged['id'],'--format','json'],capture_output=True,text=True,timeout=90)
+        hints=json.loads(level.stdout) if level.returncode==0 else None
+        pclone=cli('variant','clone',tagged['id']);pref=pclone['workingRef']
+        current=cli('get',pref)
+        sideways,_=tool('geometry_set',{'workingRef':pref,'ifGeometryState':current['geometryStateHash'],'orientation':0})
+        oriented_preview(pref,False)
+        sideways_hints=json.loads(subprocess.run([str(CLI),'exif',pref,'--format','json'],capture_output=True,text=True,timeout=90).stdout) if hints else None
+        upright,_=tool('geometry_set',{'workingRef':pref,'ifGeometryState':sideways['geometryStateHash'],'orientation':90,'aspectRatio':.75})
+        assert upright['after']['orientation']==90,upright
+        oriented_preview(pref,True,.75)
+        if hints:
+            assert hints.get('levelRotation') is not None and 'levelRotation' not in sideways_hints,(hints,sideways_hints)
+        restored=cli('geometry','restore',pref,'--if-geometry-state',upright['geometryStateHash'])
+        assert restored['after']['orientation']==90 and restored['after']['crop']==current['geometry']['crop'],restored
+        cli('variant','delete',pref)
+        assert sha(PORTRAIT)==portrait_sha and sha(portrait_copy)==portrait_sha
+        log('portrait-fixture',importGeometry=tagged['geometry'],exif=hints,exifSideways=sideways_hints,sideways=sideways,upright=upright,restored=restored)
     assert cli('get',original['id'])==original,'Original variant changed'
     assert sha(RAW)==original_sha and sha(fixture)==original_sha
     cli('variant','delete',ref)
     log('passed',originalUnchanged=True,rawSHA256=sha(fixture))
     shutil.copy2(journal,EVIDENCE/'journal.jsonl')
     apple('close current document')
-    print('PASS: geometry CLI/MCP, ratios, anchored crops, rotations, off-center crop, exact containment, rotation-only, full-frame context and rectangles, orientation, original/RAW preservation')
+    print('PASS: geometry CLI/MCP, ratios, anchored crops, rotations, off-center crop, exact containment, rotation-only, full-frame context and rectangles, orientation writes and restore'+(', portrait fixture' if PORTRAIT else '')+', original/RAW preservation')
     print(EVIDENCE)
 except BaseException as e:
     log('failed',error=str(e));raise

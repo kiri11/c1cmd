@@ -16,6 +16,8 @@ final class GeometryFake: ScriptExecuting {
     var normalizePerspective = false
     /// Capture One's automatic crop after a transform-only request.
     var automaticCrop: [Double] = [3150,2300,2400,1600]
+    /// The orientation the last geometry handler was asked for.
+    var lastOrientation: Int?
     init(directory: URL) { base = FakeScript(directory: directory) }
     init(base: FakeScript) { self.base = base }
     func record(_ id: String) -> [String: Any] {
@@ -58,6 +60,12 @@ final class GeometryFake: ScriptExecuting {
             let id = args[1].stringValue!
             var r = record(id)
             if failure == "stale-dispatch" { throw C1Error.stateChanged("injected state change at handler") }
+            // Capture One turns the stored crop with the canvas; centred crops swap their axes.
+            let requestedOrientation = Int(args[handler == "applyCorrectedGeometry" ? 9 : 8].int32Value)
+            lastOrientation = requestedOrientation
+            let turned = (requestedOrientation - (r["orientationDegrees"] as! Int) + 360) % 180 == 90 && failure != "ignore-orientation"
+            if failure != "ignore-orientation" { r["orientationDegrees"] = requestedOrientation }
+            if turned { let c = r["cropValues"] as! [Double]; r["cropValues"] = [c[1], c[0], c[3], c[2]] }
             if failure == "timeout" { throw C1Error.timeout("injected timeout") }
             let keyIndex = handler == "applyCorrectedGeometry" ? 8 : 7
             r["keystoneValues"] = (1...5).map { args[keyIndex].atIndex($0)!.doubleValue }
@@ -72,7 +80,7 @@ final class GeometryFake: ScriptExecuting {
                 } else if args[7].descriptorType != NSAppleEventDescriptor.missingValue().descriptorType {
                     let ratio = args[7].doubleValue, w = floor(min(bounds[2], bounds[3]*args[7].doubleValue))
                     target = [bounds[0], bounds[1], w, floor(w/ratio)]
-                } else { target = automaticCrop }
+                } else { target = turned ? r["cropValues"] as! [Double] : automaticCrop }
                 r["maximumValues"] = bounds
             } else { target = (1...4).map { args[5].atIndex($0)!.doubleValue } }
             var fitted = target
@@ -100,6 +108,7 @@ struct GeometryTests {
         print("Running GeometryTests...")
         testContainmentTable()
         testRotationOnly()
+        testOrientation()
         testCorrectedLens()
         testKeystone()
         testAnchorMaths()
@@ -299,6 +308,102 @@ struct GeometryTests {
             let restored = try core.geometryRestore(workingRef:ref,ifGeometryState:exposed.geometryStateHash)
             XCTAssertEqual(restored.after.crop,source.geometry!.crop)
             XCTAssertNil(restored.exposedCorners)
+        }
+    }
+
+    /// Orientation is absolute and applied first; crops are planned on the oriented canvas.
+    private static func testOrientation() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = GeometryFake(directory:directory)
+        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "orientation-db"}, imageDimensions:{_ in [6000,4000]})
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
+            let ref = try core.editVariant(sourceRef:"1",ifState:source.stateHash,ifDocument:doc.openToken).workingRef
+            let token = source.geometryStateHash!
+            fake.handlers = []
+            for bad in [45, 360, -90, 1] {
+                XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,orientation:bad)) { XCTAssertTrue(isInvalidRequest($0), "\(bad)") }
+                XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,aspectRatio:1.5,orientation:bad)) { XCTAssertTrue(isInvalidRequest($0), "\(bad) with a ratio") }
+            }
+            XCTAssertEqual(fake.handlers.filter { $0.hasPrefix("apply") }, [], "Invalid orientations never dispatch")
+            XCTAssertNoThrow(try ContractSchema.validate(tool:"geometry_set", arguments:["workingRef":ref, "ifGeometryState":token, "orientation":270]))
+            // Capture One's turned crop cannot be predicted, so an orientation-only dry run is refused.
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,orientation:90,dryRun:true))
+            XCTAssertEqual(fake.writeCount, 0, "Refused requests never dispatch")
+
+            let turned = try core.geometrySet(workingRef:ref,ifGeometryState:token,orientation:90)
+            XCTAssertEqual(turned.after.orientation, 90)
+            XCTAssertEqual(turned.after.crop, CropRect(centerX:2000,centerY:3000,width:4000,height:6000), "The turned crop is kept")
+            XCTAssertEqual(turned.diff["orientation"], DoubleDiff(before:0, after:90))
+            XCTAssertEqual(fake.lastOrientation, 90)
+            XCTAssertTrue(fake.pendingBeforeWrite)
+            let record = journal.find(operationId:turned.operationId)!
+            XCTAssertEqual(record.requestedGeometry?.orientation, 90)
+            XCTAssertEqual(record.beforeGeometry?.orientation, 0)
+            XCTAssertEqual(record.afterGeometry?.orientation, 90)
+            XCTAssertEqual(record.status, "succeeded")
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:token,orientation:0), "The old token is stale")
+            let unchanged = try core.geometrySet(workingRef:ref,ifGeometryState:turned.geometryStateHash,orientation:90)
+            XCTAssertEqual(unchanged.after, turned.after, "Setting the current orientation again changes nothing")
+            XCTAssertEqual(unchanged.geometryStateHash, turned.geometryStateHash)
+
+            // Back to 0 with a 3:2 ratio in one request: planned on the 6000 x 4000 canvas.
+            let planned = try core.geometrySet(workingRef:ref,ifGeometryState:turned.geometryStateHash,aspectRatio:1.5,orientation:0,dryRun:true)
+            XCTAssertEqual(planned.after.orientation, 0)
+            XCTAssertEqual(planned.after.crop, CropRect(centerX:3000,centerY:2000,width:6000,height:4000))
+            // A 3:4 ratio from 0 to 90 fits the portrait canvas, anchored to the top as viewed.
+            let landscape = try core.geometrySet(workingRef:ref,ifGeometryState:turned.geometryStateHash,orientation:0)
+            let top = try CropAnchor(x:0.5, y:0)
+            let portraitPlan = try core.geometrySet(workingRef:ref,ifGeometryState:landscape.geometryStateHash,aspectRatio:0.75,anchor:top,orientation:90,dryRun:true)
+            let portrait = try core.geometrySet(workingRef:ref,ifGeometryState:landscape.geometryStateHash,aspectRatio:0.75,anchor:top,orientation:90)
+            XCTAssertEqual(portrait.after.crop, CropRect(centerX:2000,centerY:3333,width:4000,height:5333))
+            XCTAssertEqual(portrait.after.crop, portraitPlan.after.crop, "The dry run predicts the oriented fit")
+            XCTAssertEqual(portrait.anchoredCrop, portrait.after.crop)
+            XCTAssertEqual(fake.handlers.last(where: { $0.hasPrefix("apply") }), "applyGeometry")
+            XCTAssertEqual(fake.lastOrientation, 90)
+            // Explicit crops are checked on the requested canvas before dispatch.
+            let tall = CropRect(centerX:2000,centerY:3000,width:3800,height:5600)
+            let writes = fake.writeCount
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:portrait.geometryStateHash,crop:tall,orientation:0)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertEqual(fake.writeCount, writes)
+            let explicit = try core.geometrySet(workingRef:ref,ifGeometryState:portrait.geometryStateHash,crop:tall,orientation:90)
+            XCTAssertEqual(explicit.after.crop, tall)
+
+            // Restore returns the saved orientation together with the saved crop.
+            let restored = try core.geometryRestore(workingRef:ref,ifGeometryState:explicit.geometryStateHash)
+            XCTAssertEqual(restored.after.orientation, 0)
+            XCTAssertEqual(restored.after.crop, source.geometry!.crop)
+            XCTAssertEqual(fake.lastOrientation, 0)
+            XCTAssertEqual(journal.find(operationId:restored.operationId)?.beforeGeometry?.orientation, 90)
+
+            // Lens-corrected bounds exist only after the native orientation.
+            var corrected = fake.record("1"); corrected["lensValues"] = [100.0,35,0,0,0,0,0,0]; fake.records["1"] = corrected
+            let lens = try core.get(ref:ref).geometryStateHash!
+            fake.handlers = []
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:lens,aspectRatio:0.75,anchor:top,orientation:90)) { XCTAssertTrue(isInvalidRequest($0)) }
+            XCTAssertThrowsError(try core.geometrySet(workingRef:ref,ifGeometryState:lens,aspectRatio:0.75,orientation:90,dryRun:true))
+            XCTAssertEqual(fake.handlers.filter { $0.hasPrefix("apply") }, [])
+            let nativeFit = try core.geometrySet(workingRef:ref,ifGeometryState:lens,aspectRatio:0.75,orientation:90)
+            XCTAssertEqual(nativeFit.after.orientation, 90)
+            XCTAssertEqual(fake.handlers.last(where: { $0.hasPrefix("apply") }), "applyCorrectedGeometry")
+            XCTAssertEqual(journal.find(operationId:nativeFit.operationId)?.requestedGeometry?.orientation, 90)
+
+            // A write whose readback keeps the old orientation is never accepted.
+            fake.failure = "ignore-orientation"
+            do {
+                _ = try core.geometrySet(workingRef:ref,ifGeometryState:nativeFit.geometryStateHash,orientation:180)
+                XCTFail("Expected an orientation readback mismatch")
+            } catch let failure as OperationFailure {
+                let status = try core.operationStatus(operationId:failure.operationId).status
+                XCTAssertEqual(status, "partial-failure")
+            }
+            fake.failure = nil
+        }
+        XCTAssertThrowsError(try NativeEditing.validate(["orientation": .number(90)], target: NativeTarget())) { error in
+            XCTAssertTrue(String(describing: error).contains("geometry_set for guarded orientation"), String(describing: error))
         }
     }
 

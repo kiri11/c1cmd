@@ -91,11 +91,17 @@ struct ExistingVariantTests {
             database = "db-2"
             XCTAssertThrowsError(try core.get(ref: ref))
             database = "db-1"
+            // A changed orientation is restored; a changed lens context is refused.
             var changed = fake.record("1"); changed["orientationDegrees"] = 90
+            fake.records["1"] = changed
+            let turned = try core.get(ref: ref)
+            let reoriented = try core.geometryRestore(workingRef: ref, ifGeometryState: turned.geometryStateHash!)
+            XCTAssertEqual(reoriented.after.orientation, 0)
+            changed = fake.record("1"); changed["lensValues"] = [50.0, 35, 0, 0, 0, 0, 0, 0]
             fake.records["1"] = changed
             let newContext = try core.get(ref: ref)
             XCTAssertThrowsError(try core.geometryRestore(workingRef: ref, ifGeometryState: newContext.geometryStateHash!))
-            changed["orientationDegrees"] = 0; fake.records["1"] = changed
+            changed["lensValues"] = [0.0, 35, 0, 0, 0, 0, 0, 0]; fake.records["1"] = changed
 
             // A lost reply may already have changed the existing variant. Block and
             // observe after restart, never recreate a variant or blindly retry.

@@ -130,6 +130,12 @@ public struct Geometry: Codable, Equatable {
 
     /// Absolute rotation writes are qualified within ± this many degrees.
     public static let maximumRotation = 45.0
+    /// Capture One's absolute orientations: clockwise degrees from the sensor frame, so an
+    /// EXIF "rotate 90 CW" photo imports at 90.
+    public static let orientations = [0, 90, 180, 270]
+    static func validate(orientation: Int?) throws {
+        guard orientation.map(orientations.contains) ?? true else { throw C1Error.invalidRequest("orientation must be 0, 90, 180 or 270.") }
+    }
     static var rotationOutOfRange: C1Error {
         .invalidRequest("Rotation must be finite and between -\(Int(maximumRotation)) and \(Int(maximumRotation)) degrees.")
     }
@@ -193,9 +199,22 @@ public struct Geometry: Codable, Equatable {
     }
 
     /// `anchor` positions the `aspectRatio` fit inside the planning rectangle; nil centres it.
-    public func target(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?, anchor: CropAnchor? = nil) throws -> Geometry {
-        guard let reason = unsupportedReason else { return try validatedTarget(crop: requested, rotation: angle, aspectRatio: aspectRatio, anchor: anchor) }
-        throw C1Error.invalidRequest(reason)
+    /// A new `orientation` plans the crop on the oriented canvas; it needs no lens corrections,
+    /// whose bounds only Capture One reports.
+    public func target(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?, anchor: CropAnchor? = nil,
+                       orientation: Int? = nil) throws -> Geometry {
+        if let reason = unsupportedReason { throw C1Error.invalidRequest(reason) }
+        try Geometry.validate(orientation: orientation)
+        var oriented = self
+        if let orientation, orientation != self.orientation {
+            guard !requiresNativeBounds else {
+                throw C1Error.invalidRequest("Corrected geometry bounds at a new orientation require native execution; a dry run cannot predict them.")
+            }
+            oriented.orientation = orientation
+        }
+        // Setting the current orientation alone keeps the current crop and rotation.
+        let angle = angle ?? (orientation != nil && requested == nil && aspectRatio == nil ? rotation : nil)
+        return try oriented.validatedTarget(crop: requested, rotation: angle, aspectRatio: aspectRatio, anchor: anchor)
     }
     private func validatedTarget(crop requested: CropRect?, rotation angle: Double?, aspectRatio: Double?, anchor: CropAnchor?) throws -> Geometry {
         guard requested != nil || angle != nil || aspectRatio != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
@@ -240,7 +259,8 @@ public struct Geometry: Codable, Equatable {
     public func changes(from before: Geometry) -> [String: DoubleDiff] {
         var result: [String: DoubleDiff] = [:]
         for (key, a, b) in [("centerX",before.crop.centerX,crop.centerX),("centerY",before.crop.centerY,crop.centerY),
-                            ("width",before.crop.width,crop.width),("height",before.crop.height,crop.height),("rotation",before.rotation,rotation)] where a != b {
+                            ("width",before.crop.width,crop.width),("height",before.crop.height,crop.height),("rotation",before.rotation,rotation),
+                            ("orientation",Double(before.orientation),Double(orientation))] where a != b {
             result[key] = DoubleDiff(before: a, after: b)
         }
         for (index, name) in KeystoneAdjustments.fields.enumerated() where keystone.count == 5 && before.keystone.count == 5 {
@@ -253,8 +273,8 @@ public struct Geometry: Codable, Equatable {
         abs(rotation-target.rotation) <= 0.001 && keystone.count == target.keystone.count &&
         zip(keystone, target.keystone).allSatisfy { abs($0 - $1) <= 0.001 }
     }
-    public func sameContext(as other: Geometry, includingKeystone: Bool = true) -> Bool {
-        orientation == other.orientation && imageWidth == other.imageWidth && imageHeight == other.imageHeight &&
+    public func sameContext(as other: Geometry, includingKeystone: Bool = true, includingOrientation: Bool = true) -> Bool {
+        (!includingOrientation || orientation == other.orientation) && imageWidth == other.imageWidth && imageHeight == other.imageHeight &&
         flip == other.flip && aspectRatioName == other.aspectRatioName && (!includingKeystone || keystone == other.keystone) &&
         lensGeometry == other.lensGeometry && lensProfile == other.lensProfile && hideDistortedAreas == other.hideDistortedAreas && cropOutsideImage == other.cropOutsideImage
     }
@@ -267,9 +287,12 @@ public struct GeometryRequest: Codable, Equatable {
     public let rotation: Double
     public let aspectRatio: Double?
     public let keystone: KeystoneAdjustments?
+    /// A new orientation, applied before keystone, rotation and crop; nil keeps the current one.
+    public let orientation: Int?
 
-    public init(crop: CropRect?, rotation: Double, aspectRatio: Double?, keystone: KeystoneAdjustments? = nil) throws {
+    public init(crop: CropRect?, rotation: Double, aspectRatio: Double?, keystone: KeystoneAdjustments? = nil, orientation: Int? = nil) throws {
         try keystone?.validate()
+        try Geometry.validate(orientation: orientation)
         guard crop == nil || aspectRatio == nil else { throw C1Error.invalidRequest("Provide crop or aspectRatio, not both.") }
         guard rotation.isFinite, abs(rotation) <= Geometry.maximumRotation else { throw Geometry.rotationOutOfRange }
         if let crop {
@@ -278,7 +301,7 @@ public struct GeometryRequest: Codable, Equatable {
         if let aspectRatio {
             guard aspectRatio.isFinite, aspectRatio > 0 else { throw C1Error.invalidRequest("aspectRatio must be finite and positive.") }
         }
-        self.crop = crop; self.rotation = rotation; self.aspectRatio = aspectRatio; self.keystone = keystone
+        self.crop = crop; self.rotation = rotation; self.aspectRatio = aspectRatio; self.keystone = keystone; self.orientation = orientation
     }
 }
 

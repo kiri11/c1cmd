@@ -993,15 +993,15 @@ public final class SessionController {
             diff: after.state.changes(from: before), stateHash: after.observation.stateHash, isDryRun: false)
     }
 
-    // MARK: - Crop, rotation, and keystone
+    // MARK: - Orientation, crop, rotation, and keystone
     public func geometrySet(workingRef: String, ifGeometryState expected: String, crop: CropRect? = nil,
                             rotation: Double? = nil, aspectRatio: Double? = nil, anchor: CropAnchor? = nil,
-                            keystone: KeystoneAdjustments? = nil, dryRun: Bool = false,
+                            keystone: KeystoneAdjustments? = nil, orientation: Int? = nil, dryRun: Bool = false,
                             observed: CurrentObservation? = nil) throws -> GeometryMutationResult {
         guard anchor == nil || (aspectRatio != nil && crop == nil && keystone == nil) else { throw C1Error.invalidRequest(CropAnchor.usage) }
         // The centre is the unanchored fit, so it takes that path on every geometry, native fits included.
         var result = try geometryWrite(GeometryWrite(crop: crop, rotation: rotation, aspectRatio: aspectRatio,
-                                                     anchor: anchor == .center ? nil : anchor, keystone: keystone, restore: false),
+                                                     anchor: anchor == .center ? nil : anchor, keystone: keystone, orientation: orientation, restore: false),
                                        workingRef: workingRef, expected: expected, dryRun: dryRun, observed: observed)
         if anchor != nil { result.anchoredCrop = result.after.crop }
         return result

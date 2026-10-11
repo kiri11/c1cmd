@@ -500,10 +500,13 @@ on applyKeystone(v, targetKeystone)
     end tell
 end applyKeystone
 
-on applyGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation, targetKeystone)
+-- Orientation first: crop coordinates are in the oriented canvas, and Capture One turns
+-- the stored crop with the canvas.
+on applyGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, targetCrop, targetRotation, targetKeystone, targetOrientation)
     set v to my checkedGeometryVariant(docRef, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
+        if orientation of a is not equal to targetOrientation then set orientation of a to targetOrientation
         my applyKeystone(v, targetKeystone)
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         -- Rotation can recenter/shrink the native crop. Apply the final crop afterward.
@@ -513,13 +516,14 @@ on applyGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone
 end applyGeometry
 
 -- Lens and perspective corrections change the canvas. Do not extrapolate from RAW dimensions or
--- reuse bounds from another rotation. Uncorrected rotation-only changes also come
--- here to keep Capture One's automatic crop. The caller journals the request before
+-- reuse bounds from another rotation or orientation. Uncorrected rotation- and orientation-only
+-- changes also come here to keep Capture One's transformed crop. The caller journals the request before
 -- entering this handler; any error after dispatch keeps the write block.
-on applyCorrectedGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone)
+on applyCorrectedGeometry(docRef, variantId, expectedPath, expectedGeometry, expectedTone, requestedCrop, targetRotation, requestedRatio, targetKeystone, targetOrientation)
     set v to my checkedGeometryVariant(docRef, variantId, expectedPath, expectedGeometry, expectedTone)
     tell application "/Applications/Capture One.app"
         set a to adjustments of v
+        if orientation of a is not equal to targetOrientation then set orientation of a to targetOrientation
         my applyKeystone(v, targetKeystone)
         if rotation of a is not equal to targetRotation then set rotation of a to targetRotation
         set nativeBounds to maximum crop v apply false
@@ -542,7 +546,7 @@ on applyCorrectedGeometry(docRef, variantId, expectedPath, expectedGeometry, exp
         -- Native transform-only crops can exceed the reported maximum rectangle.
         -- Keep that observed crop; containment applies to caller-selected crops.
         if requestedCrop is not missing value or requestedRatio is not missing value then
-            if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after rotation; inspect operation status before any further write."
+            if cx - cw / 2 < boundsX - boundsW / 2 - 2 or cx + cw / 2 > boundsX + boundsW / 2 + 2 or cy - ch / 2 < boundsY - boundsH / 2 - 2 or cy + ch / 2 > boundsY + boundsH / 2 + 2 then error "Requested crop exceeds native bounds after orientation or rotation; inspect operation status before any further write."
             set crop of v to targetCrop
         end if
         return {targetCropValues:targetCrop, boundsValues:nativeBounds, fittedCropValues:crop of v}

@@ -29,7 +29,7 @@ public struct ToolRequest {
         case reset(workingRef: String, ifState: String, fields: [String], dryRun: Bool)
         case metadataSet(workingRef: String, ifMetadataState: String, rating: Int?, colorTag: Int?, dryRun: Bool)
         case geometrySet(workingRef: String, ifGeometryState: String, crop: CropRect?, rotation: Double?,
-                         aspectRatio: Double?, anchor: CropAnchor?, keystone: KeystoneAdjustments?, dryRun: Bool)
+                         aspectRatio: Double?, anchor: CropAnchor?, keystone: KeystoneAdjustments?, orientation: Int?, dryRun: Bool)
         case geometryRestore(workingRef: String, ifGeometryState: String, dryRun: Bool)
         case nativeSet(workingRef: String, target: NativeTarget, ifNativeState: String, patch: [String: NativeValue], dryRun: Bool)
         case nativeAction(workingRef: String, target: NativeTarget, ifNativeState: String, action: String,
@@ -132,7 +132,7 @@ public struct ToolRequest {
         case "geometry_set":
             command = .geometrySet(workingRef: string("workingRef")!, ifGeometryState: string("ifGeometryState")!,
                                    crop: try decoded("crop"), rotation: number("rotation"), aspectRatio: number("aspectRatio"),
-                                   anchor: try decoded("anchor"), keystone: try decoded("keystone"), dryRun: flag("dryRun"))
+                                   anchor: try decoded("anchor"), keystone: try decoded("keystone"), orientation: int("orientation"), dryRun: flag("dryRun"))
         case "geometry_restore":
             command = .geometryRestore(workingRef: string("workingRef")!, ifGeometryState: string("ifGeometryState")!, dryRun: flag("dryRun"))
         case "native_set":
@@ -225,9 +225,9 @@ public struct ToolRequest {
             return .mutation(try core.reset(workingRefString: workingRef, ifState: ifState, fields: fields, isDryRun: dryRun))
         case .metadataSet(let workingRef, let token, let rating, let colorTag, let dryRun):
             return .value(try core.metadataSet(workingRef: workingRef, ifMetadataState: token, rating: rating, colorTag: colorTag, dryRun: dryRun))
-        case .geometrySet(let workingRef, let token, let crop, let rotation, let aspectRatio, let anchor, let keystone, let dryRun):
+        case .geometrySet(let workingRef, let token, let crop, let rotation, let aspectRatio, let anchor, let keystone, let orientation, let dryRun):
             return .value(try core.geometrySet(workingRef: workingRef, ifGeometryState: token, crop: crop, rotation: rotation,
-                                               aspectRatio: aspectRatio, anchor: anchor, keystone: keystone, dryRun: dryRun))
+                                               aspectRatio: aspectRatio, anchor: anchor, keystone: keystone, orientation: orientation, dryRun: dryRun))
         case .geometryRestore(let workingRef, let token, let dryRun):
             return .value(try core.geometryRestore(workingRef: workingRef, ifGeometryState: token, dryRun: dryRun))
         case .nativeSet(let workingRef, let target, let token, let patch, let dryRun):

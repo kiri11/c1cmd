@@ -311,7 +311,7 @@ public final class RecipeWorkflow {
                     guard let token = fresh.result.geometryStateHash else { throw C1Error.invalidRequest("Geometry unavailable.") }
                     let crop = try geometry["crop"].map { try JSONDecoder().decode(CropRect.self,from:Recipes.data($0)) }
                     let keystone = try geometry["keystone"].map { try JSONDecoder().decode(KeystoneAdjustments.self,from:Recipes.data($0)) }
-                    try finish(Recipes.object(linked.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,anchor:try geometry["anchor"].map { try JSONDecoder().decode(CropAnchor.self,from:Recipes.data($0)) },keystone:keystone,observed:fresh)))
+                    try finish(Recipes.object(linked.geometrySet(workingRef:ref,ifGeometryState:token,crop:crop,rotation:geometry["rotation"] as? Double,aspectRatio:geometry["aspectRatio"] as? Double,anchor:try geometry["anchor"].map { try JSONDecoder().decode(CropAnchor.self,from:Recipes.data($0)) },keystone:keystone,orientation:(geometry["orientation"] as? NSNumber)?.intValue,observed:fresh)))
                 }
             }
             if verify || scoped {
@@ -330,6 +330,7 @@ public final class RecipeWorkflow {
                     if let camera = scopes["camera"] as? [String:Any] { changedKeys.formUnion((camera["settings"] as! [String:Any]).keys) }
                     if let geometry = args["geometry"] as? [String:Any] {
                         if geometry["rotation"] != nil { changedKeys.insert("rotation") }
+                        if geometry["orientation"] != nil { changedKeys.insert("orientation") }
                         if let keystone = geometry["keystone"] as? [String:Any] { changedKeys.formUnion(keystone.keys.map { "keystone " + $0 }) }
                     }
                     // Capture One exposes the same highlight control with opposite signs.

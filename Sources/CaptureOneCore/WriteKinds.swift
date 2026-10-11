@@ -153,8 +153,8 @@ extension Adjustments {
     }
 }
 
-/// Crop, rotation and keystone. The native reply resolves the final crop when
-/// Capture One supplies bounds only after its own rotation or keystone setter runs.
+/// Orientation, crop, rotation and keystone. The native reply resolves the final crop when
+/// Capture One supplies bounds only after its own orientation, rotation or keystone setter runs.
 struct GeometryWrite: WriteKind {
     struct State {
         let geometry: Geometry
@@ -166,7 +166,7 @@ struct GeometryWrite: WriteKind {
         let target: Geometry?
         /// Set when the crop depends on bounds Capture One computes during the write.
         let request: GeometryRequest?
-        /// The current geometry with the requested keystone controls applied.
+        /// The current geometry with the requested keystone controls and orientation applied.
         let context: Geometry
     }
 
@@ -176,6 +176,8 @@ struct GeometryWrite: WriteKind {
     /// An off-centre position for the `aspectRatio` fit; the centre arrives as nil.
     var anchor: CropAnchor? = nil
     let keystone: KeystoneAdjustments?
+    /// Absolute; nil keeps the current orientation.
+    var orientation: Int? = nil
     let restore: Bool
     private var registry: FieldRegistry { .shared }
 
@@ -196,34 +198,44 @@ struct GeometryWrite: WriteKind {
         let before = state.geometry
         var context = before
         if let keystone { context.keystone = try keystone.applying(to: before.keystone) }
+        if let orientation { context.orientation = orientation }
         let keystoneChanged = context.keystone != before.keystone
+        let orientationChanged = context.orientation != before.orientation
         if restore {
             guard let baseline = target.baselineGeometry, baseline.unsupportedReason == nil, before.unsupportedReason == nil,
-                  before.sameContext(as: baseline, includingKeystone: false) else {
-                throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring crop/rotation/keystone.")
+                  before.sameContext(as: baseline, includingKeystone: false, includingOrientation: false) else {
+                throw C1Error.stateChanged("Geometry context changed since the baseline; review before restoring orientation/crop/rotation/keystone.")
             }
-            // This exact crop was observed on this image with the same lens/orientation
-            // context. It may legitimately fail the containment test for NEW crops.
+            // This exact crop was observed on this image with the same lens context in the
+            // saved orientation. It may legitimately fail the containment test for NEW crops.
             var restored = before
+            restored.orientation = baseline.orientation
             restored.crop = baseline.crop; restored.rotation = baseline.rotation; restored.keystone = baseline.keystone
             return Intended(target: restored, request: nil, context: context)
         }
         var crop = self.crop, aspectRatio = self.aspectRatio
+        if anchor != nil, before.requiresNativeBounds, orientationChanged {
+            throw C1Error.invalidRequest("On lens-corrected geometry, anchor applies at the current orientation. Set the orientation first, then the anchored aspectRatio.")
+        }
         if let anchor, before.requiresNativeBounds {
             // Native bounds are known at the current rotation, so the positioned fit
             // travels the corrected path as an explicit crop.
             crop = try before.target(crop: nil, rotation: rotation, aspectRatio: aspectRatio, anchor: anchor).crop
             aspectRatio = nil
         }
-        // Rotation-only changes keep Capture One's automatic crop, as on corrected geometry.
-        let rotationOnly = crop == nil && aspectRatio == nil && keystone == nil && rotation != nil && rotation != before.rotation
-        guard before.requiresNativeBounds || keystone != nil || rotationOnly else {
-            return Intended(target: try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio, anchor: anchor), request: nil, context: context)
+        // Rotation- and orientation-only changes keep Capture One's transformed crop, as on corrected geometry.
+        let transformOnly = crop == nil && aspectRatio == nil && keystone == nil
+            && ((rotation != nil && rotation != before.rotation) || orientationChanged)
+        guard before.requiresNativeBounds || keystone != nil || transformOnly else {
+            return Intended(target: try before.target(crop: crop, rotation: rotation, aspectRatio: aspectRatio, anchor: anchor, orientation: orientation),
+                            request: nil, context: context)
         }
         if let reason = before.unsupportedReason { throw C1Error.invalidRequest(reason) }
-        guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil else { throw C1Error.invalidRequest("Provide crop, rotation, or aspectRatio.") }
-        if dryRun && rotationOnly && !before.requiresNativeBounds {
-            throw C1Error.invalidRequest("Rotation-only changes keep Capture One's automatic crop; a dry run cannot predict it.")
+        guard crop != nil || rotation != nil || aspectRatio != nil || keystone != nil || orientation != nil else {
+            throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, keystone or orientation.")
+        }
+        if dryRun && transformOnly && !before.requiresNativeBounds {
+            throw C1Error.invalidRequest("Rotation- and orientation-only changes keep Capture One's transformed crop; a dry run cannot predict it.")
         }
         if dryRun && keystoneChanged {
             throw C1Error.invalidRequest("Keystone changes require native execution; dry runs cannot predict the final crop.")
@@ -231,11 +243,13 @@ struct GeometryWrite: WriteKind {
         if dryRun && before.hasPerspectiveOrMovements && aspectRatio != nil {
             throw C1Error.invalidRequest("Perspective and movement ratio fits require native crop normalization; dry runs cannot predict the final crop.")
         }
-        let request = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio, keystone: keystone)
-        // Validate all knowable bounds before dispatch. At a new rotation,
-        // Capture One supplies bounds after its rotation setter executes.
-        let known = !keystoneChanged && (request.rotation == before.rotation || dryRun)
-        return Intended(target: known ? try before.target(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio) : nil,
+        let request = try GeometryRequest(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio, keystone: keystone,
+                                          orientation: orientationChanged ? context.orientation : nil)
+        // Validate all knowable bounds before dispatch. At a new rotation or orientation,
+        // Capture One supplies bounds after its setters execute.
+        let known = !keystoneChanged && ((request.rotation == before.rotation && !orientationChanged) || dryRun)
+        return Intended(target: known ? try before.target(crop: crop, rotation: rotation ?? before.rotation, aspectRatio: aspectRatio,
+                                                          orientation: orientation) : nil,
                         request: request, context: context)
     }
 
@@ -250,14 +264,14 @@ struct GeometryWrite: WriteKind {
             guard let exact = intended.target else { throw C1Error.invalidRequest("Geometry target is unavailable.") }
             let _: GeometryRecord = try target.executor.executeAndDecode(handler: "applyGeometry", args: arguments + [
                 NSAppleEventDescriptor(list: exact.crop.values.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(double: exact.rotation),
-                NSAppleEventDescriptor(list: exact.keystone.map { NSAppleEventDescriptor(double: $0) })])
+                NSAppleEventDescriptor(list: exact.keystone.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(int32: Int32(exact.orientation))])
             return exact
         }
         let context = intended.context
         let applied: CorrectedGeometryResult = try target.executor.executeAndDecode(handler: "applyCorrectedGeometry", args: arguments + [
             request.crop.map { NSAppleEventDescriptor(list: $0.values.map { NSAppleEventDescriptor(double: $0) }) } ?? .missingValue(),
             NSAppleEventDescriptor(double: request.rotation), request.aspectRatio.map { NSAppleEventDescriptor(double: $0) } ?? .missingValue(),
-            NSAppleEventDescriptor(list: context.keystone.map { NSAppleEventDescriptor(double: $0) })])
+            NSAppleEventDescriptor(list: context.keystone.map { NSAppleEventDescriptor(double: $0) }), NSAppleEventDescriptor(int32: Int32(context.orientation))])
         guard applied.targetCropValues.count == 4, applied.boundsValues.count == 4,
               applied.targetCropValues.allSatisfy({ $0.isFinite }), applied.boundsValues.allSatisfy({ $0.isFinite }) else {
             throw C1Error.readbackMismatch("Corrected geometry native target or bounds are malformed.")
@@ -291,7 +305,7 @@ struct GeometryWrite: WriteKind {
 
     func verify(before: Observed<State>, intended: Intended, reply resolved: Geometry, after: Observed<State>) -> String? {
         guard after.state.geometry.matchesTarget(resolved),
-              after.state.geometry.sameContext(as: before.state.geometry, includingKeystone: false),
+              after.state.geometry.sameContext(as: resolved, includingKeystone: false),
               after.observation.stateHash == before.observation.stateHash else {
             return "Crop/rotation/keystone or preserved settings did not match; inspect operation status."
         }

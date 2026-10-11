@@ -696,16 +696,17 @@ struct OperationStatusCommand: ParsableCommand {
 }
 
 struct GeometryCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Crop, rotation, and keystone on managed variants.", subcommands: [GeometrySetCommand.self, GeometryRestoreCommand.self])
+    static let configuration = CommandConfiguration(commandName: "geometry", abstract: "Orientation, crop, rotation, and keystone on managed variants.", subcommands: [GeometrySetCommand.self, GeometryRestoreCommand.self])
 }
 struct GeometrySetCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute crop/rotation/keystone; preserves other edits.")
+    static let configuration = CommandConfiguration(commandName: "set", abstract: "Set absolute orientation/crop/rotation/keystone; preserves other edits.")
     @OptionGroup var globals: GlobalOptions
     @OptionGroup var result: ResultOptions
     @Argument var workingRef: String
     @Option(help: "geometryStateHash from get, independent of the tonal stateHash.") var ifGeometryState: String
     @Option(help: "centerX,centerY,width,height in rotated-canvas pixels, bottom-left origin.") var crop: String?
     @Option(help: "Absolute rotation in degrees (-45 to 45).") var rotation: Double?
+    @Option(help: "Absolute orientation: 0, 90, 180 or 270 degrees clockwise from the sensor frame, applied before keystone, rotation and crop.") var orientation: Int?
     @Option(help: "Width/height ratio for a crop fitted inside safe bounds, centered unless --anchor is given (1.5 landscape, 0.75 portrait).") var aspectRatio: Double?
     @Option(name: .customLong("anchor"), help: "x,y position of the --aspect-ratio fit, each 0 to 1 as viewed: 0.5,0 is top-aligned, 0.5,0.5 centered.") var anchorPosition: String?
     @Option(help: "Keystone amount (integer 10 to 120).") var keystoneAmount: Double?
@@ -723,7 +724,7 @@ struct GeometrySetCommand: ParsableCommand {
                 guard parts.count == 4, values.count == 4 else { throw C1Error.invalidRequest("crop requires centerX,centerY,width,height.") }
                 args["crop"] = ["centerX": values[0], "centerY": values[1], "width": values[2], "height": values[3]]
             }
-            put(&args, "rotation", rotation); put(&args, "aspectRatio", aspectRatio); put(&args, "dryRun", flag(dryRun))
+            put(&args, "rotation", rotation); put(&args, "orientation", orientation); put(&args, "aspectRatio", aspectRatio); put(&args, "dryRun", flag(dryRun))
             put(&args, "anchor", try anchorPosition.map(anchor))
             var keystone: [String: Any] = [:]
             for (name, value) in zip(KeystoneAdjustments.fields, [keystoneAmount, keystoneVertical, keystoneHorizontal, keystoneSkew, keystoneAspect]) {
@@ -752,7 +753,7 @@ struct VariantEditCommand: ParsableCommand {
 }
 
 struct GeometryRestoreCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved crop/rotation/keystone with fresh state and matching geometry context.")
+    static let configuration = CommandConfiguration(commandName: "restore", abstract: "Restore saved orientation/crop/rotation/keystone with fresh state and matching lens context.")
     @OptionGroup var globals: GlobalOptions
     @OptionGroup var result: ResultOptions
     @Argument var workingRef: String

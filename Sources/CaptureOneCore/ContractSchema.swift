@@ -73,6 +73,7 @@ public enum ContractSchema {
     static var exposedCorners: [String: Any] {
         ["type": "array", "minItems": 1, "maxItems": 4, "items": object(["x": number, "y": number, "distance": number], required: ["x", "y", "distance"])]
     }
+    static var orientationSchema: [String: Any] { ["type": "integer", "enum": Geometry.orientations] }
     static var geometrySchema: [String: Any] { object(["crop":cropSchema, "rotation":number, "orientation":["type":"integer"], "imageWidth":number, "imageHeight":number, "maximumCrop":cropSchema, "flip":string, "aspectRatioName":string, "keystone":array(number), "lensGeometry":array(number), "lensProfile":["type":"string"], "hideDistortedAreas":boolean, "cropOutsideImage":boolean]) }
     static var exifSchema: [String: Any] {
         object(["id": string, "workingRef": string, "pitchAngle": number, "focalLength35mm": number,
@@ -142,8 +143,8 @@ public enum ContractSchema {
             result["not"] = ["allOf": [["required": ["adjustments"]], ["anyOf": fields.map { ["required": [$0]] }]]]
             return result
         case "geometry_set":
-            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-Geometry.maximumRotation, "maximum":Geometry.maximumRotation], "aspectRatio":["type":"number", "exclusiveMinimum":0], "anchor":anchorSchema, "dryRun":boolean], required:["workingRef","ifGeometryState"])
-            result["anyOf"] = ["crop", "rotation", "aspectRatio", "keystone"].map { ["required": [$0]] }
+            var result = object(["workingRef":string, "ifGeometryState":string, "crop":cropSchema, "keystone":keystoneSchema, "rotation":["type":"number", "minimum":-Geometry.maximumRotation, "maximum":Geometry.maximumRotation], "orientation":orientationSchema, "aspectRatio":["type":"number", "exclusiveMinimum":0], "anchor":anchorSchema, "dryRun":boolean], required:["workingRef","ifGeometryState"])
+            result["anyOf"] = ["crop", "rotation", "aspectRatio", "keystone", "orientation"].map { ["required": [$0]] }
             result["not"] = ["anyOf": [["required": ["crop", "aspectRatio"]], ["required": ["anchor", "keystone"]]]]
             result["dependentRequired"] = ["anchor": ["aspectRatio"]]
             return result
@@ -232,8 +233,8 @@ public enum ContractSchema {
             throw C1Error.invalidRequest("Provide rating and/or colorTag.")
         }
         if tool == "geometry_set" {
-            guard ["crop", "rotation", "aspectRatio", "keystone"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
-                throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, or keystone; crop and aspectRatio are mutually exclusive.")
+            guard ["crop", "rotation", "aspectRatio", "keystone", "orientation"].contains(where: { arguments[$0] != nil }), arguments["crop"] == nil || arguments["aspectRatio"] == nil else {
+                throw C1Error.invalidRequest("Provide crop, rotation, aspectRatio, keystone, or orientation; crop and aspectRatio are mutually exclusive.")
             }
             if arguments["anchor"] != nil, arguments["aspectRatio"] == nil || arguments["keystone"] != nil {
                 throw C1Error.invalidRequest(CropAnchor.usage)
@@ -357,7 +358,7 @@ public enum ContractSchema {
             "dump": array(object(dumpProps)),
             "preview": object(["operationId": string, "workingRef": string, "previewPath": string, "fileSizeBytes": ["type": "integer"], "width": ["type": "integer"], "height": ["type": "integer"], "size": ["type": "integer"], "pixelSha256": string, "stateHash": string, "nativeVariantId": string, "geometry":geometrySchema, "geometryStateHash":string, "contextSourceRef":string, "currentCrop":previewRectSchema,
                 "candidateCrops":array(object(["anchor":anchorSchema, "crop":cropSchema, "preview":previewRectSchema], required:["anchor", "crop", "preview"]))]),
-            "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "preconditionGeometryStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "resolution": ["enum": ["late-preview"], "description": "Present when operation_status, not the dispatch, confirmed the outcome: late-preview is a timed-out preview whose JPEG and state matched the journal without a restart."], "error": string, "previewOutputPath": string, "previewSize": ["type": "integer"], "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
+            "operation_status": object(["compoundId":string, "operationId": string, "timestamp": string, "operationType": string, "workingRef": string, "documentPath": string, "preconditionStateHash": string, "preconditionGeometryStateHash": string, "intendedAdjustments": adj, "beforeAdjustments": adj, "afterAdjustments": adj, "diff": diffs, "status": ["enum": ["pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"]], "resolution": ["enum": ["late-preview"], "description": "Present when operation_status, not the dispatch, confirmed the outcome: late-preview is a timed-out preview whose JPEG and state matched the journal without a restart."], "error": string, "previewOutputPath": string, "previewSize": ["type": "integer"], "appInstance": string, "documentIdentity": string, "nativeVariantId": string, "parentImagePath": string, "variantIdsBefore": array(string), "observedVariantIds": array(string), "beforeGeometry":geometrySchema, "intendedGeometry":geometrySchema, "requestedGeometry":object(["crop":cropSchema, "rotation":number, "aspectRatio":number, "keystone":keystoneSchema, "orientation":orientationSchema], required:["rotation"]), "afterGeometry":geometrySchema, "beforeNative":NativeEditing.snapshotSchema, "afterNative":NativeEditing.snapshotSchema, "nativePatch":["type":"object", "additionalProperties":NativeEditing.valueSchema], "nativeAction":string, "beforeMetadata":writableMetadataSchema, "intendedMetadata":writableMetadataSchema, "afterMetadata":writableMetadataSchema])
         ]
         for (name,schema) in Recipes.responses(responses) { responses[name] = schema }
         responses["native_set"] = NativeEditing.mutationSchema

@@ -168,7 +168,9 @@ Set `C1_TEST_RAW_FIXTURE` to a preserved RAW outside the build tree and
 suite, set `C1_TEST_CATALOG_LAYOUT=unpackaged` to exercise an unpackaged
 disposable catalog; the default is `package`. Both layouts include existing-variant
 rating/readback/restoration. Recipe results use `C1_RECIPE_EVIDENCE`. The native
-suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people.
+suite also needs `C1_TEST_PEOPLE_FIXTURE`, a RAW with people. The geometry suite
+adds import and orientation checks for a vertical frame when
+`C1_TEST_PORTRAIT_FIXTURE` names a RAW with EXIF orientation 6.
 
 For `native`, `recipes` and `inventory`, `QUALIFY_DOCUMENT_KINDS` selects `session`
 (default), `catalog`, or `"session catalog"`. Each mode runs sequentially with separate

@@ -80,8 +80,8 @@ are **1-based**, obtained from each `get.nativeSnapshots` entry's `layers`, `bas
 Always read again after layer or color-element creation/deletion.
 
 The eight geometry properties in adjustment settings are inspection-only here.
-Use `geometry_set` for crop, rotation and keystone. Existing repository guards
-continue to block orientation/flip changes and crop-outside-image. Container
+Use `geometry_set` for orientation, crop, rotation and keystone. Existing
+repository guards continue to block flip changes and crop-outside-image. Container
 properties (`adjustments`, `color editor settings`, `luma range`) are traversed
 through typed targets rather than replaced as opaque objects. Capture One's
 dictionary explicitly does not expose Skin Tone color-editor corrections.

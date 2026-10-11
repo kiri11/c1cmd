@@ -1,6 +1,6 @@
 # Geometry reference
 
-Crop, rotation and keystone on an existing editing reference or managed clone.
+Orientation, crop, rotation and keystone on an existing editing reference or managed clone.
 Composition choices follow the [crop policy](../../AGENT_GUIDE.md#crop-policy); writes
 follow the [safety invariants](../../AGENT_GUIDE.md#safety-invariants). Geometry writes
 require Capture One 16.8.5.30.
@@ -24,7 +24,8 @@ c1 diff <working-ref>
 ```
 
 MCP takes `workingRef`, `ifGeometryState`, optional `dryRun`, and any of
-`crop: {centerX, centerY, width, height}`, `rotation` and `aspectRatio`. `crop` and
+`crop: {centerX, centerY, width, height}`, `rotation`, `aspectRatio`, `keystone`
+and [`orientation`](#orientation). `crop` and
 `aspectRatio` are mutually exclusive. Rotation is absolute native degrees
 (positive clockwise), −45 to +45. `aspectRatio` fits a centered crop inside the
 usable bounds. A dry run predicts values without dispatch; its token is the current
@@ -51,9 +52,49 @@ c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> --aspect-r
 {"workingRef":"c1_edit_...","ifGeometryState":"geometry-v1:...","aspectRatio":0.75,"anchor":{"x":0.5,"y":0.2}}
 ```
 
-`c1 geometry restore` / `geometry_restore` restores the saved crop, rotation and
-all five keystone controls with a fresh geometry token, and refuses a changed
-orientation or lens context. Its dry run reports the saved target.
+`c1 geometry restore` / `geometry_restore` restores the saved orientation, crop,
+rotation and all five keystone controls with a fresh geometry token, setting the
+orientation first, and refuses a changed lens context. Its dry run reports the
+saved target.
+
+## Orientation
+
+`orientation` / `--orientation` turns the picture in 90° steps. It is absolute:
+0, 90, 180 or 270 degrees clockwise from the camera sensor's frame, which is
+Capture One's own convention. A photo whose EXIF tag says "rotate 90 CW" (a
+vertical frame) imports at 90 and shows upright there; at 0 it shows on its side.
+So to stand a sideways picture upright, set the orientation it should have, not a
+step from the current one; `get` reports the current value in
+`geometry.orientation`. Setting the current orientation again changes nothing.
+
+```sh
+c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> --orientation 90 --aspect-ratio 0.75
+```
+
+```json
+{"workingRef":"c1_edit_...","ifGeometryState":"geometry-v1:...","orientation":90,"aspectRatio":0.75}
+```
+
+One request sets the orientation first, then keystone and rotation, then the
+crop, and journals the requested orientation in `requestedGeometry` beside the
+before and after geometry. Rotation and keystone keep their values.
+
+- **Orientation alone** keeps Capture One's own crop, which it turns with the
+  canvas: a centred 3:2 crop becomes a centred 2:3 crop, and an off-centre crop
+  moves with its content. `dryRun` rejects it because that crop is observed, not
+  predicted. On an uncorrected image a turned crop that exposes a corner is
+  listed in `exposedCorners`.
+- **With `aspectRatio` or `crop`**, c1 crops the oriented canvas instead.
+  Coordinates, bounds and anchors refer to that canvas, so a 3:4 fit after
+  turning a landscape frame to 90 fills the portrait height. On an uncorrected
+  image c1 plans and checks the crop before dispatch, and a dry run predicts it.
+  On a lens-corrected image the bounds exist only after the native orientation,
+  so the fit or check runs inside the journaled operation, `dryRun` is rejected,
+  and an `anchor` is refused: set the orientation first, then the anchored ratio.
+
+`exif.levelRotation` follows the orientation: it measures roll from the current
+orientation, so after a change, read it again.
+
 
 ## Coordinates
 
@@ -138,9 +179,9 @@ because that crop cannot be predicted. On an uncorrected image, a result whose c
 exposes a corner lists it in `exposedCorners` (canvas `x`, `y` and `distance` in
 pixels); inspect a preview and choose an explicit crop.
 
-A failure after rotation, including an explicit crop outside the new bounds, can
-leave the rotation applied and is an uncertain operation. Distortion outside
-0–100, flips, crop-outside-image and unqualified orientations are blocked.
+A failure after orientation or rotation, including an explicit crop outside the
+new bounds, can leave them applied and is an uncertain operation. Distortion
+outside 0–100, flips and crop-outside-image are blocked.
 
 ### Stored crops
 
@@ -163,8 +204,9 @@ Homebrew locations). It only reads the file, needs no write opt-in and returns n
 state tokens. Values the camera did not record are omitted.
 
 `levelRotation` is the `geometry_set` rotation that levels the recorded roll,
-measured from the variant's Capture One orientation, or the EXIF orientation when
-native geometry is unavailable. Positive roll is clockwise camera rotation and is
+measured from the variant's current Capture One orientation, or the EXIF
+orientation when native geometry is unavailable. A vertical frame with a roll of
+89.5° gives −0.5 at orientation 90 and no hint at 0, where it is 89.5° off level. Positive roll is clockwise camera rotation and is
 levelled by the same clockwise rotation, so a vertical frame recorded at 93.9°
 gives 3.9. It is omitted when roll is unrecorded, the variant is flipped, or the
 result is more than 45° from level.
