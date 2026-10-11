@@ -98,8 +98,9 @@ preserve those folders with the manifests. New payload contents produce a new ID
 ### Verify before reuse
 
 Explicitly create a disposable managed clone using `variant clone`, then read
-its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument`
-and `ifState`. It never chooses or creates a clone silently and rejects existing
+its current state. `recipe_verify` accepts `recipeId`, `workingRef`, `ifDocument`,
+`ifState` and an optional `previewSize`, the preview's long edge (see
+[Previews](editing.md#previews)). It never chooses or creates a clone silently and rejects existing
 editing references and bare native IDs.
 
 Verification applies the payload, checks all 39 supported image settings (numbers, enums
@@ -129,9 +130,13 @@ explicit deletion; nothing is restored automatically.
   "whiteBalance": {"mode": "preserve"},
   "ifGeometryState": "GEOMETRY_HASH",
   "geometry": {"aspectRatio": 1.5},
-  "preview": true
+  "preview": true,
+  "previewSize": 800
 }
 ```
+
+`previewSize` requires `preview: true` and takes the same sizes as `preview`
+`size`; it defaults to 1500.
 
 Settings overrides replace recipe fields before dispatch. Exposure is explicitly
 `preserve`, `absolute` or `relative`; non-preserve modes require a value. Relative

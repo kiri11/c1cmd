@@ -49,6 +49,19 @@ final class FakeScript: ScriptExecuting {
     private var discoverCount = 0
     var preparedBeforeDispatch = true
     var previewRoot: String?
+    /// Each `ensurePreviewRecipe` call as recipe name and configured long edge.
+    var previewRecipeCalls: [(name: String, longEdge: Int)] = []
+    /// The recipe each `processPreview` exported through.
+    var processedRecipes: [String] = []
+    /// Capture One exporting a long edge other than the recipe's.
+    var exportedLongEdgeOverride: Int?
+    /// A JPEG with the width/height `aspect` and the long edge `recipe` was last configured with.
+    func previewJPEG(recipe: String, aspect: Double) -> Data {
+        processedRecipes.append(recipe)
+        let long = exportedLongEdgeOverride ?? previewRecipeCalls.last(where: { $0.name == recipe })!.longEdge
+        let short = Int((Double(long) * min(aspect, 1 / aspect)).rounded())
+        return aspect >= 1 ? FakeScript.jpeg(width: long, height: short) : FakeScript.jpeg(width: short, height: long)
+    }
     static func jpeg(width: Int = 2, height: Int = 2) -> Data {
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
         let data = NSMutableData()
@@ -177,10 +190,11 @@ final class FakeScript: ScriptExecuting {
             result = ["deleted": true, "existsNow": misapply]
         case "ensurePreviewRecipe":
             previewRoot = args[2].stringValue
-            result = ["configured": true, "recipeName": "c1-preview"]
+            previewRecipeCalls.append((args[1].stringValue!, Int(args[3].int32Value)))
+            result = ["configured": true, "recipeName": args[1].stringValue!]
         case "processPreview":
             let target = URL(fileURLWithPath: args[3].stringValue!).appendingPathComponent(args[4].stringValue!).appendingPathComponent("preview.jpg")
-            try FakeScript.jpeg().write(to: target)
+            try previewJPEG(recipe: args[2].stringValue!, aspect: 1.5).write(to: target)
             result = ["jobId": "job-1"]
         case "applyMetadata":
             let id = args[1].stringValue!

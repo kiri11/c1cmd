@@ -19,6 +19,8 @@ public struct PreviewResult: Codable, Equatable {
     public let fileSizeBytes: Int64
     public let width: Int
     public let height: Int
+    /// The requested long edge in pixels; the readback confirmed the output matches it.
+    public let size: Int
     public let stateHash: String?
     public let nativeVariantId: String?
     public let pixelSha256: String
@@ -30,6 +32,7 @@ public struct PreviewResult: Codable, Equatable {
         fileSizeBytes: Int64,
         width: Int,
         height: Int,
+        size: Int,
         pixelSha256: String,
         stateHash: String? = nil,
         nativeVariantId: String? = nil,
@@ -45,6 +48,7 @@ public struct PreviewResult: Codable, Equatable {
         self.fileSizeBytes = fileSizeBytes
         self.width = width
         self.height = height
+        self.size = size
         self.pixelSha256 = pixelSha256
     }
 }
@@ -76,9 +80,25 @@ public struct CandidateCrop: Codable, Equatable {
     public let preview: PreviewRect
 }
 
+/// A preview's long edge in pixels. Each size exports through its own reserved
+/// Capture One recipe, so a fixed set bounds the recipes c1 adds to a document.
+public struct PreviewSize: Equatable {
+    public static let allowed = [400, 800, 1200, 1500]
+    public static let standard = try! PreviewSize(1500)
+    public static let usage = "Preview size must be one of \(allowed.map(String.init).joined(separator: ", ")) (long-edge pixels)."
+    public let longEdge: Int
+
+    public init(_ longEdge: Int) throws {
+        guard Self.allowed.contains(longEdge) else { throw C1Error.invalidRequest(Self.usage) }
+        self.longEdge = longEdge
+    }
+
+    /// The standard size keeps the original recipe name, so documents reuse their existing recipe.
+    public var recipeName: String { self == .standard ? "c1-preview" : "c1-preview-\(longEdge)" }
+}
+
 public final class PreviewManager {
     public static let shared = PreviewManager()
-    public static let defaultRecipeName = "c1-preview"
 
     private init() {}
 

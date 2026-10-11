@@ -35,7 +35,7 @@ public struct ToolRequest {
                           arguments: [String: NativeValue], dryRun: Bool)
         case diff(ref1: String, ref2: String?, live: Bool, readWorkflow: String?)
         case dump(DumpQuery)
-        case preview(ref: String, outputDir: String?, timeout: Double, fullFrame: Bool, aspectRatio: Double?, anchors: [CropAnchor])
+        case preview(ref: String, outputDir: String?, timeout: Double, size: PreviewSize, fullFrame: Bool, aspectRatio: Double?, anchors: [CropAnchor])
         case operationStatus(operationId: String)
         case requestStatus(requestId: String)
         case recipe
@@ -146,7 +146,8 @@ public struct ToolRequest {
                 readWorkflow: string("readWorkflow"), ids: a["ids"] as? [String], rating: int("rating"), minRating: int("minRating"),
                 batchSize: int("batchSize") ?? 100, deadlineSeconds: number("deadlineSeconds")))
         case "preview":
-            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30, fullFrame: flag("fullFrame"),
+            command = .preview(ref: string("ref")!, outputDir: string("outputDir"), timeout: number("timeout") ?? 30,
+                               size: try int("size").map(PreviewSize.init) ?? .standard, fullFrame: flag("fullFrame"),
                                aspectRatio: number("aspectRatio"), anchors: try decoded("anchors") ?? [])
         case "operation_status": command = .operationStatus(operationId: string("operationId")!)
         case "request_status": command = .requestStatus(requestId: string("requestId")!)
@@ -240,8 +241,8 @@ public struct ToolRequest {
             }
             return .dump(try core.dump(collectionName: q.collection, selectedOnly: q.selected, ids: q.ids, rating: q.rating,
                                        minRating: q.minRating, batchSize: q.batchSize, deadlineSeconds: q.deadlineSeconds))
-        case .preview(let ref, let outputDir, let timeout, let fullFrame, let aspectRatio, let anchors):
-            return .preview(try core.preview(ref: ref, outputDirOverride: outputDir, timeout: timeout, fullFrame: fullFrame,
+        case .preview(let ref, let outputDir, let timeout, let size, let fullFrame, let aspectRatio, let anchors):
+            return .preview(try core.preview(ref: ref, outputDirOverride: outputDir, timeout: timeout, size: size, fullFrame: fullFrame,
                                              aspectRatio: aspectRatio, anchors: anchors))
         case .operationStatus(let id): return .operation(try core.operationStatus(operationId: id))
         case .requestStatus(let id): return .value(try RequestContext.status(requestId: id))

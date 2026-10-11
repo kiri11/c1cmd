@@ -76,7 +76,7 @@ public struct ToolDefinition {
             "reset": ("Reset verified adjustment fields on an editing reference or managed clone to defaults; white balance uses its saved baseline.", false),
             "diff": ("Compare adjustments between two variants or compare a working variant against its baseline.", true),
             "dump": ("Batched export of variants, adjustments, and metadata in JSON format. Narrow it with the variants_list filters: rating or minRating, or 1–512 known ids revalidated live. \(slowInventory)", true),
-            "preview": ("Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data. fullFrame renders the uncropped context and reports currentCrop in preview pixels (top-left origin); with aspectRatio and anchors it also reports candidateCrops.", false),
+            "preview": ("Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data. size picks the long edge (default \(PreviewSize.standard.longEdge) px). fullFrame renders the uncropped context and reports currentCrop in preview pixels (top-left origin); with aspectRatio and anchors it also reports candidateCrops.", false),
             "request_status": ("Read stored request progress and process liveness without contacting Capture One.", true),
             "operation_status": ("Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),
         ]

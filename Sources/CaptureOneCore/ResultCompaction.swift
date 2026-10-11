@@ -91,7 +91,7 @@ public enum ResultCompaction {
             "reset": compact("reset", tonal, required: tonal),
             "metadata_set": compact("metadata_set", ["operationId", "workingRef", "diff", "metadataStateHash", "isDryRun"],
                                     required: ["operationId", "workingRef", "diff", "metadataStateHash", "isDryRun"]),
-            "preview": compact("preview", ["operationId", "workingRef", "previewPath", "width", "height", "stateHash",
+            "preview": compact("preview", ["operationId", "workingRef", "previewPath", "width", "height", "size", "stateHash",
                                            "geometryStateHash", "nativeVariantId", "contextSourceRef", "currentCrop", "candidateCrops"],
                                required: ["operationId", "previewPath", "width", "height"]),
             "reference_capture": compact("reference_capture", ["referenceId"], extra: ["previewPath": string, "coverage": open],

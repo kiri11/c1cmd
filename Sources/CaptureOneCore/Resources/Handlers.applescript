@@ -323,7 +323,7 @@ on applyAdjustments(docName, variantId, expVal, contVal, satVal, tempVal, tintVa
     end tell
 end applyAdjustments
 
-on ensurePreviewRecipe(docName, recipeName, outputFolder)
+on ensurePreviewRecipe(docName, recipeName, outputFolder, longEdge)
     tell application "/Applications/Capture One.app"
         set d to my checkedDocument(docName)
         -- Catalog processing validates its default output even with a custom recipe.
@@ -348,7 +348,7 @@ on ensurePreviewRecipe(docName, recipeName, outputFolder)
         set color profile of r to "sRGB Color Space Profile"
         set scaling method of r to Long_Edge
         set scaling unit of r to pixels
-        set primary scaling value of r to 1500
+        set primary scaling value of r to (longEdge as integer)
         set root folder location of r to POSIX file outputFolder
         set root folder type of r to custom location
         set output sub folder of r to ""

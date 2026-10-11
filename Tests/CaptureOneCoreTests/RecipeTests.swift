@@ -311,6 +311,7 @@ struct RecipeTests {
         scopeFault(ignoreDelete:false)
         scopeFault(ignoreDelete:true)
         verifyFault()
+        previewSizes()
         appleEventBudget()
     }
     /// Per-step handler calls of one `edit_apply` with the #25 profile's recipe shape.
@@ -385,6 +386,48 @@ struct RecipeTests {
             let status = try workflow.run("edit_status",arguments:["compoundId":compoundId])
             XCTAssertEqual(status["status"] as? String,"interrupted")
             XCTAssertEqual(status["verified"] as? Bool,false)
+        }
+    }
+    /// Compound previews export through the requested size's recipe; an invalid size dispatches nothing.
+    static func previewSizes() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = RecipeFake(directory), base = fake.geometry.base
+        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let workflow = RecipeWorkflow(core:core)
+        let journal = OperationJournal(sessionDirectory:directory)
+        func previewStep(_ report: [String:Any]) -> [String:Any]? {
+            (report["completed"] as? [[String:Any]])?.first { $0["step"] as? String == "preview" }?["result"] as? [String:Any]
+        }
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let reference = try workflow.run("reference_capture",arguments:["ref":"1","ifDocument":doc.openToken,"ifState":source.stateHash])
+            let recipe: [String:Any] = ["version":1,"referenceId":reference["referenceId"]!,"settings":["clarity amount":5],"exposure":["mode":"preserve"],"whiteBalance":["mode":"preserve"],"cropPolicy":"preserve"]
+            let id = try workflow.run("recipe_register",arguments:["recipe":recipe])["recipeId"] as! String
+            let clone = try core.cloneVariant(sourceRef:"1")
+            let verifyArgs: [String:Any] = ["recipeId":id,"workingRef":clone.workingRef,"ifDocument":doc.openToken,"ifState":try core.get(ref:clone.workingRef).stateHash]
+            let applyArgs: [String:Any] = ["recipeId":id,"sourceRef":"1","ifDocument":doc.openToken,"ifState":source.stateHash,"preview":true]
+            for (tool,args,message) in [("recipe_verify",verifyArgs.merging(["previewSize":1000]) { $1 },PreviewSize.usage),
+                                        ("edit_apply",applyArgs.merging(["previewSize":640]) { $1 },PreviewSize.usage),
+                                        ("edit_apply",applyArgs.merging(["preview":false,"previewSize":800]) { $1 },"previewSize requires preview: true.")] {
+                let calls = base.calls.count, entries = try journal.validatedEntries().count
+                XCTAssertThrowsError(try workflow.run(tool,arguments:args),tool) { XCTAssertTrue("\($0)".contains("invalid-request: " + message),"Actual: \($0)") }
+                XCTAssertEqual(base.calls.count,calls,"Invalid previewSize sends no Apple Event")
+                let after = try journal.validatedEntries().count
+                XCTAssertEqual(after,entries,"Invalid previewSize writes no journal entry")
+            }
+            base.previewRecipeCalls = []
+            let verified = try workflow.run("recipe_verify",arguments:verifyArgs.merging(["previewSize":800]) { $1 })
+            XCTAssertEqual(verified["status"] as? String,"succeeded",String(describing:verified["error"]))
+            XCTAssertEqual(previewStep(verified)?["size"] as? Int,800)
+            let applied = try workflow.run("edit_apply",arguments:applyArgs.merging(["previewSize":400]) { $1 })
+            XCTAssertEqual(applied["status"] as? String,"succeeded",String(describing:applied["error"]))
+            XCTAssertEqual(previewStep(applied)?["size"] as? Int,400)
+            XCTAssertEqual(previewStep(applied)?["width"] as? Int,400)
+            XCTAssertEqual(base.previewRecipeCalls.map(\.name),["c1-preview-800","c1-preview-400"])
+            let previews = try journal.validatedEntries().filter { $0.operationType == "preview" }
+            XCTAssertEqual(previews.suffix(2).map(\.previewSize),[800,400])
         }
     }
     static func scopeFault(ignoreDelete: Bool) {

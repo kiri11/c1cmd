@@ -257,7 +257,7 @@ public struct OutputFormatter {
         lines.append("Working Ref : \(res.workingRef ?? "(none/native)")")
         lines.append("Preview Path: \(res.previewPath)")
         lines.append("File Size   : \(res.fileSizeBytes) bytes")
-        lines.append("Dimensions  : \(res.width) x \(res.height) px")
+        lines.append("Dimensions  : \(res.width) x \(res.height) px (long edge \(res.size))")
         lines.append("Pixel SHA256: \(res.pixelSha256)")
         return lines.joined(separator: "\n")
     }

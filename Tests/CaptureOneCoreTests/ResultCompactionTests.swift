@@ -49,7 +49,7 @@ struct ResultCompactionTests {
 
         // Preview: the path and tokens stay; geometry moves to evidence.
         let preview = PreviewResult(operationId: "op3", workingRef: "c1_edit_a", previewPath: "/x/p.jpg", fileSizeBytes: 10, width: 3, height: 2,
-                                    pixelSha256: "s", stateHash: "h2", geometryStateHash: "g2")
+                                    size: 3, pixelSha256: "s", stateHash: "h2", geometryStateHash: "g2")
         let previewSummary = compacted("preview", .preview(preview))
         XCTAssertEqual(previewSummary?["previewPath"] as? String, "/x/p.jpg")
         XCTAssertNil(previewSummary?["pixelSha256"])

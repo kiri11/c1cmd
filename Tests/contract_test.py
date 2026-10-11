@@ -226,6 +226,7 @@ def run(cli, mcp):
             ('dump', {'ids': []}), ('dump', {'ids': ['1', '1']}), ('dump', {'deadlineSeconds': 0}),
             ('preview', {'ref': '1', 'timeout': -1}),
             ('preview', {'ref': '1', 'timeout': 301}), ('get', {'ref': 1}),
+            *[('preview', {'ref': '1', 'size': value}) for value in [0, 640, 1501, 800.5, '800', True, None]],
         ]:
             result = client.tool(name, args)
             assert result.get('isError'), (name, args, result)
@@ -276,7 +277,15 @@ def run(cli, mcp):
             for value in ['4.5', 'true', 'five']:
                 result = subprocess.run([str(cli), 'variants', 'list', key, value], capture_output=True, text=True, timeout=15)
                 assert result.returncode != 0 and f"is invalid for '{key}" in result.stderr, result.stderr
-        assert not client.tool('capabilities').get('isError'), 'Server must survive malformed requests'
+        capabilities = client.tool('capabilities')
+        assert not capabilities.get('isError'), 'Server must survive malformed requests'
+        recipe = json.loads(capabilities['content'][0]['text'])['previewRecipe']
+        assert (recipe['name'], recipe['scaling'], recipe['defaultSize']) == ('c1-preview', 'Long_Edge 1500px', 1500), recipe
+        assert recipe['sizes'] == [400, 800, 1200, 1500] == cli_schema['requests']['preview']['properties']['size']['enum'], recipe
+        assert recipe['recipeNames'] == {'400': 'c1-preview-400', '800': 'c1-preview-800', '1200': 'c1-preview-1200', '1500': 'c1-preview'}, recipe
+        for name in ['recipe_verify', 'edit_apply']:
+            assert cli_schema['requests'][name]['properties']['previewSize'] == cli_schema['requests']['preview']['properties']['size'], name
+        assert cli_schema['responses']['operation_status']['properties']['previewSize'] == {'type': 'integer'}
         print('PASS: shared CLI/MCP schemas, 37 tool schemas, invalid requests, server survival')
     finally:
         client.close()
@@ -416,6 +425,9 @@ ACCEPTED = [
     ('set', ['set', 'x', '--if-state', 'h', '--full', 'exposure=1'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 1}, 'full': True}),
     ('geometry_set', ['geometry', 'set', 'x', '--if-geometry-state', 'g', '--rotation', '1', '--full'], {'workingRef': 'x', 'ifGeometryState': 'g', 'rotation': 1, 'full': True}),
     ('preview', ['preview', 'x', '--full'], {'ref': 'x', 'full': True}),
+    ('preview', ['preview', 'x', '--size', '800'], {'ref': 'x', 'size': 800}),
+    ('recipe_verify', ['recipe', 'verify'], {'recipeId': HEX, 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's', 'previewSize': 400}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'preview': True, 'previewSize': 1200}),
     ('edit_status', ['recipe', 'status', '--full'], {'compoundId': HEX, 'full': True}),
 ]
 REJECTED = [
@@ -467,6 +479,9 @@ REJECTED = [
     ('dump', ['dump', '--ids', '1,1'], {'ids': ['1', '1']}),
     ('dump', ['dump', '--ids', '1,6F9619FF-8B86-D011-B42D-00C04FC964FF'], {'ids': ['1', '6F9619FF-8B86-D011-B42D-00C04FC964FF']}),
     ('preview', ['preview', 'x', '--timeout', '301'], {'ref': 'x', 'timeout': 301}),
+    ('preview', ['preview', 'x', '--size', '640'], {'ref': 'x', 'size': 640}),
+    ('recipe_verify', ['recipe', 'verify'], {'recipeId': HEX, 'workingRef': 'x', 'ifDocument': 'd', 'ifState': 's', 'previewSize': 1000}),
+    ('edit_apply', ['recipe', 'apply'], {'recipeId': HEX, 'sourceRef': '1', 'ifDocument': 'd', 'ifState': 's', 'previewSize': 800}),
     ('operation_status', ['operation', 'status', ''], {'operationId': ''}),
     ('request_status', ['request', 'status', ''], {'requestId': ''}),
     ('reference_capture', ['recipe', 'capture'], {'ref': '1'}),

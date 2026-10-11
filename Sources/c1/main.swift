@@ -632,6 +632,9 @@ struct PreviewCommand: ParsableCommand {
     @Option(help: "Timeout in seconds for preview render (default 30).")
     var timeout: Double?
 
+    @Option(help: "Long edge in pixels, one of \(PreviewSize.allowed.map(String.init).joined(separator: ", ")) (default \(PreviewSize.standard.longEdge)).")
+    var size: Int?
+
     @Flag(help: "Render full-frame context using a temporary managed clone.")
     var fullFrame: Bool = false
 
@@ -644,7 +647,7 @@ struct PreviewCommand: ParsableCommand {
     mutating func run() throws {
         try globals.run("preview", full: result, {
             var args: [String: Any] = ["ref": ref]
-            put(&args, "outputDir", outputDir); put(&args, "timeout", timeout); put(&args, "fullFrame", flag(fullFrame))
+            put(&args, "outputDir", outputDir); put(&args, "timeout", timeout); put(&args, "size", size); put(&args, "fullFrame", flag(fullFrame))
             put(&args, "aspectRatio", aspectRatio)
             if !anchorPositions.isEmpty { args["anchors"] = try anchorPositions.map(anchor) }
             return args

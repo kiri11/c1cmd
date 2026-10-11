@@ -48,6 +48,7 @@ public struct OperationRecord: Codable, Equatable {
     public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown"
     public var error: String?
     public var previewOutputPath: String?
+    public var previewSize: Int?
 
     public init(
         operationId: String = UUID().uuidString.lowercased(),

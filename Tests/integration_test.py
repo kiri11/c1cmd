@@ -252,7 +252,14 @@ def main():
         assert preview_file.stat().st_size > 0, "Preview file is empty"
         assert prev_res["width"] > 0 and prev_res["height"] > 0
         assert len(prev_res["pixelSha256"]) == 64
+        assert prev_res["size"] == max(prev_res["width"], prev_res["height"]) == 1500, prev_res
         print(f"PASS: preview generated and decoded: {preview_file} ({prev_res['width']}x{prev_res['height']} px, size: {prev_res['fileSizeBytes']} B)")
+
+        code, small = run_c1(["preview", working_ref, "--size", "800"])
+        assert code == 0, f"800 px preview failed: {small}"
+        assert small["size"] == max(small["width"], small["height"]) == 800, small
+        assert Path(small["previewPath"]).stat().st_size < preview_file.stat().st_size, small
+        print(f"PASS: --size 800 preview decoded at {small['width']}x{small['height']} px")
 
         custom_dir = SESSION_DIR / "custom-preview"
         custom_dir.mkdir()

@@ -207,8 +207,22 @@ Session's `Output` or a supplied directory, and waits for a stable, decodable
 JPEG. MCP returns the image plus JSON metadata; other tools return JSON text.
 Metadata includes the native variant ID and state tokens, which are checked across
 rendering. Tokens do not cover every layer, curve or render setting, so preview
-caching by token is unsupported. c1 configures the reserved `c1-preview` recipe;
-do not use it for your own exports. Preview counts as a mutating tool.
+caching by token is unsupported. Preview counts as a mutating tool.
+
+`size` / `--size` sets the JPEG's long edge in pixels: 400, 800, 1200 or 1500, with
+1500 as the default. `edit_apply` and `recipe_verify` take the same values as
+`previewSize`. Any other value fails with `invalid-request` before anything is
+journaled or sent to Capture One. The result and the journal entry record the
+requested size, and the readback rejects an export whose decoded long edge differs
+from it. `capabilities.previewRecipe` lists the sizes, the default and each size's
+recipe.
+
+Each size exports through its own reserved recipe, JPEG quality 80 in sRGB:
+`c1-preview` for 1500 px and `c1-preview-<size>` for the others, such as
+`c1-preview-800`. c1 creates a recipe the first time its size is used and
+reconfigures it before every export, so do not use these recipes for your own
+exports. Capture One renders from the RAW at every size, so a smaller size makes a
+smaller file but may not save much export time.
 
 ## Compact results
 

@@ -26,9 +26,9 @@ public enum Recipes {
         switch tool {
         case "reference_capture": return ContractSchema.object(["ref":str, "ifDocument":str, "ifState":str], required:["ref","ifDocument","ifState"])
         case "recipe_register": return ContractSchema.object(["recipe":recipe], required:["recipe"])
-        case "recipe_verify": return ContractSchema.object(["recipeId":str,"workingRef":str,"ifDocument":str,"ifState":str], required:["recipeId","workingRef","ifDocument","ifState"])
+        case "recipe_verify": return ContractSchema.object(["recipeId":str,"workingRef":str,"ifDocument":str,"ifState":str,"previewSize":ContractSchema.previewSizeSchema], required:["recipeId","workingRef","ifDocument","ifState"])
         case "edit_status": return ContractSchema.object(["compoundId":str], required:["compoundId"])
-        default: return ContractSchema.object(["recipeId":str,"sourceRef":str,"ifDocument":str,"ifState":str,"ifGeometryState":str,"overrides":settings,"exposure":exposure,"whiteBalance":whiteBalance,"geometry":geometry,"preview":ContractSchema.boolean], required:["recipeId","sourceRef","ifDocument","ifState"])
+        default: return ContractSchema.object(["recipeId":str,"sourceRef":str,"ifDocument":str,"ifState":str,"ifGeometryState":str,"overrides":settings,"exposure":exposure,"whiteBalance":whiteBalance,"geometry":geometry,"preview":ContractSchema.boolean,"previewSize":ContractSchema.previewSizeSchema], required:["recipeId","sourceRef","ifDocument","ifState"])
         }
     }
     static func responses(_ existing: [String:Any]) -> [String:Any] {
@@ -49,6 +49,8 @@ public enum Recipes {
     }
     public static func validate(_ tool: String, _ args: [String:Any]) throws {
         try ContractSchema.validateValue(args, schema:input(tool), path:tool)
+        try ContractSchema.validatePreviewSize(args["previewSize"])
+        if tool == "edit_apply", args["previewSize"] != nil, args["preview"] as? Bool != true { throw C1Error.invalidRequest("previewSize requires preview: true.") }
         func enums(_ value: Any, _ schema: [String:Any]) throws {
             if let allowed = schema["enum"] as? [Any], !allowed.contains(where: { String(describing:$0) == String(describing:value) }) { throw C1Error.invalidRequest("Invalid recipe policy or version.") }
             if let object = value as? [String:Any], let props = schema["properties"] as? [String:[String:Any]] {
@@ -201,6 +203,7 @@ public final class RecipeWorkflow {
             guard try Recipes.digest(verification) == evidence["reportHash"] as? String, verification["status"] as? String == "succeeded", verification["recipeId"] as? String == id else { throw C1Error.invalidRequest("Verification report was changed.") }
             verificationEvidence = evidence
         }
+        let previewSize = try (args["previewSize"] as? NSNumber).map { try PreviewSize($0.intValue) } ?? .standard
         if args["geometry"] != nil, recipe["cropPolicy"] as? String != "per-photo" { throw C1Error.invalidRequest("Recipe crop policy preserves geometry.") }
         let sourceRef = args[verify ? "workingRef" : "sourceRef"] as! String
         if verify, !WorkingRef.isWorkingRefString(sourceRef) { throw C1Error.invalidRequest("Verification requires an explicitly created managed clone.") }
@@ -351,7 +354,7 @@ public final class RecipeWorkflow {
                     try finish(["independentBefore":try Recipes.object(oracleBefore),"independentAfter":try Recipes.object(observed),"coverage":Recipes.oracleFields])
                 }
             }
-            if verify || args["preview"] as? Bool == true { try perform("preview") { try finish(Recipes.object(linked.preview(ref:ref))) } }
+            if verify || args["preview"] as? Bool == true { try perform("preview") { try finish(Recipes.object(linked.preview(ref:ref, size:previewSize))) } }
             return try perform("observe") {
                 let observed = try linked.get(ref:ref,nativeTargets:[NativeTarget()])
                 try finish(Recipes.object(observed))

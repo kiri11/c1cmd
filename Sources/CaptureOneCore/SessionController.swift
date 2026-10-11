@@ -1179,8 +1179,8 @@ public final class SessionController {
 
     /// A full-frame preview reports the source crop in its pixels, plus the crop each
     /// candidate `anchor` would apply with `aspectRatio` at the current rotation.
-    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, fullFrame: Bool = false,
-                        aspectRatio: Double? = nil, anchors: [CropAnchor] = []) throws -> PreviewResult {
+    public func preview(ref: String, outputDirOverride: String? = nil, timeout: TimeInterval = 30.0, size: PreviewSize = .standard,
+                        fullFrame: Bool = false, aspectRatio: Double? = nil, anchors: [CropAnchor] = []) throws -> PreviewResult {
         guard timeout.isFinite && timeout > 0 && timeout <= 300 else { throw C1Error.invalidRequest("timeout must be in (0, 300] seconds.") }
         guard (aspectRatio == nil) == anchors.isEmpty, anchors.isEmpty || fullFrame, anchors.count <= PreviewResult.maximumCandidates else {
             throw C1Error.invalidRequest(PreviewResult.candidateUsage)
@@ -1198,7 +1198,7 @@ public final class SessionController {
             } else {
                 _ = try geometrySet(workingRef: clone.workingRef, ifGeometryState: cloneState, crop: bounds)
             }
-            var result = try preview(ref: clone.workingRef, outputDirOverride: outputDirOverride, timeout: timeout)
+            var result = try preview(ref: clone.workingRef, outputDirOverride: outputDirOverride, timeout: timeout, size: size)
             guard try get(ref: ref).geometryStateHash == source.geometryStateHash else { throw C1Error.stateChanged("Source changed during context preview; discard preview.") }
             _ = try deleteVariant(workingRefString: clone.workingRef)
             result.contextSourceRef = ref
@@ -1217,20 +1217,25 @@ public final class SessionController {
             let subfolder = "c1-previews/\(opId)"
             let jobDir = root.appendingPathComponent(subfolder, isDirectory: true)
             try FileManager.default.createDirectory(at: jobDir, withIntermediateDirectories: true)
-            let entry = OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
+            var entry = OperationRecord(operationId: opId, operationType: "preview", workingRef: ref,
                 documentPath: doc.documentPath, preconditionStateHash: current.stateHash,
                 beforeAdjustments: current.adjustments, previewOutputPath: jobDir.path, beforeGeometry: current.geometry)
+            entry.previewSize = size.longEdge
             // Exports change no adjustments, so every failed check leaves the outcome unknown.
             return try journaled(entry, doc: doc, source: current, dispatch: {
                 let args = [NSAppleEventDescriptor(string: doc.documentId),
-                            NSAppleEventDescriptor(string: PreviewManager.defaultRecipeName), NSAppleEventDescriptor(string: root.path)]
-                let _: PreviewRecipeResult = try executor.executeAndDecode(handler: "ensurePreviewRecipe", args: args)
+                            NSAppleEventDescriptor(string: size.recipeName), NSAppleEventDescriptor(string: root.path)]
+                let _: PreviewRecipeResult = try executor.executeAndDecode(handler: "ensurePreviewRecipe",
+                    args: args + [NSAppleEventDescriptor(int32: Int32(size.longEdge))])
                 let _: ProcessPreviewResult = try executor.executeAndDecode(handler: "processPreview", args: [
                     args[0], NSAppleEventDescriptor(string: current.id), args[1], args[2],
                     NSAppleEventDescriptor(string: subfolder), NSAppleEventDescriptor(string: "preview")])
                 return try previewMgr.pollForOutputFile(inDirectory: jobDir, timeout: timeout)
             }, readback: { pending, file in
                 let image = try previewMgr.verifyAndDecodeImage(atPath: file.path)
+                guard max(image.width, image.height) == size.longEdge else {
+                    throw C1Error.readbackMismatch("Preview long edge is \(max(image.width, image.height)) px; the \(size.recipeName) recipe exports \(size.longEdge) px.")
+                }
                 let after = try get(ref: ref)
                 guard after.stateHash == current.stateHash, after.geometryStateHash == current.geometryStateHash else { throw C1Error.stateChanged("Adjustments changed while preview rendered; discard this preview.") }
                 if let geometry = current.geometry {
@@ -1239,10 +1244,10 @@ public final class SessionController {
                         throw C1Error.readbackMismatch("Preview dimensions do not match the crop aspect ratio.")
                     }
                 }
-                let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
+                let bytes = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
                 pending.update { $0.previewOutputPath = file.path }
                 return .confirmed(PreviewResult(operationId: opId, workingRef: current.workingRef, previewPath: file.path,
-                    fileSizeBytes: size, width: image.width, height: image.height, pixelSha256: image.pixelSha256,
+                    fileSizeBytes: bytes, width: image.width, height: image.height, size: size.longEdge, pixelSha256: image.pixelSha256,
                     stateHash: current.stateHash, nativeVariantId: current.id, geometry: current.geometry, geometryStateHash: current.geometryStateHash))
             }).value
         }
@@ -1488,11 +1493,14 @@ public final class SessionController {
                 ]
             },
             "previewRecipe": [
-                "name": PreviewManager.defaultRecipeName,
+                "name": PreviewSize.standard.recipeName,
                 "format": "JPEG",
                 "quality": 80,
                 "profile": "sRGB Color Space Profile",
-                "scaling": "Long_Edge 1500px"
+                "scaling": "Long_Edge \(PreviewSize.standard.longEdge)px",
+                "sizes": PreviewSize.allowed,
+                "defaultSize": PreviewSize.standard.longEdge,
+                "recipeNames": Dictionary(uniqueKeysWithValues: PreviewSize.allowed.map { (String($0), try! PreviewSize($0).recipeName) })
             ],
             "concurrency": "advisory-lock",
             "workingVariantEnforced": true,

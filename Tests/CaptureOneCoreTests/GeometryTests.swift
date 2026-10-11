@@ -38,7 +38,7 @@ final class GeometryFake: ScriptExecuting {
             let id = args[1].stringValue!
             let r = record(id), crop = r["cropValues"] as! [Double]
             let url = URL(fileURLWithPath:args[3].stringValue!).appendingPathComponent(args[4].stringValue!).appendingPathComponent("preview.jpg")
-            try FakeScript.jpeg(width:120, height:Int((120*crop[3]/crop[2]).rounded())).write(to:url)
+            try base.previewJPEG(recipe:args[2].stringValue!, aspect:crop[2]/crop[3]).write(to:url)
             if changeDuringPreview { var changed = r; changed["rotationDegrees"] = 1.0; records[id] = changed }
             result = ["jobId":"geometry-job"]
         case "applyGeometry", "applyCorrectedGeometry":
@@ -637,18 +637,18 @@ extension GeometryTests {
             let set = try core.geometrySet(workingRef:cloned.workingRef,ifGeometryState:initial.geometryStateHash!,crop:crop)
             let anchors = [try CropAnchor(x:0,y:0.5), .center, try CropAnchor(x:1,y:0.5)]
             let variants = fake.base.values.count
-            // The 6000×4000 context renders at 120×80: 50 canvas pixels per preview pixel.
+            // The 6000×4000 context renders at 1500×1000: 4 canvas pixels per preview pixel.
             let context = try core.preview(ref:cloned.workingRef,fullFrame:true,aspectRatio:0.75,anchors:anchors)
-            XCTAssertEqual(context.width,120); XCTAssertEqual(context.height,80)
-            XCTAssertEqual(values(context.currentCrop),[24,20,48,32],"Top-left origin: the crop top, 1000 px below the canvas top, is 20 px down")
+            XCTAssertEqual(context.width,1500); XCTAssertEqual(context.height,1000)
+            XCTAssertEqual(values(context.currentCrop),[300,250,600,400],"Top-left origin: the crop top, 1000 px below the canvas top, is 250 px down")
             let candidates = context.candidateCrops ?? []
             XCTAssertEqual(candidates.map(\.anchor),anchors)
             let dryRuns = try anchors.map { try core.geometrySet(workingRef:cloned.workingRef,ifGeometryState:set.geometryStateHash,aspectRatio:0.75,anchor:$0,dryRun:true).anchoredCrop }
             XCTAssertEqual(candidates.map(\.crop),dryRuns,"Candidates are the crops a dry run returns")
-            XCTAssertEqual(candidates.map { values($0.preview) },[[0,0,60,80],[30,0,60,80],[60,0,60,80]])
+            XCTAssertEqual(candidates.map { values($0.preview) },[[0,0,750,1000],[375,0,750,1000],[750,0,750,1000]])
             XCTAssertEqual(fake.base.values.count,variants,"Context clone deleted")
             let bare = try core.preview(ref:cloned.workingRef,fullFrame:true)
-            XCTAssertEqual(values(bare.currentCrop),[24,20,48,32]); XCTAssertNil(bare.candidateCrops)
+            XCTAssertEqual(values(bare.currentCrop),[300,250,600,400]); XCTAssertNil(bare.candidateCrops)
             let plain = try core.preview(ref:cloned.workingRef)
             XCTAssertNil(plain.currentCrop); XCTAssertNil(plain.candidateCrops)
             fake.handlers = []
