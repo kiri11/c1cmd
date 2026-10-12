@@ -9,9 +9,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 import time
+from contextlib import closing
 
 from contract_test import Client, validate_response, complete, complete_args
 
@@ -30,6 +32,43 @@ def apple(body):
         capture_output=True, text=True, timeout=150)
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()
+
+
+def capture_one_started():
+    """Launch time of the Capture One process; long-running processes have stopped storing rows (#43)."""
+    pids = subprocess.run(['pgrep', '-x', 'Capture One'], capture_output=True, text=True).stdout.split()
+    if len(pids) != 1:
+        return None
+    return subprocess.run(['ps', '-o', 'lstart=', '-p', pids[0]], capture_output=True, text=True).stdout.strip()
+
+
+def close_retained(document):
+    """Close a failed run's owned document, whose files stay on disk, so the next suite can start.
+
+    Any other open document stays open. Returns what happened, for the failure evidence."""
+    try:
+        count = apple('return count of documents')
+        if count == '0':
+            return 'already closed'
+        if count != '1':
+            return 'left open: not the only open document'
+        current = json.loads(apple('return id of current document as text'))
+        if Path(current).resolve() != Path(document).resolve():
+            return f'left open: current document is {current}'
+        apple(f'if (id of current document as text) is not {json.dumps(current)} then error "Document changed"\nclose current document')
+        return 'closed'
+    except Exception as error:
+        return f'left open: {error}'
+
+
+def snapshot_database(database, destination):
+    """Copy the stored state before a close lets Capture One write again."""
+    try:
+        with closing(sqlite3.connect(Path(database).as_uri() + '?mode=ro', uri=True)) as source, closing(sqlite3.connect(destination)) as copy:
+            source.backup(copy)
+        return str(destination)
+    except Exception as error:
+        return f'not copied: {error}'
 
 
 def main():
@@ -116,7 +155,8 @@ def main():
         assert health['allChecksPassed'] and health['writesEnabled'] and not health['isSession'], health
         doc = cli('doc', 'info')
         assert Path(doc['documentPath']).resolve() == catalog.resolve() and '.cocatalogdb|' in doc['openToken'], doc
-        log('environment', document=doc, sourceSHA256=source_sha, cliSHA256=sha(CLI), mcpSHA256=sha(MCP))
+        log('environment', document=doc, sourceSHA256=source_sha, cliSHA256=sha(CLI), mcpSHA256=sha(MCP),
+            captureOneStarted=capture_one_started())
         # Exercise the application's native backup before editing this disposable catalog.
         backup = base / 'backup'
         backup.mkdir()
@@ -187,6 +227,8 @@ def main():
             if nested and len(stored('variants', '--collection-id', nested[0]['collectionID'])['variants']) == 1:
                 break
             time.sleep(.5)
+        assert nested, ('Capture One lists collections that SQLite lacks', listed,
+                        apple('get name of every collection of current document'))
         validate_response(stored('collections'), contract['responses']['catalog_collections'])
         assert sorted(c['namePath'] for c in listed if c['name'] == 'c1 album') == [['c1 album'], ['c1 group', 'c1 album']], listed
         group = next(c for c in listed if c['namePath'] == ['c1 group'])
@@ -204,7 +246,9 @@ def main():
             time.sleep(.5)
         whole = stored('variants')
         records = whole['variants']
-        assert len(records) == len(variants) + 1 and len({r['imageDatabaseID'] for r in records}) == len(variants), records
+        assert len(records) == len(variants) + 1, ('Capture One lists a clone that SQLite lacks', records,
+            apple('get id of every variant of collection "All Images" of current document'))
+        assert len({r['imageDatabaseID'] for r in records}) == len(variants), records
         assert pages('variants', 'variants', '--after-variant-id', whole) == records
         log('stored-variant-pages', variants=len(records))
         mapping = []
@@ -368,7 +412,10 @@ def main():
             if not evidence.is_relative_to(base):
                 shutil.rmtree(base)
         else:
-            log('failed-retained', catalog=str(catalog), sourceUnchanged=sha(raw) == source_sha)
+            database = next(catalog.glob('*.cocatalogdb'), None)
+            snapshot = snapshot_database(database, evidence / 'failed-before-close.cocatalogdb') if database else None
+            log('failed-retained', catalog=str(catalog), sourceUnchanged=sha(raw) == source_sha,
+                storedSnapshot=snapshot, document=close_retained(catalog))
 
 
 if __name__ == '__main__':

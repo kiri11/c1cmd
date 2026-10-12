@@ -246,9 +246,11 @@ def main():
             assert (c1 / folder / (identifier + '.json')).is_file(), folder
         log('passed',dict(rawSHA256=original,cliSHA256=sha(CLI),mcpSHA256=sha(MCP),document=str(owned.document),documentKind=owned.kind,layout=owned.layout if owned.kind == 'catalog' else None))
         owned.close()
+    except BaseException:
+        owned.retain_and_close()
+        raise
     finally:
         if client: client.close()
-        # Failed fixtures and unresolved operations remain available for inspection.
 
 
 if __name__ == '__main__':

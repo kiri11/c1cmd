@@ -159,7 +159,10 @@ Other limits:
 ## Run live checks
 
 Close all documents and reserve exclusive use of Capture One. Tests create their
-own disposable Sessions/Catalogs under `/private/tmp` or `.build`. Do not run
+own disposable Sessions/Catalogs under `/private/tmp` or `.build`. Run Catalog
+suites on a recently launched Capture One: processes that had run for five hours or
+more stopped storing new albums, clones and imports, and the catalog suite records
+the launch time in its evidence. Do not run
 offline core tests concurrently with live suites: both acquire the application
 lock.
 
@@ -180,7 +183,9 @@ own fixture modes. Catalog mode creates a new owned Catalog under `.build`, impo
 copied RAW as a referenced original outside it, sets the exact fixture write path (the
 `.cocatalogdb` for unpackaged), and takes a native backup before editing. It asserts
 RAW preservation and the Catalog's `.c1` journal/provenance/result locations and
-sibling `.c1-output/c1-previews` paths. Failed fixtures and evidence are retained.
+sibling `.c1-output/c1-previews` paths. Failed fixtures and evidence are retained,
+and the failed suite then closes its owned document so later suites can start; the
+catalog suite first copies the stored database to `failed-before-close.cocatalogdb`.
 The native suite uses a second owned fixture for the successful people-mask cases.
 
 The inventory suite clones one imported variant up to `C1_INVENTORY_SMALL_COUNT`

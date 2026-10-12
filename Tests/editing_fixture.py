@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import time
 
-from catalog_integration_test import ROOT, apple, sha
+from catalog_integration_test import ROOT, apple, close_retained, sha
 
 
 def document_mode(environment):
@@ -127,3 +127,8 @@ class EditingFixture:
     def close(self):
         self.assert_current()
         apple('close current document')
+
+    def retain_and_close(self):
+        """After a failure: keep the files, close the owned document so the next suite can start."""
+        self.log('failed-retained', dict(base=str(self.base),
+                                         document=close_retained(getattr(self, 'native_id', self.document))))

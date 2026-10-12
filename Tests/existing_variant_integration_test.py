@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 
-from catalog_integration_test import apple, sha, CLI, MCP, ROOT
+from catalog_integration_test import apple, close_retained, sha, CLI, MCP, ROOT
 from contract_test import Client, validate_response, COMPACT_TOOLS
 
 COMMANDS = {('set',): 'set', ('add',): 'add', ('reset',): 'reset', ('preview',): 'preview', ('metadata', 'set'): 'metadata_set',
@@ -232,12 +232,13 @@ def main():
         finally:
             if client:
                 client.close()
+            expected = str(package if kind == 'catalog' else base / 'existing')
             if succeeded:
-                expected = str(package if kind == 'catalog' else base / 'existing')
                 apple(f'if (id of current document as text) is not "{expected}" then error "Unexpected document"\nclose current document')
                 shutil.rmtree(base)
             else:
-                log('failed-retained', kind=kind, base=str(base), rawUnchanged=sha(raw) == original_sha)
+                log('failed-retained', kind=kind, base=str(base), rawUnchanged=sha(raw) == original_sha,
+                    document=close_retained(expected))
     log('passed', storage='session-and-referenced-catalog', noDuplicateVariants=True, rawUnchanged=sha(raw) == original_sha)
 
 

@@ -229,6 +229,9 @@ return rows'''
         client.close(); client = None
         people = people_success(log)
         log('passed',dict(group=os.environ.get('C1_NATIVE_TEST_GROUP','all'),rawSHA256=original,peopleRawSHA256=people,document=str(owned.document),documentKind=owned.kind,layout=owned.layout if owned.kind == 'catalog' else None,cliSHA256=sha(CLI),mcpSHA256=sha(MCP)))
+    except BaseException:
+        owned.retain_and_close()
+        raise
     finally:
         if client: client.close()
 
@@ -243,26 +246,31 @@ def people_success(log):
         r = subprocess.run([str(CLI), *complete(args), '--format', 'json'], env=owned.environment, capture_output=True, text=True, timeout=180)
         assert r.returncode == 0, r.stderr
         return json.loads(r.stdout)
-    variants = owned.open(cli)
-    fixture = owned.fixture
-    source = cli('get',variants[0]['id']); doc = cli('doc','info')
-    ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
-    def layers():
-        return cli('get',ref,'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
-    for areas, separate in [(['body skin','face skin'], False), (['face skin','hair'], True)]:
-        before = layers()
-        result = cli('native','action',ref,'mask.people','--if-native-state',before['nativeStateHash'],
-                     '--json',json.dumps(dict(areas=areas,separateLayers=separate)))
-        log('people-mask', dict(areas=areas, separateLayers=separate, before=before['layers'], after=result['after']['layers']))
-        added = result['after']['layers'][len(before['layers']):]
-        assert result['after']['layers'][:len(before['layers'])] == before['layers'], 'Existing layers must be kept'
-        assert 1 <= len(added) <= (len(areas) if separate else 1) and all(l['nativeKind'] == 'adjustment' for l in added), added
-        assert result['after']['values'] == before['values']
-        assert cli('operation','status',result['operationId'])['status'] == 'succeeded'
-    assert sha(raw) == sha(fixture) == original
-    preview = cli('preview', ref)
-    owned.verify([preview], provenance_files=('editing.json',))
-    owned.close()
-    return original
+    try:
+        variants = owned.open(cli)
+        fixture = owned.fixture
+        source = cli('get',variants[0]['id']); doc = cli('doc','info')
+        ref = cli('variant','edit',source['id'],'--if-state',source['stateHash'],'--if-document',doc['openToken'])['workingRef']
+        def layers():
+            return cli('get',ref,'--native-targets','[{"scope":"adjustments"}]')['nativeSnapshots'][0]
+        for areas, separate in [(['body skin','face skin'], False), (['face skin','hair'], True)]:
+            before = layers()
+            result = cli('native','action',ref,'mask.people','--if-native-state',before['nativeStateHash'],
+                         '--json',json.dumps(dict(areas=areas,separateLayers=separate)))
+            log('people-mask', dict(areas=areas, separateLayers=separate, before=before['layers'], after=result['after']['layers']))
+            added = result['after']['layers'][len(before['layers']):]
+            assert result['after']['layers'][:len(before['layers'])] == before['layers'], 'Existing layers must be kept'
+            assert 1 <= len(added) <= (len(areas) if separate else 1) and all(l['nativeKind'] == 'adjustment' for l in added), added
+            assert result['after']['values'] == before['values']
+            assert cli('operation','status',result['operationId'])['status'] == 'succeeded'
+        assert sha(raw) == sha(fixture) == original
+        preview = cli('preview', ref)
+        owned.verify([preview], provenance_files=('editing.json',))
+        owned.close()
+        return original
+    except BaseException:
+        owned.retain_and_close()
+        raise
+
 
 if __name__ == '__main__': main()

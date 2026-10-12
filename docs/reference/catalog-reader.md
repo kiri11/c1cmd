@@ -28,7 +28,7 @@ Every response includes the canonical database path, device/inode identity, stor
 
 `--collection-id` uses explicit membership: an image membership expands to every stored variant of that image; variant membership includes only that variant. Overlap does not duplicate variants. Virtual/smart collection rules, selection, manual sort order, and UI filters are not evaluated. Unscoped reads include stored trashed records, identified by `trashed`. `variants list --database` rejects the live `--selected` and `--collection` flags; use `catalog variants --collection` for a stored collection name.
 
-Stored state may lag Capture One. It cannot supply `stateHash`, `nativeStateHash`, document tokens, or any other mutation token, and cannot replace native post-write verification. Stored white balance is not decoded into Kelvin/tint; compound settings remain raw strings. External masks are not reconstructed. Use native `get` and normal editing preconditions immediately before writes.
+Stored state may lag Capture One by about a minute. A Capture One process that has run for hours can take half an hour, or lose new collections and variants for good: the Catalog then reopens without them. It cannot supply `stateHash`, `nativeStateHash`, document tokens, or any other mutation token, and cannot replace native post-write verification. Stored white balance is not decoded into Kelvin/tint; compound settings remain raw strings. External masks are not reconstructed. Use native `get` and normal editing preconditions immediately before writes.
 
 ### Stored photographer edits
 

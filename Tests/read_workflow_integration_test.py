@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import time
 from contextlib import closing
-from catalog_integration_test import apple, sha, CLI, MCP
+from catalog_integration_test import apple, close_retained, sha, CLI, MCP
 from contract_test import Client, validate_response, complete, complete_args
 
 
@@ -149,6 +149,9 @@ def main():
             else:
                 log('session-storage',rows=stored(),sidecars=[str(p.relative_to(expected)) for p in expected.rglob('*.cos')])
             log(kind+'-passed',restored=True,rawUnchanged=True,closedOwnedDocument=True)
+        except BaseException:
+            log(kind+'-failed-retained',base=str(base),document=close_retained(expected))
+            raise
         finally:
             client.close()
     log('passed',omitted='No UI edits, load/large Catalog matrix, or recovery fault injection; mutation/recovery implementation unchanged.')

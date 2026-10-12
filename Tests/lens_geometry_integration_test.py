@@ -18,6 +18,7 @@ import uuid
 
 from contract_test import Client, validate_response, complete, complete_args
 from preview_mapping import check_mapping
+from catalog_integration_test import close_retained
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN', ROOT / '.build/debug/c1'))
@@ -243,7 +244,7 @@ set crop of v to (maximum crop v apply false)''')
     apple('close current document')
     log('passed', cases=len(cases), rawSHA256=sha(fixture), originalUnchanged=True)
 except BaseException as error:
-    log('failed', error=str(error))
+    log('failed', error=str(error), document=close_retained(session))
     raise
 finally:
     client.close()

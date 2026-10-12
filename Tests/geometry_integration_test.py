@@ -7,6 +7,7 @@ import hashlib, importlib.util, json, math, os, re, shutil, subprocess, sys, tem
 from pathlib import Path
 from contract_test import Client, validate_response, complete, complete_args
 from preview_mapping import check_mapping
+from catalog_integration_test import close_retained
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.environ.get('C1_TEST_BIN',ROOT / '.build/debug/c1'))
 MCP = Path(os.environ.get('C1_TEST_MCP_BIN',ROOT / '.build/debug/c1-mcp'))
@@ -320,5 +321,5 @@ try:
     print('PASS: geometry CLI/MCP, ratios, anchored crops, rotations, off-center crop, exact containment, rotation-only, full-frame context and rectangles, orientation writes and restore'+(', portrait fixture' if PORTRAIT else '')+', original/RAW preservation')
     print(EVIDENCE)
 except BaseException as e:
-    log('failed',error=str(e));raise
+    log('failed',error=str(e),document=close_retained(session));raise
 finally:client.close()

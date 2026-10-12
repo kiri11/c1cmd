@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from catalog_integration_test import apple, sha, CLI, MCP, ROOT
+from catalog_integration_test import apple, close_retained, sha, CLI, MCP, ROOT
 from contract_test import Client, validate_response, complete, complete_args
 
 
@@ -156,7 +156,7 @@ def main():
         if success:
             apple('close current document')
         else:
-            log('failure-retained', session=str(base / 'keystone'))
+            log('failure-retained', session=str(base / 'keystone'), document=close_retained(base / 'keystone'))
 
 
 if __name__ == '__main__':
