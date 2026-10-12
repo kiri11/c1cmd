@@ -169,9 +169,20 @@ return resultRows as text
 
     def open_document(self):
         self.owned.open(lambda *args: self.cli(*args, progress=False)[0])
+        # A second image that no album receives keeps every album a strict subset of the document.
+        self.other = ((self.owned.document / "Capture") if self.kind == "session" else self.owned.base) / ("other" + RAW.suffix)
+        shutil.copy2(RAW, self.other)
+        if self.kind == "catalog":
+            self.owned.import_referenced(self.other)
+        # A Catalog import makes its import album current.
         osa(f'set current collection of first document to collection {apple_literal(self.document["allVariants"])} of first document')
         if self.kind == "catalog":
             self.album(self.document["noVariants"], [])
+        for _ in range(40):
+            if len(self.variants()) == 2:
+                break
+            time.sleep(.5)
+        assert {Path(r["parentImagePath"]).resolve() for r in self.variants()} == {self.owned.fixture, self.other.resolve()}
 
     def album(self, name, records):
         """Create an album holding exactly these variants and keep the all-variant collection current."""
@@ -192,7 +203,7 @@ return resultRows as text
     def ensure_count(self, target):
         values = self.variants()
         assert len(values) <= target, (len(values), target)
-        source = values[0]["id"]
+        source = next(r["id"] for r in values if Path(r["parentImagePath"]).resolve() == self.owned.fixture)
         missing = target - len(values)
         if missing:
             osa(f'''set d to first document
@@ -202,7 +213,7 @@ repeat {missing} times
 end repeat''', timeout=600)
             values = self.variants()
         assert len({record["id"] for record in values}) == len(values) == target, (len(values), target)
-        assert {Path(record["parentImagePath"]).resolve() for record in values} == {self.owned.fixture}, values
+        assert {Path(record["parentImagePath"]).resolve() for record in values} == {self.owned.fixture, self.other.resolve()}, values
         return values
 
     def set_ratings(self, records, rating):
@@ -217,7 +228,7 @@ end repeat''', timeout=600)
         time.sleep(.5)
 
     def assert_originals(self, label):
-        assert sha(self.owned.fixture) == self.owned.original, f"RAW changed during {label}"
+        assert sha(self.owned.fixture) == sha(self.other) == self.owned.original, f"RAW changed during {label}"
         assert sha(RAW) == self.owned.original, f"Source RAW changed during {label}"
 
     def inventory(self, label, args, strategy):
@@ -288,7 +299,7 @@ end repeat''', timeout=600)
                 listed, _, _ = self.cli("variants", "list", "--collection", collection)
                 selected, _, _ = self.cli("variants", "list", "--collection", collection, "--selected")
                 assert [r["id"] for r in listed if r["isSelected"]] == [r["id"] for r in selected], (collection, listed, selected)
-                ids = [record["id"] for record in records[:2]]
+                ids = [record["id"] for record in records if Path(record["parentImagePath"]).resolve() == self.owned.fixture][:2]
                 subset, _, _ = self.cli("variants", "list", "--ids", ",".join(ids), "--collection", collection, "--fields", "summary")
                 assert [r["id"] for r in subset] == ids and all("isSelected" in r for r in subset), subset
                 dumped, _ = self.dump("--collection", collection)
@@ -382,7 +393,11 @@ end repeat''', timeout=600)
         for count in [SMALL_COUNT, LARGE_COUNT]:
             records = self.ensure_count(count)
             album = f"c1-inventory-{count}"
-            self.album_ids = self.album(album, records[::3])
+            fixture_ids = {r["id"] for r in records if Path(r["parentImagePath"]).resolve() == self.owned.fixture}
+            self.album_ids = self.album(album, [r for r in records[::3] if r["id"] in fixture_ids])
+            # add inside adds every variant the image has: the album lists all of the fixture image and none of the other.
+            listed = {r["id"] for r in self.reference(album, False)}
+            assert listed == fixture_ids and len(listed) < len(records), ("image-level album membership", self.album_ids, sorted(listed, key=int))
             sparse = records[:1]
             self.set_ratings(records, 0)
             for record in sparse:

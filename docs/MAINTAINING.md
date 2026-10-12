@@ -126,9 +126,12 @@ managed-clone verification and compound application also have coverage in both,
 including scoped recipes and single-pixel readback. Filtered inventories use native
 rating predicates and bulk ID reads in both document kinds, qualified against the
 legacy enumeration on owned album, selection and document scopes in both layouts.
-Album qualification covers variant-level membership, including several variants of
-one image, because AppleScript `add inside` adds variants only. Image-level album
-entries made in the UI are not covered by the live suite.
+AppleScript `add inside` adds every variant the image has at that moment, not only
+the named ones: on 16.8.5.30, adding one variant of a four-variant image stored
+variant rows for all four plus an image row, and the album listed all four. A
+variant created later joins only when it is created with the album current. The
+inventory album therefore holds every variant of one image and none of a second
+image. Image-level album entries made in the UI are not covered by the live suite.
 Catalog-stored originals and Catalog fault recovery remain unqualified. Package
 Catalog default-baseline creation remains a qualification gap after uncertain
 native-ID readback.
@@ -188,9 +191,10 @@ and the failed suite then closes its owned document so later suites can start; t
 catalog suite first copies the stored database to `failed-before-close.cocatalogdb`.
 The native suite uses a second owned fixture for the successful people-mask cases.
 
-The inventory suite clones one imported variant up to `C1_INVENTORY_SMALL_COUNT`
-(default 12) and `C1_INVENTORY_LARGE_COUNT` (default 120) variants, adds every third
-variant to an album and selects every second one. Each case runs the default
+The inventory suite imports a second image, clones the first image's variant up to
+`C1_INVENTORY_SMALL_COUNT` (default 12) and `C1_INVENTORY_LARGE_COUNT` (default 120)
+variants, adds every third variant of the first image to an album, which then lists
+every variant of that image, and selects every second variant. Each case runs the default
 strategy and `C1_INVENTORY_STRATEGY=scan` across document, album and selection scopes
 with `rating` and `minRating`, and compares both ordered results with the legacy
 enumeration; the evidence keeps both strategies' timings and request status. Set

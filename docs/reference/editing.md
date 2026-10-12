@@ -117,7 +117,8 @@ document. A named collection need not be current: inventory and `dump` read its
 variants through it and leave the current collection unchanged. `isSelected` and
 `selected` both use that collection's own selection, which can differ from the
 selection shown in the current collection. Adding some variants of a photo to an
-album makes the album list every variant of that photo.
+album adds every variant the photo has at that moment. A variant created later
+joins an album only when Capture One creates it with that album current.
 
 `get`, edits, previews, clones and deletes find a native ID outside the current
 collection and leave the current collection unchanged. Capture One resolves an ID
