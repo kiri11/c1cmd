@@ -19,7 +19,7 @@ class HarnessTests(unittest.TestCase):
     def test_case_selection_rejects_invalid_before_setup(self):
         self.assertEqual(harness.parse_args(['archive', 'evidence']).cases,
                          (list(harness.RECOVERY_CASES), list(harness.RECIPE_CASES)))
-        self.assertEqual(len(harness.ALL_CASES), 21)
+        self.assertEqual(len(harness.ALL_CASES), 22)
         self.assertEqual(harness.selected_cases(['preview', 'clone-readback']), ['clone-readback', 'preview'])
         self.assertEqual(harness.parse_args(['archive', 'evidence', '--cases', 'recipe:lens', 'tonal', 'recipe:native']).cases,
                          (['tonal'], ['native', 'lens']))
@@ -106,6 +106,8 @@ class HarnessTests(unittest.TestCase):
         self.run.lookup_identities.assert_called_once_with(['2', '1'])
         self.assertEqual(calls, [('timeout', {}), ('timeout', {'metadata': True}), ('timeout', {'native': True}), ('timeout', {'native_action': True}), ('timeout', {'geometry': True}),
                                ('timeout', {'geometry': True, 'rotation_only': True}),
+                               ('timeout', {'geometry': True, 'orientation': 'planned'}),
+                               ('timeout', {'geometry': True, 'orientation': 'only'}),
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),
@@ -456,6 +458,37 @@ class HarnessTests(unittest.TestCase):
                 self.run.recovery('operation', {'workingRef':'old-reference'}, 'keystone-geometry-apple-event-timeout')
                 self.run.clone.assert_called_once()
                 self.run.cli.assert_any_call('variant', 'delete', 'fresh')
+
+    def test_orientation_reconciliation_records_observations_then_turns_a_fresh_reference(self):
+        planned = {'intendedGeometry': {'orientation': 90}}
+        only = {'requestedGeometry': {'orientation': 90, 'rotation': 0}}
+        for label, journaled, observed, accepted in [
+                ('orientation-geometry-apple-event-timeout', planned, 0, True),
+                ('orientation-geometry-apple-event-timeout', planned, 90, True),
+                ('orientation-only-geometry-apple-event-timeout', only, 90, True),
+                ('orientation-only-geometry-apple-event-timeout', only, 180, False),
+                ('orientation-geometry-apple-event-timeout', planned, 270, False)]:
+            with self.subTest(label=label, observed=observed):
+                self.configure_recovery()
+                normal = self.run.cli.side_effect
+                def cli(*args, **kwargs):
+                    if args[:2] == ('operation', 'status') and self.restarted:
+                        return dict(journaled, status='reconciled', beforeGeometry={'orientation': 0, 'rotation': 0},
+                                    afterGeometry={'orientation': observed, 'rotation': 0})
+                    if args == ('get', 'fresh'):
+                        return {'stateHash': 'fresh-state', 'geometryStateHash': 'fresh-geometry', 'geometry': {'orientation': 270}}
+                    if args[:3] == ('geometry', 'set', 'fresh'):
+                        return {'after': {'orientation': 270}}
+                    return normal(*args, **kwargs)
+                self.run.cli.side_effect = cli
+                if accepted:
+                    self.run.recovery('operation', {'workingRef': 'old-reference'}, label)
+                    self.run.cli.assert_any_call('geometry', 'set', 'fresh', '--if-geometry-state', 'fresh-geometry', '--orientation', '270')
+                    self.run.cli.assert_any_call('variant', 'delete', 'fresh')
+                else:
+                    with self.assertRaises(AssertionError):
+                        self.run.recovery('operation', {'workingRef': 'old-reference'}, label)
+                    self.run.clone.assert_not_called()
 
     def test_changed_original_state_or_geometry_still_fails(self):
         for changed in [{'stateHash': 'changed', 'geometry': {'rotation': 0}},

@@ -23,7 +23,7 @@ SUITES = {
     'lens': ('lens_geometry_integration_test.py', 1200),
     'perspective': ('perspective_geometry_integration_test.py', 1200),
     'keystone': ('keystone_integration_test.py', 600),
-    'catalog': ('catalog_integration_test.py', 600),
+    'catalog': ('catalog_integration_test.py', 900),
     'existing': ('existing_variant_integration_test.py', 600),
     'inventory': ('inventory_integration_test.py', 2400),
     'native': ('native_editing_integration_test.py', 1800),

@@ -227,6 +227,55 @@ set crop of v to (maximum crop v apply false)''')
             tool('geometry_restore', {'workingRef': ref, 'ifGeometryState': rotated['geometryStateHash']})
         assert cli('get', original['id']) == original
         log('case-passed', case=index)
+    # Orientation on the lens-corrected clone. The corrected bounds exist only after the native
+    # orientation, so dry runs and anchors are refused and dispatch nothing; each step reads back,
+    # keeps the lens context, crops inside the corrected canvas, previews in that shape, and restores.
+    fixture_write('''set distortion of lens correction of v to 100
+set hide distorted areas of lens correction of v to true
+set orientation of adjustments of v to 0
+set rotation of adjustments of v to 0
+set crop of v to (maximum crop v apply false)''')
+    before = cli('get', vid)
+    assert before['geometry']['orientation'] == 0 and before['geometry']['lensGeometry'][0] == 100, before['geometry']
+    ref = tool('variant_edit', {'sourceRef': vid, 'ifDocument': document['openToken'], 'ifState': before['stateHash'],
+               'ifGeometryState': before['geometryStateHash']})['workingRef']
+    token = before['geometryStateHash']
+    for refused in (['--orientation', 90, '--dry-run'], ['--orientation', 90, '--aspect-ratio', .75, '--dry-run'],
+                    ['--orientation', 90, '--aspect-ratio', .75, '--anchor', '0.5,0']):
+        cli('geometry', 'set', ref, '--if-geometry-state', token, *refused, error='invalid-request')
+    unchanged = cli('get', ref)
+    assert (unchanged['geometryStateHash'], unchanged['stateHash']) == (token, before['stateHash']), 'refused orientation requests dispatch nothing'
+    previous = before
+    for value, ratio in ((90, None), (180, 1.5), (0, None), (270, .75)):
+        result = tool('geometry_set', dict({'workingRef': ref, 'ifGeometryState': previous['geometryStateHash'],
+                                            'orientation': value}, **({'aspectRatio': ratio} if ratio else {})))
+        after = cli('get', ref)
+        g = after['geometry']
+        assert g['orientation'] == value == result['after']['orientation'], (value, result, g)
+        assert after['geometryStateHash'] == result['geometryStateHash'] and after['stateHash'] == before['stateHash'], (value, result)
+        for key in ['lensGeometry', 'lensProfile', 'hideDistortedAreas', 'keystone', 'rotation']:
+            assert g[key] == before['geometry'][key], (value, key)
+        bounds = after['geometryUsableBounds']
+        portrait = value in (90, 270)
+        assert bounds == g['maximumCrop'] and (bounds['height'] > bounds['width']) == portrait, (value, bounds)
+        assert all(abs(g['crop'][c] - bounds[c]) + g['crop'][s] / 2 <= bounds[s] / 2 + 2
+                   for c, s in (('centerX', 'width'), ('centerY', 'height'))), ('crop inside corrected canvas', value, g)
+        preview = tool('preview', {'ref': ref})
+        assert (preview['height'] > preview['width']) == portrait, (value, preview)
+        if ratio:
+            assert abs(g['crop']['width'] / g['crop']['height'] - ratio) < .003 and abs(preview['width'] / preview['height'] - ratio) < .003, (value, g, preview)
+        operation = tool('operation_status', {'operationId': result['operationId']})
+        assert operation['status'] == 'succeeded' and operation['requestedGeometry']['orientation'] == value, operation
+        assert operation['requestedGeometry'].get('aspectRatio') == ratio, operation
+        log('corrected-orientation', case=value, result=result, bounds=bounds, preview=preview, operation=operation)
+        previous = after
+    restored = tool('geometry_restore', {'workingRef': ref, 'ifGeometryState': previous['geometryStateHash']})
+    assert restored['after']['orientation'] == 0 and restored['after']['crop'] == before['geometry']['crop'], restored
+    assert restored['after']['lensGeometry'] == before['geometry']['lensGeometry'], restored
+    assert cli('get', ref)['geometryStateHash'] == before['geometryStateHash'], 'restore returns the corrected baseline'
+    preview = tool('preview', {'ref': ref})
+    assert preview['width'] > preview['height'], preview
+    log('corrected-orientation-restored', result=restored, preview=preview)
     # Changed correction values invalidate an earlier geometry token.
     stale = cli('get', ref)
     fixture_write('set distortion of lens correction of v to 50')

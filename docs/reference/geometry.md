@@ -76,8 +76,9 @@ c1 geometry set <working-ref> --if-geometry-state <geometryStateHash> --orientat
 ```
 
 One request sets the orientation first, then keystone and rotation, then the
-crop, and journals the requested orientation in `requestedGeometry` beside the
-before and after geometry. Rotation and keystone keep their values.
+crop, and journals the orientation beside the before and after geometry: in the
+planned `intendedGeometry` when c1 plans the crop, otherwise in
+`requestedGeometry`. Rotation and keystone keep their values.
 
 - **Orientation alone** keeps Capture One's own crop, which it turns with the
   canvas: a centred 3:2 crop becomes a centred 2:3 crop, and an off-centre crop

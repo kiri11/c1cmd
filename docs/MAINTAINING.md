@@ -84,6 +84,7 @@ the unchanged candidate from `make qualify`.
 | Rating/color tag dispatch or timeout | `metadata` |
 | Expanded native properties/actions | `native native-action` |
 | Crop/rotation dispatch or partial writes | `geometry`; add corrected-image paths when affected |
+| Orientation dispatch or timeout | `orientation`; add `geometry` when the shared geometry handlers change |
 | Lens, perspective/movements or keystone | `lens`, `perspective`, `keystone` as affected |
 | Preview export, completion detection or late-preview resolution | `preview late-preview mcp-death`; add `recipe:preview recipe:late-preview` for compound previews |
 | MCP process lifetime/cancellation around dispatch | `mcp-death` |
@@ -92,9 +93,9 @@ the unchanged candidate from `make qualify`.
 | Compound edits (`edit_apply` steps, parent reports) | `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death`; add `recipe:tonal`, or `recipe:preview recipe:late-preview`, when those steps change |
 | Fault-harness pause, dispatch detection, shutdown, identity or recovery assertions | Cases using the changed behavior |
 
-One list holds all twenty-one cases. Generic cases are `clone-readback tonal
-metadata native native-action geometry lens perspective keystone preview
-late-preview mcp-death`. Compound-edit cases carry a `recipe:` prefix:
+One list holds all twenty-two cases. Generic cases are `clone-readback tonal
+metadata native native-action geometry orientation lens perspective keystone
+preview late-preview mcp-death`. Compound-edit cases carry a `recipe:` prefix:
 `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:tonal
 recipe:geometry recipe:preview recipe:late-preview recipe:mcp-death`. Generic cases run first in one owned Session and compound cases
 after them in another; evidence lands in `recovery/` and `recipe-recovery/` under
@@ -110,6 +111,13 @@ Capture One, wait for the JPEG, and require operation status to resolve it as
 `late-preview` in the same Capture One process, with no unresolved operations and
 a fresh write on the same reference. The compound case also requires `edit_status`
 to keep the parent `outcome-unknown`.
+
+`orientation` times out two orientation writes on uncorrected clones: 90 with a 3:4
+ratio, which c1 plans before dispatch and journals as `intendedGeometry`, and 90
+alone, which keeps Capture One's turned crop and journals only `requestedGeometry`.
+They reach the native orientation setter through the two geometry handlers. The
+`edit_apply` geometry step calls the same write, so `recipe:geometry` covers its
+compound reporting and there is no `recipe:orientation` case.
 
 ## Current scope and remaining gates
 

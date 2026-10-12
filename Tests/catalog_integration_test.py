@@ -321,6 +321,65 @@ def main():
         restored = cli('get', edit['workingRef'])
         assert restored['metadataStateHash'] == source['metadataStateHash']
         log('existing-variant-rating-restored', layout=layout)
+        # Orientation on an owned Catalog clone: each step (+90, +180, -90, -180) reads back, turns the
+        # off-centre crop with the canvas inside maximumCrop, previews in that shape, and restores.
+        keys = ('centerX', 'centerY', 'width', 'height')
+
+        def inside(crop, bounds):
+            return all(abs(crop[c] - bounds[c]) + crop[s] / 2 <= bounds[s] / 2 + 2
+                       for c, s in (('centerX', 'width'), ('centerY', 'height')))
+
+        clone, _ = tool('variant_clone', {'sourceRef': variants[0]['id']})
+        ref = clone['workingRef']
+        initial = cli('get', ref)
+        assert initial['geometry']['orientation'] == 0, initial['geometry']
+        frame = initial['geometry']['maximumCrop']
+        offset, _ = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': initial['geometryStateHash'],
+                         'crop': dict(centerX=round(frame['width'] * .4), centerY=round(frame['height'] * .4),
+                                      width=round(frame['width'] * .5), height=round(frame['height'] * .5))})
+        cli('geometry', 'set', ref, '--if-geometry-state', offset['geometryStateHash'], '--orientation', 90, '--dry-run',
+            error='invalid-request')
+        previous = cli('get', ref)
+        steps = []
+        for value in (90, 270, 180, 0):
+            result, _ = tool('geometry_set', {'workingRef': ref, 'ifGeometryState': previous['geometryStateHash'],
+                             'orientation': value})
+            readback = cli('get', ref)
+            g, p = readback['geometry'], previous['geometry']
+            assert g['orientation'] == value == result['after']['orientation'], (value, result, g)
+            assert readback['geometryStateHash'] == result['geometryStateHash'], (value, result)
+            assert readback['stateHash'] == initial['stateHash'] and g['rotation'] == p['rotation'], (value, g)
+            quarter = (value - p['orientation']) % 180 == 90
+            pairs = (('width', 'height'), ('height', 'width')) if quarter else (('width', 'width'), ('height', 'height'))
+            assert all(abs(g['crop'][a] - p['crop'][b]) <= 2 for a, b in pairs), ('crop turns rigidly', value, g, p)
+            assert all(abs(g['maximumCrop'][a] - p['maximumCrop'][b]) <= 2 for a, b in pairs), ('canvas turns', value, g, p)
+            assert inside(g['crop'], g['maximumCrop']), ('crop inside the oriented canvas', value, g)
+            preview, _ = tool('preview', {'ref': ref})
+            assert (preview['height'] > preview['width']) == (value in (90, 270)), (value, preview)
+            assert abs(preview['width'] / preview['height'] - g['crop']['width'] / g['crop']['height']) < .01, (value, preview, g)
+            operation = cli('operation', 'status', result['operationId'])
+            assert operation['status'] == 'succeeded' and operation['requestedGeometry']['orientation'] == value, operation
+            assert operation['beforeGeometry']['orientation'] == p['orientation'], operation
+            steps.append(dict(orientation=value, result=result, crop=g['crop'], maximumCrop=g['maximumCrop'], preview=preview))
+            previous = readback
+        assert all(abs(previous['geometry']['crop'][k] - offset['after']['crop'][k]) <= 2 for k in keys), (previous, offset)
+        # A ratio in the same request is planned on the oriented canvas, so the dry run predicts it.
+        planned = dict(workingRef=ref, ifGeometryState=previous['geometryStateHash'], orientation=90, aspectRatio=.75)
+        dry, _ = tool('geometry_set', dict(planned, dryRun=True))
+        portrait, _ = tool('geometry_set', planned)
+        assert portrait['after']['orientation'] == 90 and all(abs(portrait['after']['crop'][k] - dry['after']['crop'][k]) <= 2 for k in keys), (dry, portrait)
+        assert inside(portrait['after']['crop'], cli('get', ref)['geometry']['maximumCrop']), portrait
+        preview, _ = tool('preview', {'ref': ref})
+        assert abs(preview['width'] / preview['height'] - .75) < .003, preview
+        restored, _ = tool('geometry_restore', {'workingRef': ref, 'ifGeometryState': portrait['geometryStateHash']})
+        assert restored['after']['orientation'] == 0 and restored['after']['crop'] == initial['geometry']['crop'], restored
+        assert cli('get', ref)['geometryStateHash'] == initial['geometryStateHash'], 'restore returns the saved geometry'
+        preview_restored, _ = tool('preview', {'ref': ref})
+        assert preview_restored['width'] > preview_restored['height'], preview_restored
+        tool('variant_delete', {'workingRef': ref})
+        assert {item['id'] for item in cli('variants', 'list')} == set(originals)
+        log('catalog-orientation', layout=layout, steps=steps, dryRun=dry, portrait=portrait, preview=preview,
+            restored=restored, restoredPreview=preview_restored)
         # Composition tool profile also supports the exact-path opt-in.
         client.close()
         client = Client(MCP, env=dict(environment, C1_TOOL_PROFILE='composition'), timeout=150)

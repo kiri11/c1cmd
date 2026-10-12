@@ -44,7 +44,7 @@ on run argv
     return output as text
 end run
 '''
-RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'lens', 'perspective', 'keystone', 'preview', 'late-preview', 'mcp-death')
+RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'orientation', 'lens', 'perspective', 'keystone', 'preview', 'late-preview', 'mcp-death')
 RECIPE_CASES = ('native', 'native-action', 'lens', 'layer-color', 'tonal', 'geometry', 'preview', 'late-preview', 'mcp-death')
 RECIPE_PREFIX = 'recipe:'
 ALL_CASES = (*RECOVERY_CASES, *(RECIPE_PREFIX + case for case in RECIPE_CASES))
@@ -337,6 +337,17 @@ class Run:
             assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry'), reconciled
             assert reconciled['requestedGeometry']['rotation'] == 3 and reconciled['requestedGeometry'].get('crop') is None
             assert reconciled['afterGeometry']['rotation'] in (reconciled['beforeGeometry']['rotation'], 3)
+        if label == 'orientation-geometry-apple-event-timeout':
+            # Planned before dispatch: the oriented 3:4 target is journaled as intendedGeometry.
+            assert reconciled.get('beforeGeometry') and reconciled.get('intendedGeometry') and reconciled.get('afterGeometry'), reconciled
+            assert reconciled['beforeGeometry']['orientation'] == 0 and reconciled['intendedGeometry']['orientation'] == 90, reconciled
+            assert reconciled['afterGeometry']['orientation'] in (0, 90), reconciled
+        if label == 'orientation-only-geometry-apple-event-timeout':
+            # Capture One's turned crop is unknown until observed; only the request is journaled.
+            assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry'), reconciled
+            assert reconciled['requestedGeometry']['orientation'] == 90 and reconciled['requestedGeometry'].get('crop') is None, reconciled
+            assert reconciled['beforeGeometry']['orientation'] == 0 and reconciled['afterGeometry']['orientation'] in (0, 90), reconciled
+            assert reconciled['afterGeometry']['rotation'] == reconciled['beforeGeometry']['rotation'], reconciled
         if label == 'keystone-geometry-apple-event-timeout':
             assert reconciled.get('beforeGeometry') and reconciled.get('requestedGeometry') and reconciled.get('afterGeometry')
             assert reconciled['requestedGeometry']['keystone'] == {'vertical':12, 'horizontal':-7}
@@ -365,6 +376,10 @@ class Run:
                 self.enable_lens_correction(fresh, perspective=label.startswith("perspective-"))
             geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
             self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--rotation', '2', '--aspect-ratio', '1.5')
+        if label in ('orientation-geometry-apple-event-timeout', 'orientation-only-geometry-apple-event-timeout'):
+            geometry_state = self.cli('get', fresh['workingRef'])['geometryStateHash']
+            turned = self.cli('geometry', 'set', fresh['workingRef'], '--if-geometry-state', geometry_state, '--orientation', '270')
+            assert turned['after']['orientation'] == 270 and self.cli('get', fresh['workingRef'])['geometry']['orientation'] == 270, turned
         if label == 'metadata-apple-event-timeout':
             token = self.cli('get', fresh['workingRef'])['metadataStateHash']
             rated = self.cli('metadata', 'set', fresh['workingRef'], '--if-metadata-state', token, '--rating', '2')
@@ -414,7 +429,7 @@ set keystone horizontal of adjustments of v to -5
         entry['status'] = 'succeeded'; entry['afterGeometry'] = observed['geometry']; append()
         return observed
 
-    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False, metadata=False, rotation_only=False):
+    def apple_event_timeout(self, geometry=False, corrected=False, perspective=False, keystone=False, native=False, native_action=False, metadata=False, rotation_only=False, orientation=None):
         clone, current = self.clone()
         if corrected or perspective:
             assert geometry
@@ -443,6 +458,12 @@ set keystone horizontal of adjustments of v to -5
             if rotation_only:
                 assert geometry and not (corrected or perspective or keystone)
                 command.remove('--aspect-ratio'); command.remove('1.5')
+            if orientation:
+                # 'planned' crops the oriented canvas through applyGeometry; 'only' keeps Capture One's
+                # turned crop through applyCorrectedGeometry.
+                assert geometry and orientation in ('planned', 'only') and not (corrected or perspective or keystone or rotation_only)
+                command = [str(self.c1), 'geometry', 'set', clone['workingRef'], '--if-geometry-state', current['geometryStateHash'],
+                           '--orientation', '90', *(['--aspect-ratio', '0.75'] if orientation == 'planned' else [])]
             self.child = subprocess.Popen(command + ['--format', 'json'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             pending = wait_for(lambda: next((r for r in self.records()
@@ -471,6 +492,7 @@ set keystone horizontal of adjustments of v to -5
         label = 'rotation-only-geometry-apple-event-timeout' if rotation_only else 'keystone-geometry-apple-event-timeout' if keystone else 'perspective-geometry-apple-event-timeout' if perspective else 'corrected-geometry-apple-event-timeout' if corrected else ('geometry-apple-event-timeout' if geometry else 'real-apple-event-timeout')
         if native or native_action: label = 'native-action-timeout' if native_action else 'native-property-timeout'
         if metadata: label = 'metadata-apple-event-timeout'
+        if orientation: label = 'orientation-only-geometry-apple-event-timeout' if orientation == 'only' else 'orientation-geometry-apple-event-timeout'
         self.recovery(pending['operationId'], clone, label)
         if native or native_action:
             observed = self.cli('operation', 'status', pending['operationId'])
@@ -681,6 +703,9 @@ set keystone horizontal of adjustments of v to -5
                 self.apple_event_timeout(**options)
                 if case == 'geometry':
                     self.apple_event_timeout(geometry=True, rotation_only=True)
+            elif case == 'orientation':
+                self.apple_event_timeout(geometry=True, orientation='planned')
+                self.apple_event_timeout(geometry=True, orientation='only')
             elif case == 'preview':
                 self.preview_timeout()
             elif case == 'late-preview':
