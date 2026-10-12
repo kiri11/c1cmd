@@ -53,6 +53,8 @@ public struct OperationRecord: Codable, Equatable {
     public var error: String?
     public var previewOutputPath: String?
     public var previewSize: Int?
+    /// Clone and baseline only: the current album Capture One put the new variant in and c1 removed it from.
+    public var removedFromAlbum: String?
 
     public init(
         operationId: String = UUID().uuidString.lowercased(),

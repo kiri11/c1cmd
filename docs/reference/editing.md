@@ -70,7 +70,13 @@ are sequential, not atomic: a later failure can leave an earlier field applied.
 `reset` restores exposure/contrast/saturation defaults and baseline white balance;
 it is not an undo. `diff <ref>` compares with the saved baseline and
 `diff <ref1> <ref2>` compares two variants. `dump` exports batched JSONL.
-`variant baseline` creates a new default-settings variant. `variant delete`
+`variant baseline` creates a new default-settings variant. Capture One puts a new
+clone or baseline into the current album. When that is one of the photographer's
+albums, c1 removes it again in the same dispatch and records the album ID as
+`removedFromAlbum` in the journal, so the album keeps its members. A Catalog's import
+album under Recent Imports keeps the new variant, because deleting through that album
+can delete the variant. After an uncertain clone, a candidate clone can remain in the
+current album. `variant delete`
 removes only agent-created clones, requires their source variant to remain, and
 never deletes an image's last variant.
 

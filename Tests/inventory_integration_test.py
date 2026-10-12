@@ -303,7 +303,8 @@ end repeat''', timeout=600)
             time.sleep(.5)
 
     def edit_outside_current(self, target):
-        """get, a tonal edit, a clone, its preview and its deletion reach a variant the empty current collection lacks."""
+        """get, a tonal edit, a clone and a baseline, a preview and their deletion reach a variant the empty
+        current album lacks, and leave that album empty."""
         def run(*args):
             return self.cli(*args, progress=False)[0]
         source = run("get", target)
@@ -316,20 +317,24 @@ end repeat''', timeout=600)
         run("set", ref, "--if-state", changed["stateHash"], f"exposure={exposure}")
         assert abs(run("get", target)["adjustments"]["exposure"] - exposure) < 1e-4
         clone = run("variant", "clone", target)
+        baseline = run("variant", "baseline", target)
+        # Capture One adds new variants to the current album; c1 takes them out again.
+        assert osa("get id of every variant of current collection of first document") == "", "clone joined the current album"
         preview = run("preview", clone["workingRef"])
         assert Path(preview["previewPath"]).is_file(), preview
         assert run("variant", "delete", clone["workingRef"])["deleted"]
+        assert run("variant", "delete", baseline["workingRef"])["deleted"]
         siblings = osa(f'get id of every variant of parent image of variant id {apple_literal(target)} of '
                        f'collection {apple_literal(self.document["allVariants"])} of first document')
         siblings = [value.strip().strip('"') for value in siblings.split(",")]
-        assert target in siblings and clone["cloneVariantId"] not in siblings, ("clone left on its image", siblings)
+        assert target in siblings and not {clone["cloneVariantId"], baseline["cloneVariantId"]} & set(siblings), ("clone left on its image", siblings)
         missing, _, process = self.cli("get", "999999", progress=False, allow_error=True)
         assert process.returncode != 0 and missing["error"]["code"] == "variant-not-found", missing
         assert "current collection" in missing["error"]["message"], missing
         self.assert_originals("edit outside the current collection")
         self.evidence.append({"label": "edit-outside-current", "variant": target, "editingRef": ref,
                               "clone": clone["cloneVariantId"], "preview": preview["previewPath"]})
-        print(f"PASS get, edit, clone, preview and delete outside the current collection ({target})", flush=True)
+        print(f"PASS get, edit, clone, baseline, preview and delete outside the current album, which stays empty ({target})", flush=True)
 
     def dump(self, *flags, allow_error=False):
         value, _, process = self.cli("dump", "--dump-format", "json", *flags, allow_error=allow_error)

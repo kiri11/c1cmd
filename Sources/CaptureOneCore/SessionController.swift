@@ -811,15 +811,16 @@ public final class SessionController {
             var entry = OperationRecord(operationType: operation, workingRef: ref,
                 documentPath: doc.documentPath, beforeAdjustments: source.adjustments)
             entry.variantIdsBefore = siblings
-            return try journaled(entry, doc: doc, source: source, dispatch: {
+            return try journaled(entry, doc: doc, source: source, dispatch: { () -> (id: String, removedFromAlbum: String?) in
                 let args = [scriptDocument(doc), NSAppleEventDescriptor(string: source.id)]
                 if baseline {
                     let result: CreateBaselineVariantResult = try executor.executeAndDecode(handler: "createBaselineVariant", args: args)
-                    return result.baselineId
+                    return (result.baselineId, result.removedFromAlbum)
                 }
                 let result: CloneVariantResult = try executor.executeAndDecode(handler: "cloneVariant", args: args)
-                return result.cloneId
-            }, readback: { pending, id in
+                return (result.cloneId, result.removedFromAlbum)
+            }, readback: { pending, reply in
+                let (id, removedFromAlbum) = reply
                 guard id != source.id, !siblings.contains(id) else {
                     return .mismatch(.identityAmbiguous("Creation did not return a new variant ID."))
                 }
@@ -832,7 +833,7 @@ public final class SessionController {
                     cloneVariantId: id, documentPath: doc.documentPath, documentName: doc.documentName,
                     parentImagePath: parent, creationOperationId: pending.entry.operationId,
                     baselineAdjustments: created.adjustments, baselineStateHash: created.stateHash, documentToken: doc.openToken, baselineGeometry: created.geometry, baselineMetadata: VariantMetadata.from(created.metadata)))
-                pending.update { $0.afterAdjustments = created.adjustments }
+                pending.update { $0.afterAdjustments = created.adjustments; $0.removedFromAlbum = removedFromAlbum }
                 return .confirmed(CloneResult(workingRef: ref, cloneVariantId: id, sourceVariantId: source.id,
                                               documentPath: doc.documentPath, baselineStateHash: created.stateHash))
             }).value

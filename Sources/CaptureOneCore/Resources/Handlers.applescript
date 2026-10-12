@@ -217,6 +217,23 @@ on readVariantSummaries(docRef, variantIDs, collectionName)
     end tell
 end readVariantSummaries
 
+-- Capture One adds a new variant to the current album, whichever route created it.
+-- Deleting through the photographer's own album only removes it from that album (see
+-- variantRoutes), so the new variant ends in the same albums as with a folder current.
+-- Deleting through a Catalog's import album can delete the variant, so a new variant
+-- stays in such an album. Returns the album's ID, or missing value when nothing changed.
+on leaveCurrentAlbum(docRef, createdId)
+    set d to my checkedDocument(docRef)
+    tell application "/Applications/Capture One.app"
+        set c to current collection of d
+        if kind of c is not album or user of c is not true then return missing value
+        if not (exists variant id createdId of c) then return missing value
+        delete variant id createdId of c
+        if exists variant id createdId of c then error "The new variant is still in the current album." number -27003
+        return (id of c as text)
+    end tell
+end leaveCurrentAlbum
+
 on cloneVariant(docRef, sourceId)
     tell application "/Applications/Capture One.app"
         set c to clone variant (my documentVariant(docRef, sourceId))
@@ -225,7 +242,7 @@ on cloneVariant(docRef, sourceId)
         repeat with attempt from 1 to 20
             try
                 set createdId to (id of c as text)
-                return {cloneId:createdId}
+                exit repeat
             on error errorMessage number errorNumber
                 if (errorNumber is not -1700 and errorNumber is not -1728) or attempt is 20 then
                     error errorMessage number errorNumber
@@ -235,6 +252,7 @@ on cloneVariant(docRef, sourceId)
             my checkedDocument(docRef)
         end repeat
     end tell
+    return {cloneId:createdId, removedFromAlbum:my leaveCurrentAlbum(docRef, createdId)}
 end cloneVariant
 
 on deleteVariant(docRef, variantId, expectedPath, sourceId)
@@ -446,9 +464,9 @@ on createBaselineVariant(docRef, sourceId)
         if newVar is missing value then
             error "Failed to locate newly created baseline variant."
         end if
-        
-        return {baselineId:(id of newVar as text)}
+        set createdId to (id of newVar as text)
     end tell
+    return {baselineId:createdId, removedFromAlbum:my leaveCurrentAlbum(docRef, createdId)}
 end createBaselineVariant
 
 

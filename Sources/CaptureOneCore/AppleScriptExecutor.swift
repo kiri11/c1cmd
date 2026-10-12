@@ -23,10 +23,12 @@ public struct VariantSummaryRecord: Codable, Equatable {
 
 public struct CloneVariantResult: Codable, Equatable {
     public let cloneId: String
+    public var removedFromAlbum: String? = nil
 }
 
 public struct CreateBaselineVariantResult: Codable, Equatable {
     public let baselineId: String
+    public var removedFromAlbum: String? = nil
 }
 
 public struct DeleteVariantResult: Codable, Equatable {
