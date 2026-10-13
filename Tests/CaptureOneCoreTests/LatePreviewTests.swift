@@ -86,7 +86,7 @@ struct LatePreviewTests {
             try f.fake.landHeldPreview()
             let resolved = try f.core.operationStatus(operationId: entry.operationId)
             XCTAssertEqual(resolved.status, "succeeded")
-            XCTAssertEqual(resolved.resolution, "late-preview")
+            XCTAssertEqual(resolved.resolution, .latePreview)
             XCTAssertNil(resolved.error)
             XCTAssertEqual(resolved.previewOutputPath.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }, f.fake.heldPreview!.file.resolvingSymlinksInPath(), "The status names the landed JPEG")
             XCTAssertNoThrow(try f.journal.assertReady())
@@ -142,7 +142,7 @@ struct LatePreviewTests {
             try f.journal.append(entry: JSONDecoder().decode(OperationRecord.self, from: JSONSerialization.data(withJSONObject: object)))
         }
         let cases: [(String, String, (Fixture, inout [String: Any]) throws -> Void)] = [
-            ("not a preview", "outcome-unknown", { _, object in object["operationType"] = "set" }),
+            ("not a preview", "outcome-unknown", { _, object in object["operationType"] = "native"; object["nativeAction"] = "mask.refine" }),
             ("still pending", "pending", { _, object in object["status"] = "pending" }),
             ("no geometry token", "outcome-unknown", { _, object in object.removeValue(forKey: "preconditionGeometryStateHash") }),
             ("no preview size", "outcome-unknown", { _, object in object.removeValue(forKey: "previewSize") }),
@@ -163,14 +163,14 @@ struct LatePreviewTests {
         }
     }
 
-    /// After a restart the existing reconciliation runs, even when the late JPEG is complete.
+    /// After a restart the restart reconciliation runs, even when the late JPEG is complete.
     static func restartKeepsReconciliation() {
         timedOut { f, entry in
             try f.fake.landHeldPreview()
             f.fake.base.generation += "-restarted"
             let reconciled = try f.core.operationStatus(operationId: entry.operationId)
             XCTAssertEqual(reconciled.status, "reconciled")
-            XCTAssertNil(reconciled.resolution)
+            XCTAssertEqual(reconciled.resolution, .restart)
         }
     }
 }

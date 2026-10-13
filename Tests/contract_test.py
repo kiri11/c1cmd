@@ -290,7 +290,7 @@ def run(cli, mcp):
         assert (timeout['exclusiveMinimum'], timeout['maximum']) == (0, 300) and 'default 120' in timeout['description'], timeout
         status = cli_schema['responses']['operation_status']['properties']
         assert status['previewSize'] == {'type': 'integer'} and status['preconditionGeometryStateHash'] == status['preconditionStateHash']
-        assert status['resolution']['enum'] == ['late-preview'], status['resolution']
+        assert status['resolution']['enum'] == ['late-preview', 'probe-barrier', 'restart'], status['resolution']
         print('PASS: shared CLI/MCP schemas, 38 tool schemas, invalid requests, server survival')
     finally:
         client.close()

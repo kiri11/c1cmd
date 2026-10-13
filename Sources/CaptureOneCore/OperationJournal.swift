@@ -16,6 +16,16 @@ public struct DoubleDiff: Codable, Equatable {
     }
 }
 
+/// How `operation_status`, rather than the dispatch, ended an uncertain operation.
+public enum Resolution: String, Codable {
+    /// A timed-out preview whose JPEG and state matched the journal; the operation succeeded.
+    case latePreview = "late-preview"
+    /// Capture One answered a later Apple Event, so it had finished the uncertain one.
+    case probeBarrier = "probe-barrier"
+    /// Capture One restarted, which ended every Apple Event of its previous process.
+    case restart
+}
+
 public struct OperationRecord: Codable, Equatable {
     public let operationId: String
     public var compoundId: String?
@@ -48,8 +58,7 @@ public struct OperationRecord: Codable, Equatable {
     public var afterGeometry: Geometry?
     public var diff: [String: DoubleDiff]?
     public var status: String // "pending", "succeeded", "failed", "partial-failure", "outcome-unknown", "reconciled"
-    /// How operation status ended the operation without a restart; only `late-preview`.
-    public var resolution: String?
+    public var resolution: Resolution?
     public var error: String?
     public var previewOutputPath: String?
     public var previewSize: Int?
@@ -150,9 +159,36 @@ public final class OperationJournal {
                 ? "Capture One stopped saving the database after acknowledging it. Restart Capture One, reopen the document, then inspect operation status."
                 : entry.operationType == "preview"
                 ? "Inspect operation status once its JPEG has landed; a complete preview resolves without a restart, otherwise restart Capture One first."
+                : Self.barrierCovers(entry)
+                ? "Inspect operation status; it reconciles this write once Capture One answers, without a restart."
                 : "Restart Capture One to end in-flight work, then inspect operation status."
             throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. " + action))
         }
+    }
+
+    // Capture One 16.8.5.30 finishes these writes on its main thread before it answers a later
+    // Apple Event; the `barrier` fault case in Tests/recovery_integration_test.py qualifies them.
+    // Exports run on a background queue, and mask feather and refine have no scripting readback
+    // to qualify. A save-stalled write has finished but is unsaved, which only a restart reveals.
+    static let barrierCoveredOperations: Set<String> = [
+        "set", "add", "reset", "metadata_set", "geometry_set", "geometry_restore", "clone", "baseline", "delete",
+    ]
+    static let barrierCoveredNativeActions: Set<String> = [
+        "layer.create", "layer.delete", "mask.people", "color.create", "color.delete",
+        "dehaze.pick", "dehaze.recalculate", "lens.reset", "luma.clear", "style.apply",
+        "mask.clear", "mask.invert", "mask.fill", "mask.rasterize", "mask.copy",
+    ]
+
+    /// Whether an answered Apple Event proves this write kind has finished. A native write
+    /// without an action is a property patch.
+    public static func barrierCovers(operationType: String, nativeAction: String?) -> Bool {
+        guard operationType == "native" else { return barrierCoveredOperations.contains(operationType) }
+        return nativeAction.map(barrierCoveredNativeActions.contains) ?? true
+    }
+
+    /// Whether operation status may reconcile this entry behind the probe barrier.
+    public static func barrierCovers(_ entry: OperationRecord) -> Bool {
+        entry.saveStalledAt == nil && barrierCovers(operationType: entry.operationType, nativeAction: entry.nativeAction)
     }
 }
 

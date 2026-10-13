@@ -79,7 +79,7 @@ public struct ToolDefinition {
             "dump": ("Batched export of variants, adjustments, and metadata in JSON format. Narrow it with the variants_list filters: rating or minRating, or 1–512 known ids revalidated live. \(slowInventory)", true),
             "preview": ("Export and verify dedicated preview JPEG for a variant or working clone. Returns JSON metadata and an image content block with JPEG data. size picks the long edge (default \(PreviewSize.standard.longEdge) px). fullFrame renders the uncropped context and reports currentCrop in preview pixels (top-left origin); with aspectRatio and anchors it also reports candidateCrops.", false),
             "request_status": ("Read stored request progress and process liveness without contacting Capture One.", true),
-            "operation_status": ("Inspect status and, after an app restart, journal recovery observations without retrying the operation.", false),
+            "operation_status": ("Inspect status and journal recovery observations without retrying the operation. A covered write reconciles once Capture One answers; other writes need an app restart first.", false),
         ]
         for tool in Recipes.tools { entries[tool] = (recipe, tool == "edit_status") }
         return entries

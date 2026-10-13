@@ -195,12 +195,15 @@ struct WritePipelineTests {
                 // Uncertain outcomes block the next write before dispatch; nothing is retried.
                 XCTAssertThrowsError(try kind.write(core, ref, token), "\(label): blocked until reconciled")
                 XCTAssertEqual(fake.calls.filter { $0 == kind.handler }.count, 1, "\(label): never retried")
-                let unrestarted = try core.operationStatus(operationId: failure.operationId)
-                XCTAssertEqual(unrestarted.status, status, "\(label): the same app instance cannot reconcile")
-                fake.generation += "-restarted"
+                // Every pipeline kind is covered by the probe barrier, so the same app instance reconciles.
+                let records = try String(contentsOf: journal.journalFile, encoding: .utf8).split(separator: "\n").count
                 let reconciled = try core.operationStatus(operationId: failure.operationId)
                 XCTAssertEqual(reconciled.status, "reconciled", label)
+                XCTAssertEqual(reconciled.resolution, .probeBarrier, label)
+                let recordsAfter = try String(contentsOf: journal.journalFile, encoding: .utf8).split(separator: "\n").count
+                XCTAssertEqual(recordsAfter, records + 1, "\(label): one reconciliation record appended")
                 XCTAssertNoThrow(try journal.assertReady(), "\(label): reconciliation clears the block")
+                XCTAssertEqual(fake.calls.filter { $0 == kind.handler }.count, 1, "\(label): reconciliation never retries")
             }
         }
     }

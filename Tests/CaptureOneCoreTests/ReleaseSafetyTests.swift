@@ -300,15 +300,21 @@ struct ReleaseSafetyTests {
                     XCTFail("Expected injected timeout")
                 } catch let failure as OperationFailure {
                     XCTAssertEqual(ErrorResponse.payload(failure)["error"] as? [String: String] != nil, true)
-                    let pending = try core.operationStatus(operationId: failure.operationId)
-                    XCTAssertEqual(pending.status, "outcome-unknown")
                     let beforeCalls = fake.calls.filter { $0 == "cloneVariant" }.count
                     fake.fail = nil
                     XCTAssertThrowsError(try core.cloneVariant(sourceRef: "1"))
                     XCTAssertEqual(fake.calls.filter { $0 == "cloneVariant" }.count, beforeCalls)
-                    fake.generation += "-restarted"
-                    let reconciled = try core.operationStatus(operationId: failure.operationId)
-                    XCTAssertEqual(reconciled.status, "reconciled")
+                    let status = try core.operationStatus(operationId: failure.operationId)
+                    if operation == "processPreview" {
+                        XCTAssertEqual(status.status, "outcome-unknown", "Exports run outside the probe barrier")
+                        fake.generation += "-restarted"
+                        let reconciled = try core.operationStatus(operationId: failure.operationId)
+                        XCTAssertEqual(reconciled.status, "reconciled")
+                        XCTAssertEqual(reconciled.resolution, .restart)
+                    } else {
+                        XCTAssertEqual(status.status, "reconciled", operation)
+                        XCTAssertEqual(status.resolution, .probeBarrier, operation)
+                    }
                     XCTAssertNoThrow(try journal.assertReady())
                 }
             }

@@ -476,7 +476,7 @@ struct RecipeTests {
                 XCTAssertThrowsError(try journal.assertReady(),"\(tool): the uncertain preview blocks writes")
                 try fake.geometry.landHeldPreview()
                 let resolved = try core.operationStatus(operationId:child.operationId)
-                XCTAssertEqual([resolved.status,resolved.resolution],["succeeded","late-preview"],tool)
+                XCTAssertEqual([resolved.status,resolved.resolution?.rawValue],["succeeded","late-preview"],tool)
                 XCTAssertNoThrow(try journal.assertReady(),"\(tool): the resolved preview lifts the block")
                 let status = try workflow.run("edit_status",arguments:["compoundId":compoundId])
                 XCTAssertEqual(status["status"] as? String,"outcome-unknown","\(tool): child resolution never promotes the parent")

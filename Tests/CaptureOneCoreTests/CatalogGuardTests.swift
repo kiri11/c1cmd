@@ -179,19 +179,18 @@ struct CatalogEditingTests {
             XCTAssertEqual(fake.base.calls.filter { $0 == "cloneVariant" }.count, dispatches)
             try Data("original".utf8).write(to: URL(fileURLWithPath: fake.base.parent))
 
-            // Outcome-unknown blocks subsequent writes; restart permits observation only.
+            // Outcome-unknown blocks subsequent writes; a restart before status permits observation only.
             fake.failure = "lost-reply"
             var operationID = ""
             do { _ = try enabled.geometrySet(workingRef: ref, ifGeometryState: crop.geometryStateHash, rotation: 3, aspectRatio: 1.5) }
             catch let error as OperationFailure { operationID = error.operationId }
             XCTAssertFalse(operationID.isEmpty)
             XCTAssertThrowsError(try enabled.cloneVariant(sourceRef: "1"))
-            let unresolvedStatus = try enabled.operationStatus(operationId: operationID).status
-            XCTAssertEqual(unresolvedStatus, "outcome-unknown")
             fake.base.generation = "app-2"
             fake.failure = nil
-            let reconciledStatus = try enabled.operationStatus(operationId: operationID).status
-            XCTAssertEqual(reconciledStatus, "reconciled")
+            let reconciled = try enabled.operationStatus(operationId: operationID)
+            XCTAssertEqual(reconciled.status, "reconciled")
+            XCTAssertEqual(reconciled.resolution, .restart)
             XCTAssertThrowsError(try enabled.get(ref: ref))
             let staleCloneListed = try enabled.listVariants().contains { $0.workingRef == ref }
             XCTAssertFalse(staleCloneListed)

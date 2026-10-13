@@ -42,6 +42,18 @@ struct SaveStallTests {
                        record(status: "failed"), record(status: "outcome-unknown"), record(status: "reconciled"), record("native", changed: false)]
         XCTAssertEqual(stalled(ignored, modified: -10, now: 1000), [],
                        "Previews, no-op writes, other processes and unresolved or reconciled writes never stall")
+        func reconciled(_ resolution: Resolution, adjusted: Bool) -> OperationRecord {
+            var entry = OperationRecord(timestamp: ISO8601DateFormatter().string(from: dispatched), operationType: "set",
+                workingRef: nil, documentPath: "/fixture", beforeAdjustments: Adjustments(exposure: 0),
+                afterAdjustments: Adjustments(exposure: adjusted ? 1 : 0), status: "reconciled")
+            entry.appInstance = "app-1"
+            entry.resolution = resolution
+            return entry
+        }
+        let barrier = reconciled(.probeBarrier, adjusted: true)
+        XCTAssertEqual(stalled([barrier, reconciled(.probeBarrier, adjusted: false), reconciled(.restart, adjusted: true)],
+                               modified: -10, now: 1000), [barrier.operationId],
+                       "A barrier reconcile that observed a change stays in the running process and can stall unsaved")
         XCTAssertEqual(stalled([record("clone", changed: false), record("delete", changed: false)], modified: -10, now: 1000).count, 2,
                        "Creating and deleting variants always changes the database")
         XCTAssertNoThrow(try SaveStall.stalled([record()], appInstance: "app-1", now: dispatched.addingTimeInterval(10)) {

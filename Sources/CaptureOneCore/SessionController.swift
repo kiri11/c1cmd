@@ -1321,27 +1321,36 @@ public final class SessionController {
     }
 
     // MARK: - Operation Status & Reconciliation
-    /// A restarted app cannot still execute an Apple Event from its previous process.
+    /// An uncertain Apple Event has ended once a restart killed its process, or once Capture One
+    /// answers a later event for a write kind the probe barrier covers on the pinned build.
     /// Reconciliation records observations, never retries an uncertain mutation or rebinds a reference.
     /// The one resolution without a restart is a late preview export (`latePreview`).
     public func operationStatus(operationId: String) throws -> OperationRecord {
         return try lock.withLock {
+            // This live Apple Event, sent after the uncertain one with the default timeout, is the probe barrier.
             let doc = try getDocumentInfo()
             try assertSessionWritable(docInfo: doc, operation: "operation status")
             let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
             guard var entry = try journal.validatedEntries().first(where: { $0.operationId == operationId }) else {
                 throw C1Error.invalidRequest("Operation ID '\(operationId)' not found in journal.")
             }
-            guard OperationJournal.isUnresolved(entry) else { return entry }
-            let instance = try appInstance()
-            guard let originalInstance = entry.appInstance, originalInstance != instance else {
-                guard entry.appInstance == instance, let resolved = try latePreview(entry, doc: doc) else { return entry }
+            guard OperationJournal.isUnresolved(entry), let originalInstance = entry.appInstance else { return entry }
+            let resolution: Resolution
+            if originalInstance != (try appInstance()) {
+                resolution = .restart
+            } else if let resolved = try latePreview(entry, doc: doc) {
                 try journal.append(entry: resolved)
                 return resolved
+            } else if doc.appVersion == Self.pinnedBuild, OperationJournal.barrierCovers(entry) {
+                resolution = .probeBarrier
+            } else {
+                return entry
             }
             guard entry.documentIdentity == (try databaseIdentity(databasePath(doc))) else {
                 throw C1Error.documentChanged("Cannot reconcile against a replaced database.")
             }
+            let cause = resolution == .restart ? "Previous app instance ended."
+                : "Capture One answered a later Apple Event, so the uncertain one has finished."
             if ["clone", "baseline"].contains(entry.operationType) {
                 guard let before = entry.variantIdsBefore, let parent = entry.parentImagePath else {
                     throw C1Error.identityAmbiguous("Creation lacks recovery identity evidence.")
@@ -1355,7 +1364,7 @@ public final class SessionController {
                 entry.observedVariantIds = siblings.filter { !before.contains($0) }
                 // Other photographer-created variants are indistinguishable; do not adopt or delete them.
                 entry.status = "reconciled"
-                entry.error = "Previous app instance ended. Review observedVariantIds manually; no variants were adopted, deleted, or recreated."
+                entry.error = "\(cause) Review observedVariantIds manually; no variants were adopted, deleted, or recreated."
             } else if let id = entry.nativeVariantId {
                 guard let parent = entry.parentImagePath else {
                     throw C1Error.identityAmbiguous("Operation lacks a recorded parent image for its native variant.")
@@ -1377,12 +1386,13 @@ public final class SessionController {
                         entry.afterNative = try nativeGet(ref: id, target: target)
                     }
                     entry.status = "reconciled"
-                    entry.error = "Previous app instance ended. Observed current adjustments, geometry, and metadata are recorded; they do not prove historical completion. Review before creating a fresh editing reference."
+                    entry.error = "\(cause) Observed current adjustments, geometry, and metadata are recorded; they do not prove the write succeeded. " + (resolution == .restart ? "Review before creating a fresh editing reference." : "Read get again for fresh tokens before the next write.")
                 case .absent:
                     entry.status = "reconciled"
-                    entry.error = "Previous app instance ended; the target variant is absent. No retry was performed."
+                    entry.error = "\(cause) The target variant is absent. No retry was performed."
                 }
             } else { throw C1Error.identityAmbiguous("Operation lacks a native variant recovery identity.") }
+            entry.resolution = resolution
             try journal.append(entry: entry)
             return entry
         }
@@ -1412,7 +1422,7 @@ public final class SessionController {
               current.stateHash == stateHash, current.geometryStateHash == geometryHash else { return nil }
         var resolved = entry
         resolved.status = "succeeded"
-        resolved.resolution = "late-preview"
+        resolved.resolution = .latePreview
         resolved.error = nil
         resolved.previewOutputPath = file.path
         return resolved

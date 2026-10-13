@@ -220,8 +220,7 @@ struct GeometryTests {
             fake.changeDuringPreview = false; fake.base.generation = "app-preview-restarted"
             let previewRecovery = try core.operationStatus(operationId:previewOp!)
             XCTAssertNotNil(previewRecovery.afterGeometry)
-            let restartClone = try core.cloneVariant(sourceRef:"1")
-            var faultRef = restartClone.workingRef
+            let faultRef = try core.cloneVariant(sourceRef:"1").workingRef
             for failure in ["stale-dispatch","timeout","partial","lost-reply","mismatch"] {
                 fake.failure = failure
                 let fresh = try core.get(ref:faultRef)
@@ -231,16 +230,12 @@ struct GeometryTests {
                 XCTAssertNotNil(op)
                 XCTAssertEqual(journal.unresolvedEntries().count,1)
                 XCTAssertThrowsError(try core.geometrySet(workingRef:faultRef,ifGeometryState:fresh.geometryStateHash!,rotation:0))
-                let pending = try core.operationStatus(operationId:op!)
-                XCTAssertTrue(OperationJournal.isUnresolved(pending))
-                fake.failure = nil; fake.base.generation += "-restart"
+                fake.failure = nil
                 let recovered = try core.operationStatus(operationId:op!)
                 XCTAssertEqual(recovered.status,"reconciled")
+                XCTAssertEqual(recovered.resolution,.probeBarrier)
                 XCTAssertNotNil(recovered.afterGeometry)
-                XCTAssertThrowsError(try core.get(ref:faultRef))
-                // Continue with a freshly bound reference after each simulated restart.
-                let next = try core.cloneVariant(sourceRef:"1")
-                faultRef = next.workingRef
+                XCTAssertNoThrow(try core.get(ref:faultRef),"The probe barrier keeps references valid")
             }
         }
     }
@@ -397,8 +392,7 @@ struct GeometryTests {
                 _ = try core.geometrySet(workingRef:ref,ifGeometryState:nativeFit.geometryStateHash,orientation:180)
                 XCTFail("Expected an orientation readback mismatch")
             } catch let failure as OperationFailure {
-                let status = try core.operationStatus(operationId:failure.operationId).status
-                XCTAssertEqual(status, "partial-failure")
+                XCTAssertEqual(journal.find(operationId:failure.operationId)?.status, "partial-failure")
             }
             fake.failure = nil
         }

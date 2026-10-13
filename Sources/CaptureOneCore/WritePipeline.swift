@@ -145,7 +145,7 @@ extension SessionController {
     /// Dispatches one write under a durable pending journal entry and classifies it.
     /// A throw from dispatch, the document re-check or the readback leaves the outcome
     /// unknown; an observed difference is a partial failure. Both block writes until
-    /// reconciled after a restart; nothing is retried or undone. The one exception is
+    /// `operationStatus` reconciles them; nothing is retried or undone. The one exception is
     /// a qualified refusal: when `refusal` recognises the dispatch error, the document
     /// is re-checked and `unchanged` must confirm from a fresh readback that nothing
     /// changed; the operation then resolves as failed. Other errors add no Apple Event.
