@@ -118,6 +118,9 @@ def run(cli, mcp):
             complete = cli_schema['responses'][name]['properties']
             assert all(complete[k] == v for k, v in cli_schema['compactResponses'][name]['properties'].items() if k != 'evidencePath'), name
         assert client.tool('get', {'ref': '1', 'full': True}).get('isError')
+        assert [name for name, schema in cli_schema['requests'].items() if 'inlineImage' in schema['properties']] == ['preview']
+        rejected = client.tool('preview', {'ref': '1', 'inlineImage': 'no'})
+        assert rejected.get('isError') and 'invalid-request' in rejected['content'][0]['text'], rejected
         for args in [{"ids": []}, {"ids": ["1", "1"]}, {"ids": [str(i) for i in range(513)]},
                      {"ids": ["1"], "fields": "unknown"}, {"fields": "minimal"}, {"parentPath": "/a.CR3"}]:
             assert client.tool("variants_list", args).get("isError"), args

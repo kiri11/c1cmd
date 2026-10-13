@@ -23,6 +23,14 @@ struct RequestDispatcherTests {
         for tool in ContractSchema.names {
             XCTAssertEqual(ToolRequest.localTools.contains(tool), tool == "request_status" || tool.hasPrefix("catalog_"))
         }
+        // `inlineImage` is MCP presentation only: preview accepts it, and the command and stored request never see it.
+        let quiet = try? ToolRequest(tool: "preview", arguments: ["ref": "x", "inlineImage": false], profile: .standard)
+        XCTAssertEqual(quiet?.inlineImage, false)
+        XCTAssertNil(quiet?.arguments["inlineImage"])
+        XCTAssertEqual(try? ToolRequest(tool: "preview", arguments: ["ref": "x"], profile: .standard).inlineImage, true)
+        XCTAssertEqual(try? ToolRequest(tool: "thumb", arguments: ["ref": "x"], profile: .standard).inlineImage, true)
+        XCTAssertThrowsError(try ToolRequest(tool: "preview", arguments: ["ref": "x", "inlineImage": "no"], profile: .standard))
+        XCTAssertThrowsError(try ToolRequest(tool: "thumb", arguments: ["ref": "x", "inlineImage": false], profile: .standard))
 
         // Every schema tool is registered with a description; only the profile removes tools.
         XCTAssertEqual(ToolProfile.standard.tools.map(\.name), ContractSchema.names)

@@ -84,11 +84,15 @@ public enum ContractSchema {
             "embeddedTag": ["enum": EmbeddedPreview.tags], "exifOrientation": integer(1...8), "cameraRendering": ["const": true], "limitation": string]
         return object(properties, required: properties.keys.filter { $0 != "workingRef" }.sorted())
     }
-    /// Mutation, recipe and preview tools also accept `full`, which `ToolRequest` removes before validation.
+    /// Mutation, recipe and preview tools also accept `full`, and preview accepts `inlineImage`;
+    /// `ToolRequest` removes both before validation.
     public static func input(_ name: String) -> [String: Any] {
         var schema = request(name)
         if ResultCompaction.tools.contains(name), var properties = schema["properties"] as? [String: Any] {
             properties["full"] = ["type": "boolean", "description": "Return the complete result instead of a compact summary with evidencePath."]
+            if name == "preview" {
+                properties["inlineImage"] = ["type": "boolean", "description": "MCP only, default true. False returns only the text result; previewPath still names the JPEG."]
+            }
             schema["properties"] = properties
         }
         return schema

@@ -3,8 +3,8 @@
 
 Tool behaviour is covered by the CLI suites through the same core dispatcher. This
 suite checks only what the MCP server adds: tool registration, JSON-RPC results and
-errors, preview image content, and that one server process compiles the AppleScript
-handlers once and reuses them for every later call."""
+errors, preview image content and its inlineImage opt-out, and that one server
+process compiles the AppleScript handlers once and reuses them for every later call."""
 
 import base64
 import json
@@ -253,7 +253,7 @@ def main():
         assert err_res.get("isError") is True and err_payload["error"]["code"] == "unmanaged-variant", err_res
         print(f"  ✓ Unmanaged variant mutation blocked: [{err_payload['error']['code']}]")
 
-        print("\n[Step 4] Preview image content on a managed clone...")
+        print("\n[Step 4] Preview image content, and inlineImage false, on a managed clone...")
         clone_res = client.call_tool("variant_clone", {"sourceRef": source_id})
         assert clone_res.get("isError") is not True, f"Clone failed: {clone_res}"
         clone_data = parse_text_content(clone_res.get("content", []))
@@ -276,9 +276,19 @@ def main():
         raw_bytes = base64.b64decode(img_block.get("data", ""))
         assert len(raw_bytes) == complete_preview["fileSizeBytes"], (len(raw_bytes), complete_preview["fileSizeBytes"])
         assert raw_bytes[:3] == b"\xff\xd8\xff", "Image content block lacks a JPEG header"
+        path_res = client.call_tool("preview", {"ref": working_ref, "timeout": 35.0, "inlineImage": False})
+        assert path_res.get("isError") is not True, f"Path-only preview failed: {path_res}"
+        assert [item.get("type") for item in path_res.get("content", [])] == ["text"], path_res
+        path_data = parse_text_content(path_res["content"])
+        validate_response(path_data, schema["compactResponses"]["preview"], "preview")
+        path_complete = json.loads(Path(path_data["evidencePath"]).read_text())
+        jpeg = Path(path_data["previewPath"]).read_bytes()
+        assert jpeg[:3] == b"\xff\xd8\xff" and len(jpeg) == path_complete["fileSizeBytes"], (len(jpeg), path_complete["fileSizeBytes"])
+        decoded = subprocess.run(["sips", "-g", "pixelWidth", path_data["previewPath"]], capture_output=True, text=True)
+        assert decoded.returncode == 0 and f"pixelWidth: {path_data['width']}" in decoded.stdout, decoded
         del_data = parse_text_content(client.call_tool("variant_delete", {"workingRef": working_ref}).get("content", []))
         assert del_data.get("deleted") is True, f"Delete failed: {del_data}"
-        print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content with a compact result; clone deleted")
+        print(f"  ✓ Preview returned {len(raw_bytes)} JPEG bytes as image content with a compact result; inlineImage false returned only text and a decodable previewPath; clone deleted")
 
         print("\n[Step 4b] Embedded camera JPEG as image content...")
         thumb_res = client.call_tool("thumb", {"ref": source_id, "maxSize": 400})

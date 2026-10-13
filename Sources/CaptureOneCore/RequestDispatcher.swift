@@ -8,6 +8,8 @@ public struct ToolRequest {
     public let arguments: [String: Any]
     /// Return the complete result instead of a compact summary with an evidence path.
     public let full: Bool
+    /// MCP attaches a preview's JPEG as image content unless `inlineImage` is false; the CLI never inlines.
+    public let inlineImage: Bool
     let command: Command
 
     enum Command {
@@ -59,13 +61,19 @@ public struct ToolRequest {
         guard profile.allows(tool) else {
             throw C1Error.invalidRequest("Tool is not enabled in the \(profile.rawValue) profile: \(tool)")
         }
-        // `full` only selects presentation; the command and any stored request never see it.
+        // `full` and `inlineImage` only select presentation; the command and any stored request never see them.
         var a = arguments
         if ResultCompaction.tools.contains(tool), let full = a.removeValue(forKey: "full") {
             try ContractSchema.validateValue(full, schema: ContractSchema.boolean, path: "\(tool).full")
             self.full = full as! Bool
         } else {
             self.full = false
+        }
+        if tool == "preview", let inlineImage = a.removeValue(forKey: "inlineImage") {
+            try ContractSchema.validateValue(inlineImage, schema: ContractSchema.boolean, path: "preview.inlineImage")
+            self.inlineImage = inlineImage as! Bool
+        } else {
+            self.inlineImage = true
         }
         try ContractSchema.validate(tool: tool, arguments: a)
         self.tool = tool
