@@ -283,11 +283,37 @@ describes compact shapes; `responses` describes complete ones.
 ## Recovery commands
 
 Errors after dispatch carry `operationId`. `c1 operation status <operationId>` /
-`operation_status` reports whether the operation is resolved. While the original
-Capture One process runs, the operation stays unresolved, because a timeout does
-not cancel the Apple Event; a late preview is the one exception. After a restart and reopening the same
-database, status reconciliation records observed adjustments or candidate clone
-IDs and ends the write block.
+`operation_status` reports whether the operation is resolved. A timeout does not
+cancel the Apple Event, so Capture One can still apply the write after the error.
+Status resolves the operation only when the event has ended, and sets `resolution`
+to say how. A reconciliation records observed adjustments, geometry, metadata,
+native state or candidate clone IDs and ends the write block.
+
+`probe-barrier` applies on the qualified build (16.8.5.30) to covered writes.
+Capture One handles scripting Apple Events one at a time, so when it answers the
+status call's own event, it has finished the uncertain one. Status reconciles at
+once, with no restart. Editing references stay valid; read `get` again for fresh
+tokens before the next write.
+
+`late-preview` applies to a timed-out preview whose JPEG has landed; see
+[late-preview resolution](#late-preview-resolution).
+
+`restart` applies to every other case. Restart Capture One, reopen the same
+database and run status again. A restart ends every Apple Event of the previous
+process. Old references are then invalid, so prepare a fresh one.
+
+| Write | Resolution without a restart |
+|---|---|
+| `set`, `add`, `reset`, `metadata_set`, `geometry_set`, `geometry_restore`, `native_set`, `variant_clone`, `variant_baseline`, `variant_delete` | Probe barrier |
+| `native_action` with `layer.create`, `layer.delete`, `mask.people`, `mask.clear`, `mask.invert`, `mask.fill`, `mask.rasterize`, `mask.copy`, `color.create`, `color.delete`, `dehaze.pick`, `dehaze.recalculate`, `lens.reset`, `luma.clear` or `style.apply` | Probe barrier |
+| `native_action` with `mask.feather` or `mask.refine` | None. They change nothing Capture One exposes to scripting, so the barrier cannot be qualified for them. |
+| `preview` | Late preview only. Capture One exports on a background queue that the barrier does not cover. |
+| A [save-stalled](#save-stalls) write | None. The write finished but is unsaved, which only a restart reveals. |
+| Any write on another build | None |
+
+A recipe's child writes follow the row of their own kind. If the status call
+itself times out, it records nothing and the write stays blocked until a restart.
+
 `doctor` reports `unresolvedOperationsCount` only after reading the journal; an
 absent count means unknown and `diagnosticError` explains why.
 
@@ -302,8 +328,9 @@ It can also stop saving: acknowledged writes then never reach the database, even
 after the document closes, and the document reopens without them. c1 checks for
 this before every write and in `doctor`.
 
-A write is unsaved when it succeeded in the running Capture One process, changed
-something (every write except `preview` and writes whose readback shows no change),
+A write is unsaved when it succeeded, or was reconciled behind the probe barrier, in
+the running Capture One process, changed something (every write except `preview`
+and writes whose readback or reconciliation shows no change),
 and the database file has not been modified since its dispatch. Once the oldest
 unsaved write is 5 minutes old, c1 appends an `outcome-unknown` snapshot with
 `saveStalledAt` for every unsaved write, so writes are blocked as after any
@@ -322,8 +349,9 @@ back or quitting Capture One.
 
 ### Late preview resolution
 
-An export changes no settings, so a timed-out `preview` is the one operation that
-`operation_status` resolves without a restart. Every condition must hold:
+An export changes no settings, so `operation_status` can confirm a timed-out
+`preview` without a restart, although the probe barrier does not cover exports.
+Every condition must hold:
 
 - The operation is a `preview` with status `outcome-unknown`, and Capture One is
   still the process that started it.
@@ -340,8 +368,8 @@ Status then appends a snapshot with `status: succeeded`,
 block lifts.
 No restart happened, so references stay valid. A failed check appends nothing and
 leaves the operation unresolved; ask again after the JPEG lands, or restart and
-reconcile. After a restart, normal reconciliation records `reconciled` even for a
-complete JPEG. Journal entries written before contract 4.9.0
+reconcile. After a restart, normal reconciliation records `reconciled` with
+`resolution: restart`, even for a complete JPEG. Journal entries written before contract 4.9.0
 lack `preconditionGeometryStateHash` and always need the restart.
 
 A saved compound report never changes after the fact. When the preview step of

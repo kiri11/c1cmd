@@ -51,18 +51,23 @@ their only statement; the reference docs link here.
    `.c1/journal.jsonl` first. A failed journal write blocks dispatch; a corrupt
    journal or provenance fails closed. Keep `.c1` files; deleting evidence is not
    recovery.
-4. **An uncertain outcome blocks all writes until restart and reconcile.** After a
-   timeout or `outcome-unknown`, never repeat the command: use
-   `operation_status <operationId>`. Restart Capture One, reopen the same database
-   and check status again. Never retry, undo, resume or adopt a candidate clone
-   automatically. `reconciled` records observations; it does not mean the write
-   succeeded. Old references stay invalid, so prepare a fresh one. The one
-   exception is a timed-out `preview` whose JPEG has since landed: `operation_status`
-   resolves it without a restart, as `succeeded` with `resolution: late-preview`,
-   when the [late-preview checks](docs/reference/editing.md#late-preview-resolution)
-   pass. Any failed check leaves it under this rule. Writes Capture One
-   acknowledged but has not saved for 5 minutes also become `outcome-unknown`
-   ([save stalls](docs/reference/editing.md#save-stalls)).
+4. **An uncertain outcome blocks all writes until it is resolved.** After a
+   timeout or `outcome-unknown`, never repeat the command; use
+   `operation_status <operationId>`. On the qualified build it reconciles a
+   [covered write](docs/reference/editing.md#recovery-commands) at once, because
+   Capture One answers the status call's Apple Event only after it finishes the
+   uncertain one (`resolution: probe-barrier`). A timed-out `preview` whose JPEG
+   has since landed resolves as `succeeded` with `resolution: late-preview` when the
+   [late-preview checks](docs/reference/editing.md#late-preview-resolution) pass.
+   Otherwise restart Capture One, reopen the same database and check status again
+   (`resolution: restart`). This covers previews that fail those checks, mask
+   feather and refine, other builds, a status call that times out, and writes
+   Capture One acknowledged but has not saved for 5 minutes, which also become
+   `outcome-unknown` ([save stalls](docs/reference/editing.md#save-stalls)). Never
+   retry, undo, resume or adopt a candidate clone automatically. `reconciled`
+   records observations; it does not mean the write succeeded. Read `get` again
+   before the next write. After a restart, old references stay invalid, so prepare
+   a fresh one.
 5. **Catalog writes require the exact-path opt-in and the exact build, with a
    native backup taken first.** `C1_CATALOG_WRITE_PATH` must name the exact open
    Catalog and Capture One must be 16.8.5.30; only online referenced originals

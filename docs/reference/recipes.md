@@ -284,12 +284,12 @@ state, and read freshly again before a later independent mutation.
 reported as interrupted with exactly its linked child journal records. It does
 not infer completion, retry, resume or reconcile. A parent that ended
 `outcome-unknown` also lists its child records, with their current status. For an
-uncertain child, follow `operation status CHILD_ID` and the normal
-restart/reconciliation procedure; a timed-out preview child can
-[resolve without a restart](editing.md#late-preview-resolution) and lift the write
-block, while the parent stays `outcome-unknown`.
-Restart invalidates old editing references. Even reconciled child observations
-do not prove the interrupted compound completed.
+uncertain child, run `operation status CHILD_ID` and follow the
+[recovery procedure](editing.md#recovery-commands); a covered child or a
+[late preview](editing.md#late-preview-resolution) resolves without a restart and
+lifts the write block, while the parent keeps its status. A restart invalidates
+old editing references. Even reconciled child observations do not prove the
+interrupted compound completed.
 
 Each operation handles one photo per call. Multi-photo scheduling, automatic
 resume, native style installation, mask reconstruction and generalized native
