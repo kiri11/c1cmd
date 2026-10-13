@@ -44,7 +44,7 @@ on run argv
     return output as text
 end run
 '''
-RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'orientation', 'lens', 'perspective', 'keystone', 'preview', 'late-preview', 'mcp-death')
+RECOVERY_CASES = ('clone-readback', 'tonal', 'metadata', 'native', 'native-action', 'geometry', 'orientation', 'lens', 'perspective', 'keystone', 'preview', 'late-preview', 'save-stall', 'mcp-death')
 RECIPE_CASES = ('native', 'native-action', 'lens', 'layer-color', 'tonal', 'geometry', 'preview', 'late-preview', 'mcp-death')
 RECIPE_PREFIX = 'recipe:'
 ALL_CASES = (*RECOVERY_CASES, *(RECIPE_PREFIX + case for case in RECIPE_CASES))
@@ -303,7 +303,7 @@ class Run:
             assert variant['parentImagePath'] == str(self.raw), (
                 'Native image path differs from the fixture path; stop before further mutations', variant)
 
-    def recovery(self, operation, clone, label, status_before_restart=True):
+    def recovery(self, operation, clone, label, status_before_restart=True, also=()):
         before = self.identities()
         self.log('recovery-inventory', case=label, phase='before-restart', identities=before)
         count = len(self.records())
@@ -325,6 +325,8 @@ class Run:
         assert blocked['error']['code'] == 'outcome-unknown'
         reconciled = self.cli('operation', 'status', operation)
         assert reconciled['status'] == 'reconciled'
+        for other in also:
+            assert self.cli('operation', 'status', other)['status'] == 'reconciled', other
         if label == 'geometry-apple-event-timeout':
             assert reconciled.get('beforeGeometry') and reconciled.get('intendedGeometry') and reconciled.get('afterGeometry')
         if label in ('corrected-geometry-apple-event-timeout', 'perspective-geometry-apple-event-timeout'):
@@ -513,6 +515,43 @@ set keystone horizontal of adjustments of v to -5
         wait_for(lambda: file.read_bytes().endswith(b'\xff\xd9'), 60)
         self.log('output-observed-after-timeout', path=str(file), bytes=file.stat().st_size, sha256=sha(file))
         self.recovery(operation, clone, 'preview-timeout-with-eventual-output', status_before_restart=False)
+
+    def save_stall(self):
+        """Capture One stops saving (#43). A database file backdated after Capture One saved
+        stands in for the stall; nothing writes until the stall bound has passed."""
+        clone, current = self.clone()
+        creation = [r for r in self.records() if r['operationType'] == 'clone'][-1]
+        assert creation['status'] == 'succeeded', creation
+        written = self.cli('set', clone['workingRef'], '--if-state', current['stateHash'], 'exposure=0.25')
+        operation = written['operationId']
+        def dispatched(record):
+            return datetime.datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00')).timestamp()
+        # Capture One saves about once a minute; the stand-in starts after that save.
+        wait_for(lambda: self.db.stat().st_mtime > dispatched(self.latest(operation)), 180)
+        doctor = self.cli('doctor')
+        assert 'saveStall' not in doctor and doctor['writesEnabled'] and doctor['allChecksPassed'], doctor
+        before = self.identities()
+        # Earlier cases' writes stay saved: the journal records dispatch to the second, so the
+        # stand-in falls inside the second before the clone. An earlier time would also move
+        # the creation time, which is part of the database identity.
+        stand_in = dispatched(creation) - .5
+        born = self.db.stat().st_birthtime
+        assert born < stand_in, 'The fixture database is too new for a stand-in'
+        assert not [r for r in self.records() if r['operationId'] not in (creation['operationId'], operation)
+                    and dispatched(r) > stand_in], 'Another write shares the stand-in second'
+        os.utime(self.db, (stand_in, stand_in))
+        assert self.db.stat().st_birthtime == born, 'Backdating changed the database identity'
+        self.log('database-backdated', modified=stand_in, creationOperationId=creation['operationId'], operationId=operation)
+        time.sleep(max(0, dispatched(creation) + 300 + 5 - time.time()))
+        assert self.db.stat().st_mtime == stand_in, 'Capture One wrote the database during the stand-in; the case does not qualify'
+        doctor = self.cli('doctor', ok=False)
+        stall = doctor.get('saveStall') or {}
+        assert doctor['writesDisabledReason'] == 'save-stalled' and not doctor['allChecksPassed'], doctor
+        assert stall.get('operationIds') == [creation['operationId'], operation] and stall['oldestAgeSeconds'] >= 300, doctor
+        for record in (self.latest(creation['operationId']), self.latest(operation)):
+            assert record['status'] == 'outcome-unknown' and record['saveStalledAt'], record
+        assert self.identities() == before
+        self.recovery(creation['operationId'], clone, 'save-stall', also=[operation])
 
     def blocked_by(self, operation):
         count = len(self.records())
@@ -710,6 +749,8 @@ set keystone horizontal of adjustments of v to -5
                 self.preview_timeout()
             elif case == 'late-preview':
                 self.late_preview()
+            elif case == 'save-stall':
+                self.save_stall()
             elif case == 'mcp-death':
                 self.mcp_death()
 

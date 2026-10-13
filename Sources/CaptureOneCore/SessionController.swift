@@ -28,6 +28,8 @@ public struct DoctorReport: Codable, Equatable {
     public var writesDisabledReason: WritesDisabledReason? = nil
     public let lockAcquired: Bool
     public let unresolvedOperationsCount: Int?
+    /// Writes c1 found unsaved past the stall bound in the running Capture One process.
+    public var saveStall: SaveStallReport? = nil
     public var diagnosticError: C1Error? = nil
     public let allChecksPassed: Bool
     public let warning: String?
@@ -61,6 +63,13 @@ public struct DoctorReport: Codable, Equatable {
         self.allChecksPassed = allChecksPassed
         self.warning = warning
     }
+}
+
+public struct SaveStallReport: Codable, Equatable {
+    public let operationIds: [String]
+    /// Seconds since the oldest unsaved write was dispatched.
+    public let oldestAgeSeconds: Int
+    public let databaseModifiedAt: String
 }
 
 public struct DocumentInfo: Codable, Equatable {
@@ -104,6 +113,7 @@ public enum WritesDisabledReason: String, Codable, CaseIterable {
     case unsupportedVersion = "unsupported-version"
     case catalogBuildRequired = "catalog-build-required"
     case checksFailed = "checks-failed"
+    case saveStalled = "save-stalled"
 }
 
 public struct VariantSummary: Codable, Equatable {
@@ -274,6 +284,8 @@ public final class SessionController {
     let executor: ScriptExecuting
     let appInstance: () throws -> String
     let databaseIdentity: (String) throws -> String
+    let databaseModified: (String) throws -> Date
+    let now: () -> Date
     private let catalogWritePath: String?
     private let imageDimensions: (String) -> [Double]?
     private let allImagesCollection: (String) -> String?
@@ -287,6 +299,8 @@ public final class SessionController {
     public init(executor: ScriptExecuting = AppleScriptExecutor.shared,
                 appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
                 databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
+                databaseModified: @escaping (String) throws -> Date = SaveStall.databaseModified,
+                now: @escaping () -> Date = Date.init,
                 catalogWritePath: String? = ProcessInfo.processInfo.environment["C1_CATALOG_WRITE_PATH"],
                 imageDimensions: @escaping (String) -> [Double]? = ImageDimensions.read,
                 allImagesCollection: @escaping (String) -> String? = { try? CatalogReader(database: $0).allImagesCollectionID() },
@@ -297,6 +311,8 @@ public final class SessionController {
         self.executor = executor
         self.appInstance = appInstance
         self.databaseIdentity = databaseIdentity
+        self.databaseModified = databaseModified
+        self.now = now
         self.catalogWritePath = catalogWritePath
         self.imageDimensions = imageDimensions
         self.allImagesCollection = allImagesCollection
@@ -310,6 +326,8 @@ public final class SessionController {
         executor = base.executor
         appInstance = base.appInstance
         databaseIdentity = base.databaseIdentity
+        databaseModified = base.databaseModified
+        now = base.now
         catalogWritePath = base.catalogWritePath
         imageDimensions = base.imageDimensions
         allImagesCollection = base.allImagesCollection
@@ -346,7 +364,10 @@ public final class SessionController {
         guard expected.documentId == actual.documentId, expected.openToken == actual.openToken else {
             throw C1Error.documentChanged("Active database changed before dispatch.")
         }
-        if writes { try OperationJournal(sessionDirectory: URL(fileURLWithPath: actual.documentPath)).assertReady() }
+        if writes {
+            try recordSaveStall(actual)
+            try OperationJournal(sessionDirectory: URL(fileURLWithPath: actual.documentPath)).assertReady()
+        }
     }
 
     func assertWritableImage(doc: DocumentInfo, source: GetResult?) throws {
@@ -408,6 +429,7 @@ public final class SessionController {
 
         var unresolvedCount: Int?
         var writesDisabledReason: WritesDisabledReason?
+        var saveStall: SaveStallReport?
         var identityOK = false
         if hasDoc, let observedInfo {
             do {
@@ -415,8 +437,17 @@ public final class SessionController {
                 identityOK = true
                 docPath = doc.documentPath
                 writesDisabledReason = doc.writesDisabledReason
+                if lockOk { try lock.withLock(timeout: 1.0) { try recordSaveStall(doc) } }
                 let journal = OperationJournal(sessionDirectory: URL(fileURLWithPath: doc.documentPath))
-                unresolvedCount = try journal.validatedEntries().filter(OperationJournal.isUnresolved).count
+                let unresolved = try journal.validatedEntries().filter(OperationJournal.isUnresolved)
+                unresolvedCount = unresolved.count
+                let unsaved = unresolved.filter { $0.saveStalledAt != nil }
+                if let oldest = unsaved.compactMap(SaveStall.dispatchDate).min() {
+                    saveStall = SaveStallReport(operationIds: unsaved.map(\.operationId),
+                        oldestAgeSeconds: Int(now().timeIntervalSince(oldest)),
+                        databaseModifiedAt: ISO8601DateFormatter().string(from: try databaseModified(databasePath(doc))))
+                    writesDisabledReason = writesDisabledReason ?? .saveStalled
+                }
             } catch {
                 diagnosticError = (error as? C1Error) ?? .invalidRequest(String(describing: error))
             }
@@ -440,6 +471,7 @@ public final class SessionController {
             warning: compat.warning
         )
         report.diagnosticError = diagnosticError
+        report.saveStall = saveStall
         report.writesDisabledReason = writesDisabledReason ?? (allPassed ? nil : .checksFailed)
         report.writesEnabled = report.writesDisabledReason == nil
         return report

@@ -55,6 +55,9 @@ public struct OutputFormatter {
         lines.append("Advisory Lock       : \(r.lockAcquired ? "Available (OK)" : "Contended / Failed (FAIL)")")
         let journalStatus = r.unresolvedOperationsCount.map { $0 == 0 ? "0 (Clean)" : "\($0) (Warning: pending/failed ops in journal)" } ?? "Unknown (journal not inspected successfully)"
         lines.append("Unresolved Ops      : \(journalStatus)")
+        if let stall = r.saveStall {
+            lines.append("Save Stalled        : \(stall.operationIds.count) unsaved write(s), oldest \(stall.oldestAgeSeconds) s; database last saved \(stall.databaseModifiedAt) (FAIL)")
+        }
         if let error = r.diagnosticError { lines.append("Diagnostic Error    : \(error)") }
         if let w = r.warning {
             lines.append("Warning             : \(w)")

@@ -13,7 +13,7 @@ its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
 cancellation, and attaches `preview` and `thumb` images; it stays long-lived so
-compiled AppleScript handlers are reused. Contract version is `4.9.0`; package
+compiled AppleScript handlers are reused. Contract version is `4.10.0`; package
 version is `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -49,6 +49,7 @@ and the MCP server are configured separately. When `writesEnabled` is false,
 | `catalog-build-required` | Catalog writes need Capture One 16.8.5.30. |
 | `unsupported-version` | The running build is outside the supported range. |
 | `checks-failed` | `doctor` only: another check failed. |
+| `save-stalled` | `doctor` only: Capture One has not saved acknowledged writes; see [save stalls](#save-stalls). |
 
 ## Tonal adjustments
 
@@ -293,6 +294,31 @@ absent count means unknown and `diagnosticError` explains why.
 Journals, provenance and baselines live in the document's `.c1` folder (for a
 Catalog, inside the package). A missing identity record, replaced database or
 corrupt journal requires manual inspection.
+
+### Save stalls
+
+Capture One acknowledges a write live and saves the database about once a minute.
+It can also stop saving: acknowledged writes then never reach the database, even
+after the document closes, and the document reopens without them. c1 checks for
+this before every write and in `doctor`.
+
+A write is unsaved when it succeeded in the running Capture One process, changed
+something (every write except `preview` and writes whose readback shows no change),
+and the database file has not been modified since its dispatch. Once the oldest
+unsaved write is 5 minutes old, c1 appends an `outcome-unknown` snapshot with
+`saveStalledAt` for every unsaved write, so writes are blocked as after any
+uncertain outcome. The block stays even if Capture One saves later. `doctor` then
+reports `writesDisabledReason: save-stalled` and `saveStall` with the
+`operationIds`, the oldest write's age in `oldestAgeSeconds`, and
+`databaseModifiedAt`, when the database was last written.
+
+To recover, restart Capture One, reopen the same document and run
+`operation_status` for each ID in `saveStall.operationIds`. Reconciliation records
+the observed state. Compare it with the journaled values and reapply what is
+missing as new writes with fresh references and tokens; never repeat the original
+command. Detection needs the Capture One process that acknowledged the writes, so
+after a batch run `doctor` at least 5 minutes after the last write, before handing
+back or quitting Capture One.
 
 ### Late preview resolution
 

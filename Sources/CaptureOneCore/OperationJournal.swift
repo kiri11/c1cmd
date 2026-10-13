@@ -55,6 +55,8 @@ public struct OperationRecord: Codable, Equatable {
     public var previewSize: Int?
     /// Clone and baseline only: the current album Capture One put the new variant in and c1 removed it from.
     public var removedFromAlbum: String?
+    /// When c1 found this acknowledged write still unsaved past the stall bound and made its outcome unknown.
+    public var saveStalledAt: String?
 
     public init(
         operationId: String = UUID().uuidString.lowercased(),
@@ -144,7 +146,9 @@ public final class OperationJournal {
     }
     public func assertReady() throws {
         if let entry = try validatedEntries().first(where: Self.isUnresolved) {
-            let action = entry.operationType == "preview"
+            let action = entry.saveStalledAt != nil
+                ? "Capture One stopped saving the database after acknowledging it. Restart Capture One, reopen the document, then inspect operation status."
+                : entry.operationType == "preview"
                 ? "Inspect operation status once its JPEG has landed; a complete preview resolves without a restart, otherwise restart Capture One first."
                 : "Restart Capture One to end in-flight work, then inspect operation status."
             throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. " + action))

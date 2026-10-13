@@ -19,7 +19,7 @@ class HarnessTests(unittest.TestCase):
     def test_case_selection_rejects_invalid_before_setup(self):
         self.assertEqual(harness.parse_args(['archive', 'evidence']).cases,
                          (list(harness.RECOVERY_CASES), list(harness.RECIPE_CASES)))
-        self.assertEqual(len(harness.ALL_CASES), 22)
+        self.assertEqual(len(harness.ALL_CASES), 23)
         self.assertEqual(harness.selected_cases(['preview', 'clone-readback']), ['clone-readback', 'preview'])
         self.assertEqual(harness.parse_args(['archive', 'evidence', '--cases', 'recipe:lens', 'tonal', 'recipe:native']).cases,
                          (['tonal'], ['native', 'lens']))
@@ -100,6 +100,7 @@ class HarnessTests(unittest.TestCase):
         self.run.apple_event_timeout = lambda **kw: calls.append(('timeout', kw))
         self.run.preview_timeout = lambda: calls.append(('preview', {}))
         self.run.late_preview = lambda: calls.append(('late-preview', {}))
+        self.run.save_stall = lambda: calls.append(('save-stall', {}))
         self.run.mcp_death = lambda: calls.append(('mcp-death', {}))
         self.run.run_cases(['all'])
         self.assertEqual(self.run.clone.call_count, 10)
@@ -111,7 +112,7 @@ class HarnessTests(unittest.TestCase):
                                ('timeout', {'geometry': True, 'corrected': True}),
                                ('timeout', {'geometry': True, 'perspective': True}),
                                ('timeout', {'geometry': True, 'keystone': True}),
-                               ('preview', {}), ('late-preview', {}), ('mcp-death', {})])
+                               ('preview', {}), ('late-preview', {}), ('save-stall', {}), ('mcp-death', {})])
 
     def test_known_id_lookup_reports_absence_and_fails_on_other_errors(self):
         self.run.handlers = self.root / 'Handlers.applescript'

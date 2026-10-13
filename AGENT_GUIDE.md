@@ -60,7 +60,9 @@ their only statement; the reference docs link here.
    exception is a timed-out `preview` whose JPEG has since landed: `operation_status`
    resolves it without a restart, as `succeeded` with `resolution: late-preview`,
    when the [late-preview checks](docs/reference/editing.md#late-preview-resolution)
-   pass. Any failed check leaves it under this rule.
+   pass. Any failed check leaves it under this rule. Writes Capture One
+   acknowledged but has not saved for 5 minutes also become `outcome-unknown`
+   ([save stalls](docs/reference/editing.md#save-stalls)).
 5. **Catalog writes require the exact-path opt-in and the exact build, with a
    native backup taken first.** `C1_CATALOG_WRITE_PATH` must name the exact open
    Catalog and Capture One must be 16.8.5.30; only online referenced originals
@@ -98,7 +100,10 @@ their only statement; the reference docs link here.
    for geometry; `set` with `baselineAdjustments` for tonal values;
    `metadata_set` with `baselineMetadata`; `native_set` with a reviewed patch from
    the journal's `beforeNative`. `reset` applies defaults and is not an undo.
-7. Hand back to the photographer, who continues on the same variant.
+7. Run `doctor` at least 5 minutes after the last write. A `saveStall` means
+   Capture One has not saved those writes: restart, reconcile and reapply them
+   ([save stalls](docs/reference/editing.md#save-stalls)).
+8. Hand back to the photographer, who continues on the same variant.
 
 Use `variant_clone` only when a separate comparison variant is wanted, and delete
 it with `variant_delete` after review. For long browsing batches, the optional
