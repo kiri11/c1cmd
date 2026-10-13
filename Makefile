@@ -21,6 +21,7 @@ C1_RECOVERY_SHUTDOWN_MODE ?= sigterm
 QUALIFY_SUITES ?= cli mcp existing
 QUALIFY_DOCUMENT_KINDS ?= session
 RECOVERY_CASES ?= all
+C1_BARRIER_TRIALS ?= 3
 TEST_BUILD_DIR ?= .build/debug
 
 .PHONY: all build build-debug install uninstall clean
@@ -50,6 +51,7 @@ check-built-core:
 	python3 -B Tests/benchmark_reads_test.py
 	python3 -B scripts/generate-native-editing.py --check
 	python3 -B Tests/recovery_harness_test.py
+	python3 -B Tests/barrier_harness_test.py
 	python3 -B Tests/recipe_harness_test.py
 	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" python3 -B Tests/apply_plan_test.py
 	python3 -B Tests/release_runner_test.py
@@ -67,11 +69,12 @@ qualify:
 	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_NATIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/native" C1_RECIPE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/recipes" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory" C1_READ_WORKFLOW_EVIDENCE="$(abspath $(EVIDENCE_DIR))/read-workflow" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES) --document-kinds $(QUALIFY_DOCUMENT_KINDS)
 
 # Real fault cases against a current archive; compound edit cases carry a recipe: prefix.
+# The barrier case (in all) also needs C1_TEST_PEOPLE_FIXTURE; C1_BARRIER_TRIALS sets its trials.
 qualify-recovery:
 	@test -f "$(C1_TEST_RAW_FIXTURE)" || { echo 'Set C1_TEST_RAW_FIXTURE to an existing RAW file.' >&2; exit 1; }
 	@test -f "$(ARCHIVE)" || { echo 'Build an archive first with make archive or make qualify.' >&2; exit 1; }
 	@test -n "$(EVIDENCE_DIR)" && test ! -e "$(EVIDENCE_DIR)" || { echo 'Set EVIDENCE_DIR to a new directory.' >&2; exit 1; }
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))" --cases $(RECOVERY_CASES)
+	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_BARRIER_TRIALS="$(C1_BARRIER_TRIALS)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))" --cases $(RECOVERY_CASES)
 
 install: build
 	mkdir -p $(DESTDIR)$(BINDIR)

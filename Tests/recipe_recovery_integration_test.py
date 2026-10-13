@@ -3,24 +3,34 @@
 
 Run through recovery_integration_test.py with recipe:-prefixed cases.
 
-Exercises real Apple Event timeouts in compound native, lens, tonal, geometry and
-preview steps, plus layer color deletion through the shared native path.
-late-preview lets a short previewTimeout expire and resolves the late JPEG without
-a restart. mcp-death kills a compound MCP caller after an observed completed mutation step.
-No faults are retried. Production binaries have no test hooks.
+Interrupts compound native, lens, tonal, geometry and preview steps, plus layer
+color deletion through the shared native path. Most cases kill the caller once the
+step is journaled; tonal waits for the real Apple Event timeout, which the compound
+report maps to outcome-unknown. late-preview lets a short previewTimeout expire and
+resolves the late JPEG without a restart. mcp-death kills a compound MCP caller after an
+observed completed mutation step. No faults are retried. Production binaries have no
+test hooks.
 """
 import json
-import os
 from pathlib import Path
 import signal
 import shutil
 import subprocess
-import sys
 import time
 import recovery_integration_test as harness
 
 
 CASES = harness.RECIPE_CASES
+# kind -> (interruption, resolution); mcp-death resolves by the coverage of its pending child.
+FAULTS = {
+    'native': (harness.KILL, harness.BARRIER),
+    'native-action': (harness.KILL, harness.BARRIER),
+    'lens': (harness.KILL, harness.BARRIER),
+    'layer-color': (harness.KILL, harness.BARRIER),
+    'tonal': (harness.TIMEOUT, harness.BARRIER),
+    'geometry': (harness.KILL, harness.BARRIER),
+    'preview': (harness.KILL, harness.RESTART),
+}
 
 
 class RecipeRun(harness.Run):
@@ -109,68 +119,68 @@ class RecipeRun(harness.Run):
         if kind in ('tonal','mcp-death'): args['exposure'] = dict(mode='absolute',value=.625)
         if kind == 'geometry': args.update(ifGeometryState=state['geometryStateHash'],geometry=dict(rotation=3,aspectRatio=1.5))
         if kind == 'preview': args['preview'] = True
-        known = {r['operationId'] for r in self.records()}
-        pid = self.pid()
-        watchdog = None
-        try:
-            if kind == 'mcp-death':
-                self.child = subprocess.Popen([str(self.mcp)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-                def send(value):
-                    self.child.stdin.write(json.dumps(value)+'\n'); self.child.stdin.flush()
-                send(dict(jsonrpc='2.0',id=1,method='initialize',params=dict(protocolVersion='2024-11-05',capabilities={},clientInfo=dict(name='compound-recovery',version='1'))))
-                import select
-                assert select.select([self.child.stdout],[],[],15)[0]
-                self.log('compound-mcp-initialize',response=json.loads(self.child.stdout.readline()))
-                send(dict(jsonrpc='2.0',method='notifications/initialized'))
-                send(dict(jsonrpc='2.0',id=2,method='tools/call',params=dict(name='edit_apply',arguments=args)))
-                completed = harness.wait_for(lambda: next((r for r in self.records() if r['operationId'] not in known and r.get('compoundId') and r['status'] == 'succeeded'),None),90)
-                self.child.kill()
-                out, err = self.child.communicate(timeout=5)
-                assert self.child.returncode == -signal.SIGKILL and not out.strip(), 'Compound already returned'
-                compound = completed['compoundId']
-                latest = self.recipe_request('status',dict(compoundId=compound),ok=False)
-                assert latest['status'] == 'interrupted'
-                children = latest['childOperations']
-                assert any(r['operationId'] == completed['operationId'] and r['status'] == 'succeeded' for r in children)
-                assert not any(r['operationType'] == 'preview' for r in children)
-                self.log('compound-caller-killed-after-completed-step',report=latest,stderr=err)
-                # If a subsequent child dispatched before process death it remains
-                # uncertain and must use normal recovery, never guessed completion.
-                pending = next((r for r in children if r['status'] in ('pending','outcome-unknown','partial-failure')),None)
-                if pending:
-                    recovery_ref = dict(clone,workingRef=latest['workingRef'])
-                    self.recovery(pending['operationId'],recovery_ref,'compound-caller-death')
-                else:
-                    assert self.cli('get',self.source)['stateHash'] == self.original['stateHash']
-                    assert harness.sha(self.raw) == self.raw_hash
-                    self.log('case-passed',case='compound-caller-death-between-steps',compoundId=compound)
-                return
-            request = self.work / ('compound-' + kind + '.json'); request.write_text(json.dumps(args))
-            self.child = subprocess.Popen([str(self.c1),'recipe','apply','--file',str(request),'--format','json'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-            pending = harness.wait_for(lambda: next((r for r in self.records() if r['operationId'] not in known and r.get('compoundId') and r['status']=='pending' and (kind != 'geometry' or r['operationType']=='geometry_set')),None),90)
-            watchdog = subprocess.Popen([sys.executable,'-c','import os,signal,sys,time; time.sleep(150); os.kill(int(sys.argv[1]),signal.SIGCONT)',str(pid)])
-            os.kill(pid,signal.SIGSTOP); self.paused = pid
-            self.log('compound-target-paused',kind=kind,pending=pending,limitation='External pause races Apple Event execution; no claim about which event was in flight.')
-            out,err = self.child.communicate(timeout=145)
-            result = json.loads(out or err)
-            self.log('compound-timeout-result',kind=kind,result=result,code=self.child.returncode)
-            assert self.child.returncode != 0 and result['status'] == 'outcome-unknown', result
-            assert result['error']['code'] == 'timeout' and '-1712' in result['error']['message'],result
-            assert result['error']['operationId'] == pending['operationId']
+        if kind == 'mcp-death': return self.caller_death(args, clone)
+        interruption, resolution = FAULTS[kind]
+        request = self.work / ('compound-' + kind + '.json'); request.write_text(json.dumps(args))
+        pending, result = self.interrupt([str(self.c1),'recipe','apply','--file',str(request)], interruption,
+            lambda r: r.get('compoundId') and (kind != 'geometry' or r['operationType'] == 'geometry_set'))
+        if interruption == harness.TIMEOUT:
+            assert result['status'] == 'outcome-unknown', result
             assert result['compoundId'] == pending['compoundId']
-            if kind == 'geometry': assert any(step['step']=='scope-lens' for step in result['completed'])
-            assert all(step['step'] != 'observe' for step in result['completed'])
+            report = result
+        else:
+            report = self.recipe_request('status',dict(compoundId=pending['compoundId']),ok=False)
+            self.log('compound-caller-killed',kind=kind,report=report)
+            # A killed caller leaves the durable report running; status presents it as interrupted.
+            assert report['status'] == 'interrupted' and report['referencesExpired'] is False, report
+            assert any(r['operationId'] == pending['operationId'] and r['status'] == 'pending' for r in report['childOperations']), report
+        if kind == 'geometry': assert any(step['step']=='scope-lens' for step in report['completed'])
+        assert all(step['step'] != 'observe' for step in report['completed'])
+        self.recovery(pending['operationId'],dict(clone,workingRef=report['workingRef']),'compound-' + kind,resolution)
+        final = self.recipe_request('status',dict(compoundId=pending['compoundId']),ok=False)
+        # Child reconciliation must not promote parent completion.
+        if interruption == harness.TIMEOUT:
+            assert final['status'] == 'outcome-unknown', final
+        else:
+            assert final['status'] == 'interrupted', final
+            assert final['referencesExpired'] is (resolution == harness.RESTART), final
+
+    def caller_death(self, args, clone):
+        known = {r['operationId'] for r in self.records()}
+        try:
+            self.child = subprocess.Popen([str(self.mcp)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            def send(value):
+                self.child.stdin.write(json.dumps(value)+'\n'); self.child.stdin.flush()
+            send(dict(jsonrpc='2.0',id=1,method='initialize',params=dict(protocolVersion='2024-11-05',capabilities={},clientInfo=dict(name='compound-recovery',version='1'))))
+            import select
+            assert select.select([self.child.stdout],[],[],15)[0]
+            self.log('compound-mcp-initialize',response=json.loads(self.child.stdout.readline()))
+            send(dict(jsonrpc='2.0',method='notifications/initialized'))
+            send(dict(jsonrpc='2.0',id=2,method='tools/call',params=dict(name='edit_apply',arguments=args)))
+            completed = harness.wait_for(lambda: next((r for r in self.records() if r['operationId'] not in known and r.get('compoundId') and r['status'] == 'succeeded'),None),90)
+            self.child.kill()
+            out, err = self.child.communicate(timeout=5)
+            assert self.child.returncode == -signal.SIGKILL and not out.strip(), 'Compound already returned'
         finally:
-            if self.paused:
-                os.kill(pid,signal.SIGCONT); self.paused = None
-            if watchdog:
-                watchdog.terminate(); watchdog.wait(timeout=5)
             if self.child and self.child.poll() is None:
                 self.child.kill(); self.child.wait()
-        # A paused export can still land; reading status first could resolve it without the restart under test.
-        self.recovery(pending['operationId'],dict(clone,workingRef=result['workingRef']),'compound-' + kind + '-timeout',status_before_restart=kind != 'preview')
-        final = self.recipe_request('status',dict(compoundId=result['compoundId']),ok=False)
-        assert final['status'] == 'outcome-unknown', 'Child reconciliation must not promote parent completion'
+        compound = completed['compoundId']
+        latest = self.recipe_request('status',dict(compoundId=compound),ok=False)
+        assert latest['status'] == 'interrupted'
+        children = latest['childOperations']
+        assert any(r['operationId'] == completed['operationId'] and r['status'] == 'succeeded' for r in children)
+        assert not any(r['operationType'] == 'preview' for r in children)
+        self.log('compound-caller-killed-after-completed-step',report=latest,stderr=err)
+        # If a subsequent child dispatched before process death it remains
+        # uncertain and must use normal recovery, never guessed completion.
+        pending = next((r for r in children if r['status'] in ('pending','outcome-unknown','partial-failure')),None)
+        if pending:
+            resolution = harness.BARRIER if harness.barrier_covered(pending) else harness.RESTART
+            self.recovery(pending['operationId'],dict(clone,workingRef=latest['workingRef']),'compound-caller-death',resolution)
+        else:
+            assert self.cli('get',self.source)['stateHash'] == self.original['stateHash']
+            assert harness.sha(self.raw) == self.raw_hash
+            self.log('case-passed',case='compound-caller-death-between-steps',compoundId=compound)
 
     def late_preview_compound(self):
         recipe_id = self.setup_recipe({}, 'late-preview')
@@ -204,26 +214,10 @@ class RecipeRun(harness.Run):
         self.seed_band(clone['workingRef'],layer)
         state = self.cli('get',clone['workingRef'],'--native-targets',json.dumps([dict(scope='advancedColor',layer=layer,element=1)]))['nativeSnapshots'][0]
         assert state['advancedColorCount'] == 2
-        known = {r['operationId'] for r in self.records()}
-        pid = self.pid()
-        watchdog = None
-        try:
-            command = [str(self.c1),'native','action',clone['workingRef'],'color.delete','--scope','advancedColor','--layer',str(layer),'--element','1','--if-native-state',state['nativeStateHash'],'--format','json']
-            self.child = subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-            pending = harness.wait_for(lambda: next((r for r in self.records() if r['operationId'] not in known and r['status']=='pending'),None),90)
-            watchdog = subprocess.Popen([sys.executable,'-c','import os,signal,sys,time; time.sleep(150); os.kill(int(sys.argv[1]),signal.SIGCONT)',str(pid)])
-            os.kill(pid,signal.SIGSTOP); self.paused = pid
-            self.log('layer-color-target-paused',pending=pending,limitation='External pause races Apple Event execution.')
-            out,err = self.child.communicate(timeout=145)
-            result = json.loads(out or err)
-            self.log('layer-color-timeout-result',result=result,code=self.child.returncode)
-            assert self.child.returncode != 0 and result['error']['code']=='timeout' and '-1712' in result['error']['message'],result
-            assert result['error']['operationId']==pending['operationId']
-        finally:
-            if self.paused: os.kill(pid,signal.SIGCONT); self.paused=None
-            if watchdog: watchdog.terminate(); watchdog.wait(timeout=5)
-            if self.child and self.child.poll() is None: self.child.kill(); self.child.wait()
-        self.recovery(pending['operationId'],clone,'layer-color-delete-timeout')
+        interruption, resolution = FAULTS['layer-color']
+        pending, _ = self.interrupt([str(self.c1),'native','action',clone['workingRef'],'color.delete','--scope','advancedColor','--layer',str(layer),
+                                     '--element','1','--if-native-state',state['nativeStateHash']], interruption)
+        self.recovery(pending['operationId'],clone,'layer-color-delete',resolution)
         observed = self.cli('operation','status',pending['operationId'])
         assert observed['beforeNative']['target']['layer']==layer
         assert observed['afterNative']['target']==dict(scope='adjustments',layer=layer,element=0)

@@ -80,29 +80,115 @@ the unchanged candidate from `make qualify`.
 
 | Changed behavior | Relevant `RECOVERY_CASES` |
 |---|---|
-| Tonal dispatch or timeout | `tonal` |
-| Rating/color tag dispatch or timeout | `metadata` |
+| Tonal dispatch | `tonal` |
+| Apple Event timeout handling, the `-1712` mapping or timer values | `timeout recipe:tonal` |
+| Rating/color tag dispatch | `metadata` |
 | Expanded native properties/actions | `native native-action` |
 | Crop/rotation dispatch or partial writes | `geometry`; add corrected-image paths when affected |
 | Orientation dispatch or timeout | `orientation`; add `geometry` when the shared geometry handlers change |
 | Lens, perspective/movements or keystone | `lens`, `perspective`, `keystone` as affected |
+| Variant clone or delete dispatch | `clone delete` |
+| Clone native-ID readback | `clone-readback` |
 | Preview export, completion detection or late-preview resolution | `preview late-preview mcp-death`; add `recipe:preview recipe:late-preview` for compound previews |
 | Save-stall detection | `save-stall` |
 | MCP process lifetime/cancellation around dispatch | `mcp-death` |
-| Clone native-ID readback | `clone-readback` |
+| Probe-barrier coverage (which kinds `operation status` reconciles without a restart) or the barrier probe | `barrier` plus the cases of every kind whose coverage changed |
 | Shared journal, locks, write blocking, restart/reconciliation or stale references | All affected paths; `all` when impact cannot be narrowed |
 | Compound edits (`edit_apply` steps, parent reports) | `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry recipe:mcp-death`; add `recipe:tonal`, or `recipe:preview recipe:late-preview`, when those steps change |
-| Fault-harness pause, dispatch detection, shutdown, identity or recovery assertions | Cases using the changed behavior |
+| Fault-harness pause, interruption, dispatch detection, shutdown, identity or recovery assertions | Cases using the changed behavior |
 
-One list holds all twenty-three cases. Generic cases are `clone-readback tonal
-metadata native native-action geometry orientation lens perspective keystone
-preview late-preview save-stall mcp-death`. Compound-edit cases carry a `recipe:` prefix:
-`recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:tonal
-recipe:geometry recipe:preview recipe:late-preview recipe:mcp-death`. Generic cases run first in one owned Session and compound cases
-after them in another; evidence lands in `recovery/` and `recipe-recovery/` under
+One list holds all twenty-seven cases. Generic cases are `clone-readback tonal
+timeout metadata native native-action geometry orientation lens perspective
+keystone clone delete preview late-preview save-stall mcp-death`. Compound-edit
+cases carry a `recipe:` prefix: `recipe:native recipe:native-action recipe:lens
+recipe:layer-color recipe:tonal recipe:geometry recipe:preview
+recipe:late-preview recipe:mcp-death`. The `barrier` case runs first, then the
+generic cases, then the compound cases; each group owns its Session, and
+evidence lands in `barrier/`, `recovery/` and `recipe-recovery/` under
 `EVIDENCE_DIR`. The default `all` runs every case. `recipe:layer-color` tests the
 shared native deletion/readback context on a numbered layer; it does not enable
 layers in recipes.
+
+#### How fault cases interrupt and resolve
+
+Each case is a row in the harness case table: the command, how the write is
+interrupted, and how the uncertain outcome resolves.
+
+| Case | Interruption | Resolution |
+|---|---|---|
+| `tonal metadata native native-action geometry orientation lens perspective keystone clone delete` | Kill | Barrier |
+| `recipe:native recipe:native-action recipe:lens recipe:layer-color recipe:geometry` | Kill | Barrier |
+| `timeout` | Real 120-second timeout | Restart |
+| `recipe:tonal` | Real 120-second timeout | Barrier |
+| `preview recipe:preview` | Preview deadline (generic) or kill (compound) | Restart |
+| `late-preview recipe:late-preview` | Preview deadline | Late preview |
+| `save-stall` | Backdated database | Restart |
+| `mcp-death recipe:mcp-death` | Kill the MCP server | Restart for preview; barrier or restart by the coverage of the pending compound step |
+
+- **Kill.** Once the pending journal entry appears, the harness pauses Capture
+  One, kills the `c1` caller, asserts that it died by `SIGKILL` without a reply and
+  that the operation is still `pending`, then resumes Capture One. Process death
+  releases the lock. No timeout is shortened.
+- **Real timeout.** `timeout` and `recipe:tonal` keep `c1`'s shipped 120-second
+  Apple Event timeout. They are the only cases that cover the shipped `-1712` path:
+  the journal's `outcome-unknown` entry and the compound report's mapping to
+  `outcome-unknown`. A shortened timeout would change which timer fires first, so
+  these cases keep the real value.
+- **Barrier.** `operation status` must return `reconciled` with
+  `resolution: probe-barrier` while the Capture One PID stays the same. The old
+  working reference must still resolve, and its fresh read must equal the recorded
+  after-state, both at once and again two seconds later. For `clone`, the recorded
+  `observedVariantIds` must equal the new siblings; nothing is adopted.
+- **Restart.** For a kind the barrier covers, the harness calls no status before
+  the restart, because that call would reconcile by barrier. For a preview it reads
+  the journal instead, because a status call could resolve a landed JPEG first. For
+  another uncovered kind, such as a save-stalled write, status must stay unresolved
+  and append nothing. After the
+  restart, status must return `resolution: restart` and the old reference
+  `document-changed`.
+
+Every case also checks that a blocked write appends nothing, that native
+identities stay the same, that the original variant and RAW stay untouched, and
+that a fresh clone accepts writes.
+
+The kill path has the same limitation as the pause before it: an external pause
+still races the handler, so the pause can land before the write is sent or between
+two setters. It cannot show which Apple Event was in flight. The deterministic
+evidence for the barrier comes from the `barrier` case.
+
+#### The barrier case
+
+`barrier` qualifies the premise behind barrier resolution: once a later Apple
+Event gets an answer, an earlier write whose sender timed out has finished. It
+sends raw Apple Events from `osascript`, does not use `c1`, and never restarts
+Capture One. It needs `C1_TEST_PEOPLE_FIXTURE` as well as `C1_TEST_RAW_FIXTURE`.
+`C1_BARRIER_TRIALS` sets the queued trials per kind (default 3). Run it when you
+qualify a new build, and when barrier coverage or reconciliation changes.
+
+- **Queued mode.** The harness pauses Capture One and sends the write with a
+  3-second instrument timeout, which must return `-1712` to prove the write is
+  queued. It then sends a probe from another process and resumes. Every trial must
+  answer the probe, land the write, and read the final state as soon as the probe
+  answers. The watch window is 5 seconds, or 15 seconds for AI kinds and the
+  control.
+- **Running mode.** For the subject mask and people mask, the writer times out
+  after 2 seconds while Capture One executes. The barrier must hold for every trial
+  that timed out. A people mask often finishes within 2 seconds, so its running
+  trials can all be uninformative; check `informative` in `summary.json`.
+- **Control.** An export through a recipe owned by the case's fixture must break
+  the barrier at least once, or the case fails, because the method must be able to
+  detect a failure. The case deletes only its own uniquely named recipe.
+
+Each write mirrors the statement the production handler sends: exposure, rating,
+color tag, clarity, rotation, crop, lens distortion, keystone, `layer.create`,
+`layer.delete`, `color.create`, `color.delete`, `dehaze.pick`,
+`dehaze.recalculate`, `lens.reset`, `luma.clear`, `style.apply` (with a runtime
+style that changes a fresh layer's exposure), baseline, clone, variant delete,
+subject mask layer, `mask.people`, and mask clear, fill, invert, copy and
+rasterize, which are observed through the layer kind.
+Mask feather and refine change no scriptable property, so they cannot be qualified
+and stay restart-only. `events.jsonl` keeps every trial and `summary.json` keeps
+the per-kind counts. With the default 3 trials, the case takes about 18 minutes.
 
 `save-stall` makes a clone and a tonal write, waits until Capture One has saved
 them, then backdates the Session database file as a stand-in for a stalled save
@@ -111,16 +197,14 @@ and makes no write for five minutes. `doctor` must then report both writes in
 after a restart and reconciliation of both. A database write during the wait
 fails the case. It takes about seven minutes.
 
-`preview` and `recipe:preview` qualify the restart path for a preview whose JPEG
-lands late, so they read the journal instead of calling operation status before
-the restart; a status call could resolve the landed JPEG first. `late-preview` and
+`late-preview` and
 `recipe:late-preview` let a 0.001-second preview timeout expire without pausing
 Capture One, wait for the JPEG, and require operation status to resolve it as
 `late-preview` in the same Capture One process, with no unresolved operations and
 a fresh write on the same reference. The compound case also requires `edit_status`
 to keep the parent `outcome-unknown`.
 
-`orientation` times out two orientation writes on uncorrected clones: 90 with a 3:4
+`orientation` interrupts two orientation writes on uncorrected clones: 90 with a 3:4
 ratio, which c1 plans before dispatch and journals as `intendedGeometry`, and 90
 alone, which keeps Capture One's turned crop and journals only `requestedGeometry`.
 They reach the native orientation setter through the two geometry handlers. The
@@ -228,9 +312,15 @@ mode, and `C1_TEST_CATALOG_LAYOUT=package|unpackaged` selects the Catalog layout
 `C1_NATIVE_EVIDENCE` / `C1_RECIPE_EVIDENCE` / `C1_INVENTORY_EVIDENCE` distinct for
 each run.
 
-Recovery tests keep real 120-second Apple Event timeouts; five timeout cases take
-at least ten minutes before setup, verification and restarts. To save time, select
-fewer cases.
+Recovery tests keep real timeouts. Only `timeout` and `recipe:tonal` wait for the
+120-second Apple Event timeout; the other cases kill the caller, and only the
+restart-resolved cases restart Capture One. The `barrier` case takes about 18
+minutes with 3 trials per kind. The rest of `all` waits about four minutes for the
+two timeouts and about six for `save-stall`, and restarts Capture One five times
+(`timeout preview save-stall mcp-death recipe:preview`). Before `orientation`,
+`late-preview`, `save-stall` and `recipe:late-preview` were added, the rest of
+`all` took 34 minutes on 16.8.5.30: 14 minutes for the generic group and 19 for the
+compound group, most of it recipe setup. To save time, select fewer cases.
 
 ### Recovery settings
 
@@ -255,11 +345,11 @@ after 60 seconds). There is no automatic fallback. Both modes require old proces
 different PID before reopening. The scoped harness also waits for repeated
 read-only CLI confirmation of the exact reopened document.
 
-The harness pauses the verified PID with an independent resume watchdog and can
-kill its own MCP child. The `caffeinate` wrapper prevents idle sleep. Keep actual
-timeouts, ownership/identity checks and sequential execution. A pause races native
-execution: an actual `-1712` verifies timeout handling but cannot prove which setter
-executed. Reconciliation records observations, never historical success.
+The harness pauses the verified PID with an independent resume watchdog and kills
+only its own `c1` or MCP child. The `caffeinate` wrapper prevents idle sleep. Keep
+actual timeouts, ownership/identity checks and sequential execution. A pause races
+native execution: an actual `-1712` verifies timeout handling but cannot prove which
+setter executed. Reconciliation records observations, never historical success.
 
 Failures stop without retry. A failed restart suppresses further cleanup Apple
 Events; otherwise cleanup closes only its owned Session and restores hidden build
