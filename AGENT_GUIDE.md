@@ -141,6 +141,9 @@ holding the complete result. Read that file or pass `--full` / `full: true` for
 before/after values. Errors, uncertain outcomes and failed or interrupted compound
 edits are never compacted. Evidence files are review aids; the journal remains the
 recovery record. See [compact results](docs/reference/editing.md#compact-results).
+An MCP `preview` also returns the JPEG as image content. For batch previews you
+will not inspect inline, such as contact sheets, later comparisons or the
+photographer's review, pass `inlineImage: false`; `previewPath` still names the file.
 
 ## Reference
 

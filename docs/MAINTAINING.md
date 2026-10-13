@@ -51,11 +51,11 @@ There are three validation targets:
 The runner lists selected and skipped suites and cases. Regular suites are
 `cli mcp geometry lens perspective keystone catalog existing inventory native
 recipes read-workflow`. They do not inject faults. `mcp` is a smoke test of the
-MCP adapter (registration, error results, preview image content, one compile of
-each AppleScript handler script per server process); the CLI suites cover tool
-behaviour through the same dispatcher. `read-workflow` covers the accelerated browsing
-handoff on owned Session and Catalog fixtures and waits for the 60-second Catalog
-catch-up boundary.
+MCP adapter (registration, error results, preview image content and its
+`inlineImage` opt-out, one compile of each AppleScript handler script per server
+process); the CLI suites cover tool behaviour through the same dispatcher.
+`read-workflow` covers the accelerated browsing handoff on owned Session and
+Catalog fixtures and waits for the 60-second Catalog catch-up boundary.
 
 | Area | Suites |
 |---|---|

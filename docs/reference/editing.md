@@ -223,7 +223,11 @@ JPEG for up to `timeout` / `--timeout` seconds: more than zero, at most 300,
 default 120. Exports in long batches have landed about 90 seconds after dispatch,
 so the default leaves margin over that. `edit_apply` and `recipe_verify` take the
 same value as `previewTimeout`. A timeout leaves the preview `outcome-unknown`
-until [late preview resolution](#late-preview-resolution) or a restart. MCP returns the image plus JSON metadata; other tools return JSON text.
+until [late preview resolution](#late-preview-resolution) or a restart.
+MCP returns the JPEG as image content after the JSON result. With
+`inlineImage: false`, it returns only the JSON text, and `previewPath` still names
+the exported JPEG. The option is MCP only and defaults to true. The CLI never
+inlines the image.
 Metadata includes the native variant ID and state tokens, which are checked across
 rendering. Tokens do not cover every layer, curve or render setting, so preview
 caching by token is unsupported. Preview counts as a mutating tool.
