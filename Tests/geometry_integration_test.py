@@ -290,7 +290,13 @@ try:
         # A vertical frame tagged EXIF 6 imports at 90 and shows upright there; 0 is the sensor frame.
         portrait_sha=sha(PORTRAIT);portrait_copy=session/'Capture'/('portrait-'+PORTRAIT.name);shutil.copy2(PORTRAIT,portrait_copy)
         for _ in range(40):
-            tagged=[v for v in cli('variants','list') if Path(v['parentImagePath']).name==portrait_copy.name]
+            # A listing that sees Capture One import the copy mid-read fails closed; read again.
+            p=subprocess.run([str(CLI),*complete(('variants','list')),'--format','json'],capture_output=True,text=True,timeout=90)
+            if p.returncode:
+                assert json.loads(p.stderr)['error']['code']=='state-changed',p.stderr
+                tagged=[]
+            else:
+                tagged=[v for v in json.loads(p.stdout) if Path(v['parentImagePath']).name==portrait_copy.name]
             if tagged: break
             time.sleep(.5)
         tagged=cli('get',tagged[0]['id'])
