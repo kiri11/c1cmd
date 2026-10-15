@@ -142,6 +142,7 @@ struct C1: ParsableCommand {
             GetCommand.self,
             ExifCommand.self,
             ThumbCommand.self,
+            ContactSheetCommand.self,
             SetCommand.self,
             AddCommand.self,
             ResetCommand.self,
@@ -437,6 +438,45 @@ struct ThumbCommand: ParsableCommand {
         try globals.run("thumb", {
             var args: [String: Any] = ["ref": ref]
             put(&args, "maxSize", maxSize)
+            return args
+        })
+    }
+}
+
+struct ContactSheetCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "contact-sheet", abstract: "Tile Capture One's cached thumbnails for a live scope into one JPEG page, for triage; read-only.")
+    @OptionGroup var globals: GlobalOptions
+
+    @Option(help: "Known native IDs, comma-separated (1–512 unique IDs); revalidated live like variants list --ids.")
+    var ids: String?
+
+    @Option(help: "Name of the collection to tile; the current collection when omitted.")
+    var collection: String?
+
+    @Flag(help: "Tile only selected variants.")
+    var selected = false
+
+    @Option(help: "Exact star rating (0–5; 0 means unrated). Cannot combine with --min-rating.")
+    var rating: Int?
+
+    @Option(help: "Inclusive minimum star rating (0–5). Cannot combine with --rating.")
+    var minRating: Int?
+
+    @Option(help: "1-based page of the scope (default 1); the result's nextPage names the next one.")
+    var page: Int?
+
+    @Option(help: "Photos per page (\(SheetLayout.perPageRange.lowerBound)–\(SheetLayout.perPageRange.upperBound); default \(SheetLayout.standard.perPage)).")
+    var perPage: Int?
+
+    @Option(help: "Target row height in pixels (\(SheetLayout.rowHeightRange.lowerBound)–\(SheetLayout.rowHeightRange.upperBound); default \(SheetLayout.standard.rowHeight)); rows are justified to the \(SheetLayout.width) px sheet width.")
+    var rowHeight: Int?
+
+    mutating func run() throws {
+        try globals.run("contact_sheet", {
+            var args: [String: Any] = [:]
+            put(&args, "ids", ids?.components(separatedBy: ",")); put(&args, "collection", collection); put(&args, "selected", flag(selected))
+            put(&args, "rating", rating); put(&args, "minRating", minRating); put(&args, "page", page)
+            put(&args, "perPage", perPage); put(&args, "rowHeight", rowHeight)
             return args
         })
     }

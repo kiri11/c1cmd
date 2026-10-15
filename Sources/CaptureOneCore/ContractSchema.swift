@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// One contract for CLI discovery, MCP tools/list, and pre-dispatch request validation.
 public enum ContractSchema {
-    public static let version = "4.11.0"
+    public static let version = "4.12.0"
     static let string: [String: Any] = ["type": "string", "minLength": 1]
     static let boolean: [String: Any] = ["type": "boolean"]
     static let number: [String: Any] = ["type": "number"]
@@ -23,7 +23,9 @@ public enum ContractSchema {
         result["minProperties"] = 1
         return result
     }
-    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_collections", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "thumb", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_collections", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "thumb", "contact_sheet", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
+    public static let inventoryTools: Set<String> = ["variants_list", "dump", "contact_sheet"]
+    public static let inlineImageTools: Set<String> = ["contact_sheet", "preview"]
     static func integer(_ range: ClosedRange<Int>) -> [String: Any] {
         ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
     }
@@ -84,17 +86,36 @@ public enum ContractSchema {
             "embeddedTag": ["enum": EmbeddedPreview.tags], "exifOrientation": integer(1...8), "cameraRendering": ["const": true], "limitation": string]
         return object(properties, required: properties.keys.filter { $0 != "workingRef" }.sorted())
     }
-    /// Mutation, recipe and preview tools also accept `full`, and preview accepts `inlineImage`;
+    static var contactSheetSchema: [String: Any] {
+        let integer: [String: Any] = ["type": "integer"]
+        let rect = object(["x": integer, "y": integer, "width": integer, "height": integer], required: ["x", "y", "width", "height"])
+        let crop = object(["status": ["enum": ["applied", "full-frame", "not-applied"]], "reason": ["enum": CotCrop.Skip.allCases.map(\.rawValue)],
+                           "userComment": ["type": "string"]], required: ["status"])
+        let tile = object(["id": string, "name": ["type": "string"], "rating": integer, "status": ["enum": ["shown", "missing", "unreadable"]],
+                           "reason": ["enum": MissingReason.allCases.map(\.rawValue) + UnreadableReason.allCases.map(\.rawValue)],
+                           "cell": rect, "cachedSize": object(["width": integer, "height": integer], required: ["width", "height"]),
+                           "cacheModifiedAt": string, "crop": crop], required: ["id", "name", "rating", "status", "cell"])
+        let counts = object(["shown": integer, "missing": integer, "unreadable": integer, "uncropped": integer],
+                            required: ["shown", "missing", "unreadable", "uncropped"])
+        let properties: [String: Any] = [
+            "source": ["const": ContactSheetResult.source], "documentKind": ["enum": ["session", "catalog"]], "documentName": string,
+            "page": ["type": "integer", "minimum": 1], "pages": integer, "total": integer, "nextPage": integer,
+            "sheet": object(["path": string, "width": integer, "height": integer], required: ["path", "width", "height"]),
+            "tiles": array(tile), "counts": counts, "renderedAt": string, "limitation": string]
+        return object(properties, required: properties.keys.filter { !["nextPage", "sheet"].contains($0) }.sorted())
+    }
+    /// Mutation, recipe and preview tools also accept `full`, and image tools accept `inlineImage`;
     /// `ToolRequest` removes both before validation.
     public static func input(_ name: String) -> [String: Any] {
         var schema = request(name)
-        if ResultCompaction.tools.contains(name), var properties = schema["properties"] as? [String: Any] {
+        guard var properties = schema["properties"] as? [String: Any] else { return schema }
+        if ResultCompaction.tools.contains(name) {
             properties["full"] = ["type": "boolean", "description": "Return the complete result instead of a compact summary with evidencePath."]
-            if name == "preview" {
-                properties["inlineImage"] = ["type": "boolean", "description": "MCP only, default true. False returns only the text result; previewPath still names the JPEG."]
-            }
-            schema["properties"] = properties
         }
+        if inlineImageTools.contains(name) {
+            properties["inlineImage"] = ["type": "boolean", "description": "MCP only, default true. False returns only the text result; the JSON still names the JPEG."]
+        }
+        schema["properties"] = properties
         return schema
     }
 
@@ -167,6 +188,18 @@ public enum ContractSchema {
                                  "aspectRatio": ["type": "number", "exclusiveMinimum": 0], "anchors": anchors], required: ["ref"])
             result["dependentRequired"] = ["anchors": ["aspectRatio", "fullFrame"], "aspectRatio": ["anchors"]]
             return result
+        case "contact_sheet":
+            var filters = inventoryFilters
+            filters["deadlineSeconds"] = nil
+            let standard = SheetLayout.standard
+            var result = object(filters.merging([
+                "collection": string, "selected": boolean,
+                "page": ["type": "integer", "minimum": 1, "description": "1-based page of the scope in Capture One's order (default 1). nextPage names the next one."],
+                "perPage": integer(SheetLayout.perPageRange).merging(["description": "Photos per page (default \(standard.perPage))."]) { $1 },
+                "rowHeight": integer(SheetLayout.rowHeightRange).merging(["description": "Target row height in pixels (default \(standard.rowHeight)). Rows are justified to the \(SheetLayout.width) px sheet width, so a row can be somewhat lower or taller; a page taller than \(SheetLayout.maximumHeight) px gets lower rows or is scaled down. Small crops are enlarged to their row."]) { $1 },
+            ]) { $1 })
+            result["not"] = ["required": ["rating", "minRating"]]
+            return result
         case "request_status": return object(["requestId": string], required: ["requestId"])
         case "operation_status": return object(["operationId": string], required: ["operationId"])
         default: return object([:])
@@ -190,7 +223,7 @@ public enum ContractSchema {
         if tool == "get", let targets = arguments["nativeTargets"] {
             _ = try NativeEditing.parseTargets(targets, ref: arguments["ref"] as! String)
         }
-        if ["variants_list", "dump"].contains(tool) {
+        if inventoryTools.contains(tool) {
             if arguments["rating"] != nil, arguments["minRating"] != nil {
                 throw C1Error.invalidRequest("rating and minRating are mutually exclusive. Provide an exact rating or an inclusive minimum.")
             }
@@ -206,7 +239,7 @@ public enum ContractSchema {
                 throw C1Error.invalidRequest("fields must be minimal or summary.")
             }
         }
-        if ["get", "variants_list", "dump"].contains(tool),
+        if tool == "get" || inventoryTools.contains(tool),
            let ref = (arguments["ids"] as? [String] ?? [arguments["ref"] as? String ?? ""]).first(where: { UUID(uuidString: $0) != nil }) {
             throw C1Error.invalidRequest("'\(ref)' is UUID-shaped; a stored variantUUID never addresses a live variant. Use the stored variantDatabaseID and confirm it with variants_list ids or get --live.")
         }
@@ -245,6 +278,10 @@ public enum ContractSchema {
             }
         }
         if tool == "preview" { try validatePreviewSize(arguments["size"]) }
+        if tool == "contact_sheet" {
+            func value(_ key: String, _ standard: Int) -> Int { (arguments[key] as? NSNumber)?.intValue ?? standard }
+            _ = try SheetLayout(perPage: value("perPage", SheetLayout.standard.perPage), rowHeight: value("rowHeight", SheetLayout.standard.rowHeight))
+        }
         if tool == "preview", arguments["anchors"] != nil || arguments["aspectRatio"] != nil {
             let anchors = arguments["anchors"] as? [Any] ?? []
             guard arguments["aspectRatio"] != nil, (1...PreviewResult.maximumCandidates).contains(anchors.count), arguments["fullFrame"] as? Bool == true else {
@@ -356,7 +393,7 @@ public enum ContractSchema {
             "metadata_set": object(["operationId": string, "workingRef": string, "before": writableMetadataSchema,
                 "after": writableMetadataSchema, "diff": diffs, "metadataStateHash": string, "isDryRun": boolean],
                 required: ["operationId", "workingRef", "before", "after", "diff", "metadataStateHash", "isDryRun"]),
-            "get": get, "exif": exifSchema, "thumb": thumbSchema, "set": mutation, "add": mutation, "reset": mutation,
+            "get": get, "exif": exifSchema, "thumb": thumbSchema, "contact_sheet": contactSheetSchema, "set": mutation, "add": mutation, "reset": mutation,
             "geometry_set": object(["operationId":string,"workingRef":string,"before":geometrySchema,"after":geometrySchema,"diff":diffs,"geometryStateHash":string,"isDryRun":boolean,"exposedCorners":exposedCorners,"anchoredCrop":cropSchema], required:["operationId","workingRef","before","after","diff","geometryStateHash","isDryRun"]),
             "diff": object(["readObservation": readObservation, "ref1": string, "ref2": string, "stateHash1": string, "stateHash2": string, "diff": diffs, "geometryBefore":geometrySchema, "geometryAfter":geometrySchema, "geometryDiff":diffs, "metadataBefore":writableMetadataSchema, "metadataAfter":writableMetadataSchema, "metadataDiff":diffs]),
             "dump": array(object(dumpProps)),

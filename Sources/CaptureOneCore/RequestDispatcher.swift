@@ -8,7 +8,7 @@ public struct ToolRequest {
     public let arguments: [String: Any]
     /// Return the complete result instead of a compact summary with an evidence path.
     public let full: Bool
-    /// MCP attaches a preview's JPEG as image content unless `inlineImage` is false; the CLI never inlines.
+    /// MCP attaches a preview's or contact sheet's JPEG as image content unless `inlineImage` is false; the CLI never inlines.
     public let inlineImage: Bool
     let command: Command
 
@@ -27,6 +27,7 @@ public struct ToolRequest {
         case get(ref: String, live: Bool, readWorkflow: String?, nativeTargets: [NativeTarget]?)
         case exif(ref: String)
         case thumb(ref: String, maxSize: Int?)
+        case contactSheet(scope: SheetScope, page: Int, layout: SheetLayout)
         case adjust(workingRef: String, ifState: String, adjustments: Adjustments, delta: Bool, dryRun: Bool)
         case reset(workingRef: String, ifState: String, fields: [String], dryRun: Bool)
         case metadataSet(workingRef: String, ifMetadataState: String, rating: Int?, colorTag: Int?, dryRun: Bool)
@@ -69,8 +70,8 @@ public struct ToolRequest {
         } else {
             self.full = false
         }
-        if tool == "preview", let inlineImage = a.removeValue(forKey: "inlineImage") {
-            try ContractSchema.validateValue(inlineImage, schema: ContractSchema.boolean, path: "preview.inlineImage")
+        if ContractSchema.inlineImageTools.contains(tool), let inlineImage = a.removeValue(forKey: "inlineImage") {
+            try ContractSchema.validateValue(inlineImage, schema: ContractSchema.boolean, path: "\(tool).inlineImage")
             self.inlineImage = inlineImage as! Bool
         } else {
             self.inlineImage = true
@@ -123,6 +124,12 @@ public struct ToolRequest {
                            nativeTargets: try a["nativeTargets"].map { try NativeEditing.parseTargets($0, ref: ref) })
         case "exif": command = .exif(ref: string("ref")!)
         case "thumb": command = .thumb(ref: string("ref")!, maxSize: int("maxSize"))
+        case "contact_sheet":
+            let standard = SheetLayout.standard
+            command = .contactSheet(scope: SheetScope(collection: string("collection"), selected: flag("selected"), ids: a["ids"] as? [String],
+                                                      rating: int("rating"), minRating: int("minRating")),
+                                    page: int("page") ?? 1,
+                                    layout: try SheetLayout(perPage: int("perPage") ?? standard.perPage, rowHeight: int("rowHeight") ?? standard.rowHeight))
         case "set", "add":
             let controls: Set<String> = ["workingRef", "ifState", "dryRun", "adjustments"]
             let values = a["adjustments"] as? [String: Any] ?? a.filter { !controls.contains($0.key) }
@@ -226,6 +233,7 @@ public struct ToolRequest {
             return .get(try core.get(ref: ref))
         case .exif(let ref): return .value(try ExifReader.read(try core.get(ref: ref)))
         case .thumb(let ref, let maxSize): return .thumb(try EmbeddedPreview.extract(try core.get(ref: ref), maxSize: maxSize))
+        case .contactSheet(let scope, let page, let layout): return .contactSheet(try core.contactSheet(scope: scope, page: page, layout: layout))
         case .adjust(let workingRef, let ifState, let adjustments, let delta, let dryRun):
             return .mutation(try core.mutate(workingRefString: workingRef, ifState: ifState, setAdjustments: delta ? nil : adjustments,
                                              addAdjustments: delta ? adjustments : nil, isDryRun: dryRun))
@@ -274,6 +282,7 @@ public enum ToolResponse {
     case dump([DumpRecord])
     case preview(PreviewResult)
     case thumb(ThumbResult)
+    case contactSheet(ContactSheetResult)
     case operation(OperationRecord)
     case clone(CloneResult)
     case delete(DeleteResult)
@@ -302,6 +311,7 @@ public enum ToolResponse {
         case .dump(let v): return OutputFormatter.formatJson(v)
         case .preview(let v): return OutputFormatter.formatJson(v)
         case .thumb(let v): return OutputFormatter.formatJson(v)
+        case .contactSheet(let v): return OutputFormatter.formatJson(v)
         case .operation(let v): return OutputFormatter.formatJson(v)
         case .clone(let v): return OutputFormatter.formatJson(v)
         case .delete(let v): return OutputFormatter.formatJson(v)
@@ -317,6 +327,7 @@ public enum ToolResponse {
         switch complete {
         case .preview(let v): return v.previewPath
         case .thumb(let v): return v.thumbPath
+        case .contactSheet(let v): return v.sheet?.path
         default: return nil
         }
     }

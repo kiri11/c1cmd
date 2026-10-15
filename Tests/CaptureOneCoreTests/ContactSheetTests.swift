@@ -15,10 +15,17 @@ struct ContactSheetTests {
         testCacheRead()
         testRenderer()
         testSheetFiles()
+        testSessionSheet()
+        testSessionIdentityFailures()
+        testDocumentChangeAndBuildGate()
+        testCatalogSheet()
     }
 
     static func errorCode(_ body: () throws -> Any) -> String? {
-        do { _ = try body(); return nil } catch let error as C1Error { return error.errorCode } catch { return "\(error)" }
+        do { _ = try body(); return nil }
+        catch let error as C1Error { return error.errorCode }
+        catch let error as VariantsNotFound { return error.cause.errorCode }
+        catch { return "\(error)" }
     }
 
     static let measuredCropComment = "3|0;2;3|60;334;279;115|0"
@@ -473,6 +480,233 @@ struct ContactSheetTests {
             XCTAssertEqual(files.filter { $0.hasSuffix(".jpg") }.count, 50, "Only the 50 newest sheets are kept")
             XCTAssertTrue(files.contains(name) && files.contains("notes.txt") && files.contains("old-59.jpg") && !files.contains("old-10.jpg"),
                           "Pruning removes the oldest sheets and nothing else")
+        }
+    }
+
+    static func variantUUID(_ id: Int) -> String { String(format: "%08X-0000-4000-8000-%012X", id, id) }
+
+    static func tree(_ root: URL) -> [String: String] {
+        var files: [String: String] = [:]
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        for case let url as URL in FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) ?? FileManager.DirectoryEnumerator() {
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            files[String(url.path.dropFirst(root.path.count))] = "\(values?.fileSize ?? -1)@\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+        }
+        return files
+    }
+
+    static func sessionFixture(_ count: Int) -> (fake: FakeScript, core: SessionController, document: URL, output: URL) {
+        let document = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let cache = document.appendingPathComponent("CaptureOne/Cache/Thumbnails")
+        try! FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        let fake = FakeScript(directory: document)
+        fake.values = [:]
+        var stored: [Int: (uuid: String?, fileName: String?)] = [:]
+        for id in 1...count {
+            fake.values[String(id)] = [0, 0, 0, 5000, 0]
+            fake.ratings[String(id)] = id % 2 == 0 ? 4 : 2
+            stored[id] = (variantUUID(id), "fixture.CR3")
+            let shade = CGFloat(id) / CGFloat(count + 1)
+            try! cot(solidImage(width: 450, height: 300, red: shade, green: 1 - shade, blue: 0), comment: "3|1;3;1|0;300;450;0|0")
+                .write(to: cache.appendingPathComponent("fixture.CR3.[\(variantUUID(id).lowercased())].cot"))
+        }
+        sessionDatabase(document.appendingPathComponent("fixture.cosessiondb").path, variants: stored)
+        FileManager.default.createFile(atPath: fake.parent, contents: Data("raw".utf8))
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
+        return (fake, core, document, output)
+    }
+
+    static func violations(_ value: Any, _ schema: [String: Any], _ path: String = "contact_sheet") -> [String] {
+        var problems: [String] = []
+        if let allowed = schema["enum"] as? [String], !allowed.contains(value as? String ?? "") { problems.append("\(path): \(value) is not in \(allowed)") }
+        if let constant = schema["const"] as? String, constant != value as? String { problems.append("\(path): \(value) is not \(constant)") }
+        switch schema["type"] as? String {
+        case "object":
+            guard let object = value as? [String: Any] else { return problems + ["\(path) is not an object"] }
+            let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
+            problems += (schema["required"] as? [String] ?? []).filter { object[$0] == nil }.map { "\(path).\($0) is missing" }
+            for (key, item) in object {
+                if let spec = properties[key] { problems += violations(item, spec, "\(path).\(key)") }
+                else if schema["additionalProperties"] as? Bool == false { problems.append("\(path).\(key) is not in the schema") }
+            }
+        case "array":
+            guard let items = value as? [Any] else { return problems + ["\(path) is not an array"] }
+            for item in items { problems += violations(item, schema["items"] as? [String: Any] ?? [:], "\(path)[]") }
+        case "integer":
+            if !(value is Int) || CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID() { problems.append("\(path) is not an integer") }
+        case "string":
+            if !(value is String) { problems.append("\(path) is not a string") }
+        default: break
+        }
+        return problems
+    }
+
+    static func schemaViolations(_ result: ContactSheetResult) -> [String] {
+        let responses = ContractSchema.document()["responses"] as! [String: Any]
+        let json = try! JSONSerialization.jsonObject(with: Data(ToolResponse.contactSheet(result).json.utf8))
+        return violations(json, responses["contact_sheet"] as! [String: Any])
+    }
+
+    static let readHandlers: Set<String> = ["getAppAndDocInfo", "discoverFilteredVariantIDs", "readVariantSummaries", "readVariantSubset"]
+
+    private static func testSessionSheet() {
+        let (fake, core, document, output) = sessionFixture(7)
+        defer { try? FileManager.default.removeItem(at: document); try? FileManager.default.removeItem(at: output) }
+        let layout = try! SheetLayout(perPage: 3, rowHeight: 150)
+        let before = tree(document)
+        XCTAssertNoThrowBlock {
+            let first = try core.contactSheet(scope: SheetScope(), page: 1, layout: layout, directory: output)
+            XCTAssertEqual(first.tiles.map(\.member.id), ["1", "2", "3"], "Tiles follow Capture One's order")
+            XCTAssertEqual([first.total, first.pages, first.nextPage], [7, 3, 2])
+            XCTAssertEqual(first.documentKind, "session")
+            let arrangement = layout.arrange([1.5, 1.5, 1.5])
+            XCTAssertEqual(first.tiles.map(\.cell), arrangement.cells, "Cells come from the arrangement of each thumbnail's aspect")
+            XCTAssertEqual(first.counts, ["shown": 3, "missing": 0, "unreadable": 0, "uncropped": 0])
+            let sheet = try XCTUnwrapSheet(first)
+            XCTAssertEqual([sheet.width, sheet.height], [arrangement.width, arrangement.height])
+            XCTAssertTrue(sheet.path.hasPrefix(output.path + "/") && FileManager.default.fileExists(atPath: sheet.path))
+            XCTAssertEqual(ToolResponse.contactSheet(first).imagePath, sheet.path, "MCP attaches the sheet")
+            XCTAssertEqual(schemaViolations(first), [], "The result matches the contract's response schema")
+            let image = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(URL(fileURLWithPath: sheet.path) as CFURL, nil)!, 0, nil)!
+            let pixel = pixels(image)
+            for (index, tile) in first.tiles.enumerated() {
+                let shade = Double(index + 1) / 8, centre = pixel(tile.cell.x + tile.cell.width / 2, tile.cell.y + tile.cell.height / 2)
+                XCTAssertTrue(abs(Double(centre[0]) - shade * 255) < 12 && abs(Double(centre[1]) - (1 - shade) * 255) < 12,
+                              "Variant \(tile.member.id)'s own thumbnail is in its cell: \(centre)")
+            }
+
+            let last = try core.contactSheet(scope: SheetScope(), page: 3, layout: layout, directory: output)
+            XCTAssertEqual(last.tiles.map(\.member.id), ["7"])
+            XCTAssertNil(last.nextPage, "The last page has no nextPage")
+            XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), page: 4, layout: layout, directory: output) }, "invalid-request")
+
+            let rated = try core.contactSheet(scope: SheetScope(minRating: 4), page: 1, layout: layout, directory: output)
+            XCTAssertEqual(rated.tiles.map(\.member.id), ["2", "4", "6"])
+            XCTAssertEqual(rated.tiles.map(\.member.rating), [4, 4, 4], "Labels carry the live rating")
+            let chosen = try core.contactSheet(scope: SheetScope(ids: ["5", "1"]), page: 1, layout: layout, directory: output)
+            XCTAssertEqual(chosen.tiles.map(\.member.id), ["5", "1"], "ids keep the requested order")
+            XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(ids: ["1", "99"]), layout: layout, directory: output) }, "variant-not-found")
+
+            let sheets = Set(try FileManager.default.contentsOfDirectory(atPath: output.path))
+            let empty = try core.contactSheet(scope: SheetScope(rating: 5), page: 1, layout: layout, directory: output)
+            XCTAssertEqual([empty.total, empty.pages], [0, 0])
+            XCTAssertTrue(empty.sheet == nil && empty.tiles.isEmpty && empty.nextPage == nil, "An empty scope has no sheet")
+            XCTAssertEqual(schemaViolations(empty), [])
+            XCTAssertNil(ToolResponse.contactSheet(empty).imagePath, "An empty scope attaches no image")
+            let after = Set(try FileManager.default.contentsOfDirectory(atPath: output.path))
+            XCTAssertEqual(after, sheets, "An empty scope writes nothing")
+            XCTAssertEqual(sheets.count, 4, "Each scope and page has its own file")
+        }
+        XCTAssertTrue(Set(fake.calls).isSubset(of: readHandlers), "Only read handlers: \(Set(fake.calls).subtracting(readHandlers))")
+        XCTAssertEqual(tree(document), before, "Nothing in the document folder is created or changed")
+
+        let cache = document.appendingPathComponent("CaptureOne/Cache/Thumbnails")
+        try! FileManager.default.removeItem(at: cache.appendingPathComponent("fixture.CR3.[\(variantUUID(2).lowercased())].cot"))
+        try! cot(solidImage(width: 300, height: 450), comment: "2|1;1;1|0;0;300;450").write(to: cache.appendingPathComponent("fixture.CR3.[\(variantUUID(3).lowercased())].cot"))
+        try! FileManager.default.removeItem(atPath: document.appendingPathComponent("fixture.cosessiondb").path)
+        sessionDatabase(document.appendingPathComponent("fixture.cosessiondb").path,
+                        variants: [1: (variantUUID(1), "fixture.CR3"), 2: (variantUUID(2), "fixture.CR3"), 3: (variantUUID(3), "fixture.CR3"),
+                                   99: (variantUUID(4), "fixture.CR3")])
+        XCTAssertNoThrowBlock {
+            let result = try core.contactSheet(scope: SheetScope(), page: 1, layout: try SheetLayout(perPage: 8, rowHeight: 150), directory: output)
+            let statuses = result.tiles.map { tile -> String in
+                switch tile.content {
+                case .shown(let thumbnail): return thumbnail.crop == .fullFrame ? "shown" : "uncropped"
+                case .missing(let reason): return reason.rawValue
+                case .unreadable(let reason): return reason.rawValue
+                }
+            }
+            XCTAssertEqual(statuses, ["shown", "not-cached", "uncropped", "not-stored", "not-stored", "not-stored", "not-stored"],
+                           "A deleted thumbnail is not cached; an unsaved variant is never guessed from the directory, even though its file is there")
+            XCTAssertEqual(result.counts, ["shown": 2, "missing": 5, "unreadable": 0, "uncropped": 1])
+            XCTAssertEqual(schemaViolations(result), [], "Missing and uncropped tiles match the response schema")
+        }
+    }
+
+    static func XCTUnwrapSheet(_ result: ContactSheetResult) throws -> SheetImage {
+        guard let sheet = result.sheet else { throw C1Error.invalidRequest("expected a sheet") }
+        return sheet
+    }
+
+    private static func testSessionIdentityFailures() {
+        let (fake, core, document, output) = sessionFixture(3)
+        defer { try? FileManager.default.removeItem(at: document); try? FileManager.default.removeItem(at: output) }
+        let database = document.appendingPathComponent("fixture.cosessiondb").path
+        func storing(_ variants: [Int: (uuid: String?, fileName: String?)]) {
+            try! FileManager.default.removeItem(atPath: database)
+            sessionDatabase(database, variants: variants)
+        }
+        storing([1: (variantUUID(1), "fixture.CR3"), 2: (variantUUID(2), "other.CR3"), 3: (variantUUID(3), "fixture.CR3")])
+        XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), directory: output) }, "identity-ambiguous",
+                       "A stored file name other than the live original fails the whole sheet")
+        storing([1: (variantUUID(1), "fixture.CR3"), 2: ("not-a-uuid", "fixture.CR3"), 3: (variantUUID(3), "fixture.CR3")])
+        XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), directory: output) }, "identity-ambiguous")
+        storing([1: (variantUUID(1), "fixture.CR3"), 2: (variantUUID(2), "fixture.CR3"), 3: (variantUUID(3), "fixture.CR3")])
+        fake.values["007"] = [0, 0, 0, 5000, 0]
+        XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), directory: output) }, "identity-ambiguous",
+                       "A native ID that is not a canonical stored ID maps to no thumbnail")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path), "A failed request writes no sheet")
+    }
+
+    private static func testDocumentChangeAndBuildGate() {
+        let (fake, core, document, output) = sessionFixture(2)
+        defer { try? FileManager.default.removeItem(at: document); try? FileManager.default.removeItem(at: output) }
+        fake.calls = []
+        XCTAssertNoThrow(try core.contactSheet(scope: SheetScope(), directory: output))
+        let documentReads = fake.calls.filter { $0 == "getAppAndDocInfo" }.count
+        var reads = 0
+        fake.beforeHandler = { handler in
+            guard handler == "getAppAndDocInfo" else { return }
+            reads += 1
+            if reads == documentReads { fake.generation = "app-2" }
+        }
+        XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), page: 1, layout: .standard, directory: output) }, "document-changed",
+                       "A document change after the thumbnails were read discards the sheet")
+        fake.beforeHandler = nil
+        fake.generation = "app-1"
+
+        for version in ["16.9.0.1", "16.8.5.31"] {
+            fake.version = version
+            fake.calls = []
+            XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), directory: output) }, "unsupported-version", version)
+            XCTAssertEqual(fake.calls, ["getAppAndDocInfo"], "Nothing is read on \(version)")
+        }
+        fake.version = "15.2.0.4"
+        setenv("C1_ALLOW_UNTESTED_BUILD", "1", 1)
+        XCTAssertNoThrow(try core.getDocumentInfo(), "The override admits the build for other tools")
+        XCTAssertEqual(errorCode { try core.contactSheet(scope: SheetScope(), directory: output) }, "unsupported-version",
+                       "The untested-build override does not enable the cache reader")
+        unsetenv("C1_ALLOW_UNTESTED_BUILD")
+    }
+
+    private static func testCatalogSheet() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let package = root.appendingPathComponent("Wedding.cocatalog"), output = root.appendingPathComponent("sheets")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = package.appendingPathComponent("Cache/Thumbnails")
+        try! FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: package.appendingPathComponent("Wedding.cocatalogdb").path, contents: Data("not sqlite".utf8))
+        let fake = FakeScript(directory: package)
+        fake.isSession = false
+        fake.catalogID = package.path
+        fake.values = ["1": [0, 0, 0, 5000, 0], "2": [0, 0, 0, 5000, 0], "10": [0, 0, 0, 5000, 0]]
+        try! cot(croppedMarker(), comment: measuredCropComment).write(to: cache.appendingPathComponent("00000001.cot"))
+        try! cot(solidImage(width: 300, height: 200)).write(to: cache.appendingPathComponent("00000010.cot"))
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" },
+                                     allImagesCollection: { _ in nil })
+        XCTAssertNoThrowBlock {
+            let result = try core.contactSheet(scope: SheetScope(), directory: output)
+            XCTAssertEqual(result.documentKind, "catalog")
+            XCTAssertEqual(result.tiles.map(\.member.id), ["1", "10", "2"])
+            XCTAssertEqual(result.counts, ["shown": 2, "missing": 1, "unreadable": 0, "uncropped": 1],
+                           "A Catalog maps IDs to files with no database read; the database here is not even SQLite")
+            if case .shown(let thumbnail) = result.tiles[0].content {
+                XCTAssertEqual(thumbnail.crop, measuredCrop)
+            } else {
+                XCTFail("Variant 1's thumbnail is shown")
+            }
+            XCTAssertNotNil(result.sheet)
         }
     }
 }

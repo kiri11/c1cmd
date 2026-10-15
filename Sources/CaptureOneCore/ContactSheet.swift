@@ -152,13 +152,13 @@ package struct SheetMember: Equatable {
     }
 }
 
-package enum MissingReason: String {
+package enum MissingReason: String, CaseIterable {
     case notCached = "not-cached"
     /// Live in Capture One but not yet in the saved database, such as a clone before the save tick.
     case notStored = "not-stored"
 }
 
-package enum UnreadableReason: String {
+package enum UnreadableReason: String, CaseIterable {
     case undecodable
     /// The cache stores oriented pixels, so an orientation tag means an unknown format.
     case orientationTag = "orientation-tag"
@@ -325,9 +325,9 @@ public struct ContactSheetResult: Encodable {
     }
 }
 
-package enum ContactSheet {
+public enum ContactSheet {
     /// Outside the document: writing near a read-only document would be a write the photographer did not enable.
-    package static var defaultDirectory: URL {
+    public static var defaultDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1/contact-sheets", isDirectory: true)
     }
     static let retainedSheets = 50
@@ -422,5 +422,76 @@ package enum ContactSheet {
             }
             .sorted { $0.modified > $1.modified }
         for sheet in sheets.dropFirst(retainedSheets - 1) { try? FileManager.default.removeItem(at: sheet.url) }
+    }
+}
+
+extension SessionController {
+    public func contactSheet(scope: SheetScope, page: Int = 1, layout: SheetLayout = .standard,
+                             directory: URL = ContactSheet.defaultDirectory) throws -> ContactSheetResult {
+        guard page >= 1 else { throw C1Error.invalidRequest("page must be at least 1.") }
+        let context = RequestContext.current
+        let (document, total, shown, contents) = try lock.withLock(checkpoint: { try context?.checkReadCancellation() }) {
+            () throws -> (DocumentInfo, Int, [SheetMember], [TileContent]) in
+            let document = try getDocumentInfo()
+            guard document.appVersion == Self.pinnedBuild else {
+                throw C1Error.unsupportedVersion("contact_sheet reads Capture One's thumbnail cache, whose layout is qualified only on \(Self.pinnedBuild); C1_ALLOW_UNTESTED_BUILD does not enable it.")
+            }
+            let members = try sheetMembers(scope)
+            let first = (page - 1) * layout.perPage
+            guard members.isEmpty || first < members.count else {
+                throw C1Error.invalidRequest("page \(page) is past the last page; the scope has \(members.count) variants in \((members.count + layout.perPage - 1) / layout.perPage) pages.")
+            }
+            let shown = Array(members.dropFirst(first).prefix(layout.perPage))
+            context?.update(phase: "thumbnails", total: shown.count)
+            let contents = try thumbnails(shown, document: document)
+            let after = try getDocumentInfo()
+            guard after.openToken == document.openToken, after.documentId == document.documentId else {
+                throw C1Error.documentChanged("The document changed while thumbnails were read; no sheet was made.")
+            }
+            return (document, members.count, shown, contents)
+        }
+        let arrangement = layout.arrange(contents.map(\.aspect))
+        let tiles = zip(shown, zip(arrangement.cells, contents)).map { ContactSheetTile(member: $0, cell: $1.0, content: $1.1) }
+        let pages = (total + layout.perPage - 1) / layout.perPage
+        let renderedAt = ISO8601DateFormatter().string(from: now())
+        var sheet: SheetImage?
+        if !tiles.isEmpty {
+            let first = (page - 1) * layout.perPage
+            let header = "\(document.documentName) · page \(page)/\(pages) · \(first + 1)–\(first + tiles.count) of \(total) · Capture One thumbnail cache · \(renderedAt)"
+            sheet = try ContactSheet.write(ContactSheet.render(tiles: tiles, width: arrangement.width, height: arrangement.height, header: header), to: directory,
+                                           fileName: ContactSheet.fileName(documentName: document.documentName, documentId: document.documentId,
+                                                                           scope: scope, layout: layout, page: page))
+        }
+        return ContactSheetResult(documentKind: document.isSession ? "session" : "catalog", documentName: document.documentName,
+                                  page: page, pages: pages, total: total, nextPage: page < pages ? page + 1 : nil,
+                                  sheet: sheet, tiles: tiles, renderedAt: renderedAt)
+    }
+
+    private func sheetMembers(_ scope: SheetScope) throws -> [SheetMember] {
+        if let ids = scope.ids {
+            return try listVariantSubset(ids: ids, collection: scope.collection, selected: scope.selected, rating: scope.rating,
+                                         minRating: scope.minRating, fields: "summary").map { row in
+                SheetMember(id: row["id"] as! String, name: row["name"] as! String, rating: row["rating"] as! Int,
+                            parentImagePath: row["parentImagePath"] as! String)
+            }
+        }
+        return try listVariants(collectionName: scope.collection, selectedOnly: scope.selected, rating: scope.rating, minRating: scope.minRating)
+            .map { SheetMember(id: $0.id, name: $0.name, rating: $0.rating, parentImagePath: $0.parentImagePath) }
+    }
+
+    private func thumbnails(_ members: [SheetMember], document: DocumentInfo) throws -> [TileContent] {
+        guard !members.isEmpty else { return [] }
+        let database = try databasePath(document)
+        let ids = try members.map { try ThumbnailCache.storedID($0.id) }
+        let locations: [URL?]
+        if document.isSession {
+            let keys = try CatalogReader(sessionDatabase: database).sessionThumbnailKeys(variantIDs: ids)
+            locations = try zip(members, ids).map { member, id in
+                try keys[id].map { try ThumbnailCache.sessionThumbnail(parentImagePath: member.parentImagePath, key: $0) }
+            }
+        } else {
+            locations = ids.map { ThumbnailCache.catalogThumbnail(databasePath: database, variantID: $0) }
+        }
+        return locations.map { $0.map { ThumbnailCache.read($0) } ?? .missing(.notStored) }
     }
 }

@@ -10,7 +10,7 @@ package enum CotCrop: Equatable {
     case fullFrame
     case notApplied(reason: Skip, userComment: String?)
 
-    package enum Skip: String {
+    package enum Skip: String, CaseIterable {
         case absent
         /// Older builds; its origin and edge inclusivity are unverified.
         case formatVersion2 = "format-version-2"

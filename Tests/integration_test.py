@@ -54,7 +54,8 @@ def run_c1(args: list[str]) -> tuple[int, dict]:
         except Exception:
             pass
     if CONTRACT is not None and parsed:
-        name = {'doc': 'doc_info', 'variants': 'variants_list', 'variant': 'variant_' + args[1]}.get(args[0], args[0]) if len(args) > 1 else args[0]
+        name = {'doc': 'doc_info', 'variants': 'variants_list', 'variant': 'variant_' + args[1],
+                'contact-sheet': 'contact_sheet'}.get(args[0], args[0]) if len(args) > 1 else args[0]
         schema = CONTRACT['definitions']['Error'] if 'error' in parsed else CONTRACT['responses'].get(name)
         if schema: validate_response(parsed, schema, name)
     return res.returncode, parsed
@@ -210,6 +211,26 @@ def main():
         else:
             assert code != 0 and thumb_res.get("error", {}).get("code") == "dependency-missing", thumb_res
             print("PASS: thumb reports dependency-missing without exiftool")
+
+        print(f"\n[Step 5d] Testing c1 contact-sheet on original variant {source_id}...")
+        def tree_outside_capture_one_folder():
+            return {str(p.relative_to(SESSION_DIR)): (p.read_bytes() if p.is_file() and ".c1" in p.parts else None)
+                    for p in SESSION_DIR.rglob("*") if "CaptureOne" not in p.relative_to(SESSION_DIR).parts}
+        tree_before = tree_outside_capture_one_folder()
+        code, sheet_res = run_c1(["contact-sheet", "--ids", source_id, "--per-page", "1", "--row-height", "120"])
+        assert code == 0, f"contact-sheet failed: {sheet_res}"
+        assert sheet_res["source"] == "capture-one-thumbnail-cache" and sheet_res["documentKind"] == "session", sheet_res
+        assert [t["id"] for t in sheet_res["tiles"]] == [source_id] and sheet_res["total"] == 1 and "nextPage" not in sheet_res, sheet_res
+        tile = sheet_res["tiles"][0]
+        assert tile["status"] in ("shown", "missing"), tile
+        sheet_path = Path(sheet_res["sheet"]["path"])
+        assert sheet_path.parent == Path.home() / "Library/Caches/c1/contact-sheets" and sheet_path.exists(), sheet_path
+        decoded = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(sheet_path)], capture_output=True, text=True)
+        assert f"pixelWidth: {sheet_res['sheet']['width']}" in decoded.stdout and f"pixelHeight: {sheet_res['sheet']['height']}" in decoded.stdout, decoded
+        assert (journal.read_bytes() if journal.exists() else b"") == journal_before, "contact-sheet must not journal"
+        assert tree_outside_capture_one_folder() == tree_before, "contact-sheet must not write in the document folder"
+        assert compute_sha256(fixture_raw) == baseline_raw_sha, "contact-sheet must not modify the original"
+        print(f"PASS: contact-sheet tile {tile['status']}{' (' + tile.get('reason', '') + ')' if tile['status'] != 'shown' else ''} at {sheet_path}")
 
         # 6. c1 variant clone
         print(f"\n[Step 6] Testing c1 variant clone {source_id}...")

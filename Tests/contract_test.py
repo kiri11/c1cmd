@@ -97,7 +97,7 @@ def run(cli, mcp):
         mcp_schema = json.loads(client.tool('schema')['content'][0]['text'])
         assert cli_schema == mcp_schema, 'CLI/MCP schema drift'
         tools = client.request('tools/list', {})['tools']
-        assert len(tools) == 38
+        assert len(tools) == 39
         assert "native_get" not in cli_schema["requests"]
         removed = client.tool('native_get', {'ref':'x', 'target':{'scope':'adjustments'}})
         assert removed.get('isError'), removed
@@ -118,9 +118,10 @@ def run(cli, mcp):
             complete = cli_schema['responses'][name]['properties']
             assert all(complete[k] == v for k, v in cli_schema['compactResponses'][name]['properties'].items() if k != 'evidencePath'), name
         assert client.tool('get', {'ref': '1', 'full': True}).get('isError')
-        assert [name for name, schema in cli_schema['requests'].items() if 'inlineImage' in schema['properties']] == ['preview']
-        rejected = client.tool('preview', {'ref': '1', 'inlineImage': 'no'})
-        assert rejected.get('isError') and 'invalid-request' in rejected['content'][0]['text'], rejected
+        assert [name for name, schema in cli_schema['requests'].items() if 'inlineImage' in schema['properties']] == ['contact_sheet', 'preview']
+        for tool, args in [('preview', {'ref': '1'}), ('contact_sheet', {})]:
+            rejected = client.tool(tool, {**args, 'inlineImage': 'no'})
+            assert rejected.get('isError') and 'invalid-request' in rejected['content'][0]['text'], rejected
         for args in [{"ids": []}, {"ids": ["1", "1"]}, {"ids": [str(i) for i in range(513)]},
                      {"ids": ["1"], "fields": "unknown"}, {"fields": "minimal"}, {"parentPath": "/a.CR3"}]:
             assert client.tool("variants_list", args).get("isError"), args
@@ -294,7 +295,7 @@ def run(cli, mcp):
         status = cli_schema['responses']['operation_status']['properties']
         assert status['previewSize'] == {'type': 'integer'} and status['preconditionGeometryStateHash'] == status['preconditionStateHash']
         assert status['resolution']['enum'] == ['late-preview', 'probe-barrier', 'restart'], status['resolution']
-        print('PASS: shared CLI/MCP schemas, 38 tool schemas, invalid requests, server survival')
+        print('PASS: shared CLI/MCP schemas, 39 tool schemas, invalid requests, server survival')
     finally:
         client.close()
     with tempfile.TemporaryDirectory(prefix='c1-contract-status-') as directory:
@@ -402,6 +403,12 @@ ACCEPTED = [
     ('exif', ['exif', 'c1_edit_x'], {'ref': 'c1_edit_x'}),
     ('thumb', ['thumb', 'c1_edit_x'], {'ref': 'c1_edit_x'}),
     ('thumb', ['thumb', '1', '--max-size', '1500'], {'ref': '1', 'maxSize': 1500}),
+    ('contact_sheet', ['contact-sheet'], {}),
+    ('contact_sheet', ['contact-sheet', '--min-rating', '3', '--page', '2', '--per-page', '48', '--row-height', '450'],
+     {'minRating': 3, 'page': 2, 'perPage': 48, 'rowHeight': 450}),
+    ('contact_sheet', ['contact-sheet', '--per-page', '1', '--row-height', '120'], {'perPage': 1, 'rowHeight': 120}),
+    ('contact_sheet', ['contact-sheet', '--ids', '1,2', '--collection', 'Day 1', '--selected', '--rating', '0'],
+     {'ids': ['1', '2'], 'collection': 'Day 1', 'selected': True, 'rating': 0}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '5', '--color-tag', '0', '--dry-run'],
      {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 5, 'colorTag': 0, 'dryRun': True}),
     ('set', ['set', 'x', '--if-state', 'h', 'exposure=0.5', 'kelvin=5400'], {'workingRef': 'x', 'ifState': 'h', 'adjustments': {'exposure': 0.5, 'kelvin': 5400}}),
@@ -472,6 +479,14 @@ REJECTED = [
     ('variants_list', ['variants', 'list', '--ids', '1,6F9619FF-8B86-D011-B42D-00C04FC964FF'], {'ids': ['1', '6F9619FF-8B86-D011-B42D-00C04FC964FF']}),
     ('exif', ['exif', ' '], {'ref': ' '}),
     ('thumb', ['thumb', '1', '--max-size', '0'], {'ref': '1', 'maxSize': 0}),
+    ('contact_sheet', ['contact-sheet', '--rating', '5', '--min-rating', '4'], {'rating': 5, 'minRating': 4}),
+    ('contact_sheet', ['contact-sheet', '--ids', '1,1'], {'ids': ['1', '1']}),
+    ('contact_sheet', ['contact-sheet', '--ids', '1,6F9619FF-8B86-D011-B42D-00C04FC964FF'], {'ids': ['1', '6F9619FF-8B86-D011-B42D-00C04FC964FF']}),
+    ('contact_sheet', ['contact-sheet', '--page', '0'], {'page': 0}),
+    ('contact_sheet', ['contact-sheet', '--per-page', '0'], {'perPage': 0}),
+    ('contact_sheet', ['contact-sheet', '--per-page', '49'], {'perPage': 49}),
+    ('contact_sheet', ['contact-sheet', '--row-height', '119'], {'rowHeight': 119}),
+    ('contact_sheet', ['contact-sheet', '--row-height', '451'], {'rowHeight': 451}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--rating', '6'], {'workingRef': 'x', 'ifMetadataState': 'h', 'rating': 6}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h', '--color-tag', '8'], {'workingRef': 'x', 'ifMetadataState': 'h', 'colorTag': 8}),
     ('metadata_set', ['metadata', 'set', 'x', '--if-metadata-state', 'h'], {'workingRef': 'x', 'ifMetadataState': 'h'}),

@@ -23,7 +23,6 @@ struct RequestDispatcherTests {
         for tool in ContractSchema.names {
             XCTAssertEqual(ToolRequest.localTools.contains(tool), tool == "request_status" || tool.hasPrefix("catalog_"))
         }
-        // `inlineImage` is MCP presentation only: preview accepts it, and the command and stored request never see it.
         let quiet = try? ToolRequest(tool: "preview", arguments: ["ref": "x", "inlineImage": false], profile: .standard)
         XCTAssertEqual(quiet?.inlineImage, false)
         XCTAssertNil(quiet?.arguments["inlineImage"])
@@ -31,6 +30,26 @@ struct RequestDispatcherTests {
         XCTAssertEqual(try? ToolRequest(tool: "thumb", arguments: ["ref": "x"], profile: .standard).inlineImage, true)
         XCTAssertThrowsError(try ToolRequest(tool: "preview", arguments: ["ref": "x", "inlineImage": "no"], profile: .standard))
         XCTAssertThrowsError(try ToolRequest(tool: "thumb", arguments: ["ref": "x", "inlineImage": false], profile: .standard))
+        let sheet = try? ToolRequest(tool: "contact_sheet", arguments: ["minRating": 3, "inlineImage": false], profile: .standard)
+        XCTAssertEqual(sheet?.inlineImage, false)
+        XCTAssertNil(sheet?.arguments["inlineImage"])
+        XCTAssertThrowsError(try ToolRequest(tool: "contact_sheet", arguments: ["inlineImage": "no"], profile: .standard))
+        XCTAssertEqual(ContractSchema.names.filter { (ContractSchema.input($0)["properties"] as? [String: Any])?["inlineImage"] != nil }.sorted(),
+                       ["contact_sheet", "preview"])
+        for arguments: [String: Any] in [["rating": 3, "minRating": 2], ["ids": ["1", "1"]], ["ids": [storedUUID]], ["page": 0],
+                                         ["perPage": 0], ["perPage": 49], ["rowHeight": 119], ["rowHeight": 451], ["columns": 5], ["tileSize": 300],
+                                         ["deadlineSeconds": 5]] {
+            XCTAssertThrowsError(try ToolRequest(tool: "contact_sheet", arguments: arguments, profile: .standard)) { error in
+                XCTAssertEqual((error as? C1Error)?.errorCode, "invalid-request", "\(arguments)")
+            }
+        }
+        XCTAssertNoThrow(try ToolRequest(tool: "contact_sheet", arguments: ["ids": ["1", "2"], "collection": "Day 1", "selected": true, "page": 2,
+                                                                            "perPage": 48, "rowHeight": 450], profile: .standard))
+        let layoutProperties = ContractSchema.input("contact_sheet")["properties"] as! [String: [String: Any]]
+        XCTAssertEqual([layoutProperties["perPage"]?["minimum"], layoutProperties["perPage"]?["maximum"],
+                        layoutProperties["rowHeight"]?["minimum"], layoutProperties["rowHeight"]?["maximum"]] as? [Int],
+                       [SheetLayout.perPageRange.lowerBound, SheetLayout.perPageRange.upperBound,
+                        SheetLayout.rowHeightRange.lowerBound, SheetLayout.rowHeightRange.upperBound])
 
         // Every schema tool is registered with a description; only the profile removes tools.
         XCTAssertEqual(ToolProfile.standard.tools.map(\.name), ContractSchema.names)
@@ -44,7 +63,7 @@ struct RequestDispatcherTests {
         XCTAssertTrue((deadline["description"] as? String ?? "").contains("deadline-exceeded"))
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.destructive).map(\.name).sorted(), ["native_action", "variant_delete"])
         XCTAssertEqual(ToolProfile.standard.tools.filter(\.readOnly).map(\.name).sorted(),
-                       ["capabilities", "catalog_collections", "catalog_get", "catalog_inspect", "catalog_variants", "diff", "doc_info", "doctor", "dump",
+                       ["capabilities", "catalog_collections", "catalog_get", "catalog_inspect", "catalog_variants", "contact_sheet", "diff", "doc_info", "doctor", "dump",
                         "edit_status", "exif", "get", "read_session_status", "request_status", "schema", "thumb", "variants_list"])
 
         // The composition profile is transport-neutral: ToolRequest enforces it for the CLI and MCP alike.
@@ -52,7 +71,7 @@ struct RequestDispatcherTests {
                        "reference_capture", "recipe_register", "recipe_verify", "edit_apply"]
         let composition = Set(ToolProfile.composition.tools.map(\.name))
         XCTAssertEqual(Set(ContractSchema.names).subtracting(composition), Set(blocked))
-        XCTAssertTrue(composition.isSuperset(of: ["variant_edit", "geometry_set", "geometry_restore", "get", "exif", "thumb", "preview", "edit_status"]))
+        XCTAssertTrue(composition.isSuperset(of: ["variant_edit", "geometry_set", "geometry_restore", "get", "exif", "thumb", "contact_sheet", "preview", "edit_status"]))
         for tool in blocked {
             XCTAssertThrowsError(try ToolRequest(tool: tool, arguments: [:], profile: .composition)) { error in
                 XCTAssertEqual(error as? C1Error, .invalidRequest("Tool is not enabled in the composition profile: \(tool)"))

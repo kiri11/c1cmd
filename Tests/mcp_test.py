@@ -3,7 +3,7 @@
 
 Tool behaviour is covered by the CLI suites through the same core dispatcher. This
 suite checks only what the MCP server adds: tool registration, JSON-RPC results and
-errors, preview image content and its inlineImage opt-out, and that one server
+errors, preview and contact sheet image content and their inlineImage opt-out, and that one server
 process compiles the AppleScript handlers once and reuses them for every later call."""
 
 import base64
@@ -221,7 +221,7 @@ def main():
         tools = client.send_request("tools/list", {}).get("result", {}).get("tools", [])
         schema = parse_text_content(client.call_tool("schema").get("content", []))
         client.contract = schema
-        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 38, [t["name"] for t in tools]
+        assert {t["name"] for t in tools} == set(schema["requests"]) and len(tools) == 39, [t["name"] for t in tools]
         for t in tools:
             assert t.get("description"), f"Tool {t['name']} missing description"
             assert t["inputSchema"] == schema["requests"][t["name"]], t["name"]
@@ -304,6 +304,19 @@ def main():
         else:
             assert thumb_res.get("isError") is True and thumb_data["error"]["code"] == "dependency-missing", thumb_res
             print("  ✓ Thumb reports dependency-missing without exiftool")
+
+        print("\n[Step 4c] Contact sheet as image content...")
+        sheet_res = client.call_tool("contact_sheet", {"ids": [source_id], "perPage": 1, "rowHeight": 120})
+        assert sheet_res.get("isError") is not True, f"Contact sheet failed: {sheet_res}"
+        sheet_data = parse_text_content(sheet_res.get("content", []))
+        validate_response(sheet_data, schema["responses"]["contact_sheet"], "contact_sheet")
+        assert [t["id"] for t in sheet_data["tiles"]] == [source_id], sheet_data
+        img_block = find_image_content(sheet_res.get("content", []))
+        assert img_block is not None and img_block.get("mimeType") == "image/jpeg", sheet_res
+        assert base64.b64decode(img_block["data"]) == Path(sheet_data["sheet"]["path"]).read_bytes(), "The image block is the sheet file"
+        quiet = client.call_tool("contact_sheet", {"ids": [source_id], "perPage": 1, "rowHeight": 120, "inlineImage": False})
+        assert [item.get("type") for item in quiet.get("content", [])] == ["text"], quiet
+        print(f"  ✓ Contact sheet returned the {sheet_data['sheet']['width']}x{sheet_data['sheet']['height']} sheet as image content; inlineImage false returned only text")
 
         client.close()
         trace.close()

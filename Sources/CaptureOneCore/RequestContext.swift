@@ -175,7 +175,7 @@ public final class RequestContext: @unchecked Sendable {
     public var cancellationRequested: Bool { mutex.lock(); defer { mutex.unlock() }; return cancelled }
     /// Only top-level batched reads honor read cancellation. Nested inventory inside a mutation must finish its safety work.
     public func checkReadCancellation() throws {
-        mutex.lock(); let stop = cancelled && ["variants_list", "dump"].contains(state.tool); mutex.unlock()
+        mutex.lock(); let stop = cancelled && ContractSchema.inventoryTools.contains(state.tool); mutex.unlock()
         if stop { throw C1Error.requestCancelled("Inventory cancelled between Apple Events; no partial inventory was returned.") }
     }
     /// Compound workflows stop only after the current guarded operation has returned.
