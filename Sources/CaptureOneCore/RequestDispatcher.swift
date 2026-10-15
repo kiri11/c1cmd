@@ -1,5 +1,36 @@
 import Foundation
 
+/// Arguments that only select presentation. `ToolRequest` removes them before validation,
+/// so the command and any stored request never see them.
+struct PresentationOptions {
+    var full = false
+    var inlineImage = true
+
+    struct Option {
+        let key: String
+        let tools: Set<String>
+        let description: String
+        let value: WritableKeyPath<PresentationOptions, Bool>
+    }
+
+    static let all = [
+        Option(key: "full", tools: ResultCompaction.tools,
+               description: "Return the complete result instead of a compact summary with evidencePath.", value: \.full),
+        Option(key: "inlineImage", tools: ["contact_sheet", "preview"],
+               description: "MCP only, default true. False returns only the text result; the JSON still names the JPEG.", value: \.inlineImage)
+    ]
+
+    static func take(from arguments: inout [String: Any], tool: String) throws -> PresentationOptions {
+        var options = PresentationOptions()
+        for option in all where option.tools.contains(tool) {
+            guard let value = arguments.removeValue(forKey: option.key) else { continue }
+            try ContractSchema.validateValue(value, schema: ContractSchema.boolean, path: "\(tool).\(option.key)")
+            options[keyPath: option.value] = value as! Bool
+        }
+        return options
+    }
+}
+
 /// One contract tool call, validated against the contract schema and decoded.
 /// Every CLI command and MCP tool call enters core through `init(tool:arguments:)`,
 /// so both transports accept and reject exactly the same arguments.
@@ -62,20 +93,10 @@ public struct ToolRequest {
         guard profile.allows(tool) else {
             throw C1Error.invalidRequest("Tool is not enabled in the \(profile.rawValue) profile: \(tool)")
         }
-        // `full` and `inlineImage` only select presentation; the command and any stored request never see them.
         var a = arguments
-        if ResultCompaction.tools.contains(tool), let full = a.removeValue(forKey: "full") {
-            try ContractSchema.validateValue(full, schema: ContractSchema.boolean, path: "\(tool).full")
-            self.full = full as! Bool
-        } else {
-            self.full = false
-        }
-        if ContractSchema.inlineImageTools.contains(tool), let inlineImage = a.removeValue(forKey: "inlineImage") {
-            try ContractSchema.validateValue(inlineImage, schema: ContractSchema.boolean, path: "\(tool).inlineImage")
-            self.inlineImage = inlineImage as! Bool
-        } else {
-            self.inlineImage = true
-        }
+        let presentation = try PresentationOptions.take(from: &a, tool: tool)
+        full = presentation.full
+        inlineImage = presentation.inlineImage
         try ContractSchema.validate(tool: tool, arguments: a)
         self.tool = tool
         self.arguments = a

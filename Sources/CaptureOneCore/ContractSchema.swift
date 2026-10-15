@@ -25,7 +25,6 @@ public enum ContractSchema {
     }
     public static let names = Recipes.tools + [ "read_session_begin", "read_session_end", "read_session_status", "catalog_get", "catalog_collections", "catalog_variants", "catalog_inspect", "catalog_snapshot", "native_set", "native_action", "doctor", "doc_info", "capabilities", "schema", "variants_list", "variant_edit", "variant_clone", "variant_delete", "variant_baseline", "get", "exif", "thumb", "contact_sheet", "metadata_set", "set", "add", "geometry_set", "geometry_restore", "reset", "diff", "dump", "preview", "operation_status", "request_status"]
     public static let inventoryTools: Set<String> = ["variants_list", "dump", "contact_sheet"]
-    public static let inlineImageTools: Set<String> = ["contact_sheet", "preview"]
     static func integer(_ range: ClosedRange<Int>) -> [String: Any] {
         ["type": "integer", "minimum": range.lowerBound, "maximum": range.upperBound]
     }
@@ -104,16 +103,11 @@ public enum ContractSchema {
             "tiles": array(tile), "counts": counts, "renderedAt": string, "limitation": string]
         return object(properties, required: properties.keys.filter { !["nextPage", "sheet"].contains($0) }.sorted())
     }
-    /// Mutation, recipe and preview tools also accept `full`, and image tools accept `inlineImage`;
-    /// `ToolRequest` removes both before validation.
     public static func input(_ name: String) -> [String: Any] {
         var schema = request(name)
         guard var properties = schema["properties"] as? [String: Any] else { return schema }
-        if ResultCompaction.tools.contains(name) {
-            properties["full"] = ["type": "boolean", "description": "Return the complete result instead of a compact summary with evidencePath."]
-        }
-        if inlineImageTools.contains(name) {
-            properties["inlineImage"] = ["type": "boolean", "description": "MCP only, default true. False returns only the text result; the JSON still names the JPEG."]
+        for option in PresentationOptions.all where option.tools.contains(name) {
+            properties[option.key] = boolean.merging(["description": option.description]) { $1 }
         }
         schema["properties"] = properties
         return schema
