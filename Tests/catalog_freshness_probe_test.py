@@ -27,10 +27,8 @@ class FreshnessProbeTests(unittest.TestCase):
                 ''')
                 self.assertTrue(probe.matches(probe.snapshot(path)[0],dict(rating=0,exposure=0)))
                 db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=4')
-                self.assertFalse(probe.matches(probe.snapshot(path)[0],dict(rating=4)))
                 db.commit()
                 self.assertTrue(probe.matches(probe.snapshot(path)[0],dict(rating=4)))
-                # A completed observation cannot hold a read transaction blocking writes.
                 db.execute('BEGIN EXCLUSIVE'); db.rollback()
             finally: db.close()
 

@@ -9,11 +9,9 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sqlite3
 import subprocess
 import tempfile
 import time
-from contextlib import closing
 
 from contract_test import Client, validate_response, complete, complete_args
 
@@ -32,14 +30,6 @@ def apple(body):
         capture_output=True, text=True, timeout=150)
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()
-
-
-def capture_one_started():
-    """Launch time of the Capture One process; long-running processes have stopped storing rows (#43)."""
-    pids = subprocess.run(['pgrep', '-x', 'Capture One'], capture_output=True, text=True).stdout.split()
-    if len(pids) != 1:
-        return None
-    return subprocess.run(['ps', '-o', 'lstart=', '-p', pids[0]], capture_output=True, text=True).stdout.strip()
 
 
 def close_retained(document):
@@ -63,12 +53,9 @@ def close_retained(document):
 
 def snapshot_database(database, destination):
     """Copy the stored state before a close lets Capture One write again."""
-    try:
-        with closing(sqlite3.connect(Path(database).as_uri() + '?mode=ro', uri=True)) as source, closing(sqlite3.connect(destination)) as copy:
-            source.backup(copy)
-        return str(destination)
-    except Exception as error:
-        return f'not copied: {error}'
+    result = subprocess.run([str(CLI), 'catalog', 'snapshot', '--database', str(database), '--destination', str(destination),
+                             '--format', 'json'], capture_output=True, text=True, timeout=150)
+    return str(destination) if result.returncode == 0 else f'not copied: {result.stderr.strip()}'
 
 
 def main():
@@ -155,8 +142,7 @@ def main():
         assert health['allChecksPassed'] and health['writesEnabled'] and not health['isSession'], health
         doc = cli('doc', 'info')
         assert Path(doc['documentPath']).resolve() == catalog.resolve() and '.cocatalogdb|' in doc['openToken'], doc
-        log('environment', document=doc, sourceSHA256=source_sha, cliSHA256=sha(CLI), mcpSHA256=sha(MCP),
-            captureOneStarted=capture_one_started())
+        log('environment', document=doc, sourceSHA256=source_sha, cliSHA256=sha(CLI), mcpSHA256=sha(MCP))
         # Exercise the application's native backup before editing this disposable catalog.
         backup = base / 'backup'
         backup.mkdir()

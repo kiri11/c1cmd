@@ -7,14 +7,13 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sqlite3
 import statistics
 import subprocess
 import tempfile
 import time
-from contextlib import closing
 from catalog_integration_test import apple, close_retained, sha, CLI, MCP
 from contract_test import Client, validate_response, complete, complete_args
+import stored_read
 
 
 def main():
@@ -118,8 +117,7 @@ def main():
             log(kind+'-timings',timings=timings)
             database=next(expected.glob('*.cosessiondb' if kind=='session' else '*.cocatalogdb'))
             def stored():
-                with closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True)) as db:
-                    return db.execute('SELECT v.Z_PK,l.ZEXPOSURE,m.ZBASIC_RATING FROM ZVARIANT v LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA').fetchall()
+                return stored_read.read(database, lambda db: db.execute('SELECT v.Z_PK,l.ZEXPOSURE,m.ZBASIC_RATING FROM ZVARIANT v LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA').fetchall())
             log(kind+'-stored-immediate',rows=stored())
             if kind=='catalog':
                 print('Waiting for the 60-second SQL catch-up boundary',flush=True)

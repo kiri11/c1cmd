@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='c1-stored-archive-') as tmp:
     for key in ['images','variants','imageMembership','variantMembership','storedSettings','storedMetadata','storedRetouching']:
         assert archived[key]==stored[key],key
     assert archived['databaseDocumentUUID']==stored['databaseDocumentUUID']
-    with sqlite3.connect(f'file:{target}?mode=ro',uri=True) as c:
+    with sqlite3.connect(f'file:{target}?mode=ro&immutable=1',uri=True) as c:
         assert c.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
     backup_bytes=target.stat().st_size
 assert cli('doc','info')['openToken']==doc['openToken']

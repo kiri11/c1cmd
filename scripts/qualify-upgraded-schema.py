@@ -45,7 +45,7 @@ def main():
         assert result.returncode == 0, result.stderr
         return json.loads(result.stdout)
 
-    with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as db, closing(sqlite3.connect(':memory:')) as original:
+    with closing(sqlite3.connect(database.as_uri() + '?mode=ro&immutable=1', uri=True)) as db, closing(sqlite3.connect(':memory:')) as original:
         db.row_factory = sqlite3.Row
         db.execute('PRAGMA query_only=ON')
         deadline = time.monotonic() + 120

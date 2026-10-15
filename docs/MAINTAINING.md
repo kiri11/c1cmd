@@ -262,10 +262,11 @@ Other limits:
 ## Run live checks
 
 Close all documents and reserve exclusive use of Capture One. Tests create their
-own disposable Sessions/Catalogs under `/private/tmp` or `.build`. Run Catalog
-suites on a recently launched Capture One: processes that had run for five hours or
-more stopped storing new albums, clones and imports, and the catalog suite records
-the launch time in its evidence. Do not run
+own disposable Sessions/Catalogs under `/private/tmp` or `.build`. Read an open
+database only through `Tests/stored_read.py` or c1's stored reads: a SQLite read
+lock across a save makes Capture One drop its changes for good
+([save stalls](reference/editing.md#save-stalls)), and `Tests/stored_read_test.py`
+rejects locking readers. Do not run
 offline core tests concurrently with live suites: both acquire the application
 lock.
 

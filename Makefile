@@ -48,6 +48,7 @@ check-built-core:
 	python3 -B Tests/contained_crop_test.py
 	python3 -B Tests/catalog_freshness_probe_test.py
 	python3 -B Tests/variant_modified_probe_test.py
+	python3 -B Tests/stored_read_test.py
 	python3 -B Tests/benchmark_reads_test.py
 	python3 -B scripts/generate-native-editing.py --check
 	python3 -B Tests/recovery_harness_test.py
