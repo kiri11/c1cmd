@@ -13,6 +13,8 @@ public final class CatalogReader {
     private var documentUUID = ""
     private var observationStartedAt = ""
     private let fileIdentity: String
+    private enum Kind { case catalog, session }
+    private let kind: Kind
     public init(database: String) throws {
         guard database.hasPrefix("/"), !database.contains("\0") else { throw C1Error.invalidRequest("database must be an absolute filesystem path.") }
         let url = URL(fileURLWithPath: database).standardizedFileURL.resolvingSymlinksInPath()
@@ -21,6 +23,17 @@ public final class CatalogReader {
         }
         path = url.path
         fileIdentity = try Self.identity(path)
+        kind = .catalog
+    }
+    package init(sessionDatabase: String) throws {
+        guard sessionDatabase.hasPrefix("/"), !sessionDatabase.contains("\0") else { throw C1Error.invalidRequest("database must be an absolute filesystem path.") }
+        let url = URL(fileURLWithPath: sessionDatabase).standardizedFileURL.resolvingSymlinksInPath()
+        guard url.pathExtension == "cosessiondb", (try url.resourceValues(forKeys: [.isRegularFileKey])).isRegularFile == true else {
+            throw C1Error.invalidRequest("An explicit regular .cosessiondb file is required.")
+        }
+        path = url.path
+        fileIdentity = try Self.identity(path)
+        kind = .session
     }
     private static func identity(_ path: String) throws -> String {
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
@@ -152,6 +165,7 @@ public final class CatalogReader {
         return expected.isEmpty
     }
     private func validateSchema() throws {
+        if kind == .session { return try validateSessionSchema() }
         let schema = try rows("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name")
         let canonical = schema.map { row in ["type", "name", "tbl_name", "sql"].map { row[$0] as! String }.joined(separator: "|") }.joined(separator: "\n")
         fingerprint = SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -178,6 +192,21 @@ public final class CatalogReader {
         let documents = try rows("SELECT ZDOCUMENTUUID FROM ZDOCUMENTCONTENT")
         guard documents.count == 1, let uuid = documents.first?["ZDOCUMENTUUID"] as? String, !uuid.isEmpty else {
             throw C1Error.invalidRequest("Catalog requires exactly one stored document UUID.")
+        }
+        documentUUID = uuid
+    }
+    private func validateSessionSchema() throws {
+        let documents = try rows("SELECT ZDOCUMENTTYPE,ZDOCUMENTUUID FROM ZDOCUMENTCONTENT")
+        guard documents.count == 1, documents[0]["ZDOCUMENTTYPE"] as? Int64 == 0,
+              let uuid = documents[0]["ZDOCUMENTUUID"] as? String, !uuid.isEmpty else {
+            throw C1Error.invalidRequest("Unsupported Session database: it must hold exactly one Session document record.")
+        }
+        func columns(_ table: String) throws -> Set<String> {
+            Set(try rows("SELECT name FROM pragma_table_info('\(table)')").compactMap { $0["name"] as? String })
+        }
+        guard try columns("ZVARIANT").isSuperset(of: ["Z_PK", "ZVARIANTUUID", "ZIMAGE"]),
+              try columns("ZIMAGE").isSuperset(of: ["Z_PK", "ZIMAGEFILENAME"]) else {
+            throw C1Error.invalidRequest("Unsupported Session database: variant or image columns are missing.")
         }
         documentUUID = uuid
     }
@@ -386,6 +415,26 @@ public final class CatalogReader {
             """) }
         guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
         return try JSONDecoder().decode([Projection].self, from: JSONSerialization.data(withJSONObject: records))
+    }
+
+    package func sessionThumbnailKeys(variantIDs: [Int]) throws -> [Int: SessionThumbnailKey] {
+        guard kind == .session else { throw C1Error.invalidRequest("Thumbnail keys are read from a Session database.") }
+        guard !variantIDs.isEmpty else { return [:] }
+        let records = try observe { try rows("""
+            SELECT v.Z_PK AS id,v.ZVARIANTUUID AS variantUUID,i.ZIMAGEFILENAME AS imageFileName
+            FROM ZVARIANT v LEFT JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
+            WHERE v.Z_PK IN (\(variantIDs.map(String.init).joined(separator: ",")))
+            """) }
+        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Session database replaced during observation.") }
+        var keys: [Int: SessionThumbnailKey] = [:]
+        for record in records {
+            guard let id = record["id"] as? Int64, let text = record["variantUUID"] as? String, let uuid = UUID(uuidString: text),
+                  let name = record["imageFileName"] as? String, !name.isEmpty else {
+                throw C1Error.identityAmbiguous("Stored variant \(record["id"] ?? "") has no usable variant UUID or image file name, so no thumbnail can be mapped.")
+            }
+            keys[Int(id)] = SessionThumbnailKey(variantUUID: uuid, imageFileName: name)
+        }
+        return keys
     }
 
     /// The native collection ID of All Images, which the root collection names; its localized

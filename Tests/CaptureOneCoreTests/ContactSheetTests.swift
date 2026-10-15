@@ -9,6 +9,7 @@ struct ContactSheetTests {
         testCachePaths()
         testLayout()
         testResultEncoding()
+        testSessionKeyReader()
     }
 
     static func errorCode(_ body: () throws -> Any) -> String? {
@@ -192,6 +193,79 @@ struct ContactSheetTests {
             let emptyJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(empty)) as! [String: Any]
             XCTAssertNil(emptyJSON["sheet"], "An empty scope has no sheet")
             XCTAssertEqual(emptyJSON["counts"] as? NSDictionary, ["shown": 0, "missing": 0, "unreadable": 0, "uncropped": 0] as NSDictionary)
+        }
+    }
+
+    static let sessionTables = [
+        "CREATE TABLE ZDOCUMENTCONTENT(Z_PK INTEGER PRIMARY KEY, ZDOCUMENTTYPE INTEGER, ZDOCUMENTUUID VARCHAR);",
+        "CREATE TABLE ZIMAGE(Z_PK INTEGER PRIMARY KEY, ZIMAGEFILENAME VARCHAR, ZDISPLAYNAME VARCHAR);",
+        "CREATE TABLE ZVARIANT(Z_PK INTEGER PRIMARY KEY, ZIMAGE INTEGER, ZVARIANTUUID VARCHAR);",
+    ]
+
+    @discardableResult
+    static func sessionDatabase(_ path: String, variants: [Int: (uuid: String?, fileName: String?)], documentType: Int = 0,
+                                tables: [String] = sessionTables, extra: [String] = []) -> String {
+        func literal(_ text: String?) -> String { text.map { "'" + $0.replacingOccurrences(of: "'", with: "''") + "'" } ?? "NULL" }
+        var sql = tables + ["INSERT INTO ZDOCUMENTCONTENT VALUES(1,\(documentType),'5B0D6A3C-1F7E-4C2B-9A55-0D6C1E2F3A4B');"]
+        for (id, row) in variants.sorted(by: { $0.key < $1.key }) {
+            sql.append("INSERT INTO ZIMAGE(Z_PK,ZIMAGEFILENAME) VALUES(\(id),\(literal(row.fileName)));")
+            sql.append("INSERT INTO ZVARIANT VALUES(\(id),\(id),\(literal(row.uuid)));")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        process.arguments = [path]
+        let input = Pipe()
+        process.standardInput = input
+        try! process.run()
+        input.fileHandleForWriting.write(Data((sql + extra).joined(separator: "\n").utf8))
+        try! input.fileHandleForWriting.close()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "Session fixture database")
+        return path
+    }
+
+    private static func testSessionKeyReader() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        func path(_ name: String) -> String { directory.appendingPathComponent(name).path }
+        let first = "0F8E2D1C-AAAA-4BBB-8CCC-123456789ABC", second = "9d1e2f3a-bbbb-4ccc-8ddd-abcdef012345"
+        let database = sessionDatabase(path("Shoot.cosessiondb"), variants: [1: (first, "IMG_1.CR3"), 2: (second, "IMG_2.CR3"), 40: (first, "IMG_40.CR3")])
+        XCTAssertNoThrowBlock {
+            let before = try Data(contentsOf: URL(fileURLWithPath: database))
+            let keys = try CatalogReader(sessionDatabase: database).sessionThumbnailKeys(variantIDs: [1, 2, 99])
+            XCTAssertEqual(keys, [1: SessionThumbnailKey(variantUUID: UUID(uuidString: first)!, imageFileName: "IMG_1.CR3"),
+                                  2: SessionThumbnailKey(variantUUID: UUID(uuidString: second)!, imageFileName: "IMG_2.CR3")],
+                           "Z_PK maps to its own UUID and file name; an unsaved variant is absent")
+            let none = try CatalogReader(sessionDatabase: database).sessionThumbnailKeys(variantIDs: [])
+            XCTAssertTrue(none.isEmpty)
+            let after = try Data(contentsOf: URL(fileURLWithPath: database))
+            XCTAssertEqual(after, before, "The read leaves the database bytes unchanged")
+            let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            XCTAssertEqual(files, ["Shoot.cosessiondb"], "No journal, WAL or shm file appears")
+        }
+        XCTAssertEqual(errorCode { try CatalogReader(database: database) }, "invalid-request", "catalog_* tools still refuse Sessions")
+        XCTAssertEqual(errorCode { try CatalogReader(sessionDatabase: "Shoot.cosessiondb") }, "invalid-request")
+        try! Data().write(to: URL(fileURLWithPath: path("Wedding.cocatalogdb")))
+        XCTAssertEqual(errorCode { try CatalogReader(sessionDatabase: path("Wedding.cocatalogdb")) }, "invalid-request")
+        try! FileManager.default.createDirectory(atPath: path("Folder.cosessiondb"), withIntermediateDirectories: true)
+        XCTAssertEqual(errorCode { try CatalogReader(sessionDatabase: path("Folder.cosessiondb")) }, "invalid-request")
+
+        let refused: [(String, String, String)] = [
+            (sessionDatabase(path("catalog.cosessiondb"), variants: [1: (first, "IMG_1.CR3")], documentType: 1), "invalid-request", "a Catalog document type"),
+            (sessionDatabase(path("wal.cosessiondb"), variants: [1: (first, "IMG_1.CR3")], extra: ["PRAGMA journal_mode=WAL;"]), "invalid-request", "a WAL database"),
+            (sessionDatabase(path("two.cosessiondb"), variants: [1: (first, "IMG_1.CR3")],
+                             extra: ["INSERT INTO ZDOCUMENTCONTENT VALUES(2,0,'second');"]), "invalid-request", "two document records"),
+            (sessionDatabase(path("blank.cosessiondb"), variants: [1: (first, "IMG_1.CR3")],
+                             extra: ["UPDATE ZDOCUMENTCONTENT SET ZDOCUMENTUUID='';"]), "invalid-request", "an empty document UUID"),
+            (sessionDatabase(path("column.cosessiondb"), variants: [:], tables: [sessionTables[0], "CREATE TABLE ZIMAGE(Z_PK INTEGER PRIMARY KEY, ZDISPLAYNAME VARCHAR);", sessionTables[2]]),
+             "invalid-request", "a missing ZIMAGEFILENAME column"),
+            (sessionDatabase(path("uuid.cosessiondb"), variants: [1: ("not-a-uuid", "IMG_1.CR3")]), "identity-ambiguous", "a stored UUID that does not parse"),
+            (sessionDatabase(path("null.cosessiondb"), variants: [1: (nil, "IMG_1.CR3")]), "identity-ambiguous", "a NULL stored UUID"),
+            (sessionDatabase(path("name.cosessiondb"), variants: [1: (first, nil)]), "identity-ambiguous", "a NULL image file name"),
+        ]
+        for (database, code, reason) in refused {
+            XCTAssertEqual(errorCode { try CatalogReader(sessionDatabase: database).sessionThumbnailKeys(variantIDs: [1]) }, code, "Refuses \(reason)")
         }
     }
 }
