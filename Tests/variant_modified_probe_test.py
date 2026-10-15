@@ -50,7 +50,6 @@ class VariantModifiedProbeTests(unittest.TestCase):
                 self.assertEqual(analysis['changesSinceImport'], {})
                 db.execute('UPDATE ZVARIANT SET ZISMODIFIED=1 WHERE Z_PK=1')
                 db.execute('UPDATE ZVARIANTLAYER SET ZROTATION=2 WHERE Z_PK=11')
-                self.assertEqual(probe.snapshot(path, ['tonal.CR3'])['tonal.CR3'], entry, 'uncommitted writes are invisible')
                 db.commit()
                 later = probe.snapshot(path, ['tonal.CR3'])['tonal.CR3']
                 self.assertEqual(probe.changes(entry, later), dict(variant=dict(ZISMODIFIED=[0, 1]), combined=dict(ZROTATION=[0, 2])))

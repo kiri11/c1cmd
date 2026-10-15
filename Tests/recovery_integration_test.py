@@ -35,6 +35,7 @@ from typing import Callable, Optional
 import uuid
 
 from contract_test import complete
+import stored_read
 
 ROOT = Path(__file__).resolve().parents[1]
 SHUTDOWN_MODES = {'quit': 'native-quit', 'sigterm': 'process-termination'}
@@ -436,7 +437,7 @@ class Run:
         # Exact-build diagnostics only. Private database rows never authorize writes.
         destination = self.evidence / f'restart-{self.restart_number}-{phase}.json'
         try:
-            with sqlite3.connect(self.db.as_uri() + '?mode=ro', uri=True) as connection:
+            def query(connection):
                 connection.row_factory = sqlite3.Row
                 data = {name: [dict(row) for row in connection.execute(query)] for name, query in {
                     'images': 'SELECT Z_PK,ZIMAGEUUID,ZIMAGELOCATION,ZIMAGEFILENAME FROM ZIMAGE',
@@ -444,6 +445,8 @@ class Run:
                     'variants': 'SELECT Z_PK,ZIMAGE,ZINDEX,ZVARIANTUUID FROM ZVARIANT',
                 }.items()}
                 data['quickCheck'] = connection.execute('PRAGMA quick_check').fetchone()[0]
+                return data
+            data = stored_read.read(self.db, query)
             destination.write_text(json.dumps(data, indent=2) + '\n')
             self.log('fixture-snapshot', phase=phase, path=str(destination))
         except (sqlite3.Error, OSError) as error:

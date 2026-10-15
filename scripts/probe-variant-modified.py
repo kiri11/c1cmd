@@ -11,7 +11,6 @@ Requires zero open documents. Failed or uncertain writes stop at once, without r
 and leave the fixture open. Never quits Capture One; closes only its own Catalog.
 """
 import argparse
-from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -27,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'Tests'))
 from catalog_integration_test import apple
 from editing_fixture import EditingFixture
+import stored_read
 
 CHANGED = 'changed'
 STRUCTURAL = frozenset({'Z_PK', 'Z_ENT', 'ZINDEX', 'ZVARIANT', 'ZMETADATA', 'ZLAYER'})
@@ -78,15 +78,10 @@ def stored_variant(db, filename):
 
 
 def snapshot(database, filenames):
-    """One short read-only transaction; no immutable/nolock and no checkpoint."""
-    with closing(sqlite3.connect(Path(database).as_uri() + '?mode=ro', uri=True, timeout=.25, isolation_level=None)) as db:
+    def query(db):
         db.row_factory = sqlite3.Row
-        db.execute('PRAGMA query_only=ON')
-        db.execute('BEGIN')
-        try:
-            return {name: stored_variant(db, name) for name in filenames}
-        finally:
-            db.execute('ROLLBACK')
+        return {name: stored_variant(db, name) for name in filenames}
+    return stored_read.read(database, query)
 
 
 def view(entry):

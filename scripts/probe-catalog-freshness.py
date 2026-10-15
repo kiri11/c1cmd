@@ -4,11 +4,10 @@
 Copies one RAW, requires zero open documents, never quits Capture One. Every mutation
 uses c1 editing references and fresh tokens. Failed/uncertain mutations stop immediately
 and leave the fixture open; there is no automatic rollback on error. Successful runs
-restore baseline values before closing their owned fixture. SQLite observations use
-short read-only transactions without immutable/nolock or forced checkpoints.
+restore baseline values before closing their owned fixture. SQLite observations are
+lock-free (Tests/stored_read.py) and never force a checkpoint.
 """
 import argparse
-from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -17,11 +16,14 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'Tests'))
+import stored_read
 QUERY = '''SELECT v.Z_PK AS variantID, v.ZVARIANTUUID AS uuid,
     m.ZBASIC_RATING AS rating, COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,
     l.ZEXPOSURE AS exposure, l.ZCONTRAST AS contrast,l.ZSATURATION AS saturation,
@@ -31,10 +33,10 @@ QUERY = '''SELECT v.Z_PK AS variantID, v.ZVARIANTUUID AS uuid,
 
 
 def snapshot(path):
-    with closing(sqlite3.connect(path.as_uri()+'?mode=ro', uri=True, timeout=.25)) as db:
+    def query(db):
         db.row_factory=sqlite3.Row
-        db.execute('PRAGMA query_only=ON')
         return [dict(r) for r in db.execute(QUERY)]
+    return stored_read.read(path, query)
 
 
 def matches(row, expected):
@@ -106,8 +108,7 @@ def main():
     databases=list(catalog.glob('*.cocatalogdb')); assert len(databases)==1
     database=databases[0]
     stored=cli('catalog','inspect','--database',database)
-    with closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True)) as db:
-        mode=db.execute('PRAGMA journal_mode').fetchone()[0]
+    mode=stored_read.read(database, lambda db: db.execute('PRAGMA journal_mode').fetchone()[0])
     sdef=ET.parse('/Applications/Capture One.app/Contents/Resources/CaptureOne.sdef')
     barriers=[x.attrib for x in sdef.iter() if x.tag in ('command','property') and any(
         word in (x.get('name','')+' '+x.get('description','')).lower() for word in ('flush','modified','change count','dirty','save'))]
@@ -115,12 +116,10 @@ def main():
     edit=cli('variant','edit',native_id,'--if-document',doc['openToken'],'--if-state',baseline['stateHash'])
     ref=edit['workingRef']
     observations=[]
-    monitor=sqlite3.connect(database.as_uri()+'?mode=ro',uri=True,isolation_level=None,timeout=.25)
     def stamp():
-        return dict(databaseMtimeNS=database.stat().st_mtime_ns, dataVersion=monitor.execute('PRAGMA data_version').fetchone()[0])
+        saved=stored_read.stamp(database)
+        return dict(databaseMtimeNS=database.stat().st_mtime_ns, changeCounter=saved and int.from_bytes(saved[0],'big'))
     def observe(label,acknowledged,expected,before_stamp):
-        # Fresh connection/transaction each time: stale reads cannot be explained by
-        # an observer holding a SQLite snapshot open across a native write.
         samples=[]
         limit=time.perf_counter()+a.observe_seconds
         while True:
@@ -156,7 +155,6 @@ def main():
         log('mutation-acknowledged',label=f'tonal-{i}',result=result)
         current=observe(f'tonal-{i}',ack,patch,before_stamp)
         assert matches(current['adjustments'],patch)
-    monitor.close()
     # Known-success mutations only. Fresh native tokens and explicit saved values.
     cli('metadata','set',ref,'--if-metadata-state',current['metadataStateHash'],
         '--rating',baseline['metadata']['rating'],'--color-tag',baseline['metadata']['colorTag'])
