@@ -20,5 +20,14 @@ struct LockTests {
             executedSecond = true
         })
         XCTAssertTrue(executedSecond)
+
+        let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for file in (try? FileManager.default.contentsOfDirectory(at: tests, includingPropertiesForKeys: nil)) ?? [] where file.pathExtension == "swift" {
+            let source = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+            let constructions = source.components(separatedBy: "SessionController" + "(").dropFirst()
+            XCTAssertTrue(constructions.allSatisfy { $0.hasPrefix("lock: testLock") } && !source.contains("CaptureOne" + "Lock.shared")
+                          && !source.contains("SessionController" + ".shared"),
+                          "\(file.lastPathComponent) must build SessionController with `lock: testLock` so it never takes the machine-wide lock")
+        }
     }
 }

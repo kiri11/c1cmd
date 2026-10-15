@@ -20,7 +20,7 @@ struct ScopedGetTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory), bridge = NativeManyFake(fake)
         var database = "db"
-        let core = SessionController(executor: bridge, appInstance: { fake.generation }, databaseIdentity: { _ in database })
+        let core = SessionController(lock: testLock, executor: bridge, appInstance: { fake.generation }, databaseIdentity: { _ in database })
         let targets = [NativeTarget(), NativeTarget(scope: "lens"), NativeTarget(scope: "variant")]
         XCTAssertThrowsError(try core.get(ref: "1", nativeTargets: []))
         XCTAssertThrowsError(try core.get(ref: "1", nativeTargets: Array(repeating: targets[0], count: 17)))

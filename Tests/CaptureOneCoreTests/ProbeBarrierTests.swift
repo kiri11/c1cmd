@@ -19,7 +19,7 @@ struct ProbeBarrierTests {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let fake = FakeScript(directory: directory)
             self.fake = fake
-            core = SessionController(executor: native ? NativeFake(fake) : fake, appInstance: { fake.generation },
+            core = SessionController(lock: testLock, executor: native ? NativeFake(fake) : fake, appInstance: { fake.generation },
                                      databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in [6000, 4000] })
             journal = OperationJournal(sessionDirectory: directory)
             let doc = try core.getDocumentInfo(), source = try core.get(ref: "1")

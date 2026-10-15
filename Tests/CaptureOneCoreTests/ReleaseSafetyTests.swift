@@ -238,7 +238,7 @@ struct ReleaseSafetyTests {
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let fake = FakeScript(directory: dir)
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
         let journal = OperationJournal(sessionDirectory: dir)
         let store = ProvenanceStore(sessionDirectory: dir)
         XCTAssertNoThrowBlock {

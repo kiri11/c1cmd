@@ -8,7 +8,7 @@ struct ExifReaderTests {
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = GeometryFake(directory: directory)
-        let core = SessionController(executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" },
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" },
                                      imageDimensions: { _ in [6000, 4000] })
         FileManager.default.createFile(atPath: fake.base.parent, contents: Data("raw".utf8))
         let output = directory.appendingPathComponent("exif.json"), argumentLog = directory.appendingPathComponent("args.txt")
@@ -56,7 +56,7 @@ struct ExifReaderTests {
             XCTAssertNil(dutch.levelRotation, "2U6A7294: an intentional 49 degree tilt is beyond the rotation range")
 
             // Without native geometry, EXIF orientation sets the level frame.
-            let unreadable = SessionController(executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in nil })
+            let unreadable = SessionController(lock: testLock, executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in nil })
             _ = try exif(["Orientation": 6, "RollAngle": 93.9], orientation: 0)
             let fallback = try ExifReader.read(unreadable.get(ref: "1"), executable: tool.path)
             XCTAssertEqual(fallback.levelRotation, 3.9)

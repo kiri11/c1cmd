@@ -69,7 +69,7 @@ public final class ReadWorkflow {
         }
     }
     public func begin(collection: String? = nil, selected: Bool = false) throws -> [String: Any] {
-        try CaptureOneLock.shared.withLock {
+        try core.lock.withLock {
             let doc = try core.getDocumentInfo()
             // Explicit handoff: discard any previous baseline before acquiring a new one.
             try? FileManager.default.removeItem(at: file(doc))
@@ -94,7 +94,7 @@ public final class ReadWorkflow {
     }
     public func end(workflowID: String? = nil) throws -> [String: Any] {
         guard let expected = workflowID ?? requestedWorkflowID() else { throw C1Error.invalidRequest("Supply the read workflow ID to end the handoff.") }
-        return try CaptureOneLock.shared.withLock {
+        return try core.lock.withLock {
             guard let path = try? String(contentsOf: pointer, encoding: .utf8) else { return ["active": false] }
             let url = URL(fileURLWithPath: path).appendingPathComponent(".c1/read-workflow.json")
             guard let state = try? JSONDecoder().decode(State.self, from: Data(contentsOf: url)), state.id == expected else {
@@ -114,7 +114,7 @@ public final class ReadWorkflow {
     public func status(workflowID: String? = nil) throws -> [String: Any] {
         guard let expected = workflowID ?? requestedWorkflowID() else { return ["active": false] }
         guard FileManager.default.fileExists(atPath: pointer.path) else { return ["active": false] }
-        return try CaptureOneLock.shared.withLock {
+        return try core.lock.withLock {
             let doc = try core.getDocumentInfo()
             guard var state = try load(doc), state.id == expected else { return ["active": false] }
             try synchronize(&state, doc: doc)
@@ -253,7 +253,7 @@ public final class ReadWorkflow {
     }
     private func route<T>(workflowID: String?, _ body: (inout State) throws -> T?) throws -> T? {
         guard let expected = workflowID ?? requestedWorkflowID(), FileManager.default.fileExists(atPath: pointer.path) else { return nil }
-        return try CaptureOneLock.shared.withLock {
+        return try core.lock.withLock {
             let doc = try core.getDocumentInfo()
             guard (try? String(contentsOf: pointer, encoding: .utf8)) == doc.documentPath else {
                 try? FileManager.default.removeItem(at: pointer); return nil

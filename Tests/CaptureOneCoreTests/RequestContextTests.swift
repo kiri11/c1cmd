@@ -10,7 +10,7 @@ struct RequestContextTests {
         let fake = FakeScript(directory: directory)
         // Exercise the bounded fallback path here so cancellation/deadline
         // checkpoints occur between rating and summary Apple Events.
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db" }, nativeInventoryEnabled: false)
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db" }, nativeInventoryEnabled: false)
 
         let cancelled = RequestContext(tool: "variants_list", progressMode: "quiet", directory: directory)
         fake.beforeReadRatings = { cancelled.cancel() }
@@ -38,7 +38,7 @@ struct RequestContextTests {
         let catalogFake = FakeScript(directory: package)
         catalogFake.isSession = false
         catalogFake.catalogID = package.path
-        let catalogCore = SessionController(executor: catalogFake, appInstance: { catalogFake.generation }, databaseIdentity: { _ in "db" })
+        let catalogCore = SessionController(lock: testLock, executor: catalogFake, appInstance: { catalogFake.generation }, databaseIdentity: { _ in "db" })
         func recovery(_ fake: FakeScript, _ core: SessionController, tool: String, deadline: Double? = nil) -> (code: String?, action: String?) {
             let context = RequestContext(tool: tool, progressMode: "quiet", directory: directory)
             fake.beforeReadSummaries = { deadline == nil ? context.cancel() : Thread.sleep(forTimeInterval: 0.03) }

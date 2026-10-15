@@ -139,7 +139,7 @@ public final class RecipeWorkflow {
                 try core.guarded("compound edit", pinned: requirement) { try apply(checked($0),args,verify:tool == "recipe_verify") }
             }
         }
-        return try CaptureOneLock.shared.withLock {
+        return try core.lock.withLock {
             let doc = try core.getDocumentInfo()
             guard doc.appVersion == SessionController.pinnedBuild else { throw C1Error.unsupportedVersion(requirement) }
             switch tool {

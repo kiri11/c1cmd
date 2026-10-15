@@ -13,7 +13,7 @@ struct ExistingVariantTests {
         XCTAssertEqual(ImageDimensions.read(image.path), [12, 8])
         XCTAssertEqual(ImageDimensions.read(directory.appendingPathComponent("missing.CR3").path), nil)
         let dimensionFake = GeometryFake(directory: directory)
-        let noGeometry = SessionController(executor: dimensionFake, appInstance: { dimensionFake.base.generation }, databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in nil })
+        let noGeometry = SessionController(lock: testLock, executor: dimensionFake, appInstance: { dimensionFake.base.generation }, databaseIdentity: { _ in "db-1" }, imageDimensions: { _ in nil })
         XCTAssertNoThrowBlock {
             let source = try noGeometry.get(ref: "1")
             XCTAssertEqual(source.geometry, nil)
@@ -29,7 +29,7 @@ struct ExistingVariantTests {
         fake.dimensionsFollowRotation = true
         fake.base.values["1"] = [0.3, 5, 8, 5000, 2]
         var database = "db-1"
-        let core = SessionController(executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in database }, imageDimensions: { _ in [6000, 4000] })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in database }, imageDimensions: { _ in [6000, 4000] })
         let journal = OperationJournal(sessionDirectory: directory)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo()

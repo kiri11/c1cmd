@@ -14,7 +14,7 @@ struct RatingFilterTests {
             fake.ratings[id] = rating
         }
         fake.selectedIDs = ["1", "5", "6"]
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
         XCTAssertNoThrowBlock {
             let all = try core.listVariants()
             XCTAssertEqual(all.map(\.rating), [0, 1, 2, 3, 4, 5])

@@ -290,13 +290,14 @@ public final class SessionController {
     private let imageDimensions: (String) -> [Double]?
     private let allImagesCollection: (String) -> String?
     private let allImagesCache: AllImagesCache
-    let lock = CaptureOneLock.shared
+    let lock: CaptureOneLock
     private let registry = FieldRegistry.shared
     private let previewMgr = PreviewManager.shared
     /// The parent compound edit that journaled writes through this controller belong to.
     let compoundId: String?
 
-    public init(executor: ScriptExecuting = AppleScriptExecutor.shared,
+    public init(lock: CaptureOneLock = .shared,
+                executor: ScriptExecuting = AppleScriptExecutor.shared,
                 appInstance: @escaping () throws -> String = DocumentIdentity.appInstance,
                 databaseIdentity: @escaping (String) throws -> String = DocumentIdentity.fileIdentity,
                 databaseModified: @escaping (String) throws -> Date = SaveStall.databaseModified,
@@ -306,6 +307,7 @@ public final class SessionController {
                 allImagesCollection: @escaping (String) -> String? = { try? CatalogReader(database: $0).allImagesCollectionID() },
                 nativeInventoryEnabled: Bool = ProcessInfo.processInfo.environment["C1_INVENTORY_STRATEGY"] != "scan",
                 isAppRunning: @escaping () -> Bool = { !NSRunningApplication.runningApplications(withBundleIdentifier: "com.captureone.captureone16").isEmpty }) {
+        self.lock = lock
         self.isAppRunning = isAppRunning
         self.nativeInventoryEnabled = nativeInventoryEnabled
         self.executor = executor
@@ -321,6 +323,7 @@ public final class SessionController {
     }
 
     private init(linking base: SessionController, compoundId: String) {
+        lock = base.lock
         isAppRunning = base.isAppRunning
         nativeInventoryEnabled = base.nativeInventoryEnabled
         executor = base.executor

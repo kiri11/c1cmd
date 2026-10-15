@@ -9,7 +9,7 @@ struct MetadataTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory)
         fake.ratings["1"] = 3; fake.colorTags["1"] = 2
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" })
         let journal = OperationJournal(sessionDirectory: directory)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), initial = try core.get(ref: "1")

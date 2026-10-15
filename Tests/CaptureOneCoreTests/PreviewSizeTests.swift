@@ -15,7 +15,7 @@ struct PreviewSizeTests {
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory)
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" })
         XCTAssertNoThrowBlock { try body(fake, core, OperationJournal(sessionDirectory: directory)) }
     }
 

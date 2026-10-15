@@ -71,7 +71,7 @@ struct NativeEditingTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
-        let core = SessionController(executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+        let core = SessionController(lock: testLock, executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
             let edit = try core.editVariant(sourceRef:"1", ifState:source.stateHash, ifDocument:doc.openToken)
@@ -136,7 +136,7 @@ struct NativeEditingTests {
             try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
             defer { try? FileManager.default.removeItem(at:directory) }
             let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
-            let core = SessionController(executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+            let core = SessionController(lock: testLock, executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
             bridge.layers = [["nativeName":"Background", "nativeKind":"background", "nativeOpacity":100, "nativeEnabled":true]]
             XCTAssertNoThrowBlock {
                 let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
@@ -165,7 +165,7 @@ struct NativeEditingTests {
             try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
             defer { try? FileManager.default.removeItem(at:directory) }
             let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
-            let core = SessionController(executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+            let core = SessionController(lock: testLock, executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
             let journal = OperationJournal(sessionDirectory:directory)
             XCTAssertNoThrowBlock {
                 let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")

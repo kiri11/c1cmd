@@ -18,7 +18,7 @@ struct LatePreviewTests {
         let fake: GeometryFake
         let journal: OperationJournal
         var identity = "database-1"
-        lazy var core = SessionController(executor: fake, appInstance: { [unowned self] in fake.base.generation },
+        lazy var core = SessionController(lock: testLock, executor: fake, appInstance: { [unowned self] in fake.base.generation },
                                           databaseIdentity: { [unowned self] _ in identity },
                                           imageDimensions: { _ in [6000, 4000] }, isAppRunning: { true })
         init() {

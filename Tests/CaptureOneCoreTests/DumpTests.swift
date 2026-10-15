@@ -65,7 +65,7 @@ public struct DumpTests {
             fake.values[String(id)] = [Double(id) / 10, 0, 0, 5000, 0]
             fake.ratings[String(id)] = id % 6
         }
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" }, nativeInventoryEnabled: native)
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" }, nativeInventoryEnabled: native)
         return (fake, core, dir)
     }
 

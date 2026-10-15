@@ -13,7 +13,7 @@ struct ReadWorkflowTests {
         let fake = FakeScript(directory: dir)
         fake.values["2"] = [1, 2, 3, 5000, 0]
         fake.ratings = ["1": 0, "2": 3]
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" })
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" })
         var workflowID: String?
         let workflow = ReadWorkflow(core: core, indexURL: dir.appendingPathComponent("active"), workflowID: { workflowID })
         let journal = OperationJournal(sessionDirectory: dir)

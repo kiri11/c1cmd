@@ -1,4 +1,5 @@
 import Foundation
+import CaptureOneCore
 
 public var totalTestCount = 0
 public var passedTestCount = 0
@@ -87,3 +88,12 @@ public func XCTFail(_ message: String = "", file: StaticString = #file, line: UI
     failedTestCount += 1
     print("FAIL: [\(file):\(line)] \(message)")
 }
+
+/// Offline tests share this per-run lock so they never contend with live c1 processes
+/// for the machine-wide `/private/tmp/c1-application.lock`.
+let testLockDirectory: URL = {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("c1-tests-\(UUID().uuidString)")
+    try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
+}()
+let testLock = CaptureOneLock(lockPath: testLockDirectory.appendingPathComponent("c1-application.lock").path)

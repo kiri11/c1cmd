@@ -67,7 +67,7 @@ struct SaveStallTests {
         let journal: OperationJournal
         var modified = Date.distantPast
         var clock: Date?
-        lazy var core = SessionController(executor: fake, appInstance: { [unowned self] in fake.generation },
+        lazy var core = SessionController(lock: testLock, executor: fake, appInstance: { [unowned self] in fake.generation },
                                           databaseIdentity: { _ in "database-1" },
                                           databaseModified: { [unowned self] _ in modified },
                                           now: { [unowned self] in clock ?? Date() }, isAppRunning: { true })

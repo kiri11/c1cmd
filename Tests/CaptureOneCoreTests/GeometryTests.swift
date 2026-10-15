@@ -118,7 +118,7 @@ struct GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "geometry-db"}, imageDimensions: { _ in [6000, 4000] })
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "geometry-db"}, imageDimensions: { _ in [6000, 4000] })
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let cloned = try core.cloneVariant(sourceRef:"1")
@@ -272,7 +272,7 @@ struct GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "rotation-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "rotation-db"}, imageDimensions:{_ in [6000,4000]})
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
@@ -312,7 +312,7 @@ struct GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "orientation-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "orientation-db"}, imageDimensions:{_ in [6000,4000]})
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
@@ -406,7 +406,7 @@ struct GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "keystone-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "keystone-db"}, imageDimensions:{_ in [6000,4000]})
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
@@ -470,7 +470,7 @@ struct GeometryTests {
         source["lensValues"] = [100.0,35,0,0,0,0,0,0]
         source["maximumValues"] = [3002.0,2000,6000,4000]
         fake.records["1"] = source
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "corrected-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "corrected-db"}, imageDimensions:{_ in [6000,4000]})
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), original = try core.get(ref:"1")
@@ -649,7 +649,7 @@ extension GeometryTests {
         var vertical = fake.record("1")
         vertical["orientationDegrees"] = 90; vertical["cropValues"] = [2000.0,3000,4000,6000]; vertical["maximumValues"] = [2000.0,3000,4000,6000]
         fake.records["1"] = vertical
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "anchor-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "anchor-db"}, imageDimensions:{_ in [6000,4000]})
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
             let source = try core.get(ref:"1"), doc = try core.getDocumentInfo()
@@ -736,7 +736,7 @@ extension GeometryTests {
         try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = GeometryFake(directory:directory)
-        let core = SessionController(executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "frame-db"}, imageDimensions:{_ in [6000,4000]})
+        let core = SessionController(lock: testLock, executor:fake, appInstance:{fake.base.generation}, databaseIdentity:{_ in "frame-db"}, imageDimensions:{_ in [6000,4000]})
         func values(_ r: PreviewRect?) -> [Double] { r.map { [$0.left, $0.top, $0.width, $0.height] } ?? [] }
         XCTAssertNoThrowBlock {
             let cloned = try core.cloneVariant(sourceRef:"1")

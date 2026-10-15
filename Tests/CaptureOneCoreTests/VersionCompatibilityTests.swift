@@ -104,7 +104,7 @@ public struct VersionCompatibilityTests {
             appVersion: "15.4.1"
         )
         XCTAssertThrowsError(
-            try SessionController.shared.assertSessionWritable(docInfo: unsupportedDoc, operation: "clone"),
+            try SessionController(lock: testLock).assertSessionWritable(docInfo: unsupportedDoc, operation: "clone"),
             "assertSessionWritable must reject unsupported version 15.4.1"
         ) { err in
             if case let C1Error.unsupportedVersion(msg) = err {
@@ -125,7 +125,7 @@ public struct VersionCompatibilityTests {
             appVersion: "16.8.4.12"
         )
         XCTAssertNoThrow(
-            try SessionController.shared.assertSessionWritable(docInfo: supportedUntestedDoc, operation: "clone"),
+            try SessionController(lock: testLock).assertSessionWritable(docInfo: supportedUntestedDoc, operation: "clone"),
             "assertSessionWritable must accept supported 16.8.4.12 build"
         )
     }

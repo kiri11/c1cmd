@@ -46,7 +46,7 @@ struct EmbeddedPreviewTests {
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = GeometryFake(directory: directory)
-        let core = SessionController(executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" },
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.base.generation }, databaseIdentity: { _ in "db-1" },
                                      imageDimensions: { _ in [6000, 4000] })
         FileManager.default.createFile(atPath: fake.base.parent, contents: Data("raw".utf8))
         let output = directory.appendingPathComponent("exif.json"), argumentLog = directory.appendingPathComponent("args.txt")

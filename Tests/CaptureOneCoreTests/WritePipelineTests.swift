@@ -116,7 +116,7 @@ struct WritePipelineTests {
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory)
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" },
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" },
                                      imageDimensions: { _ in [6000, 4000] })
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), source = try core.get(ref: "1")
@@ -125,13 +125,13 @@ struct WritePipelineTests {
             func setExposure(_ value: Double, ifState: String, observed: CurrentObservation?) throws {
                 _ = try core.mutate(workingRefString: ref, ifState: ifState, setAdjustments: Adjustments(exposure: value), addAdjustments: nil, observed: observed)
             }
-            try CaptureOneLock.shared.withLock {
+            try testLock.withLock {
                 let observed = try core.observeCurrent { try core.get(ref: ref) }
                 let reads = count("getAdjustmentsBatch")
                 try setExposure(1, ifState: observed.result.stateHash, observed: observed)
                 XCTAssertEqual(count("getAdjustmentsBatch") - reads, 1, "A current observation replaces the precondition read; only the readback reads")
             }
-            try CaptureOneLock.shared.withLock {
+            try testLock.withLock {
                 let observed = try core.observeCurrent { try core.get(ref: ref) }
                 try setExposure(2, ifState: observed.result.stateHash, observed: nil)
                 let dispatches = count("applyAdjustments"), reads = count("getAdjustmentsBatch")
@@ -158,7 +158,7 @@ struct WritePipelineTests {
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory)
-        let core = SessionController(executor: kind.executor(fake), appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" },
+        let core = SessionController(lock: testLock, executor: kind.executor(fake), appInstance: { fake.generation }, databaseIdentity: { _ in "db-1" },
                                      imageDimensions: { _ in [6000, 4000] })
         let journal = OperationJournal(sessionDirectory: directory)
         XCTAssertNoThrowBlock(label) {

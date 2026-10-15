@@ -34,7 +34,7 @@ struct VariantRouteTests {
         fake.isSession = false
         fake.catalogID = package.path
         try! Data("original".utf8).write(to: URL(fileURLWithPath: fake.parent))
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" },
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" },
                                      catalogWritePath: package.path, imageDimensions: { _ in [6000, 4000] },
                                      allImagesCollection: allImages, isAppRunning: { true })
         return (fake, core, root)
@@ -45,7 +45,7 @@ struct VariantRouteTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let fake = FakeScript(directory: dir)
         var reads = 0
-        let core = SessionController(executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" },
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { fake.generation }, databaseIdentity: { _ in "database-1" },
                                      allImagesCollection: { _ in reads += 1; return "2" })
         XCTAssertNoThrowBlock {
             _ = try core.get(ref: "1")
@@ -117,7 +117,7 @@ struct VariantRouteTests {
         // The default reader rejects a file that is not a supported Catalog database.
         let (defaultFake, _, defaultRoot) = catalog { _ in nil }
         defer { try? FileManager.default.removeItem(at: defaultRoot) }
-        let defaultCore = SessionController(executor: defaultFake, appInstance: { defaultFake.generation }, databaseIdentity: { _ in "database-1" })
+        let defaultCore = SessionController(lock: testLock, executor: defaultFake, appInstance: { defaultFake.generation }, databaseIdentity: { _ in "database-1" })
         XCTAssertNoThrowBlock { _ = try defaultCore.get(ref: "1") }
         XCTAssertTrue(isMissing(defaultFake.documentArguments.last?.document.atIndex(2)))
     }

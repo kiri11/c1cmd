@@ -8,7 +8,7 @@ struct DoctorTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let fake = FakeScript(directory: directory)
         var identityFailure = false
-        let core = SessionController(executor: fake, appInstance: { "test" }, databaseIdentity: { _ in
+        let core = SessionController(lock: testLock, executor: fake, appInstance: { "test" }, databaseIdentity: { _ in
             if identityFailure { throw C1Error.identityAmbiguous("fixture identity unavailable") }
             return "db"
         }, isAppRunning: { true })
@@ -62,7 +62,7 @@ struct DoctorTests {
             XCTAssertNil(corrupt.unresolvedOperationsCount)
             XCTAssertNotNil(corrupt.diagnosticError)
             XCTAssertFalse(corrupt.writesEnabled)
-            let stopped = try SessionController(executor: fake, isAppRunning: { false }).doctor()
+            let stopped = try SessionController(lock: testLock, executor: fake, isAppRunning: { false }).doctor()
             XCTAssertFalse(stopped.appRunning)
             XCTAssertNil(stopped.unresolvedOperationsCount)
         }

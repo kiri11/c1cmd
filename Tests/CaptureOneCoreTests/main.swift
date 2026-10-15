@@ -38,6 +38,8 @@ RecipeTests.run()
 RequestDispatcherTests.run()
 ResultCompactionTests.run()
 
+try? FileManager.default.removeItem(at: testLockDirectory)
+
 print("\n=== Test Results ===")
 print("Total Assertions : \(totalTestCount)")
 print("Passed           : \(passedTestCount)")

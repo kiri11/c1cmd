@@ -138,7 +138,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), initial = try core.get(ref:"1")
@@ -321,7 +321,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:ProfiledExecutor(fake),appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:ProfiledExecutor(fake),appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
@@ -365,7 +365,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
@@ -395,7 +395,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         let journal = OperationJournal(sessionDirectory:directory)
         func previewStep(_ report: [String:Any]) -> [String:Any]? {
@@ -438,7 +438,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         let journal = OperationJournal(sessionDirectory:directory)
         XCTAssertNoThrowBlock {
@@ -493,7 +493,7 @@ struct RecipeTests {
         try! FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:directory) }
         let fake = RecipeFake(directory), base = fake.geometry.base
-        let core = SessionController(executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
+        let core = SessionController(lock: testLock, executor:fake,appInstance:{ base.generation },databaseIdentity:{ _ in "db" },imageDimensions:{ _ in [6000,4000] })
         let workflow = RecipeWorkflow(core:core)
         XCTAssertNoThrowBlock {
             let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")

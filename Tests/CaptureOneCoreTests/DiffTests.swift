@@ -22,11 +22,11 @@ public struct DiffTests {
         )
 
         // 1. Identical diff produces empty dictionary
-        let zeroDiff = SessionController.shared.computeDiff(before: adj1, after: adj1)
+        let zeroDiff = SessionController(lock: testLock).computeDiff(before: adj1, after: adj1)
         XCTAssertTrue(zeroDiff.isEmpty, "Diff of identical adjustments should be empty")
 
         // 2. Distinct adjustments produce accurate before, after, and delta
-        let diff = SessionController.shared.computeDiff(before: adj1, after: adj2)
+        let diff = SessionController(lock: testLock).computeDiff(before: adj1, after: adj2)
         XCTAssertEqual(diff.count, 4, "Should have diffs for exposure, saturation, temperature, tint")
         XCTAssertNil(diff["contrast"], "Contrast should not be present in diff since values are identical")
 

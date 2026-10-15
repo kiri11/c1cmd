@@ -28,7 +28,7 @@ public struct CatalogGuardTests {
         // 1. All mutative ops are rejected on Catalog documents
         for op in mutativeOps {
             XCTAssertThrowsError(
-                try SessionController.shared.assertSessionWritable(docInfo: catalogDoc, operation: op),
+                try SessionController(lock: testLock).assertSessionWritable(docInfo: catalogDoc, operation: op),
                 "Catalog mutation '\(op)' must be rejected"
             ) { err in
                 if case let C1Error.invalidRequest(msg) = err {
@@ -43,14 +43,14 @@ public struct CatalogGuardTests {
         // 2. All mutative ops succeed on Session documents
         for op in mutativeOps {
             XCTAssertNoThrow(
-                try SessionController.shared.assertSessionWritable(docInfo: sessionDoc, operation: op),
+                try SessionController(lock: testLock).assertSessionWritable(docInfo: sessionDoc, operation: op),
                 "Session mutation '\(op)' must be accepted"
             )
         }
 
         // 3. Preview export is rejected on Catalog documents
         XCTAssertThrowsError(
-            try SessionController.shared.assertSessionWritable(docInfo: catalogDoc, operation: "preview"),
+            try SessionController(lock: testLock).assertSessionWritable(docInfo: catalogDoc, operation: "preview"),
             "Preview export must fail closed on Catalog"
         ) { err in
             if case let C1Error.invalidRequest(msg) = err {
@@ -79,7 +79,7 @@ struct CatalogEditingTests {
             fake.base.catalogID = package.path
             try Data("original".utf8).write(to: URL(fileURLWithPath: fake.base.parent))
             func core(_ path: String?) -> SessionController {
-                SessionController(executor: fake, appInstance: { fake.base.generation }, catalogWritePath: path, imageDimensions: { _ in [6000, 4000] }, isAppRunning: { true })
+                SessionController(lock: testLock, executor: fake, appInstance: { fake.base.generation }, catalogWritePath: path, imageDimensions: { _ in [6000, 4000] }, isAppRunning: { true })
             }
             func assertWritesDisabled(_ path: String?, _ reason: WritesDisabledReason, _ detail: String, line: UInt = #line) throws {
                 let denied = core(path)
