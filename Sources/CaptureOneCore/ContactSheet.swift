@@ -328,7 +328,7 @@ public struct ContactSheetResult: Encodable {
 public enum ContactSheet {
     /// Outside the document: writing near a read-only document would be a write the photographer did not enable.
     public static var defaultDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1/contact-sheets", isDirectory: true)
+        CacheFolder.contactSheets.url
     }
     static let retainedSheets = 50
 

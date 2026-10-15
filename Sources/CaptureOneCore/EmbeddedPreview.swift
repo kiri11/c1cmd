@@ -31,7 +31,7 @@ public enum EmbeddedPreview {
     /// Beside request status in c1's cache rather than the document: the file depends only on
     /// the original, and writing near a read-only document would be a write the photographer did not enable.
     public static var defaultDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1/thumbs", isDirectory: true)
+        CacheFolder.thumbs.url
     }
 
     /// Extracts the largest embedded JPEG from the original behind `get`, turns its pixels to the

@@ -113,7 +113,7 @@ public final class RequestContext: @unchecked Sendable {
         let env = ProcessInfo.processInfo.environment
         if env["C1_REQUEST_DIR"] == "off" { return nil }
         if let path = env["C1_REQUEST_DIR"] { return URL(fileURLWithPath: path, isDirectory: true) }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1/requests", isDirectory: true)
+        return CacheFolder.requests.url
     }
     public var snapshot: RequestSnapshot {
         mutex.lock(); defer { mutex.unlock() }
