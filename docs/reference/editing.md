@@ -12,8 +12,8 @@ response schemas and the error envelope. Every CLI command except `version` maps
 its flags to the tool's arguments object and enters the same core dispatcher as
 MCP, so both transports accept and reject identically. The MCP server registers
 tools from the contract, forwards arguments unchanged, reports progress and
-cancellation, and attaches `preview` and `thumb` images; it stays long-lived so
-compiled AppleScript handlers are reused. Contract version is `4.11.0`; package
+cancellation, and attaches `preview`, `thumb` and `contact_sheet` images; it stays long-lived so
+compiled AppleScript handlers are reused. Contract version is `4.12.0`; package
 version is `0.1.0`. The advisory lock serializes cooperating c1 processes only; it does not
 lock the Capture One UI, other automation or delayed Apple Events.
 Multi-process workflows are unqualified.
@@ -272,6 +272,110 @@ written to `~/Library/Caches/c1/thumbs`, outside the document, so a read-only
 Catalog stays untouched. Each original and `maxSize` has one file, named after
 the original, which the next call replaces; macOS may purge the folder at any time.
 
+## Contact sheets
+
+```sh
+c1 contact-sheet --min-rating 3                 # page 1: 20 photos in rows near 220 px
+c1 contact-sheet --min-rating 3 --page 2
+c1 contact-sheet --collection "Day 1" --selected --per-page 12 --row-height 300
+c1 contact-sheet --ids 101,102,140
+```
+
+`contact_sheet` tiles Capture One's own cached thumbnails for a scope of variants
+into one JPEG per call. Each tile shows the photo as Capture One renders it now,
+with the photographer's adjustments and a verified crop, so an agent can triage
+many photos in a few calls. The scope takes the filters of `dump`: `ids` (1–512
+known IDs, revalidated live), or `collection`, `selected`, and `rating` or
+`minRating`. Without a filter, the scope is the current collection. Tiles follow
+Capture One's order. MCP takes the same arguments in camelCase, such as `perPage`.
+
+`page` selects a page, 1 by default, and `perPage` (1–48, default 20) sets how many
+photos it holds. Call again with `nextPage` until the result has none. A page past
+the end fails with `invalid-request`. An empty scope returns `total` 0 and no
+`sheet`. Each call lists a scope without `ids` again, so for a large scope, list it
+once with `variants_list` and page through its IDs with `ids`.
+
+The sheet is at most 1536 px wide, below the edge at which clients downscale an
+image. A page whose rows do not fill that width narrows to its widest row, but not
+below 480 px. Photos keep their own aspect ratio, after any applied crop, in justified rows near
+`rowHeight` (120–450 px, default 220):
+
+- A row takes photos at `rowHeight` until the next one would overflow the width.
+  It then either takes that photo and becomes lower, or leaves it for the next row
+  and becomes taller, whichever lands closer to `rowHeight`. Either way the row
+  fills the width exactly. A row grows to at most 1.5 × `rowHeight`; a row capped
+  there is left-aligned.
+- The last row keeps `rowHeight` and is left-aligned.
+- A missing or unreadable tile takes a 3:2 placeholder.
+- A page taller than 2400 px gets lower rows, or the same rows scaled down
+  uniformly with a narrower sheet, whichever shows more photo.
+
+Small crops are enlarged to their row. Under each image, a 16 px label strip of the
+image's width shows `id · ★rating · name` with the live rating, truncated with an
+ellipsis.
+
+The result lists every tile's `id`, `name`, `rating`, `status` and `cell`, the
+image's rectangle in sheet pixels from the top left; its label is directly below.
+A shown tile also reports `cachedSize`, the cached pixels it shows after the crop,
+which is the real detail behind an enlarged tile:
+
+```json
+{"id": "101", "name": "TK7A7231.CR3", "rating": 3, "status": "shown",
+ "cell": {"x": 4, "y": 28, "width": 302, "height": 202},
+ "cachedSize": {"width": 219, "height": 146},
+ "cacheModifiedAt": "2026-10-15T12:00:00Z", "crop": {"status": "applied"}}
+```
+
+`status` is one of these values:
+
+- `shown`, with `cachedSize`, the thumbnail's `cacheModifiedAt` and its `crop`.
+- `missing`, with `reason` `not-cached` when Capture One has no thumbnail for the
+  variant, or `not-stored` when the variant is not yet in the saved database.
+- `unreadable`, with a `reason` such as `undecodable` or `orientation-tag`.
+
+A missing or unreadable tile is a gray placeholder labeled NO CACHE, NOT SAVED or
+UNREADABLE. c1 never replaces it with an export and never guesses which file to
+show; use `thumb` or `preview` for those IDs.
+
+The cached pixels are uncropped. c1 applies the crop that Capture One stores with
+the thumbnail only when its format is verified, and `crop.status` is `applied`,
+`full-frame` or `not-applied`. A `not-applied` tile shows the full frame with an
+amber UNCROPPED badge. Its `crop.reason` is `absent`, `format-version-2` (written by
+older builds) or `unsupported-format`, and `crop.userComment` keeps the stored
+value. `counts` totals the statuses and the uncropped tiles.
+
+A thumbnail is at most 450 px on the long edge before the crop, and it can lag an
+edit that Capture One has not processed yet. Two cases were observed on 16.8.5.30:
+
+- **Unsaved new variants.** A variant that Capture One has not yet saved to a
+  Session's database is `missing` with `not-stored`, NOT SAVED on the sheet. This
+  happened for a newly created Session and for a new clone, and lasted 25–35 s in
+  tests. Call again after Capture One's next save.
+- **Stale thumbnail after orientation.** Setting orientation through c1 on a
+  variant that already had a crop and rotation did not refresh its cached
+  thumbnail. The tile still showed the old orientation after 60–90 s, and the next
+  tonal edit refreshed it. A tile can therefore lag a c1 geometry edit.
+
+A sheet is a triage aid and never review evidence for an edit or a recipe
+([invariant 8](../../AGENT_GUIDE.md#safety-invariants)); review edits with
+`preview`. The result's `limitation` says so.
+
+`contact_sheet` only reads. It sends no write, writes no journal entry, needs no
+write opt-in, returns no state tokens and is available in the composition profile.
+It finds each thumbnail from stored identity and never lists the cache folder. In a
+Catalog, the variant's database ID names the file. In a Session, c1 reads each
+variant's UUID from the open `.cosessiondb` without SQLite locks. A stored file name
+that differs from the live original fails the call with `identity-ambiguous`, and a
+document change during the call fails it with `document-changed`. Neither writes a
+sheet. The tool requires Capture One 16.8.5.30 exactly, because the cache layout
+is qualified only on that build; `C1_ALLOW_UNTESTED_BUILD` does not enable it.
+
+The sheet is written to `~/Library/Caches/c1/contact-sheets`, outside the document,
+as `<document>-<hash>-p<page>.jpg`. The same document, scope, `perPage`,
+`rowHeight` and page replace their own file, and c1 keeps the 50 newest sheets.
+MCP attaches the sheet as image content. With `inlineImage: false`, it returns only
+the JSON, and `sheet.path` still names the JPEG.
+
 ## Compact results
 
 `set`, `add`, `reset`, `metadata_set`, `geometry_set`, `geometry_restore`,
@@ -395,7 +499,7 @@ before the preview completed, `observe` never ran, and a verification stays
 `C1_TOOL_PROFILE=composition` (older alias `C1_MCP_PROFILE`) hides and rejects
 `set`, `add`, `reset`, `variant_baseline`, `metadata_set`, native mutations and
 recipe capture/register/verify/apply. Preparation, geometry, inspection
-(including `exif` and `thumb`), cloning, clone deletion, preview and recovery
+(including `exif`, `thumb` and `contact_sheet`), cloning, clone deletion, preview and recovery
 remain. An unknown value, or two names that disagree, rejects every request.
 
 ## Error codes
@@ -404,7 +508,8 @@ remain. An unknown value, or two names that disagree, rejects every request.
 |---|---|
 | `app-not-running` | Launch Capture One. |
 | `no-document` | Open a Session or Catalog. |
-| `unsupported-version` | Build outside 16.4–16.x; `C1_ALLOW_UNTESTED_BUILD=1` overrides compatibility only. |
+| `unsupported-version` | Build outside 16.4–16.x; `C1_ALLOW_UNTESTED_BUILD=1` overrides compatibility only. `contact_sheet` requires 16.8.5.30 exactly. |
+| `identity-ambiguous` | An ID or stored record cannot identify exactly one variant, image or file, such as a contact sheet's stored file name that differs from the live original. Nothing was changed. |
 | `unmanaged-variant` | Write without an editing reference, or deletion of an existing variant. |
 | `variant-not-found` | An ID does not resolve through any route; known-ID lists report `missingIds` and `outOfScopeIds`. |
 | `state-changed` | A token is stale; read again and reconcile. |

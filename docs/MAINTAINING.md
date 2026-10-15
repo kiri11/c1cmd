@@ -51,8 +51,8 @@ There are three validation targets:
 The runner lists selected and skipped suites and cases. Regular suites are
 `cli mcp geometry lens perspective keystone catalog existing inventory native
 recipes read-workflow`. They do not inject faults. `mcp` is a smoke test of the
-MCP adapter (registration, error results, preview image content and its
-`inlineImage` opt-out, one compile of each AppleScript handler script per server
+MCP adapter (registration, error results, preview and contact sheet image content
+and the `inlineImage` opt-out, one compile of each AppleScript handler script per server
 process); the CLI suites cover tool behaviour through the same dispatcher.
 `read-workflow` covers the accelerated browsing handoff on owned Session and
 Catalog fixtures and waits for the 60-second Catalog catch-up boundary.
@@ -65,6 +65,7 @@ Catalog fixtures and waits for the 60-second Catalog catch-up boundary.
 | Recipes and compound edits | `recipes` |
 | Catalog reader and read workflow | `catalog read-workflow` |
 | Inventory, progress and cancellation | `inventory` |
+| Contact sheets and the thumbnail cache reader | `cli mcp` |
 
 During development, individual suites run directly, for example
 `python3 Tests/geometry_integration_test.py` or
