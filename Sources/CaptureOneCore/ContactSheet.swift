@@ -1,5 +1,31 @@
 import Foundation
 import CoreGraphics
+import CoreText
+import CryptoKit
+import ImageIO
+import UniformTypeIdentifiers
+
+public struct SheetScope: Equatable {
+    public let collection: String?
+    public let selected: Bool
+    public let ids: [String]?
+    public let rating: Int?
+    public let minRating: Int?
+
+    public init(collection: String? = nil, selected: Bool = false, ids: [String]? = nil, rating: Int? = nil, minRating: Int? = nil) {
+        self.collection = collection
+        self.selected = selected
+        self.ids = ids
+        self.rating = rating
+        self.minRating = minRating
+    }
+
+    var canonical: String {
+        var fields: [String: Any] = ["selected": selected]
+        fields["collection"] = collection; fields["ids"] = ids; fields["rating"] = rating; fields["minRating"] = minRating
+        return String(decoding: try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]), as: UTF8.self)
+    }
+}
 
 /// A top-left-origin rectangle in sheet pixels.
 public struct PixelRect: Equatable, Encodable {
@@ -139,6 +165,7 @@ package enum UnreadableReason: String {
     case changedDuringRead = "changed-during-read"
     case tooLarge = "too-large"
     case notRegularFile = "not-regular-file"
+    case inaccessible
 }
 
 package struct CachedThumbnail {
@@ -295,5 +322,105 @@ public struct ContactSheetResult: Encodable {
         try container.encode(counts, forKey: .counts)
         try container.encode(renderedAt, forKey: .renderedAt)
         try container.encode(Self.limitation, forKey: .limitation)
+    }
+}
+
+package enum ContactSheet {
+    /// Outside the document: writing near a read-only document would be a write the photographer did not enable.
+    package static var defaultDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1/contact-sheets", isDirectory: true)
+    }
+    static let retainedSheets = 50
+
+    package static func fileName(documentName: String, documentId: String, scope: SheetScope, layout: SheetLayout, page: Int) -> String {
+        let key = [documentId, scope.canonical, "\(layout.perPage)x\(layout.rowHeight)"].joined(separator: "|")
+        let digest = SHA256.hash(data: Data(key.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
+        let stem = URL(fileURLWithPath: documentName).deletingPathExtension().lastPathComponent
+        let number = String(page)
+        return "\(stem)-\(digest)-p\(String(repeating: "0", count: max(0, 3 - number.count)) + number).jpg"
+    }
+
+    static let background = CGColor(srgbRed: 0x26 / 255, green: 0x26 / 255, blue: 0x26 / 255, alpha: 1)
+    static let placeholder = CGColor(srgbRed: 0x3a / 255, green: 0x3a / 255, blue: 0x3a / 255, alpha: 1)
+    static let amber = CGColor(srgbRed: 0xf2 / 255, green: 0xa3 / 255, blue: 0x1b / 255, alpha: 1)
+    static let text = CGColor(srgbRed: 0.88, green: 0.88, blue: 0.88, alpha: 1)
+    static let dimText = CGColor(srgbRed: 0.7, green: 0.7, blue: 0.7, alpha: 1)
+    static let darkText = CGColor(srgbRed: 0.1, green: 0.1, blue: 0.1, alpha: 1)
+
+    package static func render(tiles: [ContactSheetTile], width: Int, height: Int, header: String) -> CGImage {
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        func flipped(_ r: PixelRect) -> CGRect { CGRect(x: r.x, y: height - r.y - r.height, width: r.width, height: r.height) }
+        func fill(_ r: PixelRect, _ color: CGColor) { context.setFillColor(color); context.fill(flipped(r)) }
+        func line(_ string: String, size: CGFloat, color: CGColor = text) -> (line: CTLine, font: CTFont, width: CGFloat) {
+            let font = CTFontCreateUIFontForLanguage(.system, size, nil)!
+            let attributes: [NSAttributedString.Key: Any] = [kCTFontAttributeName as NSAttributedString.Key: font, kCTForegroundColorAttributeName as NSAttributedString.Key: color]
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+            return (line, font, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
+        }
+        func fitted(_ string: String, size: CGFloat, width: Int, height: Int) -> CGFloat {
+            max(1, min(size, size * CGFloat(width) / line(string, size: size).width, CGFloat(height) * 0.6))
+        }
+        func draw(_ string: String, in r: PixelRect, size: CGFloat, color: CGColor, centered: Bool = false) {
+            let full = line(string, size: size, color: color)
+            let truncated = CTLineCreateTruncatedLine(full.line, Double(r.width), .end, line("…", size: size, color: color).line) ?? full.line
+            let lineWidth = CTLineGetTypographicBounds(truncated, nil, nil, nil)
+            let box = flipped(r)
+            context.textPosition = CGPoint(x: centered ? box.midX - lineWidth / 2 : box.minX,
+                                           y: box.midY - (CTFontGetAscent(full.font) - CTFontGetDescent(full.font)) / 2)
+            CTLineDraw(truncated, context)
+        }
+        fill(PixelRect(x: 0, y: 0, width: width, height: height), background)
+        draw(header, in: PixelRect(x: SheetLayout.gutter, y: 0, width: width - 2 * SheetLayout.gutter, height: SheetLayout.headerHeight),
+             size: 12, color: text)
+        context.interpolationQuality = .high
+        for tile in tiles {
+            let cell = tile.cell
+            switch tile.content {
+            case .shown(let thumbnail):
+                context.draw(thumbnail.image.cropping(to: thumbnail.visibleRect) ?? thumbnail.image, in: flipped(cell))
+                if tile.uncropped {
+                    let size = fitted("UNCROPPED", size: 11, width: cell.width - 6, height: cell.height)
+                    let badge = PixelRect(x: cell.x, y: cell.y, width: min(cell.width, Int(line("UNCROPPED", size: size).width.rounded(.up)) + 6),
+                                          height: min(cell.height, Int((size * 1.6).rounded(.up))))
+                    fill(badge, amber)
+                    draw("UNCROPPED", in: badge, size: size, color: darkText, centered: true)
+                }
+            case .missing(let reason):
+                fill(cell, placeholder)
+                let text = reason == .notStored ? "NOT SAVED" : "NO CACHE"
+                draw(text, in: cell, size: fitted(text, size: 15, width: cell.width - 8, height: cell.height), color: dimText, centered: true)
+            case .unreadable:
+                fill(cell, placeholder)
+                draw("UNREADABLE", in: cell, size: fitted("UNREADABLE", size: 15, width: cell.width - 8, height: cell.height), color: dimText, centered: true)
+            }
+            let member = tile.member
+            draw("\(member.id) · ★\(member.rating) · \(member.name)", in: SheetLayout.label(below: cell), size: 11, color: text)
+        }
+        return context.makeImage()!
+    }
+
+    package static func write(_ image: CGImage, to directory: URL, fileName: String) throws -> SheetImage {
+        let jpeg = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(jpeg, UTType.jpeg.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { throw C1Error.invalidRequest("The contact sheet could not be encoded.") }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent(fileName)
+        try (jpeg as Data).write(to: file, options: .atomic)
+        prune(directory, keeping: file)
+        return SheetImage(path: file.path, width: image.width, height: image.height)
+    }
+
+    private static func prune(_ directory: URL, keeping current: URL) {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
+        let sheets = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)) ?? [])
+            .filter { $0.pathExtension == "jpg" && $0.lastPathComponent != current.lastPathComponent }
+            .compactMap { url -> (url: URL, modified: Date)? in
+                guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { return nil }
+                return (url, values.contentModificationDate ?? .distantPast)
+            }
+            .sorted { $0.modified > $1.modified }
+        for sheet in sheets.dropFirst(retainedSheets - 1) { try? FileManager.default.removeItem(at: sheet.url) }
     }
 }

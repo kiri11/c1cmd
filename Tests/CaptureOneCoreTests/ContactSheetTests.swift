@@ -1,5 +1,7 @@
 import Foundation
 import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import CaptureOneCore
 
 struct ContactSheetTests {
@@ -10,6 +12,9 @@ struct ContactSheetTests {
         testLayout()
         testResultEncoding()
         testSessionKeyReader()
+        testCacheRead()
+        testRenderer()
+        testSheetFiles()
     }
 
     static func errorCode(_ body: () throws -> Any) -> String? {
@@ -266,6 +271,208 @@ struct ContactSheetTests {
         ]
         for (database, code, reason) in refused {
             XCTAssertEqual(errorCode { try CatalogReader(sessionDatabase: database).sessionThumbnailKeys(variantIDs: [1]) }, code, "Refuses \(reason)")
+        }
+    }
+
+    static func cot(_ image: CGImage, comment: String? = nil, orientation: Int? = nil, type: UTType = .jpeg) -> Data {
+        var properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 1.0]
+        if let comment { properties[kCGImagePropertyExifDictionary] = [kCGImagePropertyExifUserComment: comment] }
+        if let orientation { properties[kCGImagePropertyOrientation] = orientation }
+        let data = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        precondition(CGImageDestinationFinalize(destination))
+        return data as Data
+    }
+
+    /// Blue, with a red square at a top-left-origin rectangle: the measured cropped thumbnail's framing.
+    static func croppedMarker() -> CGImage {
+        let (width, height) = measuredThumbnailSize
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        context.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 60, y: height - 116 - 219, width: 219, height: 219))
+        return context.makeImage()!
+    }
+
+    private static func testCacheRead() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        func file(_ name: String, _ data: Data) -> URL {
+            let url = directory.appendingPathComponent(name)
+            try! data.write(to: url)
+            return url
+        }
+        func status(_ content: TileContent) -> String {
+            switch content {
+            case .shown: return "shown"
+            case .missing(let reason): return "missing:\(reason.rawValue)"
+            case .unreadable(let reason): return "unreadable:\(reason.rawValue)"
+            }
+        }
+        let cropped = file("cropped.cot", cot(croppedMarker(), comment: measuredCropComment))
+        if case .shown(let thumbnail) = ThumbnailCache.read(cropped) {
+            XCTAssertEqual(thumbnail.crop, measuredCrop, "UserComment round-trips through ImageIO without a prefix")
+            XCTAssertEqual([thumbnail.image.width, thumbnail.image.height], [measuredThumbnailSize.width, measuredThumbnailSize.height])
+            let modified = try! FileManager.default.attributesOfItem(atPath: cropped.path)[.modificationDate] as! Date
+            XCTAssertEqual(thumbnail.modifiedAt.timeIntervalSince1970, modified.timeIntervalSince1970, accuracy: 0.001)
+        } else {
+            XCTFail("A valid thumbnail is shown")
+        }
+        if case .shown(let thumbnail) = ThumbnailCache.read(file("plain.cot", cot(solidImage(width: 30, height: 20), orientation: 1))) {
+            XCTAssertEqual(thumbnail.crop, .notApplied(reason: .absent, userComment: nil), "Orientation 1 is accepted; no comment means no crop")
+        } else {
+            XCTFail("An orientation-1 thumbnail is shown")
+        }
+        let large = Data(count: 4 * 1024 * 1024 + 1)
+        try! FileManager.default.createDirectory(at: directory.appendingPathComponent("folder.cot"), withIntermediateDirectories: true)
+        try! FileManager.default.createSymbolicLink(at: directory.appendingPathComponent("link.cot"), withDestinationURL: cropped)
+        let cases: [(URL, String)] = [
+            (directory.appendingPathComponent("absent.cot"), "missing:not-cached"),
+            (directory.appendingPathComponent("no-folder/absent.cot"), "missing:not-cached"),
+            (cropped.appendingPathComponent("child.cot"), "missing:not-cached"),
+            (file("png.cot", cot(solidImage(width: 30, height: 20), type: .png)), "unreadable:undecodable"),
+            (file("text.cot", Data("not an image".utf8)), "unreadable:undecodable"),
+            (file("empty.cot", Data()), "unreadable:undecodable"),
+            (file("rotated.cot", cot(solidImage(width: 30, height: 20), orientation: 6)), "unreadable:orientation-tag"),
+            (directory.appendingPathComponent("folder.cot"), "unreadable:not-regular-file"),
+            (directory.appendingPathComponent("link.cot"), "unreadable:not-regular-file"),
+            (file("large.cot", large), "unreadable:too-large"),
+        ]
+        for (url, expected) in cases {
+            XCTAssertEqual(status(ThumbnailCache.read(url)), expected, url.lastPathComponent)
+        }
+
+        let replaced = file("replaced.cot", cot(solidImage(width: 30, height: 20)))
+        var replacements = 0
+        let once = ThumbnailCache.read(replaced, testHookAfterStat: {
+            guard replacements == 0 else { return }
+            replacements += 1
+            try! cot(solidImage(width: 40, height: 20)).write(to: replaced, options: .atomic)
+        })
+        if case .shown(let thumbnail) = once {
+            XCTAssertEqual(thumbnail.image.width, 40, "A thumbnail replaced during the read is read again")
+        } else {
+            XCTFail("One replacement is retried")
+        }
+        let always = ThumbnailCache.read(replaced, testHookAfterStat: { try! cot(solidImage(width: 40, height: 20)).write(to: replaced, options: .atomic) })
+        XCTAssertEqual(status(always), "unreadable:changed-during-read", "Never a mix of two files")
+    }
+
+    static func pixels(_ image: CGImage) -> (Int, Int) -> [UInt8] {
+        let width = image.width, height = image.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        bytes.withUnsafeMutableBytes { buffer in
+            CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+                .draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return { x, y in let i = (y * width + x) * 4; return Array(bytes[i..<i + 3]) }
+    }
+
+    private static func testRenderer() {
+        let date = Date()
+        func shown(_ image: CGImage, _ crop: CotCrop) -> TileContent { .shown(CachedThumbnail(image: image, modifiedAt: date, crop: crop)) }
+        let red: [UInt8] = [255, 0, 0], green: [UInt8] = [0, 255, 0], blue: [UInt8] = [0, 0, 255]
+        let background: [UInt8] = [0x26, 0x26, 0x26], placeholder: [UInt8] = [0x3a, 0x3a, 0x3a]
+        let contents = [
+            shown(solidImage(width: 450, height: 300), .fullFrame),
+            shown(croppedMarker(), measuredCrop),
+            shown(solidImage(width: 100, height: 50, red: 0, green: 1), .fullFrame),
+            .missing(.notCached),
+            .unreadable(.undecodable),
+            shown(solidImage(width: 300, height: 200, red: 0, blue: 1), .notApplied(reason: .formatVersion2, userComment: "2|1;1;1|0;0;300;200")),
+        ]
+        XCTAssertEqual(contents.map(\.aspect), [1.5, 1, 2, 1.5, 1.5, 1.5], "A crop sets the aspect; placeholders are 3:2")
+        let arrangement = SheetLayout.standard.arrange(contents.map(\.aspect))
+        let tiles = zip(arrangement.cells, contents).enumerated().map { index, item in
+            ContactSheetTile(member: SheetMember(id: "\(index + 1)", name: "IMG_\(index + 1)", rating: 2, parentImagePath: "/a/IMG.CR3"),
+                             cell: item.0, content: item.1)
+        }
+        let image = ContactSheet.render(tiles: tiles, width: arrangement.width, height: arrangement.height, header: "Shoot · page 1/1 · 1–6 of 6")
+        XCTAssertEqual([image.width, image.height], [arrangement.width, arrangement.height])
+        let pixel = pixels(image)
+        func centre(_ index: Int) -> [UInt8] { let c = tiles[index].cell; return pixel(c.x + c.width / 2, c.y + c.height / 2) }
+        XCTAssertEqual(centre(0), red, "Each image lands in its own reported cell")
+        XCTAssertEqual(centre(1), red)
+        XCTAssertEqual(centre(2), green)
+        XCTAssertEqual(centre(5), blue)
+
+        func count(_ index: Int, _ color: [UInt8]) -> Int {
+            let c = tiles[index].cell
+            return (c.y..<c.y + c.height).reduce(0) { sum, y in sum + (c.x..<c.x + c.width).filter { pixel($0, y) == color }.count }
+        }
+        for (index, color) in [(0, red), (1, red), (2, green)] {
+            let c = tiles[index].cell
+            XCTAssertEqual(count(index, color), c.width * c.height, "Tile \(index + 1) fills exactly its cell")
+            XCTAssertEqual(pixel(c.x - 1, c.y + c.height / 2), background, "Tile \(index + 1) draws nothing left of its cell")
+            XCTAssertEqual(pixel(c.x + c.width, c.y + c.height / 2), background, "Tile \(index + 1) draws nothing right of its cell")
+            XCTAssertEqual(pixel(c.x + c.width / 2, c.y - 1), background, "Tile \(index + 1) draws nothing above its cell")
+        }
+        XCTAssertEqual(count(1, blue), 0, "Nothing outside the crop is drawn")
+        XCTAssertTrue(tiles[2].cell.width > 100, "A small thumbnail is enlarged to its row: \(tiles[2].cell)")
+        XCTAssertEqual(pixel(tiles[3].cell.x + 2, tiles[3].cell.y + 2), placeholder, "A missing thumbnail draws a placeholder in its cell")
+        XCTAssertEqual(pixel(tiles[4].cell.x + 2, tiles[4].cell.y + 2), placeholder, "An unreadable thumbnail draws a placeholder in its cell")
+        let badge = pixel(tiles[5].cell.x + 2, tiles[5].cell.y + 2)
+        XCTAssertTrue(badge[0] > 200 && badge[1] > 120 && badge[2] < 60, "An uncropped tile carries an amber badge: \(badge)")
+        XCTAssertEqual(pixel(tiles[0].cell.x + 2, tiles[0].cell.y + 2), red, "A tile whose crop is known has no badge")
+
+        let label = SheetLayout.label(below: tiles[0].cell)
+        XCTAssertEqual(label, PixelRect(x: tiles[0].cell.x, y: tiles[0].cell.y + tiles[0].cell.height, width: tiles[0].cell.width, height: 16))
+        let strip = (label.y..<label.y + label.height).flatMap { y in (label.x..<label.x + label.width).map { pixel($0, y) } }
+        XCTAssertTrue(strip.contains { $0 != background }, "The label strip directly below the image carries text")
+        XCTAssertTrue((label.y..<label.y + label.height).allSatisfy { pixel(label.x + label.width + 1, $0) == background },
+                      "A label stays within its image's width")
+
+        let small = SheetLayout.standard.arrange([0.2])
+        let tiny = ContactSheetTile(member: SheetMember(id: "1", name: "IMG_1", rating: 0, parentImagePath: "/a/IMG.CR3"), cell: small.cells[0],
+                                    content: shown(solidImage(width: 90, height: 450, red: 0, blue: 1), .notApplied(reason: .absent, userComment: nil)))
+        let narrow = pixels(ContactSheet.render(tiles: [tiny], width: small.width, height: small.height, header: "Shoot"))
+        let c = small.cells[0]
+        XCTAssertEqual(c.width, 44)
+        let amber = (c.y..<c.y + c.height).filter { y in let p = narrow(c.x + 1, y); return p[0] > 200 && p[2] < 60 }.count
+        XCTAssertTrue((1..<c.height / 4).contains(amber), "The UNCROPPED badge shrinks to fit a narrow tile: \(amber) rows")
+        XCTAssertEqual(narrow(c.x + c.width, c.y + 1), background, "The badge stays inside the tile")
+    }
+
+    private static func testSheetFiles() {
+        let scope = SheetScope(minRating: 3), layout = SheetLayout.standard
+        let name = ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: scope, layout: layout, page: 1)
+        XCTAssertTrue(name.range(of: "^Shoot-[0-9a-f]{12}-p001\\.jpg$", options: .regularExpression) != nil, name)
+        XCTAssertEqual(ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: scope, layout: layout, page: 1), name,
+                       "Repeating a request replaces its own file")
+        XCTAssertEqual(ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: scope, layout: layout, page: 12),
+                       String(name.dropLast(8)) + "p012.jpg")
+        let others = [
+            ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: SheetScope(rating: 3), layout: layout, page: 1),
+            ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: SheetScope(ids: ["1", "2"]), layout: layout, page: 1),
+            ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/other/Shoot.cosessiondb", scope: scope, layout: layout, page: 1),
+            ContactSheet.fileName(documentName: "Shoot.cosessiondb", documentId: "/s/Shoot.cosessiondb", scope: scope,
+                                  layout: try! SheetLayout(perPage: 12, rowHeight: 400), page: 1),
+        ]
+        XCTAssertEqual(Set(others + [name]).count, 5, "Scope, document and layout never share a file")
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        XCTAssertNoThrowBlock {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for index in 0..<60 {
+                let old = directory.appendingPathComponent("old-\(index).jpg")
+                try Data("x".utf8).write(to: old)
+                try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: Double(-1000 + index))], ofItemAtPath: old.path)
+            }
+            try Data("keep".utf8).write(to: directory.appendingPathComponent("notes.txt"))
+            let sheet = try ContactSheet.write(solidImage(width: 64, height: 32), to: directory, fileName: name)
+            XCTAssertEqual(sheet, SheetImage(path: directory.appendingPathComponent(name).path, width: 64, height: 32))
+            let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: sheet.path) as CFURL, nil)!
+            XCTAssertEqual(CGImageSourceGetType(source) as String?, UTType.jpeg.identifier)
+            let files = Set(try FileManager.default.contentsOfDirectory(atPath: directory.path))
+            XCTAssertEqual(files.filter { $0.hasSuffix(".jpg") }.count, 50, "Only the 50 newest sheets are kept")
+            XCTAssertTrue(files.contains(name) && files.contains("notes.txt") && files.contains("old-59.jpg") && !files.contains("old-10.jpg"),
+                          "Pruning removes the oldest sheets and nothing else")
         }
     }
 }

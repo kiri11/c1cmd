@@ -1,4 +1,6 @@
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 /// The crop Capture One stored in a `.cot` thumbnail's EXIF UserComment. The cached pixels are
 /// uncropped, so only a crop whose format is verified is applied.
@@ -72,5 +74,58 @@ package enum ThumbnailCache {
         return original.deletingLastPathComponent()
             .appendingPathComponent("CaptureOne/Cache/Thumbnails", isDirectory: true)
             .appendingPathComponent("\(key.imageFileName).[\(key.variantUUID.uuidString.lowercased())].cot")
+    }
+}
+
+extension ThumbnailCache {
+    static let maximumBytes = 4 * 1024 * 1024
+
+    private enum Attempt { case read(TileContent), changed }
+
+    /// Capture One replaces a thumbnail atomically, so a read that saw two different files is retried once.
+    package static func read(_ url: URL, testHookAfterStat: () -> Void = {}) -> TileContent {
+        for _ in 0..<2 {
+            if case .read(let content) = attempt(url, testHookAfterStat: testHookAfterStat) { return content }
+        }
+        return .unreadable(.changedDuringRead)
+    }
+
+    private static func attempt(_ url: URL, testHookAfterStat: () -> Void) -> Attempt {
+        var before = stat()
+        guard lstat(url.path, &before) == 0 else {
+            return .read([ENOENT, ENOTDIR].contains(errno) ? .missing(.notCached) : .unreadable(.inaccessible))
+        }
+        guard before.st_mode & S_IFMT == S_IFREG else { return .read(.unreadable(.notRegularFile)) }
+        guard before.st_size <= maximumBytes else { return .read(.unreadable(.tooLarge)) }
+        testHookAfterStat()
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW)
+        guard fd >= 0 else { return [ENOENT, ELOOP].contains(errno) ? .changed : .read(.unreadable(.inaccessible)) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        guard let data = try? handle.read(upToCount: maximumBytes + 1) ?? Data() else { return .read(.unreadable(.inaccessible)) }
+        var after = stat()
+        guard lstat(url.path, &after) == 0, after.st_dev == before.st_dev, after.st_ino == before.st_ino,
+              after.st_size == before.st_size, data.count == Int(before.st_size),
+              after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec, after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec else {
+            return .changed
+        }
+        let modifiedAt = Date(timeIntervalSince1970: Double(before.st_mtimespec.tv_sec) + Double(before.st_mtimespec.tv_nsec) / 1e9)
+        return .read(decode(data, modifiedAt: modifiedAt))
+    }
+
+    private static func decode(_ data: Data, modifiedAt: Date) -> TileContent {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetType(source) as String? == UTType.jpeg.identifier,
+              CGImageSourceGetStatus(source) == .statusComplete,
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+            return .unreadable(.undecodable)
+        }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        for tag in [properties[kCGImagePropertyOrientation], tiff?[kCGImagePropertyTIFFOrientation]] {
+            if let tag, (tag as? NSNumber)?.intValue != 1 { return .unreadable(.orientationTag) }
+        }
+        let comment = (properties[kCGImagePropertyExifDictionary] as? [CFString: Any])?[kCGImagePropertyExifUserComment] as? String
+        return .shown(CachedThumbnail(image: image, modifiedAt: modifiedAt,
+                                      crop: CotCrop.parse(userComment: comment, width: image.width, height: image.height)))
     }
 }
