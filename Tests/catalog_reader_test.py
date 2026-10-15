@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline Catalog SQL qualification: real schema, synthetic records, real WAL/backup."""
+"""Offline Catalog SQL qualification: real schema, synthetic records, real rollback journal/backup."""
 import concurrent.futures
 import hashlib
 import json
@@ -8,6 +8,8 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from contract_test import Client, validate_response
 
@@ -186,7 +188,7 @@ class CatalogReaderTests(unittest.TestCase):
         self.assertEqual(result['storedRetouching'][0]['ZTEETHWHITENINGBRIGHTNESS'], 61.25)
         self.test_single_variant_cli_mcp()
         self.assertEqual(self.path.read_bytes(), before)
-        self.test_wal_parallel_snapshot_and_no_overwrite()
+        self.test_parallel_reads_snapshot_and_no_overwrite()
         # The snapshot test intentionally modifies the fixture; reads before it did not.
         self.assertEqual(len(result['version']), 4)
 
@@ -230,8 +232,7 @@ class CatalogReaderTests(unittest.TestCase):
         self.db.execute('UPDATE ZDOCUMENTCONTENT SET ZDOCUMENTTYPE=0'); self.db.commit()
         self.assertIn('Unsupported Catalog schema',self.cli(error=True))
 
-    def test_wal_parallel_snapshot_and_no_overwrite(self):
-        self.db.execute('PRAGMA journal_mode=WAL')
+    def test_parallel_reads_snapshot_and_no_overwrite(self):
         self.db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=5 WHERE Z_PK=1'); self.db.commit()
         with concurrent.futures.ThreadPoolExecutor(4) as pool:
             results = list(pool.map(lambda _: self.cli(),range(8)))
@@ -249,10 +250,82 @@ class CatalogReaderTests(unittest.TestCase):
         link=Path(self.temp.name)/'link.cocatalogdb'; link.symlink_to(self.path)
         self.cli('snapshot','--destination',link,error=True)
 
-    def test_uncommitted_wal_is_not_visible(self):
+    def test_wal_catalog_fails_closed(self):
         self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=5 WHERE Z_PK=1'); self.db.commit()
+        self.assertTrue(Path(f'{self.path}-wal').exists())
+        self.assertIn('rollback-journal mode', self.cli(error=True))
+        self.db.close()
+        self.assertFalse(Path(f'{self.path}-wal').exists(), 'closing checkpoints the WAL; the header still says WAL')
+        self.assertIn('rollback-journal mode', self.cli(error=True))
+        self.db = sqlite3.connect(self.path)
+
+    def test_uri_special_characters_in_path(self):
+        self.db.close()
+        moved = Path(self.temp.name) / 'Capture One #1 ?%41 é' / 'fixture.cocatalogdb'
+        moved.parent.mkdir(); self.path.rename(moved); self.path = moved
+        self.db = sqlite3.connect(self.path)
+        self.assertEqual([r['rating'] for r in self.cli()['variants']], [1, 2, 3])
+
+    def test_reader_ignores_locks(self):
+        self.db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=5 WHERE Z_PK=1'); self.db.commit()
+        self.db.execute('BEGIN EXCLUSIVE')
+        self.assertFalse(Path(f'{self.path}-journal').exists())
+        self.assertEqual(self.cli()['variants'][0]['rating'], 5)
+        self.db.rollback()
+
+    def test_writer_commits_during_observation_and_reader_returns_final_state(self):
+        # Enough rows that every reader attempt spans several writer commits.
+        self.db.executemany('INSERT INTO ZVARIANTLAYER(Z_PK,ZVARIANT,ZMETADATA) VALUES(?,1,?)', ((i, i) for i in range(4, 1004)))
+        self.db.executemany('INSERT INTO ZVARIANTMETADATA(Z_PK,ZLAYER) VALUES(?,?)', ((i, i) for i in range(4, 1004)))
+        self.db.commit()
+        writer = sqlite3.connect(self.path, timeout=0, isolation_level=None, check_same_thread=False)
+        busy, committed, stop = [], threading.Event(), threading.Event()
+        def write():
+            value = 0
+            while not stop.is_set():
+                value += 1
+                try:
+                    writer.execute('BEGIN IMMEDIATE')
+                    writer.execute('UPDATE ZVARIANTLAYER SET ZEXPOSURE=?', (value,))
+                    writer.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=?', (value,))
+                    writer.execute('COMMIT')
+                    committed.set()
+                except sqlite3.OperationalError as error:
+                    busy.append(str(error)); writer.execute('ROLLBACK')
+                time.sleep(.005)
+            return value
+        thread = threading.Thread(target=lambda: final.append(write())); final = []
+        thread.start()
+        try:
+            committed.wait(5)
+            reader = subprocess.Popen([str(CLI), 'catalog', 'inspect', '--tables', 'storedSettings,storedMetadata', '--database', str(self.path)],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            time.sleep(1.5)
+            self.assertIsNone(reader.poll(), 'no attempt completes while every one overlaps a commit')
+        finally:
+            stop.set(); thread.join(); writer.close()
+        out, err = reader.communicate(timeout=20)
+        self.assertEqual(reader.returncode, 0, err)
+        self.assertEqual(busy, [], 'an observing reader never blocks a writer')
+        result = json.loads(out)
+        self.assertEqual({r['ZEXPOSURE'] for r in result['storedSettings']}, {final[0]})
+        self.assertEqual({r['ZBASIC_RATING'] for r in result['storedMetadata']}, {final[0]})
+
+    def test_save_in_progress_retries_then_fails_closed(self):
         self.db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=5 WHERE Z_PK=1')
-        self.assertEqual(self.cli()['variants'][0]['rating'],1)
+        self.assertTrue(Path(f'{self.path}-journal').exists())
+        reader = subprocess.Popen([str(CLI), 'catalog', 'variants', '--database', str(self.path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        time.sleep(1)
+        self.assertIsNone(reader.poll(), 'reader waits while the journal exists')
+        self.db.commit()
+        out, err = reader.communicate(timeout=20)
+        self.assertEqual(reader.returncode, 0, err)
+        self.assertEqual(json.loads(out)['variants'][0]['rating'], 5)
+        self.db.execute('UPDATE ZVARIANTMETADATA SET ZBASIC_RATING=4 WHERE Z_PK=1')
+        started = time.monotonic()
+        self.assertIn('Capture One was saving', self.cli(error=True))
+        self.assertGreaterEqual(time.monotonic() - started, 10)
         self.db.rollback()
 
     def test_embedded_null_text_is_preserved(self):
@@ -263,15 +336,12 @@ class CatalogReaderTests(unittest.TestCase):
         self.db.execute('UPDATE ZIMAGE SET ZISINSIDECATALOG=1'); self.db.commit()
         self.assertIsNone(self.cli()['variants'][0]['originalPath'])
 
-    def test_row_limit_and_locked_source_fail_without_partial_output(self):
+    def test_row_limit_fails_without_partial_output(self):
         self.db.executemany('INSERT INTO ZVARIANT(Z_PK,ZIMAGE,ZVARIANTUUID) VALUES(?,1,?)', ((i,str(i)) for i in range(4,10002)))
         self.db.commit()
         message = self.cli(error=True)
         self.assertIn('10000 records', message)
         self.assertIn('catalog_variants limit and afterVariantID, or catalog_inspect tables, limit and afterPK', message)
-        self.db.execute('BEGIN EXCLUSIVE')
-        self.cli(error=True)
-        self.db.rollback()
 
     def test_variant_pages_cross_the_cap(self):
         self.db.executemany('INSERT INTO ZVARIANT(Z_PK,ZIMAGE,ZVARIANTUUID) VALUES(?,1,?)', ((i,str(i)) for i in range(4,10006)))

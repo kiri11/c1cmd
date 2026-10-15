@@ -3,7 +3,7 @@ import CryptoKit
 import CSQLite
 
 /// Stored observations only. Never produces native references or concurrency tokens.
-/// Use one reader per concurrent task; each operation owns a bounded read transaction.
+/// Use one reader per concurrent task; each operation is one bounded, lock-free observation.
 public final class CatalogReader {
     private var db: OpaquePointer?
     private var deadline = ProcessInfo.processInfo.systemUptime + 10
@@ -21,21 +21,7 @@ public final class CatalogReader {
         }
         path = url.path
         fileIdentity = try Self.identity(path)
-        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else {
-            sqlite3_close(db); db = nil
-            throw C1Error.invalidRequest("Cannot open Catalog read-only.")
-        }
-        sqlite3_busy_timeout(db, 250)
-        sqlite3_progress_handler(db, 1000, { context in
-            let reader = Unmanaged<CatalogReader>.fromOpaque(context!).takeUnretainedValue()
-            return ProcessInfo.processInfo.systemUptime > reader.deadline ? 1 : 0
-        }, Unmanaged.passUnretained(self).toOpaque())
-        do {
-            try execute("PRAGMA query_only=ON")
-            try execute("PRAGMA trusted_schema=OFF")
-        } catch { sqlite3_close(db); db = nil; throw error }
     }
-    deinit { sqlite3_close(db) }
     private static func identity(_ path: String) throws -> String {
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
         guard let device = attrs[.systemNumber] as? NSNumber, let inode = attrs[.systemFileNumber] as? NSNumber else {
@@ -44,13 +30,59 @@ public final class CatalogReader {
         return "\(device):\(inode)"
     }
     private func execute(_ sql: String) throws { _ = try rows(sql) }
-    private func endObservation() { sqlite3_exec(db, "ROLLBACK", nil, nil, nil) }
-    private func beginObservation() throws {
+    private struct Stamp: Equatable { let counter: UInt32, size: off_t, seconds: Int, nanoseconds: Int }
+    /// Nil while a rollback journal exists, since a commit may be rewriting pages. Checking on both
+    /// sides of the header read catches a commit that starts or ends during it.
+    private func stamp() throws -> Stamp? {
+        func journaling() -> Bool { access(path + "-journal", F_OK) == 0 }
+        let rollbackOnly = C1Error.invalidRequest("Catalog is not in rollback-journal mode; stored reads are unsupported.")
+        guard access(path + "-wal", F_OK) != 0 else { throw rollbackOnly }
+        if journaling() { return nil }
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { throw C1Error.invalidRequest("Cannot open Catalog read-only.") }
+        defer { close(fd) }
+        var header = [UInt8](repeating: 0, count: 28), info = stat()
+        guard pread(fd, &header, 28, 0) == 28, fstat(fd, &info) == 0 else { throw C1Error.invalidRequest("Cannot read Catalog header.") }
+        guard header[18] == 1, header[19] == 1 else { throw rollbackOnly }
+        let stamp = Stamp(counter: header[24..<28].reduce(0) { $0 << 8 | UInt32($1) }, size: info.st_size,
+                          seconds: info.st_mtimespec.tv_sec, nanoseconds: info.st_mtimespec.tv_nsec)
+        return journaling() ? nil : stamp
+    }
+    // A reader holding a SHARED lock across a Capture One save tick makes Capture One drop the
+    // pending changes. So each attempt opens a fresh immutable connection (no locks, no stale
+    // page cache).
+    private func observe<T>(_ body: () throws -> T) throws -> T {
         guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced; open a new reader.") }
-        deadline = ProcessInfo.processInfo.systemUptime + 10; bytesRead = 0
-        observationStartedAt = ISO8601DateFormatter().string(from: Date())
-        try execute("BEGIN")
-        do { try validateSchema() } catch { endObservation(); throw error }
+        deadline = ProcessInfo.processInfo.systemUptime + 10
+        while true {
+            if let before = try stamp() {
+                bytesRead = 0
+                observationStartedAt = ISO8601DateFormatter().string(from: Date())
+                let outcome = Result { () throws -> T in
+                    defer { sqlite3_close(db); db = nil }
+                    try connect()
+                    try validateSchema()
+                    return try body()
+                }
+                if try stamp() == before { return try outcome.get() }
+            }
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw C1Error.invalidRequest("Capture One was saving the Catalog throughout the 10-second observation; retry.")
+            }
+            usleep(20_000)
+        }
+    }
+    private func connect() throws {
+        let uri = "file:\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)?mode=ro&immutable=1"
+        guard sqlite3_open_v2(uri, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else {
+            throw C1Error.invalidRequest("Cannot open Catalog read-only.")
+        }
+        sqlite3_progress_handler(db, 1000, { context in
+            let reader = Unmanaged<CatalogReader>.fromOpaque(context!).takeUnretainedValue()
+            return ProcessInfo.processInfo.systemUptime > reader.deadline ? 1 : 0
+        }, Unmanaged.passUnretained(self).toOpaque())
+        try execute("PRAGMA query_only=ON")
+        try execute("PRAGMA trusted_schema=OFF")
     }
     // Preserve quoted text and token boundaries; normalize only ASCII whitespace
     // and spacing around unambiguous DDL separators. Comments fail closed.
@@ -205,19 +237,19 @@ public final class CatalogReader {
     static let layerIdentityColumns: Set = ["Z_PK", "Z_ENT", "ZINDEX", "ZVARIANT", "ZMETADATA"]
 
     public func inspect(tables: [String]? = nil, afterPK: Int? = nil, limit: Int? = nil) throws -> [String: Any] {
-        try beginObservation()
-        defer { endObservation() }
-        var output = provenance()
-        var next: [String: Int64] = [:]
-        for (key, table) in Self.inspectTables where tables?.contains(key) ?? true {
-            let after = afterPK.map { " WHERE Z_PK>\($0)" } ?? ""
-            let result = try page("SELECT * FROM \(table)\(after) ORDER BY Z_PK", key: "Z_PK", limit: limit)
-            output[key] = result.rows; next[key] = result.next
+        try observe {
+            var output = provenance()
+            var next: [String: Int64] = [:]
+            for (key, table) in Self.inspectTables where tables?.contains(key) ?? true {
+                let after = afterPK.map { " WHERE Z_PK>\($0)" } ?? ""
+                let result = try page("SELECT * FROM \(table)\(after) ORDER BY Z_PK", key: "Z_PK", limit: limit)
+                output[key] = result.rows; next[key] = result.next
+            }
+            guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
+            output.merge(provenance()) { _, fresh in fresh }
+            if !next.isEmpty { output["next"] = next }
+            return output
         }
-        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
-        output.merge(provenance()) { _, fresh in fresh }
-        if !next.isEmpty { output["next"] = next }
-        return output
     }
 
     /// Every stored collection with its raw entity and the names from the root to itself.
@@ -242,12 +274,12 @@ public final class CatalogReader {
     }
 
     public func collections() throws -> [String: Any] {
-        try beginObservation()
-        defer { endObservation() }
-        let records = try collectionRecords()
-        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
-        var output = provenance(); output["collections"] = records
-        return output
+        try observe {
+            let records = try collectionRecords()
+            guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
+            var output = provenance(); output["collections"] = records
+            return output
+        }
     }
 
     public func variants(collectionID: Int? = nil, collection: String? = nil, rating: Int? = nil, minRating: Int? = nil,
@@ -256,78 +288,78 @@ public final class CatalogReader {
         if let rating { filters["rating"] = rating }; if let minRating { filters["minRating"] = minRating }
         try ContractSchema.validate(tool: "variants_list", arguments: filters)
         if let collectionID, collectionID <= 0 { throw C1Error.invalidRequest("collectionID must be positive.") }
-        try beginObservation()
-        defer { endObservation() }
-        var collectionID = collectionID
-        if let collection {
-            let matches = try collectionRecords().filter { $0["name"] as? String == collection }
-            switch matches.count {
-            case 1:
-                collectionID = Int(matches[0]["collectionID"] as! Int64)
-                guard try rows("SELECT 1 FROM ZCOLLECTION WHERE Z_PK=\(collectionID!) AND ZSMARTCRITERIA<>''").isEmpty else {
-                    throw C1Error.invalidRequest("Stored collection '\(collection)' is a smart album; stored reads do not evaluate smart rules. Use live variants_list with collection.")
+        return try observe {
+            var collectionID = collectionID
+            if let collection {
+                let matches = try collectionRecords().filter { $0["name"] as? String == collection }
+                switch matches.count {
+                case 1:
+                    collectionID = Int(matches[0]["collectionID"] as! Int64)
+                    guard try rows("SELECT 1 FROM ZCOLLECTION WHERE Z_PK=\(collectionID!) AND ZSMARTCRITERIA<>''").isEmpty else {
+                        throw C1Error.invalidRequest("Stored collection '\(collection)' is a smart album; stored reads do not evaluate smart rules. Use live variants_list with collection.")
+                    }
+                case 0: throw C1Error.invalidRequest("No stored collection is named '\(collection)'.")
+                default:
+                    let candidates = matches.map { match in
+                        "\(match["collectionID"]!) (\((match["namePath"] as! [Any]).map { $0 as? String ?? "" }.joined(separator: " / ")))"
+                    }
+                    throw C1Error.invalidRequest("Several stored collections are named '\(collection)': \(candidates.joined(separator: ", ")). Use collectionID.")
                 }
-            case 0: throw C1Error.invalidRequest("No stored collection is named '\(collection)'.")
-            default:
-                let candidates = matches.map { match in
-                    "\(match["collectionID"]!) (\((match["namePath"] as! [Any]).map { $0 as? String ?? "" }.joined(separator: " / ")))"
+            }
+            if let collectionID {
+                let collections = try rows("SELECT Z_PK FROM ZCOLLECTION WHERE Z_PK=\(collectionID)")
+                guard collections.count == 1 else { throw C1Error.invalidRequest("Unknown stored collection ID.") }
+            }
+            var predicates = ["1=1"]
+            if let collectionID {
+                predicates.append("(EXISTS(SELECT 1 FROM ZIMAGEINCOLLECTION ic WHERE ic.ZCOLLECTION=\(collectionID) AND ic.ZIMAGE=i.Z_PK) OR EXISTS(SELECT 1 FROM ZVARIANTINCOLLECTION vc WHERE vc.ZCOLLECTION=\(collectionID) AND vc.ZVARIANT=v.Z_PK))")
+            }
+            if let rating { predicates.append("m.ZBASIC_RATING=\(rating)") }
+            if let minRating { predicates.append("m.ZBASIC_RATING>=\(minRating)") }
+            if let afterVariantID { predicates.append("v.Z_PK>\(afterVariantID)") }
+            let changed = try rows("SELECT name FROM pragma_table_info('ZVARIANTLAYER') ORDER BY cid")
+                .compactMap { $0["name"] as? String }.filter { !Self.layerIdentityColumns.contains($0) }
+                .map { "CASE WHEN d.\"\($0)\" IS NOT l.\"\($0)\" THEN ',\($0)' ELSE '' END" }.joined(separator: "||")
+            var (records, next) = try page("""
+                SELECT v.Z_PK AS variantDatabaseID,v.ZVARIANTUUID AS variantUUID,
+                       i.Z_PK AS imageDatabaseID,i.ZIMAGEUUID AS imageUUID,i.ZDISPLAYNAME AS name,
+                       i.ZIMAGEFILENAME AS originalFilename,i.ZISINSIDECATALOG AS insideCatalog,
+                       i.ZISTRASHED AS trashed,p.ZMACROOT AS macRoot,p.ZRELATIVEPATH AS relativePath,
+                       p.ZISRELATIVE AS isRelative,m.ZBASIC_RATING AS rating,
+                       COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,v.ZCOMBINEDSETTINGS AS combinedSettingsID,
+                       v.ZDEFAULTLAYER AS defaultSettingsID,
+                       CASE WHEN d.Z_PK IS NULL THEN 'missing-default-layer' WHEN l.Z_PK IS NULL THEN 'missing-combined-layer' END AS settingsUnavailableReason,
+                       \(changed) AS changedSettings
+                FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
+                LEFT JOIN ZPATHLOCATION p ON p.Z_PK=i.ZIMAGELOCATION
+                LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
+                LEFT JOIN ZVARIANTLAYER d ON d.Z_PK=v.ZDEFAULTLAYER
+                LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA
+                WHERE \(predicates.joined(separator: " AND ")) ORDER BY v.Z_PK
+                """, key: "variantDatabaseID", limit: limit)
+            for index in records.indices {
+                let record = records[index]
+                if record["settingsUnavailableReason"] is NSNull {
+                    let columns = (record["changedSettings"] as! String).split(separator: ",").map(String.init).sorted()
+                    records[index]["settingsUnavailableReason"] = nil
+                    records[index]["settingsChanged"] = !columns.isEmpty; records[index]["changedSettings"] = columns
+                } else {
+                    records[index]["settingsChanged"] = NSNull(); records[index]["changedSettings"] = NSNull()
                 }
-                throw C1Error.invalidRequest("Several stored collections are named '\(collection)': \(candidates.joined(separator: ", ")). Use collectionID.")
+                records[index]["originalPath"] = NSNull()
+                if record["insideCatalog"] as? Int64 == 0, record["isRelative"] as? Int64 == 0,
+                   let root = record["macRoot"] as? String, root.hasPrefix("/"),
+                   let relative = record["relativePath"] as? String, let filename = record["originalFilename"] as? String {
+                    records[index]["originalPath"] = URL(fileURLWithPath: root).appendingPathComponent(relative).appendingPathComponent(filename).standardizedFileURL.path
+                }
             }
+            guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
+            var output = provenance(); output["variants"] = records
+            output["membershipSemantics"] = "Explicit stored image membership expands to all image variants; explicit variant membership includes only that variant. Virtual/smart collection rules are not evaluated. Unscoped reads include stored trashed records."
+            if let collectionID { output["collectionID"] = collectionID }
+            if let next { output["next"] = next }
+            return output
         }
-        if let collectionID {
-            let collections = try rows("SELECT Z_PK FROM ZCOLLECTION WHERE Z_PK=\(collectionID)")
-            guard collections.count == 1 else { throw C1Error.invalidRequest("Unknown stored collection ID.") }
-        }
-        var predicates = ["1=1"]
-        if let collectionID {
-            predicates.append("(EXISTS(SELECT 1 FROM ZIMAGEINCOLLECTION ic WHERE ic.ZCOLLECTION=\(collectionID) AND ic.ZIMAGE=i.Z_PK) OR EXISTS(SELECT 1 FROM ZVARIANTINCOLLECTION vc WHERE vc.ZCOLLECTION=\(collectionID) AND vc.ZVARIANT=v.Z_PK))")
-        }
-        if let rating { predicates.append("m.ZBASIC_RATING=\(rating)") }
-        if let minRating { predicates.append("m.ZBASIC_RATING>=\(minRating)") }
-        if let afterVariantID { predicates.append("v.Z_PK>\(afterVariantID)") }
-        let changed = try rows("SELECT name FROM pragma_table_info('ZVARIANTLAYER') ORDER BY cid")
-            .compactMap { $0["name"] as? String }.filter { !Self.layerIdentityColumns.contains($0) }
-            .map { "CASE WHEN d.\"\($0)\" IS NOT l.\"\($0)\" THEN ',\($0)' ELSE '' END" }.joined(separator: "||")
-        var (records, next) = try page("""
-            SELECT v.Z_PK AS variantDatabaseID,v.ZVARIANTUUID AS variantUUID,
-                   i.Z_PK AS imageDatabaseID,i.ZIMAGEUUID AS imageUUID,i.ZDISPLAYNAME AS name,
-                   i.ZIMAGEFILENAME AS originalFilename,i.ZISINSIDECATALOG AS insideCatalog,
-                   i.ZISTRASHED AS trashed,p.ZMACROOT AS macRoot,p.ZRELATIVEPATH AS relativePath,
-                   p.ZISRELATIVE AS isRelative,m.ZBASIC_RATING AS rating,
-                   COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,v.ZCOMBINEDSETTINGS AS combinedSettingsID,
-                   v.ZDEFAULTLAYER AS defaultSettingsID,
-                   CASE WHEN d.Z_PK IS NULL THEN 'missing-default-layer' WHEN l.Z_PK IS NULL THEN 'missing-combined-layer' END AS settingsUnavailableReason,
-                   \(changed) AS changedSettings
-            FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
-            LEFT JOIN ZPATHLOCATION p ON p.Z_PK=i.ZIMAGELOCATION
-            LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
-            LEFT JOIN ZVARIANTLAYER d ON d.Z_PK=v.ZDEFAULTLAYER
-            LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA
-            WHERE \(predicates.joined(separator: " AND ")) ORDER BY v.Z_PK
-            """, key: "variantDatabaseID", limit: limit)
-        for index in records.indices {
-            let record = records[index]
-            if record["settingsUnavailableReason"] is NSNull {
-                let columns = (record["changedSettings"] as! String).split(separator: ",").map(String.init).sorted()
-                records[index]["settingsUnavailableReason"] = nil
-                records[index]["settingsChanged"] = !columns.isEmpty; records[index]["changedSettings"] = columns
-            } else {
-                records[index]["settingsChanged"] = NSNull(); records[index]["changedSettings"] = NSNull()
-            }
-            records[index]["originalPath"] = NSNull()
-            if record["insideCatalog"] as? Int64 == 0, record["isRelative"] as? Int64 == 0,
-               let root = record["macRoot"] as? String, root.hasPrefix("/"),
-               let relative = record["relativePath"] as? String, let filename = record["originalFilename"] as? String {
-                records[index]["originalPath"] = URL(fileURLWithPath: root).appendingPathComponent(relative).appendingPathComponent(filename).standardizedFileURL.path
-            }
-        }
-        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during observation.") }
-        var output = provenance(); output["variants"] = records
-        output["membershipSemantics"] = "Explicit stored image membership expands to all image variants; explicit variant membership includes only that variant. Virtual/smart collection rules are not evaluated. Unscoped reads include stored trashed records."
-        if let collectionID { output["collectionID"] = collectionID }
-        if let next { output["next"] = next }
-        return output
     }
 
     struct Projection: Decodable {
@@ -341,8 +373,7 @@ public final class CatalogReader {
         let saturation: Double?
     }
     func readProjection() throws -> [Projection] {
-        try beginObservation(); defer { endObservation() }
-        let records = try rows("""
+        let records = try observe { try rows("""
             SELECT v.Z_PK AS id,i.ZDISPLAYNAME AS name,
             CASE WHEN i.ZISINSIDECATALOG=0 AND p.ZISRELATIVE=0 AND p.ZMACROOT='/'
                  THEN '/' || trim(p.ZRELATIVEPATH,'/') || '/' || i.ZIMAGEFILENAME ELSE NULL END AS path,
@@ -352,7 +383,7 @@ public final class CatalogReader {
             LEFT JOIN ZPATHLOCATION p ON p.Z_PK=i.ZIMAGELOCATION
             LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
             LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA ORDER BY v.Z_PK
-            """)
+            """) }
         guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
         return try JSONDecoder().decode([Projection].self, from: JSONSerialization.data(withJSONObject: records))
     }
@@ -360,33 +391,31 @@ public final class CatalogReader {
     /// The native collection ID of All Images, which the root collection names; its localized
     /// name and its kind, shared with Trash and In Catalog, cannot identify it.
     public func allImagesCollectionID() throws -> String? {
-        try beginObservation(); defer { endObservation() }
-        let id = try rows("""
+        let id = try observe { try rows("""
             SELECT a.Z_PK AS id FROM ZDOCUMENTCONTENT d JOIN ZCOLLECTION r ON r.Z_PK=d.ZROOTCOLLECTION
             JOIN ZCOLLECTION a ON a.Z_PK=r.ZALLIMAGESCOLLECTION JOIN ZENTITIES e ON e.Z_ENT=a.Z_ENT
             WHERE e.ZNAME='CatalogAllImagesCollection'
-            """).first?["id"] as? Int64
+            """).first?["id"] as? Int64 }
         return id.map(String.init)
     }
 
     /// Offline inspection: no Capture One lookup, native token, or warm-up required.
     public func get(variantID: Int) throws -> [String: Any] {
         guard variantID > 0 else { throw C1Error.invalidRequest("variantID must be positive.") }
-        try beginObservation(); defer { endObservation() }
-        guard let variant = try rows("SELECT * FROM ZVARIANT WHERE Z_PK=\(variantID)").first,
-              let imageID = variant["ZIMAGE"] as? Int64 else { throw C1Error.variantNotFound("Stored variant not found.") }
-        var result = provenance(); result["variant"] = variant
-        result["image"] = try rows("SELECT * FROM ZIMAGE WHERE Z_PK=\(imageID)").first
-        result["storedSettings"] = try rows("SELECT * FROM ZVARIANTLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
-        result["storedMetadata"] = try rows("SELECT m.* FROM ZVARIANTMETADATA m JOIN ZVARIANTLAYER l ON l.ZMETADATA=m.Z_PK WHERE l.ZVARIANT=\(variantID) ORDER BY m.Z_PK")
-        result["storedRetouching"] = try rows("SELECT * FROM ZRETOUCHINGLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
-        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
-        return result
+        return try observe {
+            guard let variant = try rows("SELECT * FROM ZVARIANT WHERE Z_PK=\(variantID)").first,
+                  let imageID = variant["ZIMAGE"] as? Int64 else { throw C1Error.variantNotFound("Stored variant not found.") }
+            var result = provenance(); result["variant"] = variant
+            result["image"] = try rows("SELECT * FROM ZIMAGE WHERE Z_PK=\(imageID)").first
+            result["storedSettings"] = try rows("SELECT * FROM ZVARIANTLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
+            result["storedMetadata"] = try rows("SELECT m.* FROM ZVARIANTMETADATA m JOIN ZVARIANTLAYER l ON l.ZMETADATA=m.Z_PK WHERE l.ZVARIANT=\(variantID) ORDER BY m.Z_PK")
+            result["storedRetouching"] = try rows("SELECT * FROM ZRETOUCHINGLAYER WHERE ZVARIANT=\(variantID) ORDER BY Z_PK")
+            guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog replaced during observation.") }
+            return result
+        }
     }
 
     public func snapshot(destination: String) throws -> [String: Any] {
-        try beginObservation()
-        defer { endObservation() }
         guard destination.hasPrefix("/"), !destination.contains("\0") else { throw C1Error.invalidRequest("destination must be an absolute filesystem path.") }
         let target = URL(fileURLWithPath: destination).standardizedFileURL
         guard !target.deletingLastPathComponent().resolvingSymlinksInPath().pathComponents.contains(where: { $0.hasSuffix(".cocatalog") }) else {
@@ -399,20 +428,22 @@ public final class CatalogReader {
         close(fd)
         var complete = false
         defer { if !complete { try? FileManager.default.removeItem(at: target) } }
-        var destinationDB: OpaquePointer?
-        guard sqlite3_open_v2(target.path, &destinationDB, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
-            sqlite3_close(destinationDB); throw C1Error.invalidRequest("Cannot open snapshot destination.")
+        let output = try observe { () throws -> [String: Any] in
+            var destinationDB: OpaquePointer?
+            guard sqlite3_open_v2(target.path, &destinationDB, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
+                sqlite3_close(destinationDB); throw C1Error.invalidRequest("Cannot open snapshot destination.")
+            }
+            defer { sqlite3_close(destinationDB) }
+            guard let backup = sqlite3_backup_init(destinationDB, "main", db, "main") else { throw C1Error.invalidRequest("Cannot initialize SQLite backup.") }
+            var status: Int32 = SQLITE_OK
+            repeat { status = sqlite3_backup_step(backup, 128) } while status == SQLITE_OK && ProcessInfo.processInfo.systemUptime <= deadline
+            let finish = sqlite3_backup_finish(backup)
+            guard status == SQLITE_DONE && finish == SQLITE_OK else { throw C1Error.invalidRequest("SQLite backup failed or exceeded deadline; no snapshot retained.") }
+            guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during backup.") }
+            var output = provenance(); output["snapshotPath"] = target.path
+            return output
         }
-        defer { sqlite3_close(destinationDB) }
-        guard let backup = sqlite3_backup_init(destinationDB, "main", db, "main") else { throw C1Error.invalidRequest("Cannot initialize SQLite backup.") }
-        var status: Int32 = SQLITE_OK
-        repeat { status = sqlite3_backup_step(backup, 128) } while status == SQLITE_OK && ProcessInfo.processInfo.systemUptime <= deadline
-        let finish = sqlite3_backup_finish(backup)
-        guard status == SQLITE_DONE && finish == SQLITE_OK else { throw C1Error.invalidRequest("SQLite backup failed or exceeded deadline; no snapshot retained.") }
-        endObservation()
-        guard try Self.identity(path) == fileIdentity else { throw C1Error.invalidRequest("Catalog file was replaced during backup.") }
         complete = true
-        var output = provenance(); output["snapshotPath"] = target.path
         return output
     }
 }

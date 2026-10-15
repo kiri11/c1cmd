@@ -332,6 +332,14 @@ It can also stop saving: acknowledged writes then never reach the database, even
 after the document closes, and the document reopens without them. c1 checks for
 this before every write and in `doctor`.
 
+A process that holds a SQLite read lock on the database while Capture One saves
+causes this. Capture One then drops that save and every later change to the
+document. On Capture One 16.8.5.30 a read held across the save stalled it every
+time, and a reader polling twice a second stalled it in one run of six. c1's stored
+reads take no locks. While Capture One has the database open, do not open it with
+other SQLite tools, such as the `sqlite3` shell, a database browser, or a script,
+unless they read with `immutable=1`.
+
 A write is unsaved when it succeeded, or was reconciled behind the probe barrier, in
 the running Capture One process, changed something (every write except `preview`
 and writes whose readback or reconciliation shows no change),
