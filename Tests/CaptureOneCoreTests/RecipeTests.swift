@@ -18,7 +18,9 @@ private final class RecipeFake: ScriptExecuting {
     init(_ directory: URL) { geometry = GeometryFake(directory:directory) }
     var fields: [String] { ["exposure","temperature","tint"] + Recipes.supportedFields }
     func values(_ id: String) -> [String:Any] {
-        var v = Dictionary(uniqueKeysWithValues:fields.map { ($0,properties[$0] ?? 0) })
+        // A captured recipe replays every value, and 0 is out of range for sharpening radius and moire pattern.
+        let floors = Dictionary(uniqueKeysWithValues:NativeEditing.fields["adjustments"]!.compactMap { f in f.minimum.map { (f.name, max(0, $0)) } })
+        var v = Dictionary(uniqueKeysWithValues:fields.map { ($0, properties[$0] ?? floors[$0] ?? 0) })
         for key in Recipes.curveFields { v[key] = properties[key] ?? [0.0,0,100,100] }
         v["film grain type"] = properties["film grain type"] ?? "fine"
         v["vignetting method"] = properties["vignetting method"] ?? "elliptic on crop"
