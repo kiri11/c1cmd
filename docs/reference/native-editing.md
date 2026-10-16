@@ -114,9 +114,40 @@ Property keys use the exact dictionary names, including spaces. Booleans are
 JSON booleans; native enumerations are the strings listed by `capabilities`.
 Curves are flat `x,y` pairs in the native 0–100 scale, with strictly increasing
 x coordinates. RGB colors are three integers in 0–65535. Values must have the
-right native type; documented/retained ranges are enforced where available.
-For properties without qualified bounds, native normalization can produce a
-readback mismatch; this is an uncertain operation requiring normal recovery.
+right native type.
+
+### Numeric bounds
+
+The fields below have bounds measured on Capture One 16.8.5.30. A value outside
+its range fails with `invalidRequest` before dispatch, with no journal entry,
+for example `Native exposure must be within -4...4.` Bounds are inclusive and
+apply to every target of the scope, including layer adjustments. The `schema`
+and `capabilities.nativeEditing` report each one as `minimum` and `maximum`.
+
+| Range | Fields (`adjustments` scope unless named) |
+|---|---|
+| -100...100 | `black and white blue sensitivity`, `black and white cyan sensitivity`, `black and white green sensitivity`, `black and white magenta sensitivity`, `black and white red sensitivity`, `black and white yellow sensitivity`, `black recovery`, `clarity amount`, `clarity structure`, `dehaze amount`, `highlight adjustment`, `highlight recovery`, `saturation`, `shadow recovery`, `white recovery` |
+| -50...50 | `brightness`, `contrast`, `tint` |
+| -4...4 | `exposure`, `vignetting amount` |
+| -1...1 | `color balance highlight lightness`, `color balance midtone lightness`, `color balance shadow lightness`, `level midtone blue`, `level midtone green`, `level midtone red`, `level midtone rgb` |
+| 0...1 | `color balance highlight saturation`, `color balance master saturation`, `color balance midtone saturation`, `color balance shadow saturation` |
+| 0...12 | `sharpening threshold` |
+| 0...100 | `black and white split highlight saturation`, `black and white split shadow saturation`, `distortion` (lens scope), `film grain granularity`, `film grain impact`, `moire amount`, `noise reduction color`, `noise reduction details`, `noise reduction luminance`, `noise reduction single pixel`, `sharpening halo suppression` |
+| 0...255 | `level highlight blue`, `level highlight green`, `level highlight red`, `level highlight rgb`, `level shadow blue`, `level shadow green`, `level shadow red`, `level shadow rgb`, `level target highlight blue`, `level target highlight green`, `level target highlight red`, `level target highlight rgb`, `level target shadow blue`, `level target shadow green`, `level target shadow red`, `level target shadow rgb` |
+| 0...360 | `black and white split highlight hue`, `black and white split shadow hue`, `color balance highlight hue`, `color balance master hue`, `color balance midtone hue`, `color balance shadow hue` |
+| 0...1000 | `sharpening amount` |
+| 0.2...2.5 | `sharpening radius` |
+| 1...100 | `opacity` (layer scope) |
+| 4...80 | `moire pattern` |
+| 800...14000 | `temperature` |
+
+The bounds come from `sdef/16.8.5.30.native-bounds.json`, which records their
+source and build; `scripts/generate-native-editing.py` copies them into the
+generated resource. Capture One's own range errors can name the wrong limit, and
+it clamps an over-range color balance hue to 360 without an error, so these
+checks run first. For numeric fields without bounds, native normalization can
+produce a readback mismatch; this is an uncertain operation requiring normal
+recovery.
 
 Reads distinguish native unset values (`null`) from per-property `unavailable` errors. Unset layer properties may be assigned typed values; `null` is not accepted as a write or treated as zero.
 Unavailable properties cannot be written. Application/permission/timeout errors
