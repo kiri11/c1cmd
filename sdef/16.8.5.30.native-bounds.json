@@ -1,0 +1,292 @@
+{
+  "build": "16.8.5.30",
+  "source": "Bisected by byjustinjones/capture-one-mcp at cfb4e42, docs/adjustment-round-trip.json (MIT), rounded to the intended limits; confirmed at each bound and just past it by scripts/probe-native-bounds.py.",
+  "bounds": {
+    "adjustments": {
+      "black and white blue sensitivity": [
+        -100,
+        100
+      ],
+      "black and white cyan sensitivity": [
+        -100,
+        100
+      ],
+      "black and white green sensitivity": [
+        -100,
+        100
+      ],
+      "black and white magenta sensitivity": [
+        -100,
+        100
+      ],
+      "black and white red sensitivity": [
+        -100,
+        100
+      ],
+      "black and white split highlight hue": [
+        0,
+        360
+      ],
+      "black and white split highlight saturation": [
+        0,
+        100
+      ],
+      "black and white split shadow hue": [
+        0,
+        360
+      ],
+      "black and white split shadow saturation": [
+        0,
+        100
+      ],
+      "black and white yellow sensitivity": [
+        -100,
+        100
+      ],
+      "black recovery": [
+        -100,
+        100
+      ],
+      "brightness": [
+        -50,
+        50
+      ],
+      "clarity amount": [
+        -100,
+        100
+      ],
+      "clarity structure": [
+        -100,
+        100
+      ],
+      "color balance highlight hue": [
+        0,
+        360
+      ],
+      "color balance highlight lightness": [
+        -1,
+        1
+      ],
+      "color balance highlight saturation": [
+        0,
+        1
+      ],
+      "color balance master hue": [
+        0,
+        360
+      ],
+      "color balance master saturation": [
+        0,
+        1
+      ],
+      "color balance midtone hue": [
+        0,
+        360
+      ],
+      "color balance midtone lightness": [
+        -1,
+        1
+      ],
+      "color balance midtone saturation": [
+        0,
+        1
+      ],
+      "color balance shadow hue": [
+        0,
+        360
+      ],
+      "color balance shadow lightness": [
+        -1,
+        1
+      ],
+      "color balance shadow saturation": [
+        0,
+        1
+      ],
+      "contrast": [
+        -50,
+        50
+      ],
+      "dehaze amount": [
+        -100,
+        100
+      ],
+      "exposure": [
+        -4,
+        4
+      ],
+      "film grain granularity": [
+        0,
+        100
+      ],
+      "film grain impact": [
+        0,
+        100
+      ],
+      "highlight adjustment": [
+        -100,
+        100
+      ],
+      "highlight recovery": [
+        -100,
+        100
+      ],
+      "level highlight blue": [
+        0,
+        255
+      ],
+      "level highlight green": [
+        0,
+        255
+      ],
+      "level highlight red": [
+        0,
+        255
+      ],
+      "level highlight rgb": [
+        0,
+        255
+      ],
+      "level midtone blue": [
+        -1,
+        1
+      ],
+      "level midtone green": [
+        -1,
+        1
+      ],
+      "level midtone red": [
+        -1,
+        1
+      ],
+      "level midtone rgb": [
+        -1,
+        1
+      ],
+      "level shadow blue": [
+        0,
+        255
+      ],
+      "level shadow green": [
+        0,
+        255
+      ],
+      "level shadow red": [
+        0,
+        255
+      ],
+      "level shadow rgb": [
+        0,
+        255
+      ],
+      "level target highlight blue": [
+        0,
+        255
+      ],
+      "level target highlight green": [
+        0,
+        255
+      ],
+      "level target highlight red": [
+        0,
+        255
+      ],
+      "level target highlight rgb": [
+        0,
+        255
+      ],
+      "level target shadow blue": [
+        0,
+        255
+      ],
+      "level target shadow green": [
+        0,
+        255
+      ],
+      "level target shadow red": [
+        0,
+        255
+      ],
+      "level target shadow rgb": [
+        0,
+        255
+      ],
+      "moire amount": [
+        0,
+        100
+      ],
+      "moire pattern": [
+        4,
+        80
+      ],
+      "noise reduction color": [
+        0,
+        100
+      ],
+      "noise reduction details": [
+        0,
+        100
+      ],
+      "noise reduction luminance": [
+        0,
+        100
+      ],
+      "noise reduction single pixel": [
+        0,
+        100
+      ],
+      "saturation": [
+        -100,
+        100
+      ],
+      "shadow recovery": [
+        -100,
+        100
+      ],
+      "sharpening amount": [
+        0,
+        1000
+      ],
+      "sharpening halo suppression": [
+        0,
+        100
+      ],
+      "sharpening radius": [
+        0.2,
+        2.5
+      ],
+      "sharpening threshold": [
+        0,
+        12
+      ],
+      "temperature": [
+        800,
+        14000
+      ],
+      "tint": [
+        -50,
+        50
+      ],
+      "vignetting amount": [
+        -4,
+        4
+      ],
+      "white recovery": [
+        -100,
+        100
+      ]
+    },
+    "layer": {
+      "opacity": [
+        1,
+        100
+      ]
+    },
+    "lens": {
+      "distortion": [
+        0,
+        100
+      ]
+    }
+  }
+}
