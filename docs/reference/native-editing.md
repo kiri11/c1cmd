@@ -141,10 +141,7 @@ and `capabilities.nativeEditing` report each one as `minimum` and `maximum`.
 | 4...80 | `moire pattern` |
 | 800...14000 | `temperature` |
 
-The bounds come from `sdef/16.8.5.30.native-bounds.json`, which records their
-source and build; `scripts/generate-native-editing.py` copies them into the
-generated resource. Capture One's own range errors can name the wrong limit, and
-it clamps an over-range color balance hue to 360 without an error, so these
+Capture One's own range errors can name the wrong limit, and it clamps an over-range color balance hue to 360 without an error, so these
 checks run first. For numeric fields without bounds, native normalization can
 produce a readback mismatch; this is an uncertain operation requiring normal
 recovery.
