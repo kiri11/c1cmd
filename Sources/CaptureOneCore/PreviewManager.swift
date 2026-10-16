@@ -154,8 +154,12 @@ public final class PreviewManager {
         let fm = FileManager.default
         var previous: [String: Int64] = [:]
         var stable: [String: Int] = [:]
+        // A loaded machine can overrun the deadline between samples, so a complete file
+        // always gets the three samples that prove it stable before the deadline counts.
+        var samples = 0
 
-        while Date() < deadline {
+        while samples < 3 || Date() < deadline {
+            samples += 1
             if let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) {
                 for file in files {
                     if file.pathExtension.lowercased() == "jpg" || file.pathExtension.lowercased() == "jpeg" {

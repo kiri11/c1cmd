@@ -339,6 +339,11 @@ struct ReleaseSafetyTests {
             try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
             try FakeScript.jpeg().prefix(30).write(to: partial.appendingPathComponent("preview.jpg"))
             XCTAssertThrowsError(try PreviewManager.shared.pollForOutputFile(inDirectory: partial, timeout: 0.7))
+            // An expired deadline still samples a complete JPEG until it is proven stable.
+            let complete = dir.appendingPathComponent("complete")
+            try FileManager.default.createDirectory(at: complete, withIntermediateDirectories: true)
+            try FakeScript.jpeg().write(to: complete.appendingPathComponent("preview.jpg"))
+            XCTAssertEqual(try? PreviewManager.shared.pollForOutputFile(inDirectory: complete, timeout: 0).lastPathComponent, "preview.jpg")
         }
         // Observe a delayed application after timeout without ever retrying it.
         XCTAssertNoThrowBlock {

@@ -473,7 +473,10 @@ Every condition must hold:
   still the process that started it.
 - The open document's database identity matches the journal.
 - The journaled `c1-previews/<operationId>` folder holds exactly one JPEG, and it
-  is complete, stable and decodable.
+  is complete, stable and decodable. Status samples the file for up to 2 s and
+  always takes the samples that prove it stable, so a complete JPEG resolves
+  even on a loaded machine. A JPEG still being written fails this check; ask
+  again once it lands.
 - Its long edge equals the journaled `previewSize`, and its aspect matches the
   journaled crop ratio within the readback tolerance.
 - A fresh read of the journaled native variant returns the same parent image,
