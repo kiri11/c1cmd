@@ -86,119 +86,153 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 800,
+      "maximum": 14000
     },
     {
       "name": "tint",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -50,
+      "maximum": 50
     },
     {
       "name": "exposure",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -4,
+      "maximum": 4
     },
     {
       "name": "brightness",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -50,
+      "maximum": 50
     },
     {
       "name": "contrast",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -50,
+      "maximum": 50
     },
     {
       "name": "saturation",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "color balance master hue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "color balance master saturation",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 1
     },
     {
       "name": "color balance shadow hue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "color balance shadow saturation",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 1
     },
     {
       "name": "color balance shadow lightness",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "color balance midtone hue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "color balance midtone saturation",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 1
     },
     {
       "name": "color balance midtone lightness",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "color balance highlight hue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "color balance highlight saturation",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 1
     },
     {
       "name": "color balance highlight lightness",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "black and white",
@@ -212,210 +246,270 @@
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white yellow sensitivity",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white green sensitivity",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white cyan sensitivity",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white blue sensitivity",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white magenta sensitivity",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black and white split highlight hue",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "black and white split highlight saturation",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "black and white split shadow hue",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 360
     },
     {
       "name": "black and white split shadow saturation",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "level highlight rgb",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level shadow rgb",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level highlight red",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level shadow red",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level highlight green",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level shadow green",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level highlight blue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level shadow blue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target highlight rgb",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target shadow rgb",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target highlight red",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target shadow red",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target highlight green",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target shadow green",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target highlight blue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level target shadow blue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 255
     },
     {
       "name": "level midtone rgb",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "level midtone red",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "level midtone green",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "level midtone blue",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -1,
+      "maximum": 1
     },
     {
       "name": "rgb curve",
@@ -457,35 +551,45 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "highlight adjustment",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "shadow recovery",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "white recovery",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "black recovery",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "clarity method",
@@ -504,21 +608,27 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "clarity structure",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "dehaze amount",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -100,
+      "maximum": 100
     },
     {
       "name": "dehaze color",
@@ -532,7 +642,9 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": -4,
+      "maximum": 4
     },
     {
       "name": "vignetting method",
@@ -550,56 +662,72 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 1000
     },
     {
       "name": "sharpening radius",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0.2,
+      "maximum": 2.5
     },
     {
       "name": "sharpening threshold",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 12
     },
     {
       "name": "sharpening halo suppression",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "noise reduction luminance",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "noise reduction details",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "noise reduction color",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "noise reduction single pixel",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "film grain type",
@@ -620,28 +748,36 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "film grain granularity",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "moire amount",
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "moire pattern",
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 4,
+      "maximum": 80
     }
   ],
   "lens": [
@@ -685,7 +821,9 @@
       "type": "real",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 0,
+      "maximum": 100
     },
     {
       "name": "sharpness falloff",
@@ -793,7 +931,9 @@
       "type": "integer",
       "writable": true,
       "values": [],
-      "route": "native_set"
+      "route": "native_set",
+      "minimum": 1,
+      "maximum": 100
     }
   ],
   "luma": [

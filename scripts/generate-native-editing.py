@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
-root = ET.parse(ROOT / 'sdef/16.8.5.30.sdef').getroot()
+BUILD = '16.8.5.30'
+root = ET.parse(ROOT / f'sdef/{BUILD}.sdef').getroot()
 classes = {c.attrib['name']: c for c in root.iter('class')}
 enums = {e.attrib['name']: [v.attrib['name'] for v in e.findall('enumerator')] for e in root.iter('enumeration')}
 scopes = {'adjustments': 'adjustment settings', 'lens': 'lens correction settings', 'layer': 'layer', 'luma': 'luma range settings', 'basicColor': 'basic color correction', 'advancedColor': 'advanced color correction'}
@@ -22,6 +23,15 @@ for scope, cls in scopes.items():
         if typ not in ('real', 'integer', 'boolean', 'text', 'curve', 'RGB color') and typ not in enums: raise ValueError((scope, name, typ))
         fields.append(dict(name=name, type=typ, writable=p.attrib.get('access','rw') != 'r' and name not in geometry, values=enums.get(typ, []), route='geometry_set' if name in geometry else 'native_set'))
     manifest[scope] = fields
+bounds_table = json.loads((ROOT / f'sdef/{BUILD}.native-bounds.json').read_text())
+if bounds_table['build'] != BUILD: raise SystemExit('Native bounds build differs from the sdef build: ' + bounds_table['build'])
+for scope, ranges in bounds_table['bounds'].items():
+    for name, (low, high) in ranges.items():
+        field = next((f for f in manifest.get(scope, []) if f['name'] == name), None)
+        if field is None or not field['writable'] or field['type'] not in ('real', 'integer'): raise SystemExit(f'Native bound names no writable real or integer field: {scope}.{name}')
+        if field['type'] == 'integer' and not (float(low).is_integer() and float(high).is_integer()): raise SystemExit(f'Integer native bound is not integral: {scope}.{name}')
+        if not low < high: raise SystemExit(f'Native bound is empty: {scope}.{name}')
+        field['minimum'], field['maximum'] = low, high
 # Base-characteristics and LCC switches belong to the variant rather than adjustments.
 manifest['variant'] = [dict(name=p.attrib['name'],type=p.attrib['type'],writable=True,values=enums.get(p.attrib['type'],[]),route='native_set') for p in classes['variant'].findall('property') if p.attrib['name'] in ('processing mode','LCC color cast','LCC dust removal','LCC uniform light','LCC uniform light amount')]
 out = ROOT / 'Sources/CaptureOneCore/Resources'
