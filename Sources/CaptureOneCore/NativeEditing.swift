@@ -55,6 +55,8 @@ public struct NativeField: Codable {
     public let writable: Bool
     public let values: [String]
     public let route: String
+    public let minimum: Double?
+    public let maximum: Double?
 }
 public struct NativeLayer: Codable, Equatable {
     public let nativeName: String
@@ -158,16 +160,13 @@ public enum NativeEditing {
                 }
             }
             guard valid else { throw C1Error.invalidRequest("Invalid value for native \(target.scope).\(name) (\(field.type)).") }
-            // Use demonstrated bounds where retained. Unspecified native ranges are checked by readback.
-            if case .number(let n) = value {
-                var ranges: [String: ClosedRange<Double>] = ["opacity": 1...100, "distortion": 0...100]
-                for field in FieldRegistry.shared.supportedAdjustmentFields {
-                    if let low = field.minValue, let high = field.maxValue { ranges[field.name] = low...high }
-                }
-                if let range = ranges[name], !range.contains(n) { throw C1Error.invalidRequest("Native \(name) outside \(range).") }
+            // Capture One's own range errors misreport some limits, so measured bounds are checked first.
+            if case .number(let n) = value, let low = field.minimum, let high = field.maximum, !(low...high).contains(n) {
+                throw C1Error.invalidRequest("Native \(name) must be within \(format(low))...\(format(high)).")
             }
         }
     }
+    private static func format(_ n: Double) -> String { n.rounded() == n ? String(Int(n)) : String(n) }
     static func hash<T: Encodable>(_ value: T) throws -> String {
         let e = JSONEncoder(); e.outputFormatting = [.sortedKeys]
         return SHA256.hash(data: try e.encode(value)).map { String(format: "%02x", $0) }.joined()
@@ -293,8 +292,9 @@ extension NativeEditing {
         for field in fields.values.flatMap({ $0 }) where field.writable {
             var schema: [String:Any]
             switch field.type {
-            case "real": schema = ["type":"number"]
-            case "integer": schema = ["type":"integer"]
+            case "real", "integer":
+                schema = ["type": field.type == "real" ? "number" : "integer"]
+                if let low = field.minimum, let high = field.maximum { schema["minimum"] = low; schema["maximum"] = high }
             case "boolean": schema = ["type":"boolean"]
             case "curve": schema = ["type":"array", "items":["type":"number", "minimum":0, "maximum":100], "minItems":4, "maxItems":128, "description":"Flat x,y point pairs, ordered by strictly increasing x, in 0...100."]
             case "RGB color": schema = ["type":"array", "items":["type":"integer", "minimum":0, "maximum":65535], "minItems":3, "maxItems":3]

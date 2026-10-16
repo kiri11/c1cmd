@@ -124,6 +124,69 @@ struct NativeEditingTests {
         }
         peopleRefusals()
         peopleSuccess()
+        bounds()
+        outOfRangeSetDispatchesNothing()
+    }
+
+    static func invalidRequestMessage(_ block: () throws -> Void) -> String? {
+        do { try block() } catch C1Error.invalidRequest(let message) { return message } catch { return "unexpected \(error)" }
+        return nil
+    }
+
+    static func bounds() {
+        let layer = NativeTarget(scope:"layer", layer:1), lens = NativeTarget(scope:"lens"), image = NativeTarget()
+        for (target, name, low, high, below, above, range) in [
+            (image, "exposure", -4.0, 4.0, -4.01, 4.01, "-4...4"),
+            (image, "sharpening radius", 0.2, 2.5, 0.19, 2.51, "0.2...2.5"),
+            (image, "moire pattern", 4, 80, 3, 81, "4...80"),
+            (image, "level highlight rgb", 0, 255, -1, 256, "0...255"),
+            (image, "color balance master hue", 0, 360, -1, 361, "0...360"),
+            (layer, "opacity", 1, 100, 0, 101, "1...100"),
+            (lens, "distortion", 0, 100, -1, 101, "0...100"),
+        ] {
+            for accepted in [low, high] {
+                XCTAssertNil(invalidRequestMessage { try NativeEditing.validate([name:.number(accepted)], target:target) }, "\(name) \(accepted) is within bounds")
+            }
+            for rejected in [below, above] {
+                XCTAssertEqual(invalidRequestMessage { try NativeEditing.validate([name:.number(rejected)], target:target) }, "Native \(name) must be within \(range).")
+            }
+        }
+        let native = Dictionary(uniqueKeysWithValues: NativeEditing.fields["adjustments"]!.map { ($0.name, $0) })
+        for spec in FieldRegistry.shared.supportedAdjustmentFields where spec.minValue != nil || spec.maxValue != nil {
+            XCTAssertEqual(native[spec.name]?.minimum, spec.minValue, "\(spec.name) minimum agrees with the tonal registry")
+            XCTAssertEqual(native[spec.name]?.maximum, spec.maxValue, "\(spec.name) maximum agrees with the tonal registry")
+        }
+        let properties = NativeEditing.patchSchema["properties"] as! [String:[String:Any]]
+        let bounded = NativeEditing.fields.values.flatMap { $0 }.filter { $0.minimum != nil }
+        XCTAssertEqual(bounded.count, 70)
+        for field in bounded {
+            XCTAssertEqual(properties[field.name]?["minimum"] as? Double, field.minimum, "\(field.name) schema minimum")
+            XCTAssertEqual(properties[field.name]?["maximum"] as? Double, field.maximum, "\(field.name) schema maximum")
+        }
+        // Capture One clamps an over-range hue to 360 without an error, so the readback must catch it.
+        XCTAssertFalse(NativeEditing.matchesReadback(field:"color balance master hue", expected:.number(361), actual:.number(360)))
+        // Tint is stored as float32.
+        XCTAssertTrue(NativeEditing.matchesReadback(field:"tint", expected:.number(5.297744), actual:.number(5.297754)))
+    }
+
+    static func outOfRangeSetDispatchesNothing() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at:directory, withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:directory) }
+        let fake = FakeScript(directory:directory), bridge = NativeFake(fake)
+        let core = SessionController(lock: testLock, executor:bridge, appInstance:{ fake.generation }, databaseIdentity:{ _ in "db" })
+        let journal = OperationJournal(sessionDirectory:directory)
+        XCTAssertNoThrowBlock {
+            let doc = try core.getDocumentInfo(), source = try core.get(ref:"1")
+            let ref = try core.editVariant(sourceRef:"1", ifState:source.stateHash, ifDocument:doc.openToken).workingRef
+            let before = try core.get(ref:ref, nativeTargets:[NativeTarget()]).nativeSnapshots![0]
+            let entries = journal.loadEntries().count
+            bridge.calls.removeAll()
+            let message = invalidRequestMessage { _ = try core.nativeSet(workingRef:ref, target:NativeTarget(), ifNativeState:before.nativeStateHash, patch:["level highlight rgb":.number(256)]) }
+            XCTAssertEqual(message, "Native level highlight rgb must be within 0...255.")
+            XCTAssertEqual(bridge.calls, [], "Nothing is read or dispatched")
+            XCTAssertEqual(journal.loadEntries().count, entries, "Nothing is journaled")
+        }
     }
 
     /// A successful people mask keeps existing layers and appends one mask layer,
