@@ -522,4 +522,5 @@ remain. An unknown value, or two names that disagree, rejects every request.
 | `no-people-detected` | A people mask found nobody and readback confirmed no change; the operation failed and blocks nothing. |
 | `dependency-missing` | An optional local tool, such as exiftool for `exif` and `thumb`, is not installed or cannot start. Nothing was changed. |
 | `capture-one-busy` | The advisory lock timed out; check for hung processes. |
-| `permission-denied` | Allow the host app under **Privacy & Security → Automation**. |
+| `permission-denied` | Automation permission was denied (-1743). Allow the host app under **Privacy & Security → Automation**. An unanswered consent dialog does not give this code; it blocks until `timeout`. |
+| `timeout` | An Apple Event got no answer in time (-1712). macOS may be waiting for the photographer to answer the Automation consent dialog, which can be hidden behind other windows. Capture One may also show a modal dialog or be busy. After a write, follow [recovery](#recovery-commands); never repeat the write. |

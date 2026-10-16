@@ -17,8 +17,11 @@ Configure the MCP client to launch the server over stdio, with an absolute path:
 
 The host application needs macOS Automation permission for Capture One; on
 `permission-denied`, ask the photographer to allow it under **System Settings →
-Privacy & Security → Automation**. Settings are environment variables of the CLI
-process or the MCP server's `env`, and the server must restart to see changes:
+Privacy & Security → Automation**. The first connection from a new host application
+can hang until a `timeout` (-1712) while macOS waits for the photographer to answer
+the Automation consent dialog, which can be hidden behind other windows. Settings
+are environment variables of the CLI process or the MCP server's `env`, and the
+server must restart to see changes:
 
 | Variable | Effect |
 |---|---|
