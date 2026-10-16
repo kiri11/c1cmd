@@ -223,3 +223,7 @@ written. Hue readback uses circular distance, so 0 and 360 degrees are equivalen
 with a tolerance of 0.0001 degrees. At zero or very low saturation, some hue
 values cannot be represented within that tolerance; a readback mismatch follows
 the normal partial-failure and recovery rules.
+
+Restoring a wheel to 0 / 0 reads back as hue 360 and a saturation residue of
+about 3e-05, so the restored `nativeStateHash` differs from the baseline token.
+Check a restore by comparing values, not tokens.
