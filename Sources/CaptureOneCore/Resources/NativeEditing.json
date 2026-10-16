@@ -823,7 +823,7 @@
       "values": [],
       "route": "native_set",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 120
     },
     {
       "name": "sharpness falloff",
@@ -932,7 +932,7 @@
       "writable": true,
       "values": [],
       "route": "native_set",
-      "minimum": 1,
+      "minimum": 0,
       "maximum": 100
     }
   ],

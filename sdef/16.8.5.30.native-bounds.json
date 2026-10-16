@@ -1,6 +1,6 @@
 {
   "build": "16.8.5.30",
-  "source": "Bisected by byjustinjones/capture-one-mcp at cfb4e42, docs/adjustment-round-trip.json (MIT), rounded to the intended limits; confirmed at each bound and just past it by scripts/probe-native-bounds.py.",
+  "source": "Adjustment bounds bisected by byjustinjones/capture-one-mcp at cfb4e42, docs/adjustment-round-trip.json (MIT), rounded to the intended limits; layer opacity and lens distortion measured live. All confirmed at each bound and just past it by scripts/probe-native-bounds.py.",
   "bounds": {
     "adjustments": {
       "black and white blue sensitivity": [
@@ -278,14 +278,14 @@
     },
     "layer": {
       "opacity": [
-        1,
+        0,
         100
       ]
     },
     "lens": {
       "distortion": [
         0,
-        100
+        120
       ]
     }
   }

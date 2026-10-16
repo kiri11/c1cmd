@@ -141,8 +141,8 @@ struct NativeEditingTests {
             (image, "moire pattern", 4, 80, 3, 81, "4...80"),
             (image, "level highlight rgb", 0, 255, -1, 256, "0...255"),
             (image, "color balance master hue", 0, 360, -1, 361, "0...360"),
-            (layer, "opacity", 1, 100, 0, 101, "1...100"),
-            (lens, "distortion", 0, 100, -1, 101, "0...100"),
+            (layer, "opacity", 0, 100, -1, 101, "0...100"),
+            (lens, "distortion", 0, 120, -1, 120.01, "0...120"),
         ] {
             for accepted in [low, high] {
                 XCTAssertNil(invalidRequestMessage { try NativeEditing.validate([name:.number(accepted)], target:target) }, "\(name) \(accepted) is within bounds")
