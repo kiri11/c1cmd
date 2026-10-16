@@ -59,6 +59,7 @@ struct ProbeBarrierTests {
         XCTAssertNoThrowBlock("restart") { try restartReconciles() }
         XCTAssertNoThrowBlock("barrier timeout") { try barrierTimeoutLeavesBlock() }
         XCTAssertNoThrowBlock("clone") { try cloneObservedNotAdopted() }
+        XCTAssertNoThrowBlock("consent timeout") { try consentTimeoutHint() }
     }
 
     static func coverageTable() {
@@ -186,6 +187,38 @@ struct ProbeBarrierTests {
         f.fake.fail = nil
         XCTAssertEqual(f.journal.find(operationId: operationId)?.status, "outcome-unknown")
         f.assertStillBlocked(operationId, records: records, "barrier timeout")
+    }
+
+    /// A -1712 write timeout names the hidden consent dialog and never suggests a retry.
+    static func consentTimeoutHint() throws {
+        let f = try Fixture()
+        let consent = AppleScriptExecutor.error("AppleEvent timed out.", number: -1712)
+        f.fake.failWith = consent
+        let current = try f.core.get(ref: f.editRef)
+        f.fake.fail = "applyAdjustments"
+        var failure: OperationFailure?
+        do {
+            _ = try f.core.mutate(workingRefString: f.editRef, ifState: current.stateHash,
+                                  setAdjustments: Adjustments(exposure: 2), addAdjustments: nil)
+        } catch let error as OperationFailure { failure = error }
+        guard let failure else { throw C1Error.invalidRequest("Expected an injected timeout") }
+        let write = failure.description
+        XCTAssertTrue(write.contains(AppleScriptExecutor.timeoutHint), write)
+        XCTAssertTrue(write.hasSuffix("Inspect operation status; do not retry the write."), write)
+        XCTAssertFalse(write.replacingOccurrences(of: "do not retry", with: "").lowercased().contains("retry"), write)
+
+        XCTAssertThrowsError(try f.journal.assertReady()) {
+            let blocked = String(describing: $0)
+            XCTAssertTrue(blocked.contains("it reconciles this write once Capture One answers, without a restart."), blocked)
+            XCTAssertTrue(blocked.contains(AppleScriptExecutor.timeoutHint), blocked)
+            XCTAssertFalse(blocked.replacingOccurrences(of: "do not retry", with: "").lowercased().contains("retry"), blocked)
+        }
+
+        // The dialog is still unanswered when operation status asks.
+        f.fake.fail = "getAppAndDocInfo"
+        XCTAssertThrowsError(try f.core.operationStatus(operationId: failure.operationId)) {
+            XCTAssertTrue(String(describing: $0).contains(AppleScriptExecutor.timeoutHint), "\($0)")
+        }
     }
 
     static func cloneObservedNotAdopted() throws {

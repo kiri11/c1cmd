@@ -179,6 +179,9 @@ public final class AppleScriptExecutor: ScriptExecuting {
         }
     }
 
+    /// Names the causes of a -1712 timeout that the caller cannot see.
+    public static let timeoutHint = "macOS may be waiting for the photographer to answer an Automation dialog that asks to let this app control Capture One; the dialog can be hidden behind other windows. Also check whether Capture One shows a modal dialog or is busy."
+
     /// The typed error for a handler's AppleScript error number; -27001...-27004 are raised by the handlers.
     public static func error(_ msg: String, number: Int?) -> C1Error {
         switch number {
@@ -187,7 +190,7 @@ public final class AppleScriptExecutor: ScriptExecuting {
         case -27003: return .identityAmbiguous(msg)
         case -27004:
             return .variantNotFound("\(msg) Capture One resolves a variant only through a collection that holds it; make such a collection current and retry.")
-        case -1712: return .timeout("Capture One Apple Event timed out (-1712): \(msg)")
+        case -1712: return .timeout("Capture One Apple Event timed out (-1712): \(msg) \(timeoutHint)")
         case -1743, -1744: return .permissionDenied("Automation permission denied (-1743): \(msg)")
         case -600, -609: return .appNotRunning("Capture One is not running (\(number!)): \(msg)")
         default: return .scriptError(msg, code: number)

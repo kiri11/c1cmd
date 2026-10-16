@@ -162,7 +162,8 @@ public final class OperationJournal {
                 : Self.barrierCovers(entry)
                 ? "Inspect operation status; it reconciles this write once Capture One answers, without a restart."
                 : "Restart Capture One to end in-flight work, then inspect operation status."
-            throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. " + action))
+            let hint = entry.error?.contains("(-1712)") == true ? " " + AppleScriptExecutor.timeoutHint : ""
+            throw OperationFailure(operationId: entry.operationId, cause: C1Error.outcomeUnknown("An unresolved operation blocks further writes. " + action + hint))
         }
     }
 

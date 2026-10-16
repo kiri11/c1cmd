@@ -130,6 +130,13 @@ struct VariantRouteTests {
         // A people mask's -1728 is a native refusal, not a missing variant.
         XCTAssertEqual(AppleScriptExecutor.error("Can't get people mask.", number: -1728), .scriptError("Can't get people mask.", code: -1728))
         XCTAssertEqual(AppleScriptExecutor.error("x", number: -27003).errorCode, "identity-ambiguous")
+        let timeout = AppleScriptExecutor.error("AppleEvent timed out.", number: -1712)
+        XCTAssertEqual(timeout.errorCode, "timeout")
+        XCTAssertTrue(timeout.description.contains("(-1712)"), timeout.description)
+        XCTAssertTrue(timeout.description.contains("Automation dialog"), "Names the consent dialog: \(timeout.description)")
+        XCTAssertTrue(timeout.description.contains("modal dialog or is busy"), timeout.description)
+        XCTAssertFalse(timeout.description.lowercased().contains("retry"), timeout.description)
+        XCTAssertFalse(AppleScriptExecutor.error("x", number: -1743).description.contains("Automation dialog"), "A denial is not a pending dialog")
     }
 
     /// The stored root names All Images by ID; the name is localized and its kind is shared with Trash.

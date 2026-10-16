@@ -21,6 +21,7 @@ final class FakeScript: ScriptExecuting {
     /// Each handler call's document argument, in call order.
     var documentArguments: [(handler: String, document: NSAppleEventDescriptor)] = []
     var fail: String?
+    var failWith = C1Error.timeout("injected late reply")
     var mutatePatch: [Bool] = []
     var parentOverride: String?
     var parents: [String: String] = [:]
@@ -104,7 +105,7 @@ final class FakeScript: ScriptExecuting {
         if Self.mutationHandlers.union(["ensurePreviewRecipe", "processPreview"]).contains(handler) {
             preparedBeforeDispatch = preparedBeforeDispatch && OperationJournal(sessionDirectory: directory).unresolvedEntries().contains { $0.status == "pending" }
         }
-        if fail == handler { throw C1Error.timeout("injected late reply") }
+        if fail == handler { throw failWith }
         if Self.mutationHandlers.contains(handler) { beforeApply?() }
     }
     func executeAndDecode<T: Decodable>(handler: String, args: [NSAppleEventDescriptor]) throws -> T {

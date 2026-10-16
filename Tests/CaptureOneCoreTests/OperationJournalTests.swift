@@ -43,6 +43,29 @@ struct OperationJournalTests {
         XCTAssertTrue(unresolved.contains { $0.operationId == "op-3" })
 
         incrementalReads()
+        consentTimeoutHint()
+    }
+
+    /// The hint follows the recorded -1712 code, so entries written before the hint existed qualify too.
+    private static func consentTimeoutHint() {
+        let older = "timeout: Capture One Apple Event timed out (-1712): AppleEvent timed out."
+        func blocked(_ entry: OperationRecord) -> String {
+            var message = ""
+            withJournal { journal in
+                try journal.append(entry: entry)
+                XCTAssertThrowsError(try journal.assertReady()) { message = String(describing: $0) }
+            }
+            return message
+        }
+        let covered = blocked(record("covered", "outcome-unknown", error: older))
+        XCTAssertTrue(covered.contains("Inspect operation status; it reconciles this write once Capture One answers, without a restart. " + AppleScriptExecutor.timeoutHint), covered)
+        XCTAssertFalse(covered.contains("Restart"), "A covered write needs no restart: \(covered)")
+        let previewMessage = blocked(OperationRecord(operationId: "preview", operationType: "preview", workingRef: nil,
+                                                     documentPath: "/tmp/doc", status: "outcome-unknown", error: older))
+        XCTAssertTrue(previewMessage.contains("otherwise restart Capture One first. " + AppleScriptExecutor.timeoutHint), previewMessage)
+        let other = blocked(record("other", "outcome-unknown", error: "timeout: injected late reply"))
+        XCTAssertTrue(other.contains("without a restart."), other)
+        XCTAssertFalse(other.contains(AppleScriptExecutor.timeoutHint), "Only a -1712 entry gets the hint: \(other)")
     }
 
     private static func record(_ id: String, _ status: String, error: String? = nil) -> OperationRecord {

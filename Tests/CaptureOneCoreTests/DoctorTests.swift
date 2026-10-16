@@ -54,6 +54,11 @@ struct DoctorTests {
             XCTAssertEqual(failed.diagnosticError, .timeout("injected late reply"))
             XCTAssertNil(failed.unresolvedOperationsCount)
             XCTAssertFalse(failed.allChecksPassed)
+            fake.failWith = AppleScriptExecutor.error("AppleEvent timed out.", number: -1712)
+            let consent = try core.doctor()
+            XCTAssertEqual(consent.diagnosticError?.errorCode, "timeout")
+            XCTAssertTrue(consent.diagnosticError?.description.contains(AppleScriptExecutor.timeoutHint) ?? false, "\(String(describing: consent.diagnosticError))")
+            fake.failWith = .timeout("injected late reply")
             fake.fail = nil
             let journalDir = directory.appendingPathComponent(".c1")
             try FileManager.default.createDirectory(at: journalDir, withIntermediateDirectories: true)
