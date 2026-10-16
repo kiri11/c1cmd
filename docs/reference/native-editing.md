@@ -132,12 +132,12 @@ and `capabilities.nativeEditing` report each one as `minimum` and `maximum`.
 | -1...1 | `color balance highlight lightness`, `color balance midtone lightness`, `color balance shadow lightness`, `level midtone blue`, `level midtone green`, `level midtone red`, `level midtone rgb` |
 | 0...1 | `color balance highlight saturation`, `color balance master saturation`, `color balance midtone saturation`, `color balance shadow saturation` |
 | 0...12 | `sharpening threshold` |
-| 0...100 | `black and white split highlight saturation`, `black and white split shadow saturation`, `distortion` (lens scope), `film grain granularity`, `film grain impact`, `moire amount`, `noise reduction color`, `noise reduction details`, `noise reduction luminance`, `noise reduction single pixel`, `sharpening halo suppression` |
+| 0...100 | `black and white split highlight saturation`, `black and white split shadow saturation`, `film grain granularity`, `film grain impact`, `moire amount`, `noise reduction color`, `noise reduction details`, `noise reduction luminance`, `noise reduction single pixel`, `opacity` (layer scope), `sharpening halo suppression` |
+| 0...120 | `distortion` (lens scope) |
 | 0...255 | `level highlight blue`, `level highlight green`, `level highlight red`, `level highlight rgb`, `level shadow blue`, `level shadow green`, `level shadow red`, `level shadow rgb`, `level target highlight blue`, `level target highlight green`, `level target highlight red`, `level target highlight rgb`, `level target shadow blue`, `level target shadow green`, `level target shadow red`, `level target shadow rgb` |
 | 0...360 | `black and white split highlight hue`, `black and white split shadow hue`, `color balance highlight hue`, `color balance master hue`, `color balance midtone hue`, `color balance shadow hue` |
 | 0...1000 | `sharpening amount` |
 | 0.2...2.5 | `sharpening radius` |
-| 1...100 | `opacity` (layer scope) |
 | 4...80 | `moire pattern` |
 | 800...14000 | `temperature` |
 
