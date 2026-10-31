@@ -24,7 +24,7 @@ ALWAYS_REPORTED = {
         "dehaze color", "sharpening amount", "sharpening radius", "sharpening threshold",
         "noise reduction luminance", "noise reduction details", "noise reduction color",
     ],
-    "lensCorrection": ["lens profile", "aperture", "focal length"],
+    "lensCorrection": ["lens profile", "aperture", "focal length", "chromatic aberration", "shift"],
     "layer": ["name", "kind"],
 }
 

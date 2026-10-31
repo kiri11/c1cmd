@@ -59,7 +59,7 @@ public final class Database {
     static let requiredSchema: [String: [String]] = [
         "ZDOCUMENTCONTENT": ["ZDOCUMENTTYPE", "ZROOTCOLLECTION"],
         "ZVARIANT": ["Z_PK", "ZIMAGE", "ZDEFAULTLAYER", "ZCOMBINEDSETTINGS"],
-        "ZIMAGE": ["Z_PK", "ZDISPLAYNAME", "ZIMAGEFILENAME", "ZIMAGELOCATION", "ZISINSIDECATALOG"],
+        "ZIMAGE": ["Z_PK", "ZDISPLAYNAME", "ZIMAGEFILENAME", "ZIMAGELOCATION", "ZISINSIDECATALOG", "ZISTRASHED"],
         "ZPATHLOCATION": ["Z_PK", "ZMACROOT", "ZRELATIVEPATH", "ZISRELATIVE"],
         "ZVARIANTLAYER": ["Z_PK", "ZMETADATA"],
         "ZVARIANTMETADATA": ["Z_PK", "ZBASIC_RATING", "ZCOLOR_TAG_INDEX"],
@@ -163,7 +163,7 @@ public final class Database {
 
     public func list(_ query: ListQuery) throws -> (rows: [VariantRow], next: VariantID?) {
         try query.validate()
-        var predicates: [String] = []
+        var predicates = ["trashed=0"]
         if let rating = query.rating { predicates.append("rating=\(rating)") }
         if let minRating = query.minRating { predicates.append("rating>=\(minRating)") }
         if let colorTag = query.colorTag { predicates.append("colorTag=\(colorTag)") }
@@ -182,7 +182,7 @@ public final class Database {
         let rows = try sql.rows("""
             SELECT * FROM (
                 SELECT v.Z_PK AS id, i.ZDISPLAYNAME AS name, i.ZIMAGEFILENAME AS filename, i.ZIMAGELOCATION AS location,
-                       i.ZISINSIDECATALOG AS inside, p.ZMACROOT AS root, p.ZRELATIVEPATH AS relative, p.ZISRELATIVE AS isRelative,
+                       i.ZISINSIDECATALOG AS inside, COALESCE(i.ZISTRASHED,0) AS trashed, p.ZMACROOT AS root, p.ZRELATIVEPATH AS relative, p.ZISRELATIVE AS isRelative,
                        COALESCE(m.ZBASIC_RATING,0) AS rating, COALESCE(m.ZCOLOR_TAG_INDEX,0) AS colorTag,
                        CASE WHEN d.Z_PK IS NULL OR l.Z_PK IS NULL THEN NULL WHEN \(differs.isEmpty ? "0" : differs) THEN 1 ELSE 0 END AS edited
                 FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
@@ -190,7 +190,7 @@ public final class Database {
                 LEFT JOIN ZVARIANTLAYER l ON l.Z_PK=v.ZCOMBINEDSETTINGS
                 LEFT JOIN ZVARIANTLAYER d ON d.Z_PK=v.ZDEFAULTLAYER
                 LEFT JOIN ZVARIANTMETADATA m ON m.Z_PK=l.ZMETADATA)
-            \(predicates.isEmpty ? "" : "WHERE " + predicates.joined(separator: " AND "))
+            WHERE \(predicates.joined(separator: " AND "))
             ORDER BY id LIMIT \(limit + 1)
             """)
         let folders = try folderByLocation()
@@ -284,11 +284,11 @@ public final class Database {
     public func collections() throws -> [CollectionRow] {
         let all = try collectionRows()
         var albumCounts: [Int64: Int] = [:]
-        for row in try sql.rows("SELECT ZCOLLECTION AS id, COUNT(*) AS n FROM ZVARIANTINCOLLECTION GROUP BY ZCOLLECTION") {
+        for row in try sql.rows("SELECT vc.ZCOLLECTION AS id, COUNT(*) AS n FROM ZVARIANTINCOLLECTION vc JOIN ZVARIANT v ON v.Z_PK=vc.ZVARIANT JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
             if let id = row["id"]?.int { albumCounts[id] = Int(row["n"]?.int ?? 0) }
         }
         var locationCounts: [Int64: Int] = [:]
-        for row in try sql.rows("SELECT i.ZIMAGELOCATION AS location, COUNT(*) AS n FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE GROUP BY 1") {
+        for row in try sql.rows("SELECT i.ZIMAGELOCATION AS location, COUNT(*) AS n FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
             if let location = row["location"]?.int { locationCounts[location] = Int(row["n"]?.int ?? 0) }
         }
         let total = locationCounts.values.reduce(0, +)
