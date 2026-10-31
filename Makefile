@@ -34,6 +34,12 @@ build:
 build-debug:
 	swift build
 
+# v2 read core (temporary until the cutover): build it and run its offline tests.
+.PHONY: check-v2
+check-v2:
+	swift build --product c1next
+	swift run C1KitTests
+
 # Validation targets: check (offline), qualify (live suites), qualify-recovery (live faults).
 # Fast development feedback: build once, then run all offline assertions.
 .PHONY: check check-built-core qualify qualify-recovery

@@ -2,6 +2,7 @@ import Foundation
 
 TerminologyTests.run()
 DatabaseTests.run()
+ServiceTests.run()
 QueueTests.run()
 
 try? FileManager.default.removeItem(at: FileManager.default.temporaryDirectory.appendingPathComponent("c1kit-tests-\(getpid())"))

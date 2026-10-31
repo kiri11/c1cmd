@@ -18,6 +18,10 @@ let package = Package(
         .executable(
             name: "c1-mcp",
             targets: ["c1-mcp"]
+        ),
+        .executable(
+            name: "c1next",
+            targets: ["c1next"]
         )
     ],
     dependencies: [
@@ -69,7 +73,12 @@ let package = Package(
         ),
         .target(
             name: "C1Kit",
-            dependencies: ["CSQLite"]
+            dependencies: ["CSQLite"],
+            resources: [.copy("Resources/Defaults.json")]
+        ),
+        .executableTarget(
+            name: "c1next",
+            dependencies: ["C1Kit"]
         ),
         .executableTarget(
             name: "C1KitTests",
