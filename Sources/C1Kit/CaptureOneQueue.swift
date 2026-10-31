@@ -9,7 +9,7 @@ import Foundation
 /// other as separate processes do.
 public final class CaptureOneQueue {
     public let directory: URL
-    /// Callers in the queue at once, including the one running.
+    /// Callers in the queue at once, including the one running: 8 waiting plus 1.
     public let capacity: Int
     public let maxWait: TimeInterval
     let pollInterval: TimeInterval
@@ -18,7 +18,7 @@ public final class CaptureOneQueue {
         URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("c1-queue")
     }
 
-    public init(directory: URL = defaultDirectory, capacity: Int = 8, maxWait: TimeInterval = 600, pollInterval: TimeInterval = 0.02) {
+    public init(directory: URL = defaultDirectory, capacity: Int = 9, maxWait: TimeInterval = 600, pollInterval: TimeInterval = 0.02) {
         self.directory = directory; self.capacity = capacity; self.maxWait = maxWait; self.pollInterval = pollInterval
     }
 

@@ -100,7 +100,5 @@ enum TerminologyTests {
     }
 
     static func specifiers() {
-        checkEqual(AppleScriptCaptureOne.specifierID(reference()), "42", "a selected variant's id comes from its specifier")
-        checkEqual(AppleScriptCaptureOne.specifierID(NSAppleEventDescriptor(string: "42")), nil)
     }
 }

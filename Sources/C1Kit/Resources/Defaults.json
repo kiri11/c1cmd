@@ -22,7 +22,9 @@
     "lensCorrection": [
       "lens profile",
       "aperture",
-      "focal length"
+      "focal length",
+      "chromatic aberration",
+      "shift"
     ],
     "variant": [
       "id",
@@ -124,14 +126,12 @@
       "opacity": 100
     },
     "lensCorrection": {
-      "chromatic aberration": true,
       "custom chromatic aberration": false,
       "diffraction correction": false,
       "distortion": 0,
       "hide distorted areas": true,
       "light falloff": 0,
       "sharpness falloff": 0,
-      "shift": 0,
       "shift direction": 0,
       "shift x": 0,
       "shift y": 0,

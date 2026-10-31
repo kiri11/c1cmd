@@ -41,18 +41,15 @@ public final class AppleScriptCaptureOne: CaptureOne {
     }
 
     public func selection() throws -> [VariantID] {
-        // Capture One answers with `variant id "N" of …` specifiers, so the ids come from the
-        // specifiers themselves instead of one more event per variant.
         let result = try run("""
             tell application "Capture One"
             \twith timeout of \(timeoutSeconds) seconds
-            \t\treturn selected variants
+            \t\treturn id of every variant of current document whose selected is true
             \tend timeout
             end tell
             """)
-        let items = fourCC(result.descriptorType) == "obj " ? [result] : list(result)
-        return try items.map { item in
-            guard let id = Self.specifierID(item).flatMap(VariantID.init) else {
+        return try list(result).map { item in
+            guard let id = item.stringValue.flatMap(VariantID.init) else {
                 throw C1Failure(.scriptError, "Capture One returned a selected variant without an id: \(item).")
             }
             return id
@@ -151,13 +148,6 @@ public final class AppleScriptCaptureOne: CaptureOne {
         }
         guard let adjustments else { return .failed("Capture One returned no Image (background) layer.") }
         return .state(VariantState(id: id, variant: variant, adjustments: adjustments, lensCorrection: lens, layers: layers))
-    }
-
-    public static func specifierID(_ descriptor: NSAppleEventDescriptor) -> String? {
-        guard fourCC(descriptor.descriptorType) == "obj ",
-              let form = descriptor.forKeyword(fourCharCode("form")), fourCC(form.enumCodeValue) == "ID  ",
-              let key = descriptor.forKeyword(fourCharCode("seld")) else { return nil }
-        return key.stringValue
     }
 
     private func list(_ descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {
