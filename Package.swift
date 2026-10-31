@@ -66,6 +66,15 @@ let package = Package(
                 "CaptureOneCore"
             ],
             path: "Tests/CaptureOneCoreTests"
+        ),
+        .target(
+            name: "C1Kit",
+            dependencies: ["CSQLite"]
+        ),
+        .executableTarget(
+            name: "C1KitTests",
+            dependencies: ["C1Kit"],
+            path: "Tests/C1KitTests"
         )
     ]
 )
