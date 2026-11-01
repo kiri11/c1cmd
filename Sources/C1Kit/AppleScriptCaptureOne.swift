@@ -106,6 +106,58 @@ public final class AppleScriptCaptureOne: CaptureOne {
         return output
     }
 
+    public func export(_ request: ExportRequest, in document: LiveDocument) throws -> Bool {
+        let result = list(try run(Self.exportScript(request, document: document, timeoutSeconds: timeoutSeconds)))
+        guard result.count == 3 else { throw C1Failure(.scriptError, "Unexpected export result from Capture One.") }
+        guard result[0].booleanValue else {
+            throw C1Failure(.notFound, "Capture One has no variant \(request.target.id) in this document.")
+        }
+        // `process` answers with a job id, or with an error message that starts with ERROR.
+        if let job = result[1].stringValue, job.hasPrefix("ERROR") {
+            throw C1Failure(.scriptError, "Capture One refused the export: \(job)")
+        }
+        return result[2].booleanValue
+    }
+
+    /// Sets every recipe field c1 relies on each time, so a photographer's change to the recipe cannot leak in.
+    public static func exportScript(_ request: ExportRequest, document: LiveDocument, timeoutSeconds: Int) -> String {
+        let notFound = "{\(notFoundErrors.sorted().map(String.init).joined(separator: ", "))}"
+        let id = request.target.id
+        let recipe = quote(ExportRequest.recipe)
+        var lines = ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
+                     "set d to current document",
+                     "if (id of d as text) is not \(quote(document.id)) then error \(quote("The open document is no longer \(document.name).")) number \(documentChangedError)",
+                     "set v to missing value"]
+        switch request.target.route {
+        case .collection(let collection), .allImages(let collection):
+            lines += ["try", "set v to (variant id \"\(id)\" of collection id \"\(collection)\" of d)",
+                      "on error e number n", "if n is not in \(notFound) then error e number n", "end try"]
+        case .favoritesScan:
+            lines += ["repeat with c in (every collection of d whose kind is favorite)", "try",
+                      "set v to (variant id \"\(id)\" of (contents of c))", "exit repeat",
+                      "on error e number n", "if n is not in \(notFound) then error e number n", "end try", "end repeat"]
+        }
+        let folder = request.file.deletingLastPathComponent().path
+        let name = request.file.deletingPathExtension().lastPathComponent
+        // Measured on 16.8.5.30: a Catalog refuses any export (-43, "Invalid process output folder") while its own
+        // output folder is unset or missing, even through a recipe with a custom location.
+        lines += ["if v is missing value then return {false, \"\", false}", "set outputSet to false",
+                  "if kind of d is catalog then", "try", "get (output of d) as alias", "on error",
+                  "set output of d to POSIX file \(quote(folder))", "set outputSet to true", "end try", "end if",
+                  "if exists recipe \(recipe) of d then", "set r to recipe \(recipe) of d", "else",
+                  "set r to make new recipe at d with properties {name:\(recipe)}", "end if",
+                  "tell r", "set enabled to false", "set output format to JPEG", "set JPEG quality to 90",
+                  "set color profile to \"sRGB Color Space Profile\"", "set scaling method to Long_Edge", "set scaling unit to pixels",
+                  "set primary scaling value to \(request.longEdge)", "set upscale to true",
+                  "set root folder type to custom location", "set root folder location to POSIX file \(quote(folder))",
+                  "set output sub folder to \"\"", "set output name format to \(quote(name))", "set existing files to add suffix",
+                  // Measured on 16.8.5.30: `ignore crop` changes nothing; `export crop method: ignore` renders the default crop.
+                  "set ignore crop to false", "set export crop method to \(request.fullFrame ? "ignore" : "respect")",
+                  "end tell",
+                  "return {true, process v recipe \(recipe), outputSet}", "end timeout", "end tell"]
+        return lines.joined(separator: "\n")
+    }
+
     /// Each step runs in its own `try`, so one refused value does not stop the rest; errors that end
     /// the call (timeout, permission, Capture One quitting) still propagate.
     public static func writeScript(_ writes: [VariantWrite], document: LiveDocument, timeoutSeconds: Int) -> String {

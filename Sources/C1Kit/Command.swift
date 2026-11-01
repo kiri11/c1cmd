@@ -2,7 +2,8 @@ import Foundation
 
 /// Every command, declared once. Step 4 generates the CLI, MCP tools and reference from this table.
 public enum Command: String, CaseIterable {
-    case doctor, list, collections, get, selection, set, action, revert
+    case doctor, list, collections, get, selection, set, action, revert, preview
+    case cropPreview = "crop_preview"
 
     public var summary: String {
         switch self {
@@ -14,6 +15,8 @@ public enum Command: String, CaseIterable {
         case .collections: return "List collections with kind, parent and variant count."
         case .get: return "Read live settings, geometry and layers of 1–100 variants."
         case .selection: return "Read the ids of the variants selected in Capture One."
+        case .preview: return "Export a JPEG of one variant: the crop at a long edge, the full frame with a pixel mapping, or a region at a scale."
+        case .cropPreview: return "Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written."
         }
     }
 
@@ -26,6 +29,8 @@ public enum Command: String, CaseIterable {
         case .set: return ["ids", "variant", "adjustments", "lensCorrection", "layers"]
         case .action: return ["ids", "action", "arguments"]
         case .revert: return ["ids", "scope"]
+        case .preview: return ["id", "size", "fullFrame", "region", "scale", "timeout"]
+        case .cropPreview: return ["id", "candidates", "size", "timeout"]
         }
     }
 
@@ -59,6 +64,10 @@ public enum Command: String, CaseIterable {
         case .revert:
             let arguments = try decode(RevertArguments.self, json)
             return try service.revert(ids: arguments.ids, scope: arguments.scope ?? .all)
+        case .preview:
+            return try service.preview(try decode(PreviewArguments.self, json))
+        case .cropPreview:
+            return try service.cropPreview(try decode(CropPreviewArguments.self, json))
         }
     }
 

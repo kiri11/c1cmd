@@ -1,0 +1,215 @@
+import C1Kit
+import CoreGraphics
+import Foundation
+import ImageIO
+
+enum ViewingTests {
+    static func run() {
+        argumentsFailBeforeDispatch()
+        cropPreview()
+        fullFrameMapping()
+        regionMapping()
+        timeoutIsUnknownAndReleasesTheQueue()
+        pruning()
+    }
+
+    static func service(_ fake: FakeCaptureOne, _ name: String, queue: CaptureOneQueue? = nil, extraSQL: String = "") -> (Service, URL) {
+        let path = Fixture.make(name, extraSQL: extraSQL)
+        let caches = scratchDirectory("\(name)-caches")
+        return (Service(captureOne: fake, queue: queue ?? CaptureOneQueue(directory: scratchDirectory("\(name)-queue")),
+                        home: scratchDirectory("\(name)-home"), caches: caches, openDatabase: { _ in try Database(path: path) },
+                        defaults: { ServiceTests.defaults }, schema: { WriteTests.schema }), caches)
+    }
+
+    static func small(_ id: String, canvas: [Double] = [600, 400], crop: [Double] = [300, 200, 600, 400], rotation: Double = 0) -> VariantState {
+        var state = FakeCaptureOne.state(id, adjustments: ["rotation": .double(rotation)])
+        state.variant["crop"] = .array(crop.map(JSONValue.double))
+        state.canvasSize = canvas
+        state.maximumCrop = [canvas[0] / 2, canvas[1] / 2, canvas[0], canvas[1]]
+        return state
+    }
+
+    static func fake(_ states: VariantState...) -> FakeCaptureOne {
+        let fake = FakeCaptureOne()
+        fake.variants = [.collection(cid("10")): Dictionary(uniqueKeysWithValues: states.map { ($0.id, $0) })]
+        return fake
+    }
+
+    static func exports(_ fake: FakeCaptureOne) -> [ExportRequest] {
+        fake.calls.compactMap { if case .export(let request) = $0 { return request }; return nil }
+    }
+
+    /// The canvas point a gradient pixel shows, from its red and green.
+    static func canvasPoint(_ image: CGImage, x: Int, y: Int, canvas: [Double]) -> (x: Double, y: Double) {
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let context = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        context.draw(image, in: CGRect(x: -x, y: y - image.height + 1, width: image.width, height: image.height))
+        return (Double(pixel[0]) / 255 * canvas[0], Double(pixel[1]) / 255 * canvas[1])
+    }
+
+    static func image(_ result: JSONValue) -> CGImage? {
+        guard case .string(let path)? = result["path"], let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    static func argumentsFailBeforeDispatch() {
+        let fake = fake(small("1"))
+        let (service, _) = service(fake, "viewing-arguments")
+        let region = Region(x: 0.5, y: 0, width: 0.6, height: 0.2)
+        for (arguments, text) in [(PreviewArguments(id: id("1"), size: 199), "size must be 200–3000"),
+                                  (PreviewArguments(id: id("1"), size: 3001), "size must be 200–3000"),
+                                  (PreviewArguments(id: id("1"), region: region), "x + width"),
+                                  (PreviewArguments(id: id("1"), region: Region(x: 0, y: 0, width: 0, height: 1)), "width, height > 0"),
+                                  (PreviewArguments(id: id("1"), region: Region(x: 0, y: 0, width: 1, height: 1), scale: 1.5), "scale must be"),
+                                  (PreviewArguments(id: id("1"), size: 800, region: Region(x: 0, y: 0, width: 1, height: 1)), "region takes scale"),
+                                  (PreviewArguments(id: id("1"), fullFrame: true, region: Region(x: 0, y: 0, width: 1, height: 1)), "region takes scale"),
+                                  (PreviewArguments(id: id("1"), scale: 0.5), "scale goes with region"),
+                                  (PreviewArguments(id: id("1"), timeout: 0.5), "timeout must be")] {
+            checkFailure(.invalidArguments, containing: text) { _ = try service.preview(arguments) }
+        }
+        checkFailure(.invalidArguments, containing: "1–6 candidates") { _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [])) }
+        let seven = Array(repeating: CanvasRect(centerX: 300, centerY: 200, width: 100, height: 100), count: 7)
+        checkFailure(.invalidArguments, containing: "1–6 candidates") { _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: seven)) }
+        checkEqual(fake.calls, [], "invalid arguments fail before any Apple Event")
+
+        let outside = CanvasRect(centerX: 580, centerY: 200, width: 100, height: 100)
+        checkFailure(.invalidArguments, containing: "Candidate 2 lies outside cropBounds (image): the top right corner by 30 px") {
+            _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [CanvasRect(centerX: 300, centerY: 200, width: 100, height: 100), outside]))
+        }
+        checkEqual(exports(fake), [], "a candidate outside cropBounds fails before the export")
+        checkFailure(.notFound) { _ = try service.preview(PreviewArguments(id: id("9"))) }
+    }
+
+    static func cropPreview() {
+        let fake = fake(small("1"))
+        let (service, caches) = service(fake, "viewing-crop")
+        let candidates = [CanvasRect(centerX: 300, centerY: 200, width: 300, height: 200),
+                          CanvasRect(centerX: 150, centerY: 300, width: 150, height: 100),
+                          CanvasRect(centerX: 450, centerY: 120, width: 120, height: 160)]
+        guard let first = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: candidates, size: 900)) else {
+            return check(false, "crop_preview failed")
+        }
+        checkEqual(exports(fake).map(\.fullFrame), [true], "one full-frame export")
+        checkEqual(exports(fake).first?.longEdge, 1500, "the cached frame is at least 1500 px")
+        checkEqual(first["cached"], .bool(false))
+        guard let composite = image(first), case .array(let items)? = first["candidates"], items.count == 3 else { return check(false, "no composite") }
+        check(abs(max(composite.width, composite.height) - 900) <= 2, "the composite's long edge is size: \(composite.width)×\(composite.height)")
+        for (candidate, item) in zip(candidates, items) {
+            guard let x = item["rect"]?["x"]?.number, let y = item["rect"]?["y"]?.number,
+                  let w = item["rect"]?["width"]?.number, let h = item["rect"]?["height"]?.number else { return check(false, "no rect") }
+            check(abs(w / h - candidate.width / candidate.height) < 0.02, "tile keeps the candidate's proportions: \(w)×\(h)")
+            // Away from the number badge in the top left corner.
+            let point = canvasPoint(composite, x: Int(x + w * 0.7), y: Int(y + h * 0.7), canvas: [600, 400])
+            let expected = (candidate.centerX + 0.2 * candidate.width, candidate.centerY - 0.2 * candidate.height)
+            check(abs(point.x - expected.0) < 6 && abs(point.y - expected.1) < 6,
+                  "tile shows its candidate's canvas point \(expected), got \(point)")
+        }
+        checkEqual(items[1]["crop"], .object(["centerX": .double(150), "centerY": .double(300), "width": .double(150), "height": .double(100)]))
+
+        let again = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900))
+        checkEqual(again?["cached"], .bool(true), "the same state reuses the frame")
+        fake.variants[.collection(cid("10"))]![id("1")]!.variant["crop"] = .array([.double(200), .double(200), .double(300), .double(300)])
+        fake.variants[.collection(cid("10"))]![id("1")]!.variant["rating"] = .int(4)
+        let cropped = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900))
+        checkEqual(cropped?["cached"], .bool(true), "a crop or rating change keeps the frame")
+        fake.variants[.collection(cid("10"))]![id("1")]!.adjustments["exposure"] = .double(1)
+        let edited = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900))
+        checkEqual(edited?["cached"], .bool(false), "another setting renders again")
+        checkEqual(exports(fake).count, 2)
+        let frames = (try? FileManager.default.subpathsOfDirectory(atPath: caches.path))?.filter { $0.contains("frame-1-") } ?? []
+        checkEqual(frames.count, 2, "one cached frame per render state: \(frames)")
+        checkEqual(fake.state(id("1"))?.variant["crop"], .array([.double(200), .double(200), .double(300), .double(300)]), "crop_preview writes nothing")
+        check(!fake.calls.contains { if case .write = $0 { return true }; return false }, "no write reaches Capture One")
+    }
+
+    /// Measured on 16.8.5.30 at rotation 5: canvas 6325 × 4507, default crop {3162, 2253, 5324, 3549}.
+    static func fullFrameMapping() {
+        var state = small("1", canvas: [6325, 4507], crop: [2900, 2100, 2400, 1600], rotation: 5)
+        state.maximumCrop = nil
+        let fake = fake(state)
+        fake.defaultCrops[id("1")] = [3162.5, 2253.5, 5324.1, 3549.4]
+        let (service, _) = service(fake, "viewing-full")
+        guard let result = try? service.preview(PreviewArguments(id: id("1"), size: 800, fullFrame: true)),
+              let mapping = result["fullFrame"]?["mapping"], let scale = mapping["scale"]?.number,
+              let left = mapping["left"]?.number, let top = mapping["top"]?.number else { return check(false, "no mapping") }
+        checkEqual(result["width"], .int(800))
+        check(abs(left - (3162.5 - 5324.1 / 2)) < 1 && abs(top - (2253.5 + 3549.4 / 2)) < 1 && abs(scale - 800 / 5324.1) < 1e-3,
+              "the full frame is the default crop, computed from canvas and rotation: \(mapping.encoded())")
+        guard let crop = result["fullFrame"]?["currentCrop"], let x = crop["x"]?.number, let y = crop["y"]?.number else { return check(false, "no currentCrop") }
+        check(abs(x - (1700 - left) * scale) < 0.1 && abs(y - (top - 2900) * scale) < 0.1, "currentCrop in preview pixels: \(crop.encoded())")
+        if let rendered = image(result) {
+            let point = canvasPoint(rendered, x: Int(x) + 40, y: Int(y) + 40, canvas: [6325, 4507])
+            check(abs(point.x - (1700 + 40 / scale)) < 60 && abs(point.y - (2900 - 40 / scale)) < 60, "the mapping finds the canvas point: \(point)")
+        }
+        checkEqual(exports(fake).map(\.fullFrame), [true])
+
+        let outside = CanvasRect(centerX: 1500, centerY: 4200, width: 400, height: 200)
+        checkFailure(.invalidArguments, containing: "Candidate 1 reaches past the full-frame render") {
+            _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [outside]))
+        }
+    }
+
+    static func regionMapping() {
+        let fake = fake(small("1", canvas: [800, 600], crop: [500, 300, 600, 400]))
+        let (service, caches) = service(fake, "viewing-region")
+        guard let result = try? service.preview(PreviewArguments(id: id("1"), region: Region(x: 0.25, y: 0.5, width: 0.5, height: 0.25))),
+              let rendered = image(result) else { return check(false, "region failed") }
+        checkEqual(exports(fake).first?.longEdge, 600, "scale 1 renders the crop at full resolution")
+        checkEqual([rendered.width, rendered.height], [300, 100], "the region's pixels at scale 1")
+        checkEqual(result["region"]?["crop"], .object(["centerX": .double(500), "centerY": .double(250), "width": .double(300), "height": .double(100)]),
+                   "the region in full-resolution canvas pixels, as set takes a crop")
+        let point = canvasPoint(rendered, x: 150, y: 50, canvas: [800, 600])
+        check(abs(point.x - 500) < 6 && abs(point.y - 250) < 6, "the region shows its canvas area: \(point)")
+        let files = (try? FileManager.default.subpathsOfDirectory(atPath: caches.path))?.filter { $0.hasSuffix(".jpg") } ?? []
+        checkEqual(files.count, 1, "the intermediate render is deleted: \(files)")
+
+        let big = Self.fake(small("1", canvas: [3000, 2000], crop: [1500, 1000, 3000, 2000]))
+        let (bigService, _) = Self.service(big, "viewing-region-cap")
+        let capped = try? bigService.preview(PreviewArguments(id: id("1"), region: Region(x: 0, y: 0, width: 1, height: 1)))
+        checkEqual([capped?["width"], capped?["height"]], [JSONValue.int(2048), .int(1365)] as [JSONValue?], "the result is capped at 2048 px")
+        check(abs((capped?["region"]?["scale"]?.number ?? 0) - 2048.0 / 3000) < 1e-3, "the scale reports the cap")
+    }
+
+    static func timeoutIsUnknownAndReleasesTheQueue() {
+        let fake = fake(small("1"))
+        fake.exportDelay = nil
+        let directory = scratchDirectory("viewing-timeout-queue")
+        let (service, _) = service(fake, "viewing-timeout", queue: CaptureOneQueue(directory: directory))
+        var other: Result<JSONValue, Error>?
+        Thread.detachNewThread {
+            Thread.sleep(forTimeInterval: 0.5)
+            let quick = Service(captureOne: fake, queue: CaptureOneQueue(directory: directory, maxWait: 0.3), home: scratchDirectory("viewing-timeout-other"))
+            other = Result { try quick.selection() }
+        }
+        do {
+            _ = try service.preview(PreviewArguments(id: id("1"), size: 400, timeout: 2))
+            check(false, "expected a timeout")
+        } catch let failure as C1Failure {
+            check(failure.code == .timeout && failure.outcomeUnknown && failure.message.contains("previews/\(Fixture.uuid)/1-crop-400-"),
+                  "a timeout is unknown and names where the file will land: \(failure)")
+        } catch {
+            check(false, "\(error)")
+        }
+        check((try? other?.get()) != nil, "another call ran while the export was pending: \(String(describing: other))")
+    }
+
+    static func pruning() {
+        let fake = fake(small("1"))
+        let (service, caches) = service(fake, "viewing-prune")
+        let folder = caches.appendingPathComponent("previews/OLD-DOC")
+        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = folder.appendingPathComponent("old.jpg"), recent = caches.appendingPathComponent("previews/\(Fixture.uuid)/recent.jpg")
+        try! FileManager.default.createDirectory(at: recent.deletingLastPathComponent(), withIntermediateDirectories: true)
+        for file in [old, recent] { FileManager.default.createFile(atPath: file.path, contents: Data("x".utf8)) }
+        try! FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-8 * 86400)], ofItemAtPath: old.path)
+        try! FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-6 * 86400)], ofItemAtPath: recent.path)
+        fake.outputFolderMissing = true
+        let result = try? service.preview(PreviewArguments(id: id("1"), size: 300))
+        check(result?["warnings"]?.arrayValue?.first?.stringValue?.contains("output folder was unset or missing") == true,
+              "a result says when c1 set the Catalog's output folder: \(String(describing: result))")
+        check(!FileManager.default.fileExists(atPath: folder.path), "files older than 7 days go, with their emptied folder")
+        check(FileManager.default.fileExists(atPath: recent.path), "younger files stay")
+    }
+}
+
