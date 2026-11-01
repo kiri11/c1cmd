@@ -35,6 +35,9 @@ enum CLITests {
         let commandHelp = run(binary, ["set", "--help"])
         check(commandHelp.status == 0 && commandHelp.stdout.contains("adjustments.exposure"), "c1 set --help prints the built-in field table")
         checkEqual(run(binary, ["--version"]).stdout, "dev\n")
+        let listed = try? JSONDecoder().decode(JSONValue.self, from: Data(run(binary, ["--commands"]).stdout.utf8))
+        checkEqual(listed?.arrayValue?.compactMap { $0["readOnly"] == .bool(false) ? $0["name"]?.stringValue : nil }, ["set", "action", "revert"],
+                   "--commands marks the writing commands from the table, for setup's allow rules")
         for usage in [[], ["bogus"], ["get", "--bogus"], ["get", "{}", "{}"], ["get", "--document", "/x", "{}"], ["list", "--document"]] {
             let result = run(binary, usage)
             check(result.status == 2 && result.stdout.isEmpty && result.stderr.contains("usage: c1"), "\(usage) is a usage error on stderr, exit 2")

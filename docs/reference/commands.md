@@ -12,18 +12,18 @@ c1 never touches originals and never deletes variants. Before its first write to
 
 | Command | Changes variants | Summary |
 |---|---|---|
-| [`doctor`](#doctor) | no | Check Capture One, the open document and its backup; warns without blocking. |
-| [`list`](#list) | no | List variants from the database, filtered and paged. |
-| [`collections`](#collections) | no | List collections with kind, parent and variant count. |
-| [`get`](#get) | no | Read live settings, geometry and layers of 1–100 variants. |
-| [`selection`](#selection) | no | Read the ids of the variants selected in Capture One. |
-| [`set`](#set) | yes | Write absolute values to 1–100 variants: adjustments, curves, color corrections, lens correction, geometry, crop, rating, color tag, layers. |
-| [`action`](#action) | yes | Run a layer, mask, color, dehaze, lens or reset action on 1–100 variants. |
-| [`revert`](#revert) | yes | Restore variants to the snapshot c1 took before its first write; scope all, adjustments, geometry, metadata or layers. |
-| [`preview`](#preview) | no | Export a JPEG of one variant: the crop at a long edge, the full frame with a pixel mapping, or a region at a scale. |
-| [`crop_preview`](#crop_preview) | no | Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written. |
-| [`contact_sheet`](#contact_sheet) | no | Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events; fillMissing exports the photos the cache lacks. |
-| [`thumb`](#thumb) | no | Read the camera's embedded JPEG of one variant's original, without Capture One's edits. |
+| `doctor` | no | Check Capture One, the open document and its backup; warns without blocking. |
+| `list` | no | List variants from the database, filtered and paged. |
+| `collections` | no | List collections with kind, parent and variant count. |
+| `get` | no | Read live settings, geometry and layers of 1–100 variants. |
+| `selection` | no | Read the ids of the variants selected in Capture One. |
+| `set` | yes | Write absolute values to 1–100 variants: adjustments, curves, color corrections, lens correction, geometry, crop, rating, color tag, layers. |
+| `action` | yes | Run a layer, mask, color, dehaze, lens or reset action on 1–100 variants. |
+| `revert` | yes | Restore variants to the snapshot c1 took before its first write; scope all, adjustments, geometry, metadata or layers. |
+| `preview` | no | Export a JPEG of one variant: the crop at a long edge, the full frame with a pixel mapping, or a region at a scale. |
+| `crop_preview` | no | Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written. |
+| `contact_sheet` | no | Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events; fillMissing exports the photos the cache lacks. |
+| `thumb` | no | Read the camera's embedded JPEG of one variant's original, without Capture One's edits. |
 
 ## Failure codes
 
