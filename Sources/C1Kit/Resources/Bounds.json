@@ -308,6 +308,66 @@
         "min": -100
       }
     },
+    "advancedColor": {
+      "blue": {
+        "max": 255,
+        "min": 0
+      },
+      "green": {
+        "max": 255,
+        "min": 0
+      },
+      "hue change": {
+        "max": 30.0,
+        "min": -30.0
+      },
+      "hue end": {
+        "max": 360.0,
+        "min": 0.0
+      },
+      "hue start": {
+        "max": 0.0,
+        "min": -360.0
+      },
+      "lightness change": {
+        "max": 100.0,
+        "min": -100.0
+      },
+      "red": {
+        "max": 255,
+        "min": 0
+      },
+      "saturation change": {
+        "max": 200.0,
+        "min": -100.0
+      },
+      "saturation end": {
+        "max": 100.0,
+        "min": null
+      },
+      "saturation start": {
+        "max": null,
+        "min": 0.0
+      },
+      "smoothness": {
+        "max": 30.0,
+        "min": 1.0
+      }
+    },
+    "basicColor": {
+      "hue change": {
+        "max": 30.0,
+        "min": -30.0
+      },
+      "lightness change": {
+        "max": 50.0,
+        "min": -50.0
+      },
+      "saturation change": {
+        "max": 80.0,
+        "min": -80.0
+      }
+    },
     "layer": {
       "opacity": {
         "max": 100,
@@ -347,6 +407,6 @@
       }
     }
   },
-  "measured": "2026-11-01T01:16:55+00:00",
+  "measured": "2026-11-01T02:33:48+00:00",
   "method": "scripts/v2-measure-bounds.py: accepted means no error and the value reads back as written"
 }
