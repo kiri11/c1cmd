@@ -10,6 +10,16 @@ enum ServiceTests {
         timeoutReporting()
         commandArguments()
         liveCallsShareTheQueue()
+        databasePaths()
+    }
+
+    static func databasePaths() {
+        checkEqual(LiveDocument(kind: .session, name: "Shoot.cosessiondb", folder: "/s/Shoot", appVersion: "").databasePath,
+                   "/s/Shoot/Shoot.cosessiondb", "a Session's name already carries the extension")
+        checkEqual(LiveDocument(kind: .catalog, name: "Main", folder: "/c/Main.cocatalog", appVersion: "").databasePath,
+                   "/c/Main.cocatalog/Main.cocatalogdb")
+        checkEqual(LiveDocument(kind: .catalog, name: "Main", folder: "/c/Main.cocatalogdb", appVersion: "").databasePath,
+                   "/c/Main.cocatalogdb", "an unpackaged Catalog")
     }
 
     static func liveCallsShareTheQueue() {
@@ -120,7 +130,9 @@ enum ServiceTests {
         checkFailure(.timeout) { _ = try service(fake, "timeout").get(ids: [id("1")]) }
         checkEqual(fake.calls, [.document], "no retry after a timeout")
 
-        let script = AppleScriptCaptureOne.readScript([ReadTarget(id("1"), .collection(cid("14")))], timeoutSeconds: 30)
+        let script = AppleScriptCaptureOne.readScript([ReadTarget(id("1"), .collection(cid("14")))], timeoutSeconds: 30, layerFields: ["CVex"])
+        check(!script.contains("properties of adjustments of every layer"), "Capture One refuses properties of a non-background layer's adjustments")
+        check(script.contains("«property CVex» of a"), "non-background layers are read field by field")
         check(script.contains("with timeout of 30 seconds"), "the read runs under a timeout")
         check(script.contains("if n is in {-1712"), "a per-variant try rethrows a timeout instead of recording it")
         check(script.contains("variant id \"1\" of collection id \"14\" of current document"), "the read names its route")

@@ -69,6 +69,17 @@ public struct Terminology {
         }
     }
 
+    /// The property codes of a class, sorted.
+    public func propertyCodes(ofClass code: String) -> [String] {
+        (classes[code] ?? [:]).keys.sorted()
+    }
+
+    /// One property of a class by name; nil for an unknown code or a value with no JSON form.
+    public func field(ofClass classCode: String, code: String, _ descriptor: NSAppleEventDescriptor) -> (String, JSONValue)? {
+        guard let property = classes[classCode]?[code], let value = decode(descriptor, type: property.type) else { return nil }
+        return (property.name, value)
+    }
+
     /// A record's properties by name; the class key is consumed to pick the class's terminology.
     public func record(_ descriptor: NSAppleEventDescriptor) -> [String: JSONValue] {
         guard descriptor.numberOfItems > 0 else { return [:] }
