@@ -51,11 +51,11 @@ enum ServiceTests {
                    "lensCorrection": ["distortion": .double(0)], "layer": ["opacity": .int(100), "enabled": .bool(true)]])
 
     static func service(_ fake: FakeCaptureOne, _ name: String, documentType: Int = 1, extraSQL: String = "",
-                        now: @escaping () -> Date = Date.init) -> Service {
+                        now: @escaping () -> Date = Date.init, liveTerms: @escaping () throws -> Terminology = { .snapshot }) -> Service {
         let path = Fixture.make(name, documentType: documentType, extraSQL: extraSQL)
         return Service(captureOne: fake, queue: CaptureOneQueue(directory: scratchDirectory("\(name)-queue")),
                        home: scratchDirectory("\(name)-home"), openDatabase: { _ in try Database(path: path) },
-                       defaults: { defaults }, schema: { WriteTests.schema }, now: now)
+                       defaults: { defaults }, schema: { WriteTests.schema }, now: now, liveTerms: liveTerms)
     }
 
     static func catalogRoutesAndFallback() {

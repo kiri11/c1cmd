@@ -64,11 +64,7 @@ public struct BoundsTable: Codable, Equatable {
     public init(build: String, fields: [String: [String: Bound]]) { self.build = build; self.fields = fields }
 
     public static func bundled() throws -> BoundsTable {
-        guard let url = Bundle.module.url(forResource: "Bounds", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            throw C1Failure(.internal, "Bounds.json is missing from the C1Kit bundle.")
-        }
-        return try JSONDecoder().decode(BoundsTable.self, from: data)
+        try JSONDecoder().decode(BoundsTable.self, from: Data(Embedded.bounds.utf8))
     }
 }
 

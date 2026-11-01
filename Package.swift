@@ -74,7 +74,8 @@ let package = Package(
         .target(
             name: "C1Kit",
             dependencies: ["CSQLite"],
-            resources: [.copy("Resources/Defaults.json"), .copy("Resources/Bounds.json")]
+            // Built into Generated/Embedded.swift, so c1 is one file with no bundle beside it.
+            exclude: ["Resources"]
         ),
         .executableTarget(
             name: "c1next",

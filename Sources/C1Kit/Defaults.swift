@@ -8,11 +8,7 @@ public struct Defaults: Decodable {
     public let defaults: [String: [String: JSONValue]]
 
     public static func bundled() throws -> Defaults {
-        guard let url = Bundle.module.url(forResource: "Defaults", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            throw C1Failure(.internal, "Defaults.json is missing from the C1Kit bundle.")
-        }
-        return try JSONDecoder().decode(Defaults.self, from: data)
+        try JSONDecoder().decode(Defaults.self, from: Data(Embedded.defaults.utf8))
     }
 
     public init(alwaysReported: [String: [String]], defaults: [String: [String: JSONValue]]) {

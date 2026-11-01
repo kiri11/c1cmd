@@ -10,6 +10,8 @@ public final class Service {
     let defaults: () throws -> Defaults
     let schema: () throws -> WriteSchema
     let now: () -> Date
+    /// The live sdef's terms, which `doctor` compares with the built-in snapshot.
+    let liveTerms: () throws -> Terminology
     let memory: DocumentMemory
 
     public static let maxIDs = 100
@@ -20,9 +22,9 @@ public final class Service {
                 openDatabase: @escaping (String) throws -> Database = { try Database(path: $0) },
                 defaults: @escaping () throws -> Defaults = { try Defaults.bundled() },
                 schema: @escaping () throws -> WriteSchema = { throw C1Failure(.internal, "No write schema.") },
-                now: @escaping () -> Date = Date.init) {
+                now: @escaping () -> Date = Date.init, liveTerms: @escaping () throws -> Terminology = { try Terminology.load().used() }) {
         self.captureOne = captureOne; self.queue = queue; self.home = home; self.caches = caches; self.openDatabase = openDatabase
-        self.defaults = defaults; self.schema = schema; self.now = now; self.memory = DocumentMemory(home: home)
+        self.defaults = defaults; self.schema = schema; self.now = now; self.liveTerms = liveTerms; self.memory = DocumentMemory(home: home)
     }
 
     public func get(ids requested: [VariantID], changed: Bool = false) throws -> JSONValue {

@@ -1,5 +1,10 @@
 import Foundation
 
+if CommandLine.arguments.dropFirst().first == "--generate" {
+    Generated.run(write: true)
+    exit(failures.isEmpty ? 0 : 1)
+}
+Generated.run(write: false)
 TerminologyTests.run()
 DatabaseTests.run()
 ServiceTests.run()

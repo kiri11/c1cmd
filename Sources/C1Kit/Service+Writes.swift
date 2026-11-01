@@ -36,16 +36,19 @@ extension Service {
     // MARK: doctor
 
     public func doctor() throws -> JSONValue {
+        let c1: JSONValue = .object(["version": .string(C1Version.current)])
         let document: LiveDocument
         do {
             document = try queue.run { try captureOne.document() }
         } catch let failure as C1Failure where failure.code == .noDocument {
-            return .object(["document": .null, "warnings": .array([.string(failure.message + " Open the Catalog or Session to edit.")])])
+            return .object(["c1": c1, "document": .null,
+                            "warnings": .array([.string(failure.message + " Open the Catalog or Session to edit.")] + termWarnings().map(JSONValue.string))])
         }
         memory.save(document)
         let database = try openDatabase(document.databasePath)
         let store = DocumentStore(home: home, documentUUID: database.documentUUID)
         return .object([
+            "c1": c1,
             "captureOne": .object(["version": .string(document.appVersion), "tested": .bool(Self.testedBuilds.contains(document.appVersion))]),
             "document": .object([
                 "kind": .string(document.kind.rawValue), "name": .string(document.name), "path": .string(document.folder),
@@ -53,8 +56,19 @@ extension Service {
                 "lastBackup": database.lastBackup.map { .string(ISO8601DateFormatter().string(from: $0)) } ?? .null,
             ]),
             "storage": .string(store.directory.path),
-            "warnings": .array(Self.warnings(document, database, now()).map(JSONValue.string)),
+            "warnings": .array((Self.warnings(document, database, now()) + termWarnings()).map(JSONValue.string)),
         ])
+    }
+
+    /// Warns when the scripting terms c1 uses differ between Capture One's sdef and the snapshot c1 was built with.
+    func termWarnings() -> [String] {
+        let differences: [String]
+        do { differences = try liveTerms().differences(from: .snapshot) } catch {
+            return ["c1 cannot read Capture One's sdef, so it cannot check its built-in scripting terms against it: \(error)"]
+        }
+        guard !differences.isEmpty else { return [] }
+        let shown = differences.prefix(10).joined(separator: "; ")
+        return ["Capture One's scripting terms differ from the 16.8.5.30 terms c1 is built with (\(differences.count) difference\(differences.count == 1 ? "" : "s")): \(shown)\(differences.count > 10 ? "; …" : ""). Reads and writes of those terms may fail or be misnamed."]
     }
 
     /// Warnings that never block: an untested build, and a Catalog backup missing or older than a day.
