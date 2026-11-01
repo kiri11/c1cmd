@@ -465,7 +465,9 @@ public final class AppleScriptCaptureOne: CaptureOne {
 
     func run(_ source: String) throws -> NSAppleEventDescriptor {
         guard Self.isCaptureOneRunning() else {
-            throw C1Failure(.notRunning, "Capture One is not running.", hint: "Open Capture One and its document, then try again.")
+            // A sandbox (Codex's workspace-write) hides other apps from NSWorkspace and blocks Apple Events.
+            throw C1Failure(.notRunning, "Capture One is not running.",
+                            hint: "Open Capture One and its document, then try again. If it is open, a sandbox is hiding it: run c1 outside the sandbox (in Codex, start it with --sandbox danger-full-access).")
         }
         guard let script = NSAppleScript(source: source) else {
             throw C1Failure(.scriptError, "Cannot create the AppleScript.")

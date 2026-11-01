@@ -9,9 +9,10 @@ c1 edits photos in the Capture One Catalog or Session the photographer has open.
 
 ## 1. Find c1
 
-Run `command -v c1`.
+Run `c1 --version`.
 
-- **Found**: go on.
+- **Prints a version**: go on.
+- **`Unknown option '--version'`**: an old c1 (v1) comes first on PATH, and the agent would run it instead of the plugin's. `command -v c1` shows where; ask the photographer to remove it (with `make uninstall` in its checkout, or by deleting that `c1` and the `c1-mcp` beside it). c1 cannot be set up while it stays.
 - **Missing in Claude Code**: the plugin puts its `bin/` on the shell's PATH while it is enabled. Ask the photographer to run `/plugin`, enable `c1`, and start a new session.
 - **Missing elsewhere (Codex, a plain shell)**: c1 sits in the unzipped plugin folder at `bin/c1`. Ask the photographer to link it onto their PATH, then check again:
 
@@ -21,7 +22,7 @@ Run `command -v c1`.
 
   If `~/.local/bin` is not on PATH, they add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`.
 
-Done when `c1 --version` prints a version. If it fails with `Unknown option '--version'`, an old c1 (v1) comes first on PATH: `command -v c1` shows where. Ask the photographer to remove it, then check again.
+Done when `c1 --version` prints a version.
 
 ## 2. Automation permission and doctor
 
@@ -29,7 +30,7 @@ Capture One must be running with the Catalog or Session open. Run `c1 doctor`.
 
 - **The first call can hang** until `timeout`: macOS is showing the Automation consent dialog for the app running c1 (Terminal, Claude, Codex), often hidden behind other windows. Tell the photographer to look for it and click **Allow**, then run `c1 doctor` again.
 - **`permission-denied`**: the photographer allows it under **System Settings > Privacy & Security > Automation**, by turning on Capture One under the app that runs c1.
-- **`not-running`** or `document: null`: the photographer opens Capture One and the document.
+- **`not-running`** or `document: null`: the photographer opens Capture One and the document. In Codex, `not-running` while Capture One is open means the sandbox hides it: c1 needs Codex started with `--sandbox danger-full-access`.
 
 Done when `doctor` returns a `document`. Read its `warnings` aloud to the photographer: an untested Capture One build, an old Catalog backup, or scripting terms that differ from the ones c1 was built with. Warnings never block.
 

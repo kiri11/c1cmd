@@ -9,8 +9,8 @@ Writes `~/.c1/styles/<name>.md`: per scene, a description, the setting ranges th
 
 ## Steps
 
-1. **Name and scope.** Ask for the style's name (lowercase, hyphens: `wedding-film`) and where its examples are: a collection (`c1 collections`), a rating, or the current selection. If `~/.c1/styles/<name>.md` exists, read it and ask whether to replace it or add to it.
-2. **Find the edited photos.** `c1 list` with that scope and `edited: true`, paging with `after` until `next` is absent. Fewer than about 8: say the style will be thin and ask for more examples.
+1. **Name and scope.** Ask for the style's name (lowercase, hyphens: `wedding-film`) and where its examples are: a collection (`c1 collections`; use one whose kind holds variants, such as `allImages`), a rating, the current selection, or the whole document. If `~/.c1/styles/<name>.md` exists, read it and ask whether to replace it or add to it.
+2. **Find the edited photos.** `c1 list` with that scope and `edited: true`, paging with `after` until `next` is absent. Fewer than about 8: say the style will be thin and ask for more examples. The database can trail Capture One by up to a minute, so photos edited just now may be missing; list again before concluding.
 3. **See them.** `c1 contact_sheet` with the same filters (`fillMissing: true` if tiles are missing). Group the photos by scene: light, setting and subject that call for different treatment (golden-hour portrait, overcast landscape, night street). Two to six scenes is typical; a scene needs at least 3 photos.
 4. **Read their settings.** `c1 get` with `changed: true` for each scene's photos, up to 100 ids per call. Per scene, collect each field the photographer changed in most of its photos: the minimum and maximum, and what stays constant (a film curve, black and white, a curve shape). Note fields that depend on the camera, such as white balance, as values to judge per photo, not to copy.
 5. **Look at the extremes.** `c1 preview` two or three photos per scene, including the ones at the ends of a range, to tie each number to what it looks like.

@@ -57,7 +57,7 @@ Start a new session. The skills appear as `/c1:setup`, `/c1:edit`, `/c1:learn-st
 
    `c1 --version` must print 2.0 or later. An older c1 (v1, installed with `make install`, often in `/opt/homebrew/bin`) may come first on your PATH: remove it.
 
-**Codex's sandbox (pending).** Whether Codex's default sandbox lets `c1` send Apple Events to Capture One, and which setting it needs if not, is checked in the next pre-release test. Until then, run c1 in Codex with a sandbox mode that allows it, or approve each call.
+**Codex's sandbox.** `c1` has to run outside Codex's sandbox. Under `read-only` it cannot write its lock file, and under `workspace-write` it cannot see Capture One, so it reports `not-running` while Capture One is open. Start Codex with `--sandbox danger-full-access` for a c1 session (tested with Codex 0.153.4). In Codex the skills appear as `$c1:setup`, `$c1:edit`, `$c1:learn-style` and `$c1:crop-policy`.
 
 ### Without a plugin system
 

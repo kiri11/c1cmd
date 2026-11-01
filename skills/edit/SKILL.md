@@ -29,7 +29,7 @@ Per photo:
 
 1. **Look.** `c1 preview` the photo and `c1 get` it. State the visual goal in one sentence.
 2. **Pick one small group of related controls**: white balance; or exposure and contrast; or highlights and shadows; or a curve; or the color editor; or crop and rotation. Never everything at once.
-3. **Set absolute targets.** Turn the goal into target values ("exposure 0.4", not "a bit brighter") and `c1 set` them. Every `set` reads the variant first: about 3 s, and about 1 s more per extra layer, so group fields into one call.
+3. **Set absolute targets.** Turn the goal into target values ("exposure 0.4", not "a bit brighter") and `c1 set` them. Every `set` reads the variant first, which costs about 1 s more per extra layer, so group fields into one call.
 4. **Look again.** `c1 preview` and compare against the goal. Use `preview` with `region` and `scale` only for judgements at pixel level: sharpness, noise, halos, mask edges.
 5. **Stop** when the goal is met, progress stalls, a capability limit is reached (a hand-drawn mask, a control c1 lacks), or after four passes. Then summarize the visible effect and the values you changed.
 
@@ -37,7 +37,7 @@ A result's `warnings` with `sent` and `stored` mean Capture One kept a different
 
 ## Crops
 
-Follow the crop policy. Rotate (and any keystone) first in its own `set`, then `get` again: rotation changes `cropBounds`, and a crop is in pixels of the rotated canvas. Compare candidate crops side by side with `c1 crop_preview`. It renders only Capture One's default crop, the largest centred rectangle, so a candidate beyond it fails; try that one with `set`, `preview` and `revert` (scope `geometry`).
+Follow the crop policy. Rotate (and any keystone) first in its own `set`, then `get` again: rotation changes `cropBounds`, Capture One shrinks the crop to fit, and a crop is in pixels of the rotated canvas. Compare candidate crops side by side with `c1 crop_preview`. It renders only Capture One's default crop, the largest centred rectangle, so a candidate beyond it fails; try that one with `set`, `preview` and `revert` (scope `geometry`).
 
 ## Fan-out for many photos
 
