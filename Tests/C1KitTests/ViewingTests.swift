@@ -13,6 +13,8 @@ enum ViewingTests {
         pruning()
         sheetLayout()
         contactSheet()
+        thumbOfAJPEG()
+        commandTable()
     }
 
     static func service(_ fake: FakeCaptureOne, _ name: String, queue: CaptureOneQueue? = nil, extraSQL: String = "") -> (Service, URL) {
@@ -270,6 +272,34 @@ enum ViewingTests {
                                              document: scratchURL("viewing-sheet").appendingPathComponent("viewing-sheet.cocatalogdb").path)
         checkEqual(next?["tiles"]?.arrayValue?.count, 1)
         checkEqual(next?["next"], nil)
+    }
+
+    static func thumbOfAJPEG() {
+        let folder = scratchDirectory("viewing-thumb-originals")
+        let original = folder.appendingPathComponent("photo.jpg")
+        let pixels = FakeCaptureOne.gradient(area: [1000, 750, 2000, 1500], canvas: [2000, 1500], longEdge: 2000)
+        FakeCaptureOne.writeJPEG(pixels, to: original, properties: [kCGImagePropertyOrientation: 6])
+        let sql = """
+            INSERT INTO ZPATHLOCATION VALUES (103,'/','\(folder.path.dropFirst())',0);
+            INSERT INTO ZIMAGE VALUES (5,'photo','photo.jpg',103,0,0);
+            INSERT INTO ZVARIANT VALUES (6,5,41,42,NULL);
+            """
+        let (service, _) = service(FakeCaptureOne(), "viewing-thumb", extraSQL: sql)
+        let document = scratchURL("viewing-thumb").appendingPathComponent("viewing-thumb.cocatalogdb").path
+        let result = try? service.thumb(ThumbArguments(id: id("6"), maxSize: 800), document: document)
+        checkEqual([result?["width"], result?["height"], result?["source"]], [JSONValue.int(600), .int(800), .string("file")] as [JSONValue?],
+                   "a JPEG original is read itself, turned upright and fitted to maxSize")
+        checkFailure(.notFound, containing: "not readable") { _ = try service.thumb(ThumbArguments(id: id("1")), document: document) }
+        checkFailure(.invalidArguments) { _ = try service.thumb(ThumbArguments(id: id("6"), maxSize: 100), document: document) }
+    }
+
+    static func commandTable() {
+        checkFailure(.invalidArguments, containing: "does not take size") {
+            _ = try Command.thumb.run(Service(captureOne: FakeCaptureOne(), queue: CaptureOneQueue(directory: scratchDirectory("viewing-command"))),
+                                      arguments: Data(#"{"id":"1","size":3}"#.utf8))
+        }
+        check(Command.contactSheet.acceptsDocumentPath && Command.thumb.acceptsDocumentPath && !Command.preview.acceptsDocumentPath,
+              "SQLite-only commands take a document path")
     }
 }
 
