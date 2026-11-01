@@ -265,6 +265,9 @@ public final class AppleScriptCaptureOne: CaptureOne {
 
     static let adjustmentsClass = "CVas"
 
+    /// Past this rotation CropBounds cannot undo the canvas rotation (cos 2r ≤ 0.05 from 43.57°) and falls back to `maximum crop`.
+    static let maximumCropRotation = 43.5
+
     /// Capture One refuses `properties of adjustments` on a layer other than the background (-50),
     /// so those layers are read one field at a time by raw code; unsupported fields raise and are skipped.
     /// Curves and color corrections are elements, which `properties of adjustments` leaves as references,
@@ -272,9 +275,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
     public static func readScript(_ targets: [ReadTarget], timeoutSeconds: Int, layerFields: [String]) -> String {
         let fatal = "{\(fatalErrors.map(String.init).joined(separator: ", "))}"
         let notFound = "{\(notFoundErrors.sorted().map(String.init).joined(separator: ", "))}"
-        func reads(_ id: VariantID) -> String {
-            "{\"\(id)\", true, properties of v, properties of lens correction of v, properties of every layer of v, properties of adjustments of v, my layerFields(v), dimensions of parent image of v, maximum crop v apply false}"
-        }
+        func reads(_ id: VariantID) -> String { "my variantFields(v, \"\(id)\")" }
         let curves = WriteSchema.curveChannels.map { "properties of every curve point of \($0) curve of a" }
         var lines = ["on editor(a)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
                      "return {\(curves.joined(separator: ", ")), properties of every basic color correction of color editor settings of a, properties of every advanced color correction of color editor settings of a}",
@@ -288,6 +289,15 @@ public final class AppleScriptCaptureOne: CaptureOne {
                       "on error e number n", "if n is in \(fatal) then error e number n", "end try"]
         }
         lines += ["end if", "set end of out to {fields, my editor(a)}", "end repeat", "return out", "end timeout", "end tell", "end layerFields"]
+        // CropBounds needs `maximum crop` only for these corrections, so other reads skip its Apple Event.
+        let corrected = ["keystone vertical of a", "keystone horizontal of a", "keystone skew of a", "keystone aspect of a",
+                         "distortion of lc", "tilt of lc", "shift of lc"].map { "\($0) ≠ 0" }
+            + ["flip of a is not «constant ****Cfln»", "rotation of a > \(maximumCropRotation)", "rotation of a < -\(maximumCropRotation)"]
+        lines += ["on variantFields(v, i)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
+                  "set a to properties of adjustments of v", "set lc to properties of lens correction of v", "set mc to missing value",
+                  "if \(corrected.joined(separator: " or ")) then set mc to maximum crop v apply false",
+                  "return {i, true, properties of v, lc, properties of every layer of v, a, my layerFields(v), dimensions of parent image of v, mc}",
+                  "end timeout", "end tell", "end variantFields"]
         lines += ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds"] + documentLines + ["set out to {}"]
         if targets.contains(where: { $0.route == .favoritesScan }) {
             lines.append("set favorites to every collection of d whose kind is favorite")
