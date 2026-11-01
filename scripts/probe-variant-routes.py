@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import statistics
+import tempfile
 import subprocess
 import sys
 import time
@@ -28,6 +29,7 @@ p.add_argument('--sizes', default='0,1000,4000', help='Filler JPEG counts, cumul
 p.add_argument('--samples', type=int, default=3)
 p.add_argument('--fields', type=int, default=10, help='Adjustment properties read per sample')
 p.add_argument('--cli', default=str(ROOT / '.build/debug/c1'))
+p.add_argument('--next', help='c1next binary; times its get beside the old c1 get')
 p.add_argument('--output', required=True)
 a = p.parse_args()
 
@@ -97,15 +99,16 @@ try:
         'allImages': f'variant id "{vid}" of collection id "{all_images}" of d',
         'album': f'variant id "{vid}" of collection id "{album}" of d',
     }
-    filler_dir = fixture.base / 'filler'
-    filler_dir.mkdir()
+    # Fillers live outside the target's folder, so the target's folder route stays one variant.
+    filler_root = Path(tempfile.mkdtemp(prefix='c1-probe-fillers-', dir=str(fixture.base.parent)))
+    log('fillers', dict(root=str(filler_root)))
     seed = fixture.base / 'seed.jpg'
     subprocess.run(['sips', '-s', 'format', 'jpeg', '-Z', '96', str(fixture.fixture), '--out', str(seed)], check=True, capture_output=True)
     made = 0
     results = []
     for target in [int(s) for s in a.sizes.split(',')]:
         if target > made:
-            batch = fixture.base / f'filler-{target}'
+            batch = filler_root / f'filler-{target}'
             batch.mkdir()
             for i in range(made, target):
                 shutil.copyfile(seed, batch / f'f{i:06d}.jpg')
@@ -135,6 +138,12 @@ try:
             start = time.perf_counter()
             cli('get', vid)
             row['seconds'].setdefault('c1Get', []).append(time.perf_counter() - start)
+            if a.next:
+                start = time.perf_counter()
+                r = subprocess.run([a.next, 'get', json.dumps(dict(ids=[vid]))], capture_output=True, text=True, timeout=900)
+                if r.returncode or 'error' in json.loads(r.stdout)['variants'][0]:
+                    raise RuntimeError(r.stdout + r.stderr)
+                row['seconds'].setdefault('c1nextGet', []).append(time.perf_counter() - start)
         row['median'] = {k: statistics.median([x for x in v if x is not None]) for k, v in row['seconds'].items() if any(x is not None for x in v)}
         log('size', row)
         results.append(row)
