@@ -74,7 +74,7 @@ let package = Package(
         .target(
             name: "C1Kit",
             dependencies: ["CSQLite"],
-            resources: [.copy("Resources/Defaults.json")]
+            resources: [.copy("Resources/Defaults.json"), .copy("Resources/Bounds.json")]
         ),
         .executableTarget(
             name: "c1next",

@@ -56,15 +56,17 @@ public struct ReadTarget: Hashable {
     public init(_ id: VariantID, _ route: Route) { self.id = id; self.route = route }
 }
 
-public struct LiveDocument: Equatable {
+public struct LiveDocument: Codable, Equatable {
+    /// Capture One's `id of document`, its path; a write script refuses to run on any other document.
+    public let id: String
     public let kind: DocumentKind
     public let name: String
     /// The document's own folder item: the `.cocatalog` package, an unpackaged `.cocatalogdb`, or the Session folder.
     public let folder: String
     public let appVersion: String
 
-    public init(kind: DocumentKind, name: String, folder: String, appVersion: String) {
-        self.kind = kind; self.name = name; self.folder = folder; self.appVersion = appVersion
+    public init(id: String, kind: DocumentKind, name: String, folder: String, appVersion: String) {
+        self.id = id; self.kind = kind; self.name = name; self.folder = folder; self.appVersion = appVersion
     }
 
     public var databasePath: String {
@@ -84,20 +86,41 @@ public struct VariantState: Equatable {
     /// The Image (background) layer's adjustments, which are the variant's adjustments.
     public var adjustments: [String: JSONValue]
     public var lensCorrection: [String: JSONValue]
-    /// Every layer; non-background layers carry their own `adjustments`.
+    /// Every layer, the background first; non-background layers carry their own `adjustments`.
     public var layers: [[String: JSONValue]]
+    /// The parent image's width and height before orientation.
+    public var imageSize: [Double]?
+    /// `maximum crop`: the largest centred crop of the image's proportions, as {centre x, centre y, width, height}.
+    public var maximumCrop: [Double]?
 
     public init(id: VariantID, variant: [String: JSONValue], adjustments: [String: JSONValue],
-                lensCorrection: [String: JSONValue], layers: [[String: JSONValue]]) {
+                lensCorrection: [String: JSONValue], layers: [[String: JSONValue]],
+                imageSize: [Double]? = nil, maximumCrop: [Double]? = nil) {
         self.id = id; self.variant = variant; self.adjustments = adjustments
         self.lensCorrection = lensCorrection; self.layers = layers
+        self.imageSize = imageSize; self.maximumCrop = maximumCrop
+    }
+
+    /// Reads back a state written by `json`, as stored in a snapshot.
+    public init?(json: JSONValue) {
+        guard case .string(let text)? = json["id"], let id = VariantID(text),
+              case .object(let variant)? = json["variant"], case .object(let adjustments)? = json["adjustments"],
+              case .object(let lens)? = json["lensCorrection"], case .array(let layerItems)? = json["layers"] else { return nil }
+        var layers: [[String: JSONValue]] = []
+        for item in layerItems {
+            guard case .object(let layer) = item else { return nil }
+            layers.append(layer)
+        }
+        self.init(id: id, variant: variant, adjustments: adjustments, lensCorrection: lens, layers: layers)
     }
 
     public var json: JSONValue {
-        .object([
+        var fields: [String: JSONValue] = [
             "id": .string(id.description), "variant": .object(variant), "adjustments": .object(adjustments),
             "lensCorrection": .object(lensCorrection), "layers": .array(layers.map(JSONValue.object)),
-        ])
+        ]
+        if let bounds = cropBounds { fields["cropBounds"] = bounds.json }
+        return .object(fields)
     }
 }
 
@@ -107,11 +130,21 @@ public enum ReadResult: Equatable {
     case failed(String)
 }
 
+public struct ReadBatch: Equatable {
+    /// The document that was open during the read.
+    public let document: LiveDocument
+    public let results: [VariantID: ReadResult]
+    public init(document: LiveDocument, results: [VariantID: ReadResult]) { self.document = document; self.results = results }
+}
+
 /// The seam between c1 and Capture One. `AppleScriptCaptureOne` is the real one; tests use a fake.
 public protocol CaptureOne {
     func document() throws -> LiveDocument
-    /// Reads every target in one execution; per-target errors do not fail the call.
-    func read(_ targets: [ReadTarget]) throws -> [VariantID: ReadResult]
+    /// Reads every target and the open document in one execution; per-target errors do not fail the call.
+    func read(_ targets: [ReadTarget]) throws -> ReadBatch
+    /// Runs every variant's steps in one execution, only if `document` is still the open one.
+    /// Per-step and per-variant errors do not fail the call.
+    func write(_ writes: [VariantWrite], in document: LiveDocument) throws -> [VariantID: WriteResult]
     func selection() throws -> [VariantID]
 }
 
@@ -124,6 +157,7 @@ public struct C1Failure: Error, Equatable, CustomStringConvertible {
         case timeout
         case busy
         case schemaMismatch = "schema-mismatch"
+        case documentChanged = "document-changed"
         case database
         case scriptError = "script-error"
         case `internal`

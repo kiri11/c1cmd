@@ -25,8 +25,12 @@ func checkFailure(_ code: C1Failure.Code, containing text: String = "", file: St
     }
 }
 
+func scratchURL(_ name: String) -> URL {
+    FileManager.default.temporaryDirectory.appendingPathComponent("c1kit-tests-\(getpid())").appendingPathComponent(name)
+}
+
 func scratchDirectory(_ name: String) -> URL {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("c1kit-tests-\(getpid())").appendingPathComponent(name)
+    let url = scratchURL(name)
     try? FileManager.default.removeItem(at: url)
     try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     return url
@@ -38,4 +42,9 @@ func cid(_ text: String) -> CollectionID { CollectionID(text)! }
 func ids(_ value: JSONValue, key: String = "variants") -> [String] {
     guard case .array(let items)? = value[key] else { return [] }
     return items.compactMap { if case .string(let id)? = $0["id"] { return id }; return nil }
+}
+
+/// Equality that treats 0 and 0.0 alike, as JSON does after a round trip.
+func checkSame(_ actual: JSONValue?, _ expected: JSONValue, _ message: String = "", file: StaticString = #fileID, line: UInt = #line) {
+    check(actual.map { $0.approximatelyEquals(expected) } ?? false, "\(message) expected \(expected.encoded()), got \(actual?.encoded() ?? "nil")", file: file, line: line)
 }
