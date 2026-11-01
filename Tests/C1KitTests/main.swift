@@ -4,6 +4,7 @@ TerminologyTests.run()
 DatabaseTests.run()
 ServiceTests.run()
 QueueTests.run()
+WriteTests.run()
 
 try? FileManager.default.removeItem(at: FileManager.default.temporaryDirectory.appendingPathComponent("c1kit-tests-\(getpid())"))
 for failure in failures { print("FAIL \(failure)") }

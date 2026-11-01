@@ -4,56 +4,36 @@ import Foundation
 public final class Service {
     let captureOne: CaptureOne
     let queue: CaptureOneQueue
+    let home: URL
     let openDatabase: (String) throws -> Database
     let defaults: () throws -> Defaults
+    let schema: () throws -> WriteSchema
+    let now: () -> Date
+    let memory: DocumentMemory
 
-    public static let maxGetIDs = 100
+    public static let maxIDs = 100
+    public static let testedBuilds = ["16.8.5.30"]
+    public static let backupAge: TimeInterval = 24 * 60 * 60
 
-    public init(captureOne: CaptureOne, queue: CaptureOneQueue,
+    public init(captureOne: CaptureOne, queue: CaptureOneQueue, home: URL = C1Home.url,
                 openDatabase: @escaping (String) throws -> Database = { try Database(path: $0) },
-                defaults: @escaping () throws -> Defaults = { try Defaults.bundled() }) {
-        self.captureOne = captureOne; self.queue = queue; self.openDatabase = openDatabase; self.defaults = defaults
+                defaults: @escaping () throws -> Defaults = { try Defaults.bundled() },
+                schema: @escaping () throws -> WriteSchema = { throw C1Failure(.internal, "No write schema.") },
+                now: @escaping () -> Date = Date.init) {
+        self.captureOne = captureOne; self.queue = queue; self.home = home; self.openDatabase = openDatabase
+        self.defaults = defaults; self.schema = schema; self.now = now; self.memory = DocumentMemory(home: home)
     }
 
     public func get(ids requested: [VariantID], changed: Bool = false) throws -> JSONValue {
-        var seen = Set<VariantID>()
-        let ids = requested.filter { seen.insert($0).inserted }
-        guard !ids.isEmpty, ids.count <= Self.maxGetIDs else {
-            throw C1Failure(.invalidArguments, "get takes 1–\(Self.maxGetIDs) ids, got \(ids.count).")
-        }
+        let ids = try Self.unique(requested, command: "get")
         let defaults = changed ? try self.defaults() : nil
-        let (results, routes) = try queue.run { () throws -> ([VariantID: ReadResult], [VariantID: Route]) in
-            let document = try captureOne.document()
-            let database = try openDatabase(document.databasePath)
-            guard database.kind == document.kind else {
-                throw C1Failure(.database, "The database at \(document.databasePath) is a \(database.kind.rawValue), but Capture One reports a \(document.kind.rawValue).")
-            }
-            let folders = try database.routes(for: ids)
-            let fallback: Route
-            switch document.kind {
-            case .catalog:
-                guard let allImages = try database.allImagesCollection() else {
-                    throw C1Failure(.database, "The Catalog database names no All Images collection.")
-                }
-                fallback = .allImages(allImages)
-            case .session:
-                fallback = .favoritesScan
-            }
-            var routes = Dictionary(uniqueKeysWithValues: ids.map { ($0, folders[$0].map(Route.collection) ?? fallback) })
-            var results = try captureOne.read(ids.map { ReadTarget($0, routes[$0]!) })
-            // SQLite lags Capture One, so a moved image can be missing from its recorded folder.
-            let retry = ids.filter { results[$0] == .notFound && routes[$0] != fallback }
-            if !retry.isEmpty {
-                for id in retry { routes[id] = fallback }
-                results.merge(try captureOne.read(retry.map { ReadTarget($0, fallback) })) { $1 }
-            }
-            return (results, routes)
-        }
+        let read = try queue.run { try liveRead(ids) }
         return .object(["variants": .array(ids.map { id -> JSONValue in
-            switch results[id] ?? .failed("Capture One returned no result for this id.") {
+            switch read.results[id] ?? .failed("Capture One returned no result for this id.") {
             case .state(let state):
                 guard case .object(var fields) = defaults?.changed(state) ?? state.json else { return state.json }
-                fields["route"] = .string(Self.describe(routes[id]!))
+                if defaults != nil, let bounds = state.cropBounds { fields["cropBounds"] = bounds.json }
+                fields["route"] = .string(Self.describe(read.routes[id]!))
                 return .object(fields)
             case .notFound:
                 return Self.variantError(id, "not-found", "Capture One has no variant \(id) in this document.")
@@ -61,6 +41,73 @@ public final class Service {
                 return Self.variantError(id, "read-failed", reason)
             }
         })])
+    }
+
+    static func unique(_ requested: [VariantID], command: String) throws -> [VariantID] {
+        var seen = Set<VariantID>()
+        let ids = requested.filter { seen.insert($0).inserted }
+        guard !ids.isEmpty, ids.count <= maxIDs else {
+            throw C1Failure(.invalidArguments, "\(command) takes 1–\(maxIDs) ids, got \(ids.count).")
+        }
+        return ids
+    }
+
+    struct LiveRead {
+        let document: LiveDocument
+        let database: Database
+        let results: [VariantID: ReadResult]
+        let routes: [VariantID: Route]
+    }
+
+    /// Reads live state in one Apple Event when the open document is the remembered one: routes come
+    /// from that document's database, and the read reports the live document. Call inside the queue.
+    func liveRead(_ ids: [VariantID]) throws -> LiveRead {
+        var candidate = memory.load()
+        for _ in 0..<3 {
+            let document = try candidate ?? captureOne.document()
+            let database: Database
+            let routes: [VariantID: Route]
+            let fallback: Route
+            do {
+                database = try openDatabase(document.databasePath)
+                guard database.kind == document.kind else {
+                    throw C1Failure(.database, "The database at \(document.databasePath) is a \(database.kind.rawValue), but Capture One reports a \(document.kind.rawValue).")
+                }
+                switch document.kind {
+                case .catalog:
+                    guard let allImages = try database.allImagesCollection() else {
+                        throw C1Failure(.database, "The Catalog database names no All Images collection.")
+                    }
+                    fallback = .allImages(allImages)
+                case .session:
+                    fallback = .favoritesScan
+                }
+                let collections = try database.routes(for: ids)
+                routes = Dictionary(uniqueKeysWithValues: ids.map { ($0, collections[$0].map(Route.collection) ?? fallback) })
+            } catch where candidate != nil {
+                memory.forget(); candidate = nil
+                continue
+            }
+            let batch = try captureOne.read(ids.map { ReadTarget($0, routes[$0]!) })
+            guard batch.document == document else {
+                candidate = batch.document
+                continue
+            }
+            memory.save(document)
+            var results = batch.results, settled = routes
+            // SQLite lags Capture One, so a moved image can be missing from its recorded collection.
+            let retry = ids.filter { results[$0] == .notFound && routes[$0] != fallback }
+            if !retry.isEmpty {
+                for id in retry { settled[id] = fallback }
+                let again = try captureOne.read(retry.map { ReadTarget($0, fallback) })
+                guard again.document == document else {
+                    throw C1Failure(.documentChanged, "Capture One's open document changed during the call.", hint: "Call it again.")
+                }
+                results.merge(again.results) { $1 }
+            }
+            return LiveRead(document: document, database: database, results: results, routes: settled)
+        }
+        throw C1Failure(.documentChanged, "Capture One's open document kept changing during the call.", hint: "Call it again.")
     }
 
     public func selection() throws -> JSONValue {
@@ -82,7 +129,12 @@ public final class Service {
     /// The database at `document`, a Catalog or Session path, or the live document's.
     func database(_ document: String?) throws -> Database {
         guard let document else {
-            return try openDatabase(try queue.run { try captureOne.document() }.databasePath)
+            let live = try queue.run { () throws -> LiveDocument in
+                let document = try captureOne.document()
+                memory.save(document)
+                return document
+            }
+            return try openDatabase(live.databasePath)
         }
         let url = URL(fileURLWithPath: document)
         switch url.pathExtension {

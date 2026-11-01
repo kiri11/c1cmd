@@ -5,6 +5,7 @@ enum ServiceTests {
     static func run() {
         catalogRoutesAndFallback()
         staleFolderFallsBack()
+        documentReadIsFolded()
         sessionFallsBackToFavorites()
         changedFiltering()
         timeoutReporting()
@@ -14,11 +15,11 @@ enum ServiceTests {
     }
 
     static func databasePaths() {
-        checkEqual(LiveDocument(kind: .session, name: "Shoot.cosessiondb", folder: "/s/Shoot", appVersion: "").databasePath,
+        checkEqual(LiveDocument(id: "/s/Shoot", kind: .session, name: "Shoot.cosessiondb", folder: "/s/Shoot", appVersion: "").databasePath,
                    "/s/Shoot/Shoot.cosessiondb", "a Session's name already carries the extension")
-        checkEqual(LiveDocument(kind: .catalog, name: "Main", folder: "/c/Main.cocatalog", appVersion: "").databasePath,
+        checkEqual(LiveDocument(id: "/c/Main.cocatalog", kind: .catalog, name: "Main", folder: "/c/Main.cocatalog", appVersion: "").databasePath,
                    "/c/Main.cocatalog/Main.cocatalogdb")
-        checkEqual(LiveDocument(kind: .catalog, name: "Main", folder: "/c/Main.cocatalogdb", appVersion: "").databasePath,
+        checkEqual(LiveDocument(id: "/c/Main.cocatalogdb", kind: .catalog, name: "Main", folder: "/c/Main.cocatalogdb", appVersion: "").databasePath,
                    "/c/Main.cocatalogdb", "an unpackaged Catalog")
     }
 
@@ -34,7 +35,7 @@ enum ServiceTests {
             Thread.detachNewThread {
                 defer { group.leave() }
                 let service = Service(captureOne: fake, queue: CaptureOneQueue(directory: directory, pollInterval: 0.002),
-                                      openDatabase: { _ in try Database(path: path) }, defaults: { defaults })
+                                      home: scratchDirectory("shared-queue-home-\(index)"), openDatabase: { _ in try Database(path: path) }, defaults: { defaults })
                 _ = index.isMultiple(of: 2) ? try? service.selection() : try? service.get(ids: [id("1")])
             }
         }
@@ -45,13 +46,16 @@ enum ServiceTests {
 
     static let defaults = Defaults(
         alwaysReported: ["variant": ["id"], "adjustments": ["temperature"], "lensCorrection": [], "layer": ["kind", "name"]],
-        defaults: ["variant": ["rating": .int(0)], "adjustments": ["exposure": .double(0), "contrast": .double(0)],
-                   "lensCorrection": ["distortion": .double(0)], "layer": ["opacity": .int(100)]])
+        defaults: ["variant": ["rating": .int(0), "color tag": .int(0), "crop": .array([.int(3000), .int(2000), .int(6000), .int(4000)])],
+                   "adjustments": ["exposure": .double(0), "contrast": .double(0), "rotation": .double(0)],
+                   "lensCorrection": ["distortion": .double(0)], "layer": ["opacity": .int(100), "enabled": .bool(true)]])
 
-    static func service(_ fake: FakeCaptureOne, _ name: String, documentType: Int = 1) -> Service {
-        let path = Fixture.make(name, documentType: documentType)
+    static func service(_ fake: FakeCaptureOne, _ name: String, documentType: Int = 1, extraSQL: String = "",
+                        now: @escaping () -> Date = Date.init) -> Service {
+        let path = Fixture.make(name, documentType: documentType, extraSQL: extraSQL)
         return Service(captureOne: fake, queue: CaptureOneQueue(directory: scratchDirectory("\(name)-queue")),
-                       openDatabase: { _ in try Database(path: path) }, defaults: { defaults })
+                       home: scratchDirectory("\(name)-home"), openDatabase: { _ in try Database(path: path) },
+                       defaults: { defaults }, schema: { WriteTests.schema }, now: now)
     }
 
     static func catalogRoutesAndFallback() {
@@ -69,6 +73,21 @@ enum ServiceTests {
         checkEqual(items[2]["route"], .string("all images 2"))
         checkEqual(items[3]["error"]?["code"], .string("not-found"), "a missing id fails alone")
         checkEqual(items[0]["adjustments"]?["temperature"], .double(5000), "full state without changed")
+        checkEqual(items[0]["cropBounds"]?["source"], .string("image"), "get reports cropBounds")
+    }
+
+    static func documentReadIsFolded() {
+        let fake = FakeCaptureOne()
+        fake.variants = [.collection(cid("10")): [id("1"): FakeCaptureOne.state("1")]]
+        let service = service(fake, "folded")
+        _ = try! service.get(ids: [id("1")])
+        _ = try! service.get(ids: [id("1")])
+        let read = FakeCaptureOne.Call.read([ReadTarget(id("1"), .collection(cid("10")))])
+        checkEqual(fake.calls, [.document, read, read], "after the first call, a get is one read that also reports the document")
+
+        fake.liveDocument = LiveDocument(id: "/other.cocatalog", kind: .catalog, name: "other", folder: "/other.cocatalog", appVersion: "16.8.5.30")
+        _ = try! service.get(ids: [id("1")])
+        checkEqual(fake.calls.count, 5, "a different live document makes c1 plan the read again")
     }
 
     static func staleFolderFallsBack() {
@@ -84,7 +103,7 @@ enum ServiceTests {
 
     static func sessionFallsBackToFavorites() {
         let fake = FakeCaptureOne()
-        fake.liveDocument = LiveDocument(kind: .session, name: "s", folder: "/s", appVersion: "16.8.5.30")
+        fake.liveDocument = LiveDocument(id: "/s", kind: .session, name: "s", folder: "/s", appVersion: "16.8.5.30")
         fake.variants = [.collection(cid("11")): [id("3"): FakeCaptureOne.state("3"), id("4"): FakeCaptureOne.state("4")]]
         let result = try! service(fake, "session", documentType: 0).get(ids: [id("3"), id("4")])
         checkEqual(fake.calls, [.document, .read([ReadTarget(id("3"), .collection(cid("11"))), ReadTarget(id("4"), .favoritesScan)])],
@@ -135,7 +154,8 @@ enum ServiceTests {
         check(script.contains("«property CVex» of a"), "non-background layers are read field by field")
         check(script.contains("with timeout of 30 seconds"), "the read runs under a timeout")
         check(script.contains("if n is in {-1712"), "a per-variant try rethrows a timeout instead of recording it")
-        check(script.contains("variant id \"1\" of collection id \"14\" of current document"), "the read names its route")
+        check(script.contains("variant id \"1\" of collection id \"14\" of d)"), "the read names its route")
+        check(script.contains("set info to {version, kind of d, name of d, folder of d, id of d}"), "the read reports the open document")
     }
 
     static func commandArguments() {

@@ -1,0 +1,191 @@
+import Foundation
+
+/// One writable Capture One property: its sdef name and code, its type, and its measured bounds.
+public struct FieldSpec: Equatable {
+    public enum Kind: Equatable {
+        case real, integer, boolean, text
+        /// Enumerator names mapped to their codes.
+        case enumeration([String: String])
+        /// Three 16-bit components.
+        case rgb
+        /// The crop: centre x, centre y, width and height in whole pixels.
+        case rectangle
+    }
+
+    public let name: String
+    public let code: String
+    public let kind: Kind
+    public let bound: Bound?
+
+    public init(name: String, code: String, kind: Kind, bound: Bound? = nil) {
+        self.name = name; self.code = code; self.kind = kind; self.bound = bound
+    }
+}
+
+/// A numeric field's accepted values, measured live by `scripts/v2-measure-bounds.py`.
+public struct Bound: Codable, Equatable {
+    /// nil: the measurement found no limit on that side.
+    public let min: Double?
+    public let max: Double?
+    /// When set, the only accepted values.
+    public let values: [Double]?
+
+    public init(min: Double? = nil, max: Double? = nil, values: [Double]? = nil) {
+        self.min = min; self.max = max; self.values = values
+    }
+
+    func accepts(_ value: Double) -> Bool {
+        if let values { return values.contains(value) }
+        return (min.map { value >= $0 } ?? true) && (max.map { value <= $0 } ?? true)
+    }
+
+    var description: String {
+        if let values { return "one of \(values.map(format).joined(separator: ", "))" }
+        switch (min, max) {
+        case let (low?, high?): return "within \(format(low))…\(format(high))"
+        case let (low?, nil): return "at least \(format(low))"
+        case let (nil, high?): return "at most \(format(high))"
+        case (nil, nil): return "finite"
+        }
+    }
+}
+
+func format(_ value: Double) -> String {
+    value.rounded() == value && abs(value) < 1e15 ? String(Int64(value)) : String(value)
+}
+
+/// The bounds table, `Resources/Bounds.json`, keyed by section then field name.
+public struct BoundsTable: Codable, Equatable {
+    public let build: String
+    public let fields: [String: [String: Bound]]
+
+    public init(build: String, fields: [String: [String: Bound]]) { self.build = build; self.fields = fields }
+
+    public static func bundled() throws -> BoundsTable {
+        guard let url = Bundle.module.url(forResource: "Bounds", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else {
+            throw C1Failure(.internal, "Bounds.json is missing from the C1Kit bundle.")
+        }
+        return try JSONDecoder().decode(BoundsTable.self, from: data)
+    }
+}
+
+/// The parts of a variant `set` writes, named as `get` reports them.
+public enum Section: String, CaseIterable {
+    case variant, adjustments, lensCorrection, layer
+
+    var classCode: String {
+        switch self {
+        case .variant: return "cvar"
+        case .adjustments: return "CVas"
+        case .lensCorrection: return "Clco"
+        case .layer: return "clyr"
+        }
+    }
+}
+
+/// What `set` and `revert` may write, from the sdef's names and types and the measured bounds.
+public struct WriteSchema {
+    public private(set) var fields: [Section: [String: FieldSpec]] = [:]
+    /// Writable numeric fields the bounds table lacks; c1 refuses them rather than guess.
+    public private(set) var unmeasured: [Section: Set<String>] = [:]
+    /// Everything the sdef lets a script write, including what c1 does not, for revert's report.
+    public private(set) var sdefWritable: [Section: Set<String>] = [:]
+
+    /// Variant and layer fields are an explicit list: the rest are browser state, metadata c1 does not
+    /// write (#50), or derived from the crop.
+    static let allowed: [Section: Set<String>] = [.variant: ["rating", "color tag", "crop"], .layer: ["enabled", "opacity"]]
+    /// Fields that move the crop's usable area. A patch cannot set them with the crop, whose bounds they change.
+    public static let boundsFields: [Section: Set<String>] = [
+        .adjustments: ["orientation", "flip", "rotation", "keystone amount", "keystone vertical", "keystone horizontal", "keystone skew", "keystone aspect"],
+        .lensCorrection: ["distortion", "tilt", "tilt direction", "shift", "shift direction", "shift x", "shift y", "hide distorted areas", "lens profile"],
+    ]
+    /// Geometry is the background's alone; a layer's adjustments never carry it.
+    static let geometryFields: Set<String> = boundsFields[.adjustments]!
+
+    public init(terminology: Terminology, bounds: BoundsTable) {
+        for section in Section.allCases {
+            for property in terminology.properties(ofClass: section.classCode) where property.writable {
+                sdefWritable[section, default: []].insert(property.name)
+                if let allowed = Self.allowed[section], !allowed.contains(property.name) { continue }
+                let kind: FieldSpec.Kind
+                switch property.type {
+                case "real": kind = .real
+                case "integer": kind = .integer
+                case "boolean": kind = .boolean
+                case "text": kind = .text
+                case "RGB color": kind = .rgb
+                case "rectangle": kind = .rectangle
+                case let type?:
+                    guard let enumerators = terminology.enumerators(type) else { continue }
+                    kind = .enumeration(enumerators)
+                case nil:
+                    continue
+                }
+                let bound = bounds.fields[section.rawValue]?[property.name]
+                if bound == nil, [.real, .integer, .rgb].contains(kind) {
+                    unmeasured[section, default: []].insert(property.name)
+                    continue
+                }
+                fields[section, default: [:]][property.name] = FieldSpec(name: property.name, code: property.code, kind: kind, bound: bound)
+            }
+        }
+    }
+
+    /// The field's spec and the value to send; throws `invalid-arguments` naming what is wrong.
+    public func validate(_ section: Section, _ name: String, _ value: JSONValue, layerAdjustments: Bool = false) throws -> FieldValue {
+        let place = layerAdjustments ? "a layer's adjustments" : section.rawValue
+        if layerAdjustments, Self.geometryFields.contains(name) {
+            throw C1Failure(.invalidArguments, "\(name) is geometry, which belongs to the variant's adjustments, not a layer's.")
+        }
+        guard let spec = fields[section]?[name] else {
+            if unmeasured[section]?.contains(name) == true {
+                throw C1Failure(.invalidArguments, "\(place).\(name) has no measured bounds on this build, so c1 does not write it.")
+            }
+            let known = (fields[section] ?? [:]).keys.sorted()
+            throw C1Failure(.invalidArguments, "\(place) has no writable field \"\(name)\"; writable: \(known.joined(separator: ", ")).")
+        }
+        func fail(_ expected: String) -> C1Failure {
+            C1Failure(.invalidArguments, "\(place).\(name) must be \(expected), got \(value.encoded()).")
+        }
+        func number(_ item: JSONValue, integral: Bool) throws -> Double {
+            guard let number = item.number, number.isFinite, !integral || number.rounded() == number else {
+                throw fail(integral ? "an integer" : "a number")
+            }
+            if let bound = spec.bound, !bound.accepts(number) { throw fail(bound.description) }
+            return number
+        }
+        switch spec.kind {
+        case .real:
+            return FieldValue(spec, .double(try number(value, integral: false)))
+        case .integer:
+            return FieldValue(spec, .int(Int64(try number(value, integral: true))))
+        case .boolean:
+            guard case .bool = value else { throw fail("true or false") }
+            return FieldValue(spec, value)
+        case .text:
+            guard case .string = value else { throw fail("text") }
+            return FieldValue(spec, value)
+        case .enumeration(let enumerators):
+            guard case .string(let text) = value, enumerators[text] != nil else {
+                throw fail("one of \(enumerators.keys.sorted().joined(separator: ", "))")
+            }
+            return FieldValue(spec, value)
+        case .rgb:
+            guard case .array(let items) = value, items.count == 3 else { throw fail("three integers") }
+            return FieldValue(spec, .array(try items.map { .int(Int64(try number($0, integral: true))) }))
+        case .rectangle:
+            guard case .array(let items) = value, items.count == 4 else {
+                throw fail("[centre x, centre y, width, height] in whole pixels")
+            }
+            let numbers = try items.map { item -> Double in
+                guard let number = item.number, number.isFinite, number.rounded() == number else {
+                    throw fail("[centre x, centre y, width, height] in whole pixels")
+                }
+                return number
+            }
+            guard numbers[2] >= 1, numbers[3] >= 1 else { throw fail("a rectangle at least 1 pixel wide and high") }
+            return FieldValue(spec, .array(numbers.map { .int(Int64($0)) }))
+        }
+    }
+}

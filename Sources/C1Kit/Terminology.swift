@@ -4,7 +4,9 @@ import Foundation
 /// returns records keyed by four-char codes; this turns them back into property names.
 /// Codes are not unique across the sdef, so properties resolve per class and enumerators per enumeration.
 public struct Terminology {
-    struct Property { let name: String; let type: String? }
+    struct Property { let name: String; let type: String?; var writable = true }
+
+    public struct PropertyInfo: Equatable { public let name: String; public let code: String; public let type: String?; public let writable: Bool }
 
     var classes: [String: [String: Property]] = [:]
     var enumerations: [String: [String: String]] = [:]
@@ -74,6 +76,17 @@ public struct Terminology {
         (classes[code] ?? [:]).keys.sorted()
     }
 
+    /// A class's properties with their codes, sdef types and whether they are writable, sorted by name.
+    public func properties(ofClass code: String) -> [PropertyInfo] {
+        (classes[code] ?? [:]).map { PropertyInfo(name: $0.value.name, code: $0.key, type: $0.value.type, writable: $0.value.writable) }
+            .sorted { $0.name < $1.name }
+    }
+
+    /// An enumeration's enumerator names mapped to their codes.
+    public func enumerators(_ enumeration: String) -> [String: String]? {
+        enumerations[enumeration].map { Dictionary($0.map { ($1, $0) }, uniquingKeysWith: { first, _ in first }) }
+    }
+
     /// One property of a class by name; nil for an unknown code or a value with no JSON form.
     public func field(ofClass classCode: String, code: String, _ descriptor: NSAppleEventDescriptor) -> (String, JSONValue)? {
         guard let property = classes[classCode]?[code], let value = decode(descriptor, type: property.type) else { return nil }
@@ -122,7 +135,7 @@ private final class SdefParser: NSObject, XMLParserDelegate {
     var enumerations: [String: [String: String]] = [:]
     private var currentClass: ParsedClass?
     private var currentEnumeration: String?
-    private var pendingProperty: (code: String, name: String, type: String?)?
+    private var pendingProperty: (code: String, name: String, type: String?, writable: Bool)?
 
     func parser(_ parser: XMLParser, didStartElement element: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
         switch element {
@@ -136,7 +149,7 @@ private final class SdefParser: NSObject, XMLParserDelegate {
             }
         case "property":
             if currentClass != nil, let name = attributes["name"], let code = attributes["code"] {
-                pendingProperty = (code, name, attributes["type"])
+                pendingProperty = (code, name, attributes["type"], attributes["access"] != "r")
             }
         case "type":
             if pendingProperty?.type == nil { pendingProperty?.type = attributes["type"] }
@@ -156,7 +169,7 @@ private final class SdefParser: NSObject, XMLParserDelegate {
         switch element {
         case "property":
             if let property = pendingProperty, currentClass?.properties[property.code] == nil {
-                currentClass?.properties[property.code] = .init(name: property.name, type: property.type)
+                currentClass?.properties[property.code] = .init(name: property.name, type: property.type, writable: property.writable)
             }
             pendingProperty = nil
         case "class", "record-type", "class-extension":
