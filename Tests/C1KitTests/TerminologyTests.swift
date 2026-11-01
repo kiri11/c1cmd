@@ -32,6 +32,33 @@ enum TerminologyTests {
         perClassCodes(terminology)
         scalars(terminology)
         specifiers()
+        builtInTerms()
+    }
+
+    static func builtInTerms() {
+        let text = try! String(contentsOfFile: Generated.sdef, encoding: .utf8)
+        let full = try! Terminology(sdef: Data(text.utf8))
+        let builtIn = WriteSchema(terminology: .snapshot, bounds: try! BoundsTable.bundled())
+        let live = WriteSchema(terminology: full, bounds: try! BoundsTable.bundled())
+        checkEqual(builtIn.fields, live.fields, "the built-in terms give set the same fields as the full sdef")
+        checkEqual(builtIn.sdefWritable, live.sdefWritable)
+        check(Terminology.snapshot.enumerators("documentType")?["catalog"] != nil, "the document kind enumeration is built in")
+        check(!Terminology.snapshot.propertyCodes(ofClass: "LRSt").isEmpty, "classes named by property types are followed: a layer's luma range")
+        check(Terminology.snapshot.propertyCodes(ofClass: "COrp").isEmpty, "classes c1 does not read stay out")
+        checkEqual(full.used().differences(from: .snapshot), [], "the snapshot is the 16.8.5.30 sdef's used terms")
+
+        let changed = try! Terminology(sdef: Data(text.replacingOccurrences(of: #"name="exposure" type="real" code="CVex""#,
+                                                                               with: #"name="exposure value" type="real" code="CVex""#).utf8))
+        checkEqual(changed.used().differences(from: .snapshot),
+                   ["class adjustment settings (CVas) property CVex: exposure: real became exposure value: real"], "a renamed term is reported")
+        let fake = FakeCaptureOne()
+        let doctor = try! ServiceTests.service(fake, "terms-drift", now: { Date(timeIntervalSince1970: 0) }, liveTerms: { changed.used() }).doctor()
+        check(doctor["warnings"]?.arrayValue?.contains { $0.stringValue?.contains("exposure value") == true } == true,
+              "doctor warns about a differing term: \(doctor.encoded())")
+        checkEqual(doctor["c1"]?["version"], .string("dev"), "doctor reports c1's version")
+        let missing = try! ServiceTests.service(fake, "terms-missing", liveTerms: { try Terminology.load(path: "/nonexistent.sdef") }).doctor()
+        check(missing["warnings"]?.arrayValue?.contains { $0.stringValue?.contains("cannot read Capture One's sdef") == true } == true,
+              "doctor warns when it cannot read the live sdef")
     }
 
     static func code(_ text: String) -> FourCharCode { text.utf8.reduce(0) { $0 << 8 | FourCharCode($1) } }

@@ -3,13 +3,76 @@ import Foundation
 /// Capture One's scripting terminology, parsed from its sdef at runtime. In-process NSAppleScript
 /// returns records keyed by four-char codes; this turns them back into property names.
 /// Codes are not unique across the sdef, so properties resolve per class and enumerators per enumeration.
-public struct Terminology {
-    struct Property { let name: String; let type: String?; var writable = true }
+public struct Terminology: Codable, Equatable {
+    struct Property: Codable, Equatable { let name: String; let type: String?; var writable = true }
 
     public struct PropertyInfo: Equatable { public let name: String; public let code: String; public let type: String?; public let writable: Bool }
 
     var classes: [String: [String: Property]] = [:]
+    /// Class and record-type names mapped to their codes, so property types can be followed.
+    var classCodes: [String: String] = [:]
     var enumerations: [String: [String: String]] = [:]
+
+    /// The classes c1 reads and writes, and the enumeration of `kind of document`; `used` adds every class and
+    /// enumeration their properties name.
+    static let usedClasses = ["cvar", "CVas", "Clco", "clyr", "CCba", "CCad", "Cpcv"]
+    static let usedEnumerations = ["documentType"]
+
+    /// The terms c1 uses from Capture One 16.8.5.30's sdef, built in so validation and `--help` need no Capture One.
+    public static let snapshot: Terminology = {
+        do { return try JSONDecoder().decode(Terminology.self, from: Data(Embedded.terms.utf8)) }
+        catch { fatalError("The built-in sdef terms do not decode: \(error)") }
+    }()
+
+    /// The terms c1 uses: its classes, the classes and enumerations their properties name, transitively.
+    public func used() -> Terminology {
+        var used = Terminology()
+        var pending = Self.usedClasses
+        var enumerationNames = Set(Self.usedEnumerations)
+        while let code = pending.popLast() {
+            guard used.classes[code] == nil, let properties = classes[code] else { continue }
+            used.classes[code] = properties
+            for type in properties.values.compactMap(\.type) {
+                if let classCode = classCodes[type] {
+                    used.classCodes[type] = classCode
+                    pending.append(classCode)
+                } else if enumerations[type] != nil {
+                    enumerationNames.insert(type)
+                }
+            }
+        }
+        for (name, code) in classCodes where used.classes[code] != nil { used.classCodes[name] = code }
+        for name in enumerationNames { used.enumerations[name] = enumerations[name] }
+        return used
+    }
+
+    /// The terms that differ from `other`, as readable lines; empty when they match.
+    public func differences(from other: Terminology) -> [String] {
+        var lines: [String] = []
+        let names = Dictionary(classCodes.map { ($1, $0) }, uniquingKeysWith: min).merging(Dictionary(other.classCodes.map { ($1, $0) }, uniquingKeysWith: min)) { a, _ in a }
+        for code in Set(classes.keys).union(other.classes.keys).sorted() {
+            let label = "class \(names[code] ?? code) (\(code))"
+            let mine = classes[code] ?? [:], theirs = other.classes[code] ?? [:]
+            if mine.isEmpty != theirs.isEmpty { lines.append("\(label) \(mine.isEmpty ? "added" : "missing")"); continue }
+            for property in Set(mine.keys).union(theirs.keys).sorted() where mine[property] != theirs[property] {
+                func describe(_ p: Property?) -> String { p.map { "\($0.name): \($0.type ?? "no type")\($0.writable ? "" : ", read-only")" } ?? "absent" }
+                lines.append("\(label) property \(property): \(describe(theirs[property])) became \(describe(mine[property]))")
+            }
+        }
+        for name in Set(enumerations.keys).union(other.enumerations.keys).sorted() where enumerations[name] != other.enumerations[name] {
+            lines.append("enumeration \(name) changed")
+        }
+        return lines
+    }
+
+    /// The terms as sorted JSON, the form `snapshot` is built in.
+    public func encoded() -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+        return String(decoding: try! encoder.encode(self), as: UTF8.self)
+    }
+
+    init() {}
 
     public static let defaultSdefPath = "/Applications/Capture One.app/Contents/Resources/CaptureOne.sdef"
 
@@ -28,6 +91,7 @@ public struct Terminology {
             throw C1Failure(.scriptError, "Cannot parse Capture One's sdef: \(xml.parserError?.localizedDescription ?? "unknown error").")
         }
         enumerations = parser.enumerations
+        for parsed in parser.classes { classCodes[parsed.name] = parsed.code }
         // A class can be declared in several suites under one code (application), so merge by code.
         for parsed in parser.classes {
             classes[parsed.code, default: [:]].merge(parsed.properties) { old, _ in old }

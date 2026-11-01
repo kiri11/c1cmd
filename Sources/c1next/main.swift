@@ -25,8 +25,7 @@ if let index = arguments.firstIndex(of: "--document") {
 guard arguments.count <= 1 else { fail(C1Failure(.invalidArguments, "Pass the arguments as one JSON object.")) }
 
 do {
-    // A database read with --document must work where Capture One is not installed.
-    let terminology = document == nil ? try Terminology.load() : try Terminology(sdef: Data("<dictionary/>".utf8))
+    let terminology = Terminology.snapshot
     let captureOne = AppleScriptCaptureOne(terminology: terminology)
     if ProcessInfo.processInfo.environment["C1_TRACE"] != nil {
         captureOne.trace = { FileHandle.standardError.write(Data("[c1next] \($0)\n".utf8)) }
