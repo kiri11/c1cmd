@@ -35,6 +35,10 @@ SECTIONS = [
     ('lensCorrection', 'lens correction settings', '«property vlns» of v', None),
     ('variant', 'variant', 'v', {'rating', 'color tag'}),
     ('layer', 'layer', f'(first layer of v whose name is "{LAYER}")', {'opacity'}),
+    ('basicColor', 'basic color correction', 'basic color correction "red" of color editor settings of «property vset» of v', None),
+    # A new correction picks no color; its ranges are measured around that, so a range Capture One narrows
+    # around another color is still refused there.
+    ('advancedColor', 'advanced color correction', 'advanced color correction 1 of color editor settings of «property vset» of v', None),
 ]
 ORIENTATIONS = [0, 90, 180, 270]
 # Lens facts of the image's own lens, not settings: a fixed lens accepts only its focal length, and tilt
@@ -153,6 +157,7 @@ def main():
                                                       'tell application "/Applications/Capture One.app" to return id of current document as text'], text=True))
         probe = Probe(document, variant, probes)
         probe.run(f'make new layer of v with properties {{name:"{LAYER}", kind:adjustment}}')
+        probe.run('make new advanced color correction at color editor settings of «property vset» of v')
         version = json.loads(probe.run('return version')[0])
         fields = json.loads(args.output.read_text())['fields'] if args.only else {}
         codes = {(section, name): code for section, _, name, code, _ in numeric_fields()}
