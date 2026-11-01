@@ -5,7 +5,7 @@ extension Command {
     public static let usage = """
         usage: c1 <command> '<json>' [--document <path>] [--pretty]
                c1 <command> --help
-               c1 --help | --version
+               c1 --help | --version | --commands
         """
 
     public static var overview: String {
