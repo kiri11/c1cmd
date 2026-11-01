@@ -18,7 +18,7 @@ public enum Command: String, CaseIterable {
         case .selection: return "Read the ids of the variants selected in Capture One."
         case .preview: return "Export a JPEG of one variant: the crop at a long edge, the full frame with a pixel mapping, or a region at a scale."
         case .cropPreview: return "Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written."
-        case .contactSheet: return "Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events."
+        case .contactSheet: return "Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events; fillMissing exports the photos the cache lacks."
         case .thumb: return "Read the camera's embedded JPEG of one variant's original, without Capture One's edits."
         }
     }
@@ -34,7 +34,7 @@ public enum Command: String, CaseIterable {
         case .revert: return ["ids", "scope"]
         case .preview: return ["id", "size", "fullFrame", "region", "scale", "timeout"]
         case .cropPreview: return ["id", "candidates", "size", "timeout"]
-        case .contactSheet: return ["rating", "minRating", "colorTag", "collection", "ids", "edited", "after", "perPage", "rowHeight"]
+        case .contactSheet: return ["rating", "minRating", "colorTag", "collection", "ids", "edited", "after", "perPage", "rowHeight", "fillMissing", "timeout"]
         case .thumb: return ["id", "maxSize"]
         }
     }

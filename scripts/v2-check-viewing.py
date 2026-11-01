@@ -259,6 +259,21 @@ def main():
         assert len(sheet['tiles']) == 20, sheet
         timed('contact_sheet 20 photos', {}, 'contact_sheet')
 
+        # fillMissing exports the photos the cache lacks; a second call reuses those exports.
+        gaps = [t['id'] for t in sheet['tiles'] if t['status'] != 'shown']
+        gap_before = live.get(gaps[0])[0] if gaps else None
+        filled, cold = live.run('contact_sheet', {'fillMissing': True})
+        again, warm = live.run('contact_sheet', {'fillMissing': True})
+        statuses = [t['status'] for t in filled['tiles']]
+        reused = [t.get('reused') for t in again['tiles'] if t['status'] == 'exported']
+        report['fillMissing'] = dict(gaps=len(gaps), seconds=dict(cold=round(cold, 2), reused=round(warm, 2)), path=filled.get('path'),
+                                     statuses=statuses, reusedOnSecondCall=reused, warnings=filled.get('warnings'),
+                                     errors=[t['fillError'] for t in filled['tiles'] if 'fillError' in t])
+        report['fillMissing']['ok'] = (all(s in ('shown', 'exported') for s in statuses) and statuses.count('exported') == len(gaps)
+                                       and len(reused) == len(gaps) and all(reused))
+        if gaps:
+            report['getUnchanged']['fillMissing'] = live.get(gaps[0])[0] == gap_before
+
         timed('thumb (ImageIO) 1500', {'id': variant}, 'thumb')
         timed('thumb (ImageIO) full size', {'id': variant, 'maxSize': 8192}, 'thumb')
         report['thumb'] = live.run('thumb', {'id': variant})[0]
@@ -276,6 +291,8 @@ def main():
         failed += ['regionMatchesOverview'] if not report['regionMatchesOverview']['comparison']['ok'] else []
         failed += [k for k in ('reconfigureChangedExport', 'writeChangedExport') if report['races'][k]]
         failed += ['revertRestoresStart'] if not report['revertRestoresStart'] else []
+        failed += ['fillMissing'] if not report['fillMissing']['ok'] else []
+        failed += [k for k, v in report['getUnchanged'].items() if not v]
         report['failed'] = failed
         assert not failed, failed
         fixture.close()

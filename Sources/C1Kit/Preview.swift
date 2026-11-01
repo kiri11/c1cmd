@@ -134,13 +134,15 @@ enum Preview {
         return CanvasRect(centerX: W / 2, centerY: H / 2, width: width, height: width / aspect)
     }
 
-    /// Fields that do not change a full-frame render.
-    static func rendersAlike(_ name: String) -> Bool { name == "crop" || name.hasPrefix("crop ") || name == "rating" || name == "color tag" }
+    /// Fields that do not change a full-frame render; a cropped render differs only in rating and color tag.
+    static func rendersAlike(_ name: String, cropped: Bool) -> Bool {
+        name == "rating" || name == "color tag" || (!cropped && (name == "crop" || name.hasPrefix("crop ")))
+    }
 
-    /// Names a full-frame render of `state` at `longEdge`: equal for states that differ only in crop or metadata.
-    static func cacheKey(_ state: VariantState, longEdge: Int) -> String {
+    /// Names a render of `state` at `longEdge`: equal for states that render alike.
+    static func cacheKey(_ state: VariantState, longEdge: Int, cropped: Bool = false) -> String {
         guard case .object(var fields) = state.json else { return "" }
-        fields["variant"] = .object(state.variant.filter { !rendersAlike($0.key) })
+        fields["variant"] = .object(state.variant.filter { !rendersAlike($0.key, cropped: cropped) })
         fields["longEdge"] = .int(Int64(longEdge))
         let digest = SHA256.hash(data: Data(JSONValue.object(fields).encoded().utf8))
         return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
