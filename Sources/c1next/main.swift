@@ -17,6 +17,9 @@ switch arguments.first {
 case nil: usageError("give a command, or --help.")
 case "--help", "-h", "help": print(Command.overview); exit(0)
 case "--version": print(C1Version.current); exit(0)
+case "--commands":
+    print(JSONValue.array(Command.allCases.map { .object(["name": .string($0.rawValue), "readOnly": .bool($0.readOnly), "summary": .string($0.summary)]) }).encoded())
+    exit(0)
 default: break
 }
 guard let command = Command(rawValue: arguments.removeFirst()) else {
