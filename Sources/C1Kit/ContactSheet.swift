@@ -155,16 +155,79 @@ public struct ContactSheetArguments: Decodable {
     public var edited: Bool?
     public var after: VariantID?
     public var perPage, rowHeight: Int?
+    /// Exports the photos the cache lacks through Capture One, and reuses those exports until a setting changes.
+    public var fillMissing: Bool?
+    public var timeout: Double?
 
-    public init(ids: [VariantID]? = nil, minRating: Int? = nil, after: VariantID? = nil, perPage: Int? = nil, rowHeight: Int? = nil) {
+    public init(ids: [VariantID]? = nil, minRating: Int? = nil, after: VariantID? = nil, perPage: Int? = nil, rowHeight: Int? = nil,
+                fillMissing: Bool? = nil, timeout: Double? = nil) {
         self.ids = ids; self.minRating = minRating; self.after = after; self.perPage = perPage; self.rowHeight = rowHeight
+        self.fillMissing = fillMissing; self.timeout = timeout
     }
 }
 
+enum TileFill {
+    case exported(CGImage, reused: Bool)
+    case failed(String)
+}
+
 extension Service {
-    /// Tiles Capture One's cached thumbnails for one page of `list`'s scope, from SQLite and the cache only.
+    static let tileEdge = 1024
+
+    /// Starts an export for each id in one queue slot, reusing a tile exported from the same settings, then waits
+    /// for the files outside the queue. A variant Capture One lacks or a late file fails its tile, not the sheet.
+    func exportTiles(_ ids: [VariantID], documentUUID: String, timeout: Double) throws -> (fills: [VariantID: TileFill], outputSet: Bool) {
+        var fills: [VariantID: TileFill] = [:]
+        var pending: [(VariantID, URL)] = []
+        var outputSet = false
+        try queue.run {
+            let read = try liveRead(ids)
+            guard read.database.documentUUID == documentUUID else {
+                throw C1Failure(.documentChanged, "fillMissing exports through Capture One, whose open document is not this sheet's.",
+                                hint: "Open that document in Capture One, or leave out fillMissing.")
+            }
+            let folder = previewsRoot.appendingPathComponent(documentUUID)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for id in ids {
+                let state: VariantState
+                switch read.results[id] ?? .notFound {
+                case .state(let found): state = found
+                case .notFound: fills[id] = .failed("Capture One has no variant \(id) in this document."); continue
+                case .failed(let reason): fills[id] = .failed(reason); continue
+                }
+                let file = folder.appendingPathComponent("tile-\(id)-\(Preview.cacheKey(state, longEdge: Self.tileEdge, cropped: true)).jpg")
+                if let image = Images.decodeJPEG(file) {
+                    try? FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: file.path)
+                    fills[id] = .exported(image, reused: true)
+                    continue
+                }
+                let request = ExportRequest(target: ReadTarget(id, read.routes[id]!), longEdge: Self.tileEdge, fullFrame: false, file: file)
+                do {
+                    if try captureOne.export(request, in: read.document) { outputSet = true }
+                    pending.append((id, file))
+                } catch let failure as C1Failure where failure.code == .notFound {
+                    fills[id] = .failed(failure.message)
+                }
+            }
+        }
+        let deadline = Date().addingTimeInterval(timeout)
+        for (id, file) in pending {
+            do {
+                fills[id] = .exported(try Preview.waitForJPEG(file, timeout: max(0.1, deadline.timeIntervalSinceNow)), reused: false)
+            } catch let failure as C1Failure {
+                fills[id] = .failed(failure.message)
+            }
+        }
+        return (fills, outputSet)
+    }
+
+    /// Tiles Capture One's cached thumbnails for one page of `list`'s scope, from SQLite and the cache only, unless
+    /// `fillMissing` exports the gaps.
     public func contactSheet(_ arguments: ContactSheetArguments, document: String? = nil) throws -> JSONValue {
         let layout = try SheetLayout(perPage: arguments.perPage, rowHeight: arguments.rowHeight)
+        let fillMissing = arguments.fillMissing ?? false
+        guard fillMissing || arguments.timeout == nil else { throw C1Failure(.invalidArguments, "timeout goes with fillMissing.") }
+        let timeout = try Preview.timeout(arguments.timeout)
         let database = try self.database(document)
         let query = ListQuery(rating: arguments.rating, minRating: arguments.minRating, colorTag: arguments.colorTag, collection: arguments.collection,
                               ids: arguments.ids, edited: arguments.edited, after: arguments.after, limit: layout.perPage)
@@ -174,7 +237,7 @@ extension Service {
         guard !rows.isEmpty else { return .object(output.merging(["tiles": .array([])]) { $1 }) }
         let originals = try database.originals(rows.map(\.id))
         let databaseFolder = URL(fileURLWithPath: database.path).deletingLastPathComponent()
-        let tiles = rows.map { row -> Tile in
+        var tiles = rows.map { row -> Tile in
             let original = originals[row.id]
             let location: URL?
             switch database.kind {
@@ -191,9 +254,25 @@ extension Service {
             }
             return Tile.read(location)
         }
+        var fills: [VariantID: TileFill] = [:]
+        var warnings: [String] = []
+        let gaps = rows.indices.filter { if case .shown = tiles[$0] { return false }; return true }
+        if fillMissing, !gaps.isEmpty {
+            let exported = try exportTiles(gaps.map { rows[$0].id }, documentUUID: database.documentUUID, timeout: timeout)
+            fills = exported.fills
+            for index in gaps {
+                // An export already carries the variant's crop.
+                if case .exported(let image, _)? = fills[rows[index].id] { tiles[index] = .shown(image, crop: .fullFrame) }
+            }
+            if exported.outputSet {
+                warnings.append("The Catalog's output folder was unset or missing, and Capture One refuses every export then, so c1 set it to \(previewsRoot.appendingPathComponent(database.documentUUID).path). Choose another in Capture One's Output tool if you like.")
+            }
+        }
         let arrangement = layout.arrange(tiles.map(\.aspect))
         let canvas = Images.Canvas(width: arrangement.width, height: arrangement.height, background: Images.background)
-        let header = "\(database.kind.rawValue) · \(rows.first!.id)–\(rows.last!.id) · Capture One thumbnail cache · \(ISO8601DateFormatter().string(from: now()))"
+        let exportedCount = fills.values.filter { if case .exported = $0 { return true }; return false }.count
+        let source = exportedCount > 0 ? "Capture One thumbnail cache + \(exportedCount) exported" : "Capture One thumbnail cache"
+        let header = "\(database.kind.rawValue) · \(rows.first!.id)–\(rows.last!.id) · \(source) · \(ISO8601DateFormatter().string(from: now()))"
         canvas.text(header, in: CGRect(x: SheetLayout.gutter, y: 0, width: arrangement.width - 2 * SheetLayout.gutter, height: SheetLayout.headerHeight),
                     size: 12, color: Images.text)
         var items: [JSONValue] = []
@@ -201,6 +280,10 @@ extension Service {
             var item: [String: JSONValue] = ["id": .string(row.id.description), "name": row.name.map(JSONValue.string) ?? .null,
                                              "rating": .int(Int64(row.rating)), "cell": Self.pixelJSON(cell)]
             switch tile {
+            case .shown(let image, _) where fills[row.id] != nil:
+                canvas.draw(image, from: tile.visible, in: cell)
+                item["status"] = .string("exported")
+                if case .exported(_, let reused)? = fills[row.id] { item["reused"] = .bool(reused) }
             case .shown(let image, let crop):
                 canvas.draw(image, from: tile.visible, in: cell)
                 switch crop {
@@ -218,6 +301,7 @@ extension Service {
                 canvas.fill(cell, Images.placeholder)
                 canvas.text(missing ? "NO CACHE" : "UNREADABLE", in: cell.insetBy(dx: 4, dy: 0), size: 15, color: Images.dimText, centered: true)
                 item["status"] = .string(missing ? "missing" : "unreadable")
+                if case .failed(let reason)? = fills[row.id] { item["fillError"] = .string(reason) }
             }
             canvas.text("\(row.id) · ★\(row.rating) · \(row.name ?? "")",
                         in: CGRect(x: cell.minX, y: cell.maxY, width: cell.width, height: CGFloat(SheetLayout.labelHeight)), size: 11, color: Images.text)
@@ -231,6 +315,7 @@ extension Service {
         output["width"] = .int(Int64(arrangement.width))
         output["height"] = .int(Int64(arrangement.height))
         output["tiles"] = .array(items)
+        if !warnings.isEmpty { output["warnings"] = .array(warnings.map(JSONValue.string)) }
         return .object(output)
     }
 }

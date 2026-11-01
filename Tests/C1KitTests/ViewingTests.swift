@@ -13,6 +13,7 @@ enum ViewingTests {
         pruning()
         sheetLayout()
         contactSheet()
+        contactSheetFillsGaps()
         thumbOfAJPEG()
         commandTable()
     }
@@ -272,6 +273,52 @@ enum ViewingTests {
                                              document: scratchURL("viewing-sheet").appendingPathComponent("viewing-sheet.cocatalogdb").path)
         checkEqual(next?["tiles"]?.arrayValue?.count, 1)
         checkEqual(next?["next"], nil)
+    }
+
+    /// Variant 3 lives in the fixture's subfolder, collection 11.
+    static func subfolderFake() -> FakeCaptureOne {
+        let fake = FakeCaptureOne()
+        fake.variants = [.collection(cid("11")): [id("3"): small("3")]]
+        return fake
+    }
+
+    static func contactSheetFillsGaps() {
+        let fake = subfolderFake()
+        let (service, _) = service(fake, "viewing-fill")
+        let document = scratchURL("viewing-fill").appendingPathComponent("viewing-fill.cocatalogdb").path
+        writeCot(scratchURL("viewing-fill").appendingPathComponent("Cache/Thumbnails/00000001.cot"), width: 300, height: 200, comment: "3|0;0;0|0;200;300;0|0")
+        checkFailure(.invalidArguments, containing: "timeout goes with fillMissing") {
+            _ = try service.contactSheet(ContactSheetArguments(perPage: 3, timeout: 30), document: document)
+        }
+        func sheet() -> [JSONValue] {
+            (try? service.contactSheet(ContactSheetArguments(perPage: 3, fillMissing: true), document: document))?["tiles"]?.arrayValue ?? []
+        }
+        let first = sheet()
+        checkEqual(first.map { $0["status"] }, [.string("shown"), .string("missing"), .string("exported")],
+                   "a cached tile stays; a gap Capture One has is exported; one it lacks stays missing")
+        check(first.count == 3 && first[1]["fillError"]?.stringValue?.contains("no variant 2") == true, "the unfilled gap says why")
+        checkEqual(first.last?["reused"], .bool(false))
+        checkEqual(exports(fake).map { [$0.target.id.description, "\($0.longEdge)", "\($0.fullFrame)"] }, [["3", "1024", "false"]],
+                   "only the gap is exported, cropped, at the tile edge")
+        if let cell = first.last?["cell"], let w = cell["width"]?.number, let h = cell["height"]?.number {
+            check(abs(w / h - 1.5) < 0.02, "the exported tile keeps the crop's proportions: \(w)×\(h)")
+        }
+
+        fake.variants[.collection(cid("11"))]![id("3")]!.variant["rating"] = .int(5)
+        checkEqual(sheet().last?["reused"], .bool(true), "a rating change reuses the export")
+        checkEqual(exports(fake).count, 1)
+
+        fake.variants[.collection(cid("11"))]![id("3")]!.variant["crop"] = .array([300, 200, 400, 400].map(JSONValue.double))
+        checkEqual(sheet().last?["reused"], .bool(false), "a crop change exports again")
+        checkEqual(exports(fake).count, 2)
+
+        let late = subfolderFake()
+        late.exportDelay = 5
+        let (slow, _) = ViewingTests.service(late, "viewing-fill-late")
+        let slowDocument = scratchURL("viewing-fill-late").appendingPathComponent("viewing-fill-late.cocatalogdb").path
+        let tiles = (try? slow.contactSheet(ContactSheetArguments(perPage: 3, fillMissing: true, timeout: 1), document: slowDocument))?["tiles"]?.arrayValue ?? []
+        check(tiles.count == 3 && tiles[2]["status"] == JSONValue.string("missing") && tiles[2]["fillError"]?.stringValue?.contains("may still land") == true,
+              "a late export leaves its tile missing and says where it may land, without failing the sheet")
     }
 
     static func thumbOfAJPEG() {
