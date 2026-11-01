@@ -69,12 +69,11 @@ public struct LiveDocument: Equatable {
 
     public var databasePath: String {
         let url = URL(fileURLWithPath: folder)
-        switch kind {
-        case .catalog:
-            return url.pathExtension == "cocatalogdb" ? url.path : url.appendingPathComponent("\(name).cocatalogdb").path
-        case .session:
-            return url.appendingPathComponent("\(name).cosessiondb").path
-        }
+        let file = kind == .catalog ? "cocatalogdb" : "cosessiondb"
+        if url.pathExtension == file { return url.path }
+        // A Session's name carries the extension; a Catalog's does not.
+        let base = name.hasSuffix(".\(file)") ? String(name.dropLast(file.count + 1)) : name
+        return url.appendingPathComponent("\(base).\(file)").path
     }
 }
 

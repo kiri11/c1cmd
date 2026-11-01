@@ -58,7 +58,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
 
     public func read(_ targets: [ReadTarget]) throws -> [VariantID: ReadResult] {
         guard !targets.isEmpty else { return [:] }
-        let result = try run(Self.readScript(targets, timeoutSeconds: timeoutSeconds))
+        let result = try run(Self.readScript(targets, timeoutSeconds: timeoutSeconds, layerFields: terminology.propertyCodes(ofClass: Self.adjustmentsClass)))
         var output: [VariantID: ReadResult] = [:]
         for item in list(result) {
             let fields = list(item)
@@ -68,13 +68,25 @@ public final class AppleScriptCaptureOne: CaptureOne {
         return output
     }
 
-    public static func readScript(_ targets: [ReadTarget], timeoutSeconds: Int) -> String {
+    static let adjustmentsClass = "CVas"
+
+    /// Capture One refuses `properties of adjustments` on a layer other than the background (-50),
+    /// so those layers are read one field at a time by raw code; unsupported fields raise and are skipped.
+    public static func readScript(_ targets: [ReadTarget], timeoutSeconds: Int, layerFields: [String]) -> String {
         let fatal = "{\(fatalErrors.map(String.init).joined(separator: ", "))}"
         let notFound = "{\(notFoundErrors.sorted().map(String.init).joined(separator: ", "))}"
         func reads(_ id: VariantID) -> String {
-            "{\"\(id)\", true, properties of v, properties of lens correction of v, properties of every layer of v, properties of adjustments of every layer of v}"
+            "{\"\(id)\", true, properties of v, properties of lens correction of v, properties of every layer of v, properties of adjustments of v, my layerFields(v)}"
         }
-        var lines = ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds", "set out to {}"]
+        var lines = ["on layerFields(v)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
+                     "set kinds to kind of every layer of v", "set out to {}", "repeat with i from 1 to count of kinds",
+                     "set fields to {}", "if item i of kinds is not background then", "set a to a reference to adjustments of layer i of v"]
+        for code in layerFields {
+            lines += ["try", "set end of fields to {\"\(code)\", «property \(code)» of a}",
+                      "on error e number n", "if n is in \(fatal) then error e number n", "end try"]
+        }
+        lines += ["end if", "set end of out to fields", "end repeat", "return out", "end timeout", "end tell", "end layerFields"]
+        lines += ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds", "set out to {}"]
         if targets.contains(where: { $0.route == .favoritesScan }) {
             lines.append("set favorites to every collection of current document whose kind is favorite")
         }
@@ -128,25 +140,26 @@ public final class AppleScriptCaptureOne: CaptureOne {
             let message = fields.count > 3 ? fields[3].stringValue ?? "" : ""
             return .failed("Capture One error \(number): \(message)")
         }
-        guard fields.count == 6 else { return .failed("Unexpected read result with \(fields.count) items.") }
+        guard fields.count == 7 else { return .failed("Unexpected read result with \(fields.count) items.") }
         let variant = terminology.record(fields[2]).filter { !Self.isDroppedVariantField($0.key) }
         let lens = terminology.record(fields[3])
         let layerRecords = list(fields[4]).map(terminology.record)
-        let layerAdjustments = list(fields[5]).map(terminology.record)
-        guard layerRecords.count == layerAdjustments.count else {
-            return .failed("Capture One returned \(layerRecords.count) layers but \(layerAdjustments.count) layer adjustments.")
+        let adjustments = terminology.record(fields[5])
+        let layerFields = list(fields[6])
+        guard layerRecords.count == layerFields.count else {
+            return .failed("Capture One returned \(layerRecords.count) layers but \(layerFields.count) layer field lists.")
         }
-        var adjustments: [String: JSONValue]?
-        var layers: [[String: JSONValue]] = []
-        for (layer, layerAdjustment) in zip(layerRecords, layerAdjustments) {
-            if layer["kind"] == .string("background") {
-                adjustments = layerAdjustment
-                layers.append(layer)
-            } else {
-                layers.append(layer.merging(["adjustments": .object(layerAdjustment)]) { $1 })
+        let layers = zip(layerRecords, layerFields).map { layer, pairs -> [String: JSONValue] in
+            guard layer["kind"] != .string("background") else { return layer }
+            var values: [String: JSONValue] = [:]
+            for pair in list(pairs) {
+                let items = list(pair)
+                guard items.count == 2, let code = items[0].stringValue,
+                      let (name, value) = terminology.field(ofClass: Self.adjustmentsClass, code: code, items[1]), value != .null else { continue }
+                values[name] = value
             }
+            return layer.merging(["adjustments": .object(values)]) { $1 }
         }
-        guard let adjustments else { return .failed("Capture One returned no Image (background) layer.") }
         return .state(VariantState(id: id, variant: variant, adjustments: adjustments, lensCorrection: lens, layers: layers))
     }
 
