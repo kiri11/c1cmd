@@ -16,7 +16,7 @@ extension Command {
         return ([usage, ""] + wrap(general) + ["", "Commands:"] + commands + ["", "Run c1 <command> --help for its arguments."]).joined(separator: "\n")
     }
 
-    static let general = [
+    public static let general = [
         "c1 reads and edits photos in Capture One, the open Catalog or Session, through its scripting interface and database.",
         "Arguments are one JSON object; '-' reads it from stdin. Output is compact JSON with nulls left out; --pretty indents it. Exit status: 0 for a result, including an unknown outcome; 1 for a failure, whose JSON is on stdout; 2 for a usage error, on stderr.",
         "--document <path> reads a Catalog (.cocatalog) or Session folder's database instead of the open document, without Capture One: list, collections, contact_sheet and thumb take it.",

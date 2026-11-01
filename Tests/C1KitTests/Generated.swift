@@ -6,7 +6,7 @@ enum Generated {
     static let sdef = "sdef/16.8.5.30.sdef"
 
     static func files() throws -> [(path: String, content: String)] {
-        [("Sources/C1Kit/Generated/Embedded.swift", try embedded())]
+        [("Sources/C1Kit/Generated/Embedded.swift", try embedded()), (Reference.path, try Reference.markdown())]
     }
 
     static func embedded() throws -> String {

@@ -169,7 +169,7 @@ public struct ExportRequest: Equatable {
 }
 
 public struct C1Failure: Error, Equatable, CustomStringConvertible {
-    public enum Code: String {
+    public enum Code: String, CaseIterable {
         case invalidArguments = "invalid-arguments"
         case notRunning = "not-running"
         case noDocument = "no-document"
@@ -182,6 +182,24 @@ public struct C1Failure: Error, Equatable, CustomStringConvertible {
         case scriptError = "script-error"
         case notFound = "not-found"
         case `internal`
+
+        /// What the code means, for the reference.
+        public var meaning: String {
+            switch self {
+            case .invalidArguments: return "The arguments are malformed or out of range; nothing was sent to Capture One."
+            case .notRunning: return "Capture One is not running."
+            case .noDocument: return "Capture One has no open Catalog or Session."
+            case .permissionDenied: return "macOS refused Automation access to Capture One; allow it under System Settings > Privacy & Security > Automation."
+            case .timeout: return "Capture One did not answer in time; the outcome is unknown, so call get again. A first call may be waiting for the Automation consent dialog."
+            case .busy: return "The queue for Capture One is full, or the call waited 10 minutes for its turn."
+            case .schemaMismatch: return "The database lacks a table or column c1 reads: an untested Capture One build."
+            case .documentChanged: return "The open document changed during the call; call it again."
+            case .database: return "The document's database could not be read."
+            case .scriptError: return "Capture One reported a scripting error."
+            case .notFound: return "The variant, or its original file, is not there."
+            case .internal: return "A bug in c1."
+            }
+        }
     }
 
     public let code: Code
