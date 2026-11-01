@@ -33,6 +33,8 @@ public final class AppleScriptCaptureOne: CaptureOne {
     /// Sets `d` to the current document and `info` to its description, or returns `{{version}}` without one.
     static let documentLines = [
         "try", "set d to current document", "on error", "return {{version}}", "end try",
+        // With no document open, current document is missing value rather than an error.
+        "if d is missing value then return {{version}}",
         "set info to {version, kind of d, name of d, folder of d, id of d}",
     ]
 
@@ -126,7 +128,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
         let recipe = quote(ExportRequest.recipe)
         var lines = ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
                      "set d to current document",
-                     "if (id of d as text) is not \(quote(document.id)) then error \(quote("The open document is no longer \(document.name).")) number \(documentChangedError)",
+                     "if d is missing value or (id of d as text) is not \(quote(document.id)) then error \(quote("The open document is no longer \(document.name).")) number \(documentChangedError)",
                      "set v to missing value"]
         switch request.target.route {
         case .collection(let collection), .allImages(let collection):
@@ -165,7 +167,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
         let notFound = "{\(notFoundErrors.sorted().map(String.init).joined(separator: ", "))}"
         var lines = ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
                      "set d to current document",
-                     "if (id of d as text) is not \(quote(document.id)) then error \(quote("The open document is no longer \(document.name).")) number \(documentChangedError)",
+                     "if d is missing value or (id of d as text) is not \(quote(document.id)) then error \(quote("The open document is no longer \(document.name).")) number \(documentChangedError)",
                      "set out to {}"]
         if writes.contains(where: { $0.target.route == .favoritesScan }) {
             lines.append("set favorites to every collection of d whose kind is favorite")

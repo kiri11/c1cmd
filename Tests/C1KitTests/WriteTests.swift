@@ -314,7 +314,7 @@ enum WriteTests {
 
     static func documentChangeWritesNothing() {
         let script = AppleScriptCaptureOne.writeScript([], document: LiveDocument(id: "/a \"b\".cocatalog", kind: .catalog, name: "a", folder: "/a", appVersion: ""), timeoutSeconds: 5)
-        check(script.contains(#"if (id of d as text) is not "/a \"b\".cocatalog" then error"#), "a write script checks the document first, quoting its id")
+        check(script.contains(#"if d is missing value or (id of d as text) is not "/a \"b\".cocatalog" then error"#), "a write script checks the document first, quoting its id, and treats a closed document as changed")
         checkEqual(AppleScriptCaptureOne.failure(message: "x", number: 9001).code, .documentChanged)
     }
 
