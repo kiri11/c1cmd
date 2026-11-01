@@ -5,6 +5,7 @@ public final class Service {
     let captureOne: CaptureOne
     let queue: CaptureOneQueue
     let home: URL
+    let caches: URL
     let openDatabase: (String) throws -> Database
     let defaults: () throws -> Defaults
     let schema: () throws -> WriteSchema
@@ -15,12 +16,12 @@ public final class Service {
     public static let testedBuilds = ["16.8.5.30"]
     public static let backupAge: TimeInterval = 24 * 60 * 60
 
-    public init(captureOne: CaptureOne, queue: CaptureOneQueue, home: URL = C1Home.url,
+    public init(captureOne: CaptureOne, queue: CaptureOneQueue, home: URL = C1Home.url, caches: URL = C1Home.caches,
                 openDatabase: @escaping (String) throws -> Database = { try Database(path: $0) },
                 defaults: @escaping () throws -> Defaults = { try Defaults.bundled() },
                 schema: @escaping () throws -> WriteSchema = { throw C1Failure(.internal, "No write schema.") },
                 now: @escaping () -> Date = Date.init) {
-        self.captureOne = captureOne; self.queue = queue; self.home = home; self.openDatabase = openDatabase
+        self.captureOne = captureOne; self.queue = queue; self.home = home; self.caches = caches; self.openDatabase = openDatabase
         self.defaults = defaults; self.schema = schema; self.now = now; self.memory = DocumentMemory(home: home)
     }
 

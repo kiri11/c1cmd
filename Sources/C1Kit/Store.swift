@@ -6,6 +6,12 @@ public enum C1Home {
         if let path = ProcessInfo.processInfo.environment["C1_HOME"], !path.isEmpty { return URL(fileURLWithPath: path) }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".c1")
     }
+
+    /// Previews and contact sheets: `~/Library/Caches/c1`, or `$C1_CACHES`.
+    public static var caches: URL {
+        if let path = ProcessInfo.processInfo.environment["C1_CACHES"], !path.isEmpty { return URL(fileURLWithPath: path) }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/c1")
+    }
 }
 
 /// A variant's full state before c1's first write to it, kept until a `revert` of everything succeeds.

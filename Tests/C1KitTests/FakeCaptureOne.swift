@@ -1,10 +1,12 @@
 import C1Kit
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 /// An in-memory Capture One: variants are reachable only through the routes that hold them,
 /// and writes change the stored state.
 final class FakeCaptureOne: CaptureOne {
-    enum Call: Equatable { case document, read([ReadTarget]), write([VariantWrite]), selection }
+    enum Call: Equatable { case document, read([ReadTarget]), write([VariantWrite]), selection, export(ExportRequest) }
 
     var liveDocument = LiveDocument(id: "/fixture.cocatalog", kind: .catalog, name: "fixture", folder: "/fixture.cocatalog", appVersion: "16.8.5.30")
     var variants: [Route: [VariantID: VariantState]] = [:]
@@ -23,6 +25,12 @@ final class FakeCaptureOne: CaptureOne {
     /// Adjustments after `reset adjustments`.
     var resetAdjustments: [String: JSONValue] = ["exposure": .double(0)]
     private(set) var commands: [String] = []
+    /// Seconds before an export's file lands; nil never lands it.
+    var exportDelay: TimeInterval? = 0
+    /// The rectangle a full-frame export renders, by variant; otherwise the state's `maximumCrop`.
+    var defaultCrops: [VariantID: [Double]] = [:]
+    /// A Catalog whose output folder is unset, which Capture One refuses to export from.
+    var outputFolderMissing = false
 
     private let lock = NSLock()
     private var recorded: [Call] = []
@@ -142,6 +150,54 @@ final class FakeCaptureOne: CaptureOne {
     func selection() throws -> [VariantID] {
         try enter(.selection)
         return selected
+    }
+
+    /// Renders a gradient whose colour encodes canvas position (red rises with x, green with y), so a test
+    /// can tell which canvas point any output pixel shows.
+    func export(_ request: ExportRequest, in document: LiveDocument) throws -> Bool {
+        try enter(.export(request))
+        guard document == liveDocument else { throw C1Failure(.documentChanged, "The open document is no longer \(document.name).") }
+        guard let state = locate(request.target).flatMap({ variants[$0]?[request.target.id] }) else {
+            throw C1Failure(.notFound, "Capture One has no variant \(request.target.id) in this document.")
+        }
+        let outputSet = outputFolderMissing && document.kind == .catalog
+        outputFolderMissing = false
+        guard let delay = exportDelay else { return outputSet }
+        let area = request.fullFrame ? defaultCrops[state.id] ?? state.maximumCrop! : state.variant["crop"]!.arrayValue!.map { $0.number! }
+        let image = Self.gradient(area: area, canvas: state.canvasSize!, longEdge: request.longEdge)
+        let write = { Self.writeJPEG(image, to: request.file) }
+        if delay == 0 { write() } else { DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: write) }
+        return outputSet
+    }
+
+    static func gradient(area: [Double], canvas: [Double], longEdge: Int) -> CGImage {
+        let scale = Double(longEdge) / max(area[2], area[3])
+        let width = max(1, Int((area[2] * scale).rounded())), height = max(1, Int((area[3] * scale).rounded()))
+        let left = area[0] - area[2] / 2, top = area[1] + area[3] / 2
+        var pixels = [UInt8](repeating: 255, count: width * height * 4)
+        pixels.withUnsafeMutableBufferPointer { buffer in
+            for j in 0..<height {
+                let y = top - (Double(j) + 0.5) / scale
+                let green = UInt8(max(0, min(255, y / canvas[1] * 255)))
+                for i in 0..<width {
+                    let x = left + (Double(i) + 0.5) / scale
+                    let index = (j * width + i) * 4
+                    buffer[index] = UInt8(max(0, min(255, x / canvas[0] * 255)))
+                    buffer[index + 1] = green
+                    buffer[index + 2] = 100
+                }
+            }
+        }
+        let provider = CGDataProvider(data: Data(pixels) as CFData)!
+        return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
+                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                       provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+    }
+
+    static func writeJPEG(_ image: CGImage, to url: URL, properties: [CFString: Any] = [:]) {
+        let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, properties.merging([kCGImageDestinationLossyCompressionQuality: 0.95]) { $1 } as CFDictionary)
+        precondition(CGImageDestinationFinalize(destination), "cannot write \(url.path)")
     }
 
     /// Applies `body` to a layer's adjustments, 0 being the background's.

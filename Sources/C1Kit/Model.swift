@@ -146,6 +146,26 @@ public protocol CaptureOne {
     /// Per-step and per-variant errors do not fail the call.
     func write(_ writes: [VariantWrite], in document: LiveDocument) throws -> [VariantID: WriteResult]
     func selection() throws -> [VariantID]
+    /// Configures c1's recipe and queues one export, only if `document` is still the open one. Returns once
+    /// Capture One has queued it, before the file lands; throws `notFound` when the variant is gone. Returns
+    /// true when it had to set a Catalog's unusable output folder to the export's folder first.
+    func export(_ request: ExportRequest, in document: LiveDocument) throws -> Bool
+}
+
+/// One JPEG export through c1's recipe.
+public struct ExportRequest: Equatable {
+    public static let recipe = "c1-preview"
+
+    public let target: ReadTarget
+    public let longEdge: Int
+    /// Renders the default crop in place of the variant's, through the recipe's `export crop method`; the variant is not written.
+    public let fullFrame: Bool
+    /// Where the JPEG lands: Capture One adds `.jpg` to the name.
+    public let file: URL
+
+    public init(target: ReadTarget, longEdge: Int, fullFrame: Bool, file: URL) {
+        self.target = target; self.longEdge = longEdge; self.fullFrame = fullFrame; self.file = file
+    }
 }
 
 public struct C1Failure: Error, Equatable, CustomStringConvertible {
@@ -160,6 +180,7 @@ public struct C1Failure: Error, Equatable, CustomStringConvertible {
         case documentChanged = "document-changed"
         case database
         case scriptError = "script-error"
+        case notFound = "not-found"
         case `internal`
     }
 
