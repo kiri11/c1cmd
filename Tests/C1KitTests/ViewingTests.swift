@@ -11,6 +11,8 @@ enum ViewingTests {
         regionMapping()
         timeoutIsUnknownAndReleasesTheQueue()
         pruning()
+        sheetLayout()
+        contactSheet()
     }
 
     static func service(_ fake: FakeCaptureOne, _ name: String, queue: CaptureOneQueue? = nil, extraSQL: String = "") -> (Service, URL) {
@@ -211,5 +213,77 @@ enum ViewingTests {
         check(!FileManager.default.fileExists(atPath: folder.path), "files older than 7 days go, with their emptied folder")
         check(FileManager.default.fileExists(atPath: recent.path), "younger files stay")
     }
+
+    static func rows(_ cells: [CGRect]) -> [[CGRect]] { Dictionary(grouping: cells, by: \.minY).sorted { $0.key < $1.key }.map(\.value) }
+
+    /// v1's layout facts, kept for v2.
+    static func sheetLayout() {
+        let standard = try! SheetLayout()
+        checkFailure(.invalidArguments) { _ = try SheetLayout(perPage: 49) }
+        checkFailure(.invalidArguments) { _ = try SheetLayout(rowHeight: 119) }
+        let full = standard.arrange(Array(repeating: 1.5, count: 20))
+        checkEqual(rows(full.cells).map(\.count), [5, 5, 5, 5], "a fifth 330 px image overflows; taking it gives 202 px rows, nearer 220 than 253")
+        checkEqual(rows(full.cells).map { Int($0.last!.maxX) }, [1532, 1532, 1532, 1532], "closed rows fill the width")
+        checkEqual(full.cells[0], CGRect(x: 4, y: 28, width: 302, height: 202))
+        checkEqual(full.height, 28 + 4 * (202 + 20))
+        let partial = standard.arrange(Array(repeating: 1.5, count: 7))
+        checkEqual(Array(partial.cells[5...]), [CGRect(x: 4, y: 250, width: 330, height: 220), CGRect(x: 338, y: 250, width: 330, height: 220)],
+                   "the last row keeps rowHeight, left-aligned")
+        let single = standard.arrange([1.5])
+        checkEqual([single.width, single.height], [480, 268], "a one-image page keeps the minimum width")
+        checkEqual(standard.arrange([4, 30]).cells, [CGRect(x: 4, y: 28, width: 1320, height: 330), CGRect(x: 4, y: 378, width: 1528, height: 51)],
+                   "a row stretches at most 1.5 × rowHeight")
+        let tall = try! SheetLayout(perPage: 48, rowHeight: 450)
+        let lowered = tall.arrange(Array(repeating: 1.5, count: 48))
+        check(lowered.width == 1536 && lowered.height <= 2400 && lowered.height > 2200, "a tall page gets lower rows: \(lowered.width)×\(lowered.height)")
+    }
+
+    static func writeCot(_ url: URL, width: Int, height: Int, comment: String?) {
+        try! FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let image = FakeCaptureOne.gradient(area: [Double(width) / 2, Double(height) / 2, Double(width), Double(height)],
+                                            canvas: [Double(width), Double(height)], longEdge: max(width, height))
+        let temporary = url.appendingPathExtension("jpg")
+        FakeCaptureOne.writeJPEG(image, to: temporary, properties: comment.map { [kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: $0]] } ?? [:])
+        try? FileManager.default.removeItem(at: url)
+        try! FileManager.default.moveItem(at: temporary, to: url)
+    }
+
+    static func contactSheet() {
+        let fake = FakeCaptureOne()
+        let (service, caches) = service(fake, "viewing-sheet")
+        let thumbnails = scratchURL("viewing-sheet").appendingPathComponent("Cache/Thumbnails")
+        writeCot(thumbnails.appendingPathComponent("00000001.cot"), width: 300, height: 200, comment: "3|0;0;0|30;180;270;20|0")
+        writeCot(thumbnails.appendingPathComponent("00000002.cot"), width: 300, height: 200, comment: "2|0;0;0|30;180;270;20|0")
+        guard let result = try? service.contactSheet(ContactSheetArguments(perPage: 3), document: scratchURL("viewing-sheet").appendingPathComponent("viewing-sheet.cocatalogdb").path),
+              case .array(let tiles)? = result["tiles"] else { return check(false, "contact_sheet failed") }
+        checkEqual(fake.calls, [], "contact_sheet makes no Apple Events")
+        checkEqual(tiles.map { $0["id"] }, [.string("1"), .string("2"), .string("3")])
+        checkEqual(tiles.map { $0["status"] }, [.string("shown"), .string("shown"), .string("missing")])
+        checkEqual(tiles.map { $0["crop"] ?? .null }, [.string("applied"), .string("not-applied"), .null], "a version 3 crop applies; version 2 does not")
+        checkEqual(result["next"], .string("3"), "pages continue after the last id")
+        if let first = tiles.first?["cell"], let w = first["width"]?.number, let h = first["height"]?.number {
+            check(abs(w / h - 1.5) < 0.02, "the tile shows the 240 × 160 crop: \(w)×\(h)")
+        }
+        check(result["path"]?.stringValue?.hasPrefix(caches.appendingPathComponent("previews/\(Fixture.uuid)/sheet-1-3-").path) == true, "the sheet lands in the cache")
+        checkEqual(CotCropProbe.parse("3|0;0;0|0;200;300;0|0"), "full-frame")
+        let next = try? service.contactSheet(ContactSheetArguments(after: id("3"), perPage: 3),
+                                             document: scratchURL("viewing-sheet").appendingPathComponent("viewing-sheet.cocatalogdb").path)
+        checkEqual(next?["tiles"]?.arrayValue?.count, 1)
+        checkEqual(next?["next"], nil)
+    }
 }
 
+/// `CotCrop` is internal; this reads its verdict through a one-tile sheet.
+enum CotCropProbe {
+    static func parse(_ comment: String) -> String {
+        let name = "viewing-cot-\(abs(comment.hashValue))"
+        let path = Fixture.make(name)
+        writeCot(scratchURL(name).appendingPathComponent("Cache/Thumbnails/00000001.cot"), comment: comment)
+        let service = Service(captureOne: FakeCaptureOne(), queue: CaptureOneQueue(directory: scratchDirectory("\(name)-queue")),
+                              home: scratchDirectory("\(name)-home"), caches: scratchDirectory("\(name)-caches"))
+        let result = try? service.contactSheet(ContactSheetArguments(ids: [id("1")]), document: path)
+        return result?["tiles"]?.arrayValue?.first?["crop"]?.stringValue ?? "none"
+    }
+
+    static func writeCot(_ url: URL, comment: String) { ViewingTests.writeCot(url, width: 300, height: 200, comment: comment) }
+}
