@@ -15,7 +15,7 @@ enum Reference {
         ]
         lines += Command.general.flatMap { [$0, ""] }
         lines += ["| Command | Changes variants | Summary |", "|---|---|---|"]
-        lines += Command.allCases.map { "| [`\($0.rawValue)`](#\($0.rawValue)) | \($0.readOnly ? "no" : "yes") | \(cell($0.summary)) |" }
+        lines += Command.allCases.map { "| `\($0.rawValue)` | \($0.readOnly ? "no" : "yes") | \(cell($0.summary)) |" }
         lines += ["", "## Failure codes", "", "A failed call prints `{\"error\": {code, message, hint?, outcome?}}` and exits 1; with `outcome: unknown` it may have run in Capture One, and exits 0.", "",
                   "| Code | Meaning |", "|---|---|"]
         lines += C1Failure.Code.allCases.map { "| `\($0.rawValue)` | \(cell($0.meaning)) |" }
