@@ -6,6 +6,8 @@ if CommandLine.arguments.dropFirst().first == "--generate" {
 }
 Generated.run(write: false)
 TerminologyTests.run()
+SpecTests.run()
+CLITests.run()
 DatabaseTests.run()
 ServiceTests.run()
 QueueTests.run()
