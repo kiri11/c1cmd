@@ -11,7 +11,7 @@ func fail(_ failure: C1Failure) -> Never {
 
 var arguments = Array(CommandLine.arguments.dropFirst())
 guard let name = arguments.first, let command = Command(rawValue: name) else {
-    let usage = Command.allCases.map { "  \($0.rawValue)\(String(repeating: " ", count: 13 - $0.rawValue.count))\($0.summary)" }
+    let usage = Command.allCases.map { "  \($0.rawValue)\(String(repeating: " ", count: 15 - $0.rawValue.count))\($0.summary)" }
     FileHandle.standardError.write(Data(("usage: c1next <command> [--document <path>] ['<json arguments>']\n" + usage.joined(separator: "\n") + "\n").utf8))
     exit(2)
 }

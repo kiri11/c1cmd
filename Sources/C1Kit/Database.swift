@@ -62,7 +62,7 @@ public final class Database {
     /// Every table and column c1 reads. The open fails, naming what is missing, when Capture One changes them.
     static let requiredSchema: [String: [String]] = [
         "ZDOCUMENTCONTENT": ["ZDOCUMENTTYPE", "ZROOTCOLLECTION", "ZDOCUMENTUUID", "ZLASTBACKUPDATE"],
-        "ZVARIANT": ["Z_PK", "ZIMAGE", "ZDEFAULTLAYER", "ZCOMBINEDSETTINGS"],
+        "ZVARIANT": ["Z_PK", "ZIMAGE", "ZDEFAULTLAYER", "ZCOMBINEDSETTINGS", "ZVARIANTUUID"],
         "ZIMAGE": ["Z_PK", "ZDISPLAYNAME", "ZIMAGEFILENAME", "ZIMAGELOCATION", "ZISINSIDECATALOG", "ZISTRASHED"],
         "ZPATHLOCATION": ["Z_PK", "ZMACROOT", "ZRELATIVEPATH", "ZISRELATIVE"],
         "ZVARIANTLAYER": ["Z_PK", "ZMETADATA"],
@@ -187,6 +187,34 @@ public final class Database {
             }
         }
         return paths
+    }
+
+    public var path: String { sql.path }
+
+    // MARK: Originals
+
+    public struct Original: Equatable {
+        /// The original's absolute path; nil when its location cannot be resolved.
+        public let path: String?
+        public let fileName: String?
+        public let variantUUID: String?
+    }
+
+    public func originals(_ ids: [VariantID]) throws -> [VariantID: Original] {
+        guard !ids.isEmpty else { return [:] }
+        let paths = try locationPaths()
+        var output: [VariantID: Original] = [:]
+        for row in try sql.rows("""
+            SELECT v.Z_PK AS id, v.ZVARIANTUUID AS uuid, i.ZIMAGEFILENAME AS filename, i.ZIMAGELOCATION AS location
+            FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE v.Z_PK IN (\(ids.map(\.description).joined(separator: ",")))
+            """) {
+            guard let id = row["id"]?.int else { continue }
+            let fileName = row["filename"]?.text
+            let folder = row["location"]?.int.flatMap { paths[$0] }
+            output[VariantID(id)] = Original(path: fileName.flatMap { name in folder.map { URL(fileURLWithPath: $0).appendingPathComponent(name).path } },
+                                             fileName: fileName, variantUUID: row["uuid"]?.text)
+        }
+        return output
     }
 
     // MARK: List
