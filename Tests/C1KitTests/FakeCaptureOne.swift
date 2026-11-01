@@ -132,7 +132,7 @@ final class FakeCaptureOne: CaptureOne {
                      adjustments: ["exposure": .double(0), "temperature": .double(5000), "rotation": .double(0)].merging(adjustments) { $1 },
                      lensCorrection: ["distortion": .double(0)],
                      layers: [["kind": .string("background"), "name": .string("Background"), "opacity": .int(100), "enabled": .bool(true)]],
-                     imageSize: [6000, 4000], maximumCrop: [3000, 2000, 6000, 4000])
+                     canvasSize: [6000, 4000], maximumCrop: [3000, 2000, 6000, 4000])
     }
 }
 

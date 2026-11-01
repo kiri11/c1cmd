@@ -32,12 +32,19 @@ public struct CropBounds: Equatable {
             self = Self.rectangle(crop, source: .maximumCrop)
             return
         }
-        guard let size = state.imageSize, size.count == 2, size[0] > 0, size[1] > 0 else { return nil }
-        let quarterTurn = Int(value(a, "orientation")) % 180 != 0
-        let (w, h) = quarterTurn ? (size[1], size[0]) : (size[0], size[1])
+        guard let canvas = state.canvasSize, canvas.count == 2, canvas[0] > 0, canvas[1] > 0 else { return nil }
         let r = value(a, "rotation") * .pi / 180
         let c = cos(r), s = sin(r)
-        let center = ((w * abs(c) + h * abs(s)) / 2, (w * abs(s) + h * abs(c)) / 2)
+        // The canvas bounds the oriented image turned by the rotation; near 45° that cannot be undone.
+        let determinant = c * c - s * s
+        guard determinant > 0.05 else {
+            guard let crop = state.maximumCrop, crop.count == 4 else { return nil }
+            self = Self.rectangle(crop, source: .maximumCrop)
+            return
+        }
+        let (W, H) = (canvas[0], canvas[1])
+        let w = (W * abs(c) - H * abs(s)) / determinant, h = (H * abs(c) - W * abs(s)) / determinant
+        let center = (W / 2, H / 2)
         // The image turns clockwise as viewed by `rotation` degrees about the canvas centre.
         corners = [(-w / 2, h / 2), (w / 2, h / 2), (w / 2, -h / 2), (-w / 2, -h / 2)].map { x, y in
             [center.0 + x * c + y * s, center.1 - x * s + y * c]
