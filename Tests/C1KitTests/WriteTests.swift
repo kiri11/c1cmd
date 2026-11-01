@@ -25,6 +25,31 @@ enum WriteTests {
             <property name="contrast" code="CVco" type="real"/>
             <property name="dehaze color" code="CVdc" type="RGB color"/>
             <property name="rgb curve" code="CVac" type="curve"/>
+            <property name="luma curve" code="CVlc" type="curve"/>
+            <property name="red curve" code="CVrc" type="curve"/>
+            <property name="green curve" code="CVgc" type="curve"/>
+            <property name="blue curve" code="CVbc" type="curve"/>
+            <property name="color editor settings" code="CCEs" type="color editor options"/>
+          </class>
+          <class name="basic color correction" code="CCba">
+            <property name="name" code="pnam" type="text" access="r"/>
+            <property name="hue change" code="Chuc" type="real"/>
+            <property name="saturation change" code="Csac" type="real"/>
+            <property name="lightness change" code="Clic" type="real"/>
+          </class>
+          <class name="advanced color correction" code="CCad">
+            <property name="enabled" code="CRen" type="boolean"/>
+            <property name="red" code="CRrd" type="integer"/>
+            <property name="green" code="CRgn" type="integer"/>
+            <property name="blue" code="CRbl" type="integer"/>
+            <property name="hue start" code="Chus" type="real"/>
+            <property name="hue end" code="Chue" type="real"/>
+            <property name="saturation start" code="Csas" type="real"/>
+            <property name="saturation end" code="Csae" type="real"/>
+            <property name="smoothness" code="Csmo" type="real"/>
+            <property name="hue change" code="Chuc" type="real"/>
+            <property name="saturation change" code="Csac" type="real"/>
+            <property name="lightness change" code="Clic" type="real"/>
           </class>
           <class name="lens correction settings" code="Clco">
             <property name="distortion" code="CLdv" type="real"/>
@@ -38,6 +63,11 @@ enum WriteTests {
         "adjustments": ["rotation": Bound(min: -45, max: 45), "exposure": Bound(min: -4, max: 4), "temperature": Bound(min: 800, max: 14000),
                         "dehaze color": Bound(min: 0, max: 65535)],
         "lensCorrection": ["distortion": Bound(min: 0, max: 120)],
+        "basicColor": ["hue change": Bound(min: -30, max: 30), "saturation change": Bound(min: -100, max: 100), "lightness change": Bound(min: -100, max: 100)],
+        "advancedColor": ["red": Bound(min: 0, max: 255), "green": Bound(min: 0, max: 255), "blue": Bound(min: 0, max: 255),
+                          "hue start": Bound(max: 0), "hue end": Bound(min: 0), "saturation start": Bound(min: 0, max: 100), "saturation end": Bound(min: 0, max: 100),
+                          "smoothness": Bound(min: 1, max: 100), "hue change": Bound(min: -30, max: 30), "saturation change": Bound(min: -100, max: 100),
+                          "lightness change": Bound(min: -100, max: 100)],
     ])
 
     static let schema = WriteSchema(terminology: try! Terminology(sdef: Data(sdef.utf8)), bounds: bounds)
@@ -79,7 +109,9 @@ enum WriteTests {
 
     static func schemaFields() {
         checkEqual(schema.fields[.variant].map { Set($0.keys) }, ["rating", "color tag", "crop"], "variant fields are the allowed list; pick and id are not")
-        check(schema.fields[.adjustments]?["rgb curve"] == nil, "curves are not writable values")
+        checkEqual(schema.fields[.adjustments]?["rgb curve"]?.kind, .curve, "curves are written whole")
+        checkEqual(schema.fields[.basicColor].map { Set($0.keys) }, ["hue change", "saturation change", "lightness change"], "a basic correction's name is read-only")
+        checkEqual(schema.fields[.advancedColor]?.count, 12)
         check(schema.unmeasured[.adjustments]?.contains("contrast") == true, "a numeric field without bounds is unmeasured")
         checkEqual(schema.fields[.adjustments]?["flip"]?.kind, .enumeration(["none": "Cfln", "horizontal": "Cflh"]))
     }

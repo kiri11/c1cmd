@@ -2,7 +2,7 @@ import Foundation
 
 /// One writable Capture One property: its sdef name and code, its type, and its measured bounds.
 public struct FieldSpec: Equatable {
-    public enum Kind: Equatable {
+    public enum Kind: Hashable {
         case real, integer, boolean, text
         /// Enumerator names mapped to their codes.
         case enumeration([String: String])
@@ -10,6 +10,8 @@ public struct FieldSpec: Equatable {
         case rgb
         /// The crop: centre x, centre y, width and height in whole pixels.
         case rectangle
+        /// A curve's points as [x, y] pairs ordered by x, each within 0–100.
+        case curve
     }
 
     public let name: String
@@ -72,7 +74,7 @@ public struct BoundsTable: Codable, Equatable {
 
 /// The parts of a variant `set` writes, named as `get` reports them.
 public enum Section: String, CaseIterable {
-    case variant, adjustments, lensCorrection, layer
+    case variant, adjustments, lensCorrection, layer, basicColor, advancedColor
 
     var classCode: String {
         switch self {
@@ -80,6 +82,8 @@ public enum Section: String, CaseIterable {
         case .adjustments: return "CVas"
         case .lensCorrection: return "Clco"
         case .layer: return "clyr"
+        case .basicColor: return "CCba"
+        case .advancedColor: return "CCad"
         }
     }
 }
@@ -102,6 +106,17 @@ public struct WriteSchema {
     ]
     /// Geometry is the background's alone; a layer's adjustments never carry it.
     static let geometryFields: Set<String> = boundsFields[.adjustments]!
+    /// `get` and `set` name curves by channel under `curves`; the sdef names them "<channel> curve".
+    public static let curveChannels = ["rgb", "luma", "red", "green", "blue"]
+    static func curveField(_ channel: String) -> String { "\(channel) curve" }
+    static func curveChannel(_ field: String) -> String { String(field.dropLast(" curve".count)) }
+    /// Capture One 16.8.5.30 refuses a 19th point ("Too many curve points") and a point within 1.5 of
+    /// another's x ("very close to an existing point"); 1.55 apart is accepted.
+    public static let curvePoints = 2...18
+    public static let curveGap = 1.5
+    /// Setting a color moves the ranges around it, so an advanced correction is written in this order.
+    public static let advancedColorOrder = ["enabled", "red", "green", "blue", "hue start", "hue end", "saturation start", "saturation end",
+                                            "smoothness", "hue change", "saturation change", "lightness change"]
 
     public init(terminology: Terminology, bounds: BoundsTable) {
         for section in Section.allCases {
@@ -116,6 +131,7 @@ public struct WriteSchema {
                 case "text": kind = .text
                 case "RGB color": kind = .rgb
                 case "rectangle": kind = .rectangle
+                case "curve": kind = .curve
                 case let type?:
                     guard let enumerators = terminology.enumerators(type) else { continue }
                     kind = .enumeration(enumerators)
@@ -133,7 +149,8 @@ public struct WriteSchema {
     }
 
     /// The field's spec and the value to send; throws `invalid-arguments` naming what is wrong.
-    public func validate(_ section: Section, _ name: String, _ value: JSONValue, layerAdjustments: Bool = false) throws -> FieldValue {
+    /// `label` names the value in errors when its place in `set` is not `<section>.<name>`.
+    public func validate(_ section: Section, _ name: String, _ value: JSONValue, layerAdjustments: Bool = false, label: String? = nil) throws -> FieldValue {
         let place = layerAdjustments ? "a layer's adjustments" : section.rawValue
         if layerAdjustments, Self.geometryFields.contains(name) {
             throw C1Failure(.invalidArguments, "\(name) is geometry, which belongs to the variant's adjustments, not a layer's.")
@@ -146,7 +163,7 @@ public struct WriteSchema {
             throw C1Failure(.invalidArguments, "\(place) has no writable field \"\(name)\"; writable: \(known.joined(separator: ", ")).")
         }
         func fail(_ expected: String) -> C1Failure {
-            C1Failure(.invalidArguments, "\(place).\(name) must be \(expected), got \(value.encoded()).")
+            C1Failure(.invalidArguments, "\(label ?? "\(place).\(name)") must be \(expected), got \(value.encoded()).")
         }
         func number(_ item: JSONValue, integral: Bool) throws -> Double {
             guard let number = item.number, number.isFinite, !integral || number.rounded() == number else {
@@ -186,6 +203,16 @@ public struct WriteSchema {
             }
             guard numbers[2] >= 1, numbers[3] >= 1 else { throw fail("a rectangle at least 1 pixel wide and high") }
             return FieldValue(spec, .array(numbers.map { .int(Int64($0)) }))
+        case .curve:
+            let expected = "\(Self.curvePoints.lowerBound)–\(Self.curvePoints.upperBound) [x, y] points within 0–100, x increasing by more than \(format(Self.curveGap))"
+            guard case .array(let items) = value, Self.curvePoints.contains(items.count) else { throw fail(expected) }
+            let points = try items.map { item -> [Double] in
+                guard case .array(let pair) = item, pair.count == 2,
+                      let x = pair[0].number, let y = pair[1].number, (0...100).contains(x), (0...100).contains(y) else { throw fail(expected) }
+                return [x, y]
+            }
+            guard zip(points, points.dropFirst()).allSatisfy({ $1[0] - $0[0] > Self.curveGap }) else { throw fail(expected) }
+            return FieldValue(spec, .array(points.map { .array($0.map(JSONValue.double)) }))
         }
     }
 }

@@ -18,6 +18,8 @@ final class FakeCaptureOne: CaptureOne {
     var clamps: [String: ClosedRange<Double>] = [:]
     /// Field names Capture One refuses to write.
     var refused: Set<String> = []
+    /// Values Capture One stores in place of the one sent, by field name.
+    var substitutes: [String: JSONValue] = [:]
     /// Adjustments after `reset adjustments`.
     var resetAdjustments: [String: JSONValue] = ["exposure": .double(0)]
     private(set) var commands: [String] = []
@@ -95,13 +97,14 @@ final class FakeCaptureOne: CaptureOne {
             if let range = clamps[name], let number = value.number {
                 value = .double(min(max(number, range.lowerBound), range.upperBound))
             }
+            if let substitute = substitutes[name] { value = substitute }
             return FieldPath(write.read).set(&state, value) ? nil : "no such layer"
         case .action(let action):
             commands.append("\(action)")
             switch action {
             case .createLayer(let kind, let name):
                 state.layers.append(["kind": .string(kind), "name": .string(name), "enabled": .bool(true), "opacity": .int(100),
-                                     "adjustments": .object(["exposure": .double(0)])])
+                                     "adjustments": .object(Self.editor.merging(["exposure": .double(0)]) { $1 })])
             case .deleteLayer(let index):
                 guard index > 0, index < state.layers.count else { return "Invalid index." }
                 state.layers.remove(at: index)
@@ -111,8 +114,23 @@ final class FakeCaptureOne: CaptureOne {
             case .resetVariant:
                 state.adjustments.merge(resetAdjustments) { $1 }
                 state.layers = [state.layers[0]]
+            case .createColor(let layer):
+                guard Self.modifyAdjustments(&state, layer: layer, { adjustments in
+                    var advanced = adjustments["colorEditor"]?["advanced"]?.arrayValue ?? []
+                    advanced.append(.object(Self.newAdvancedColor))
+                    adjustments["colorEditor"] = .object(["basic": adjustments["colorEditor"]?["basic"] ?? .array([]), "advanced": .array(advanced)])
+                    return true
+                }) else { return "Invalid index." }
+            case .deleteColor(let layer, let index):
+                guard Self.modifyAdjustments(&state, layer: layer, { adjustments in
+                    var advanced = adjustments["colorEditor"]?["advanced"]?.arrayValue ?? []
+                    guard index < advanced.count else { return false }
+                    advanced.remove(at: index)
+                    adjustments["colorEditor"] = .object(["basic": adjustments["colorEditor"]?["basic"] ?? .array([]), "advanced": .array(advanced)])
+                    return true
+                }) else { return "Invalid index." }
             case .layerCommand(_, let index), .maskAmount(_, let index, _), .copyMask(_, let index), .applyStyle(let index, _),
-                 .createColor(let index), .deleteColor(let index, _), .pickDehaze(let index, _), .recalculateDehaze(let index):
+                 .pickDehaze(let index, _), .recalculateDehaze(let index):
                 guard index < state.layers.count else { return "Invalid index." }
             case .resetLens:
                 state.lensCorrection["distortion"] = .double(0)
@@ -124,6 +142,35 @@ final class FakeCaptureOne: CaptureOne {
     func selection() throws -> [VariantID] {
         try enter(.selection)
         return selected
+    }
+
+    /// Applies `body` to a layer's adjustments, 0 being the background's.
+    static func modifyAdjustments(_ state: inout VariantState, layer: Int, _ body: (inout [String: JSONValue]) -> Bool) -> Bool {
+        if layer == 0 { return body(&state.adjustments) }
+        guard layer < state.layers.count, case .object(var adjustments)? = state.layers[layer]["adjustments"] else { return false }
+        guard body(&adjustments) else { return false }
+        state.layers[layer]["adjustments"] = .object(adjustments)
+        return true
+    }
+
+    /// What `make new advanced color correction` creates on 16.8.5.30.
+    static let newAdvancedColor: [String: JSONValue] = [
+        "enabled": .bool(true), "red": .int(0), "green": .int(0), "blue": .int(0), "hue start": .double(0), "hue end": .double(0),
+        "saturation start": .double(0), "saturation end": .double(0), "smoothness": .double(20),
+        "hue change": .double(0), "saturation change": .double(0), "lightness change": .double(0),
+    ]
+
+    static let identity: JSONValue = .array([.array([.double(0), .double(0)]), .array([.double(100), .double(100)])])
+
+    /// A layer's curves and color editor as Capture One reports them untouched.
+    static var editor: [String: JSONValue] {
+        ["curves": .object(Dictionary(uniqueKeysWithValues: ["rgb", "luma", "red", "green", "blue"].map { ($0, identity) })),
+         "colorEditor": .object([
+            "basic": .array(["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "all"].map {
+                .object(["name": .string($0), "hue change": .double(0), "saturation change": .double(0), "lightness change": .double(0)])
+            }),
+            "advanced": .array([]),
+         ])]
     }
 
     static func state(_ id: String, adjustments: [String: JSONValue] = [:]) -> VariantState {
@@ -141,30 +188,70 @@ struct FieldPath {
     let read: FieldRead
     init(_ read: FieldRead) { self.read = read }
 
+    var channel: String { String(read.name.dropLast(" curve".count)) }
+
     func get(_ state: VariantState) -> JSONValue? {
         switch read.owner {
         case .variant: return state.variant[read.name]
-        case .adjustments: return state.adjustments[read.name]
         case .lensCorrection: return state.lensCorrection[read.name]
         case .layer(let index): return index < state.layers.count ? state.layers[index][read.name] : nil
-        case .layerAdjustments(let index):
+        case .adjustments: return field(state.adjustments)
+        case .layerAdjustments(let index), .basicColor(let index, _), .advancedColor(let index, _):
+            if index == 0 { return field(state.adjustments) }
             guard index < state.layers.count, case .object(let adjustments)? = state.layers[index]["adjustments"] else { return nil }
-            return adjustments[read.name]
+            return field(adjustments)
+        }
+    }
+
+    private func field(_ adjustments: [String: JSONValue]) -> JSONValue? {
+        switch read.owner {
+        case .basicColor(_, let name):
+            return adjustments["colorEditor"]?["basic"]?.arrayValue?.first { $0["name"] == .string(name) }?[read.name]
+        case .advancedColor(_, let index):
+            let corrections = adjustments["colorEditor"]?["advanced"]?.arrayValue ?? []
+            return index < corrections.count ? corrections[index][read.name] : nil
+        default:
+            return read.kind == .curve ? adjustments["curves"]?[channel] : adjustments[read.name]
         }
     }
 
     func set(_ state: inout VariantState, _ value: JSONValue) -> Bool {
         switch read.owner {
         case .variant: state.variant[read.name] = value
-        case .adjustments: state.adjustments[read.name] = value
         case .lensCorrection: state.lensCorrection[read.name] = value
         case .layer(let index):
             guard index < state.layers.count else { return false }
             state.layers[index][read.name] = value
-        case .layerAdjustments(let index):
-            guard index < state.layers.count, case .object(var adjustments)? = state.layers[index]["adjustments"] else { return false }
-            adjustments[read.name] = value
-            state.layers[index]["adjustments"] = .object(adjustments)
+        case .adjustments:
+            return set(&state.adjustments, value)
+        case .layerAdjustments(let index), .basicColor(let index, _), .advancedColor(let index, _):
+            return FakeCaptureOne.modifyAdjustments(&state, layer: index) { set(&$0, value) }
+        }
+        return true
+    }
+
+    private func set(_ adjustments: inout [String: JSONValue], _ value: JSONValue) -> Bool {
+        switch read.owner {
+        case .basicColor(_, let name):
+            var basic = adjustments["colorEditor"]?["basic"]?.arrayValue ?? []
+            guard let index = basic.firstIndex(where: { $0["name"] == .string(name) }), case .object(var correction) = basic[index] else { return false }
+            correction[read.name] = value
+            basic[index] = .object(correction)
+            adjustments["colorEditor"] = .object(["basic": .array(basic), "advanced": adjustments["colorEditor"]?["advanced"] ?? .array([])])
+        case .advancedColor(_, let index):
+            var advanced = adjustments["colorEditor"]?["advanced"]?.arrayValue ?? []
+            guard index < advanced.count, case .object(var correction) = advanced[index] else { return false }
+            correction[read.name] = value
+            advanced[index] = .object(correction)
+            adjustments["colorEditor"] = .object(["basic": adjustments["colorEditor"]?["basic"] ?? .array([]), "advanced": .array(advanced)])
+        default:
+            if read.kind == .curve {
+                guard case .object(var curves)? = adjustments["curves"] else { return false }
+                curves[channel] = value
+                adjustments["curves"] = .object(curves)
+            } else {
+                adjustments[read.name] = value
+            }
         }
         return true
     }

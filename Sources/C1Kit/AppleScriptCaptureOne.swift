@@ -99,7 +99,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
                                  message: "Capture One error \(parts[1].int32Value): \(parts[2].stringValue ?? "")")
             }
             let values = zip(write.readBack, list(fields[3])).map { read, descriptor -> JSONValue? in
-                terminology.field(ofClass: read.owner.classCode, code: read.code, descriptor)?.1
+                read.kind == .curve ? curve(descriptor) : terminology.field(ofClass: read.owner.classCode, code: read.code, descriptor)?.1
             }
             output[write.target.id] = .done(stepErrors: errors, readBack: values, layerNames: list(fields[4]).compactMap(\.stringValue))
         }
@@ -139,7 +139,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
             }
             lines.append("set rb to {}")
             for read in write.readBack {
-                lines += ["try", "set end of rb to «property \(read.code)» of \(owner(read.owner))",
+                lines += ["try", "set end of rb to \(readExpression(read))",
                           "on error e number n", "if n is in \(fatal) then error e number n", "set end of rb to missing value", "end try"]
             }
             lines += ["set r to {\"\(id)\", true, errs, rb, name of every layer of v}",
@@ -163,11 +163,35 @@ public final class AppleScriptCaptureOne: CaptureOne {
         case .lensCorrection: return "«property vlns» of v"
         case .layer(let index): return layer(index)
         case .layerAdjustments(let index): return adjustments(ofLayer: index)
+        case .basicColor(let layer, let name): return "basic color correction \(quote(name)) of «property CCEs» of \(adjustments(ofLayer: layer))"
+        case .advancedColor(let layer, let index): return "advanced color correction \(index + 1) of «property CCEs» of \(adjustments(ofLayer: layer))"
         }
+    }
+
+    /// The expression a read-back evaluates: a curve's points, or the property itself.
+    static func readExpression(_ read: FieldRead) -> String {
+        let property = "«property \(read.code)» of \(owner(read.owner))"
+        return read.kind == .curve ? "properties of every curve point of \(property)" : property
+    }
+
+    /// Replaces a curve's points. Capture One keeps points sorted by x and refuses one within 1.5 of another,
+    /// so the endpoints move out to 0 and 100 before taking their new places, and the rest are added between.
+    static func curveStatements(_ write: FieldWrite) -> [String] {
+        let points = (write.field.value.array ?? []).map { $0.array?.compactMap(\.number) ?? [] }
+        guard let first = points.first, let last = points.last else { return [] }
+        return ["tell «property \(write.field.spec.code)» of \(owner(write.owner))",
+                "repeat while (count of curve points) > 2", "delete curve point 2", "end repeat",
+                "set brightness of first curve point to 0", "set brightness of last curve point to 100",
+                "set brightness of first curve point to \(number(first[0]))", "set brightness of last curve point to \(number(last[0]))",
+                "set amount of first curve point to \(number(first[1]))", "set amount of last curve point to \(number(last[1]))"]
+            + points.dropFirst().dropLast().map { "make new curve point with properties {brightness:\(number($0[0])), amount:\(number($0[1]))}" }
+            + ["end tell"]
     }
 
     static func statements(_ step: Step) -> [String] {
         switch step {
+        case .write(let write) where write.field.spec.kind == .curve:
+            return curveStatements(write)
         case .write(let write):
             return ["set «property \(write.field.spec.code)» of \(owner(write.owner)) to \(literal(write.field))"]
         case .action(let action):
@@ -243,20 +267,27 @@ public final class AppleScriptCaptureOne: CaptureOne {
 
     /// Capture One refuses `properties of adjustments` on a layer other than the background (-50),
     /// so those layers are read one field at a time by raw code; unsupported fields raise and are skipped.
+    /// Curves and color corrections are elements, which `properties of adjustments` leaves as references,
+    /// so every layer's, the background's included, are read as `properties of every …`: seven events per layer.
     public static func readScript(_ targets: [ReadTarget], timeoutSeconds: Int, layerFields: [String]) -> String {
         let fatal = "{\(fatalErrors.map(String.init).joined(separator: ", "))}"
         let notFound = "{\(notFoundErrors.sorted().map(String.init).joined(separator: ", "))}"
         func reads(_ id: VariantID) -> String {
             "{\"\(id)\", true, properties of v, properties of lens correction of v, properties of every layer of v, properties of adjustments of v, my layerFields(v), dimensions of parent image of v, maximum crop v apply false}"
         }
-        var lines = ["on layerFields(v)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
-                     "set kinds to kind of every layer of v", "set out to {}", "repeat with i from 1 to count of kinds",
-                     "set fields to {}", "if item i of kinds is not background then", "set a to a reference to adjustments of layer i of v"]
+        let curves = WriteSchema.curveChannels.map { "properties of every curve point of \($0) curve of a" }
+        var lines = ["on editor(a)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
+                     "return {\(curves.joined(separator: ", ")), properties of every basic color correction of color editor settings of a, properties of every advanced color correction of color editor settings of a}",
+                     "end timeout", "end tell", "end editor"]
+        lines += ["on layerFields(v)", "tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds",
+                  "set kinds to kind of every layer of v", "set out to {}", "repeat with i from 1 to count of kinds",
+                  "set fields to {}", "if item i of kinds is background then", "set a to a reference to adjustments of v", "else",
+                  "set a to a reference to adjustments of layer i of v"]
         for code in layerFields {
             lines += ["try", "set end of fields to {\"\(code)\", «property \(code)» of a}",
                       "on error e number n", "if n is in \(fatal) then error e number n", "end try"]
         }
-        lines += ["end if", "set end of out to fields", "end repeat", "return out", "end timeout", "end tell", "end layerFields"]
+        lines += ["end if", "set end of out to {fields, my editor(a)}", "end repeat", "return out", "end timeout", "end tell", "end layerFields"]
         lines += ["tell application \"Capture One\"", "with timeout of \(timeoutSeconds) seconds"] + documentLines + ["set out to {}"]
         if targets.contains(where: { $0.route == .favoritesScan }) {
             lines.append("set favorites to every collection of d whose kind is favorite")
@@ -315,21 +346,27 @@ public final class AppleScriptCaptureOne: CaptureOne {
         let variant = terminology.record(fields[2]).filter { !Self.isDroppedVariantField($0.key) }
         let lens = terminology.record(fields[3])
         let layerRecords = list(fields[4]).map(terminology.record)
-        let adjustments = terminology.record(fields[5])
-        let layerFields = list(fields[6])
-        guard layerRecords.count == layerFields.count else {
-            return .failed("Capture One returned \(layerRecords.count) layers but \(layerFields.count) layer field lists.")
+        let layerReads = list(fields[6]).map(list)
+        guard layerRecords.count == layerReads.count, layerReads.allSatisfy({ $0.count == 2 }) else {
+            return .failed("Capture One returned \(layerRecords.count) layers but \(layerReads.count) layer field lists.")
         }
-        let layers = zip(layerRecords, layerFields).map { layer, pairs -> [String: JSONValue] in
-            guard layer["kind"] != .string("background") else { return layer }
-            var values: [String: JSONValue] = [:]
-            for pair in list(pairs) {
+        var adjustments = terminology.record(fields[5])
+        var layers: [[String: JSONValue]] = []
+        for (layer, read) in zip(layerRecords, layerReads) {
+            let editor = self.editor(read[1])
+            guard layer["kind"] != .string("background") else {
+                adjustments.merge(editor) { $1 }
+                layers.append(layer)
+                continue
+            }
+            var values = editor
+            for pair in list(read[0]) {
                 let items = list(pair)
                 guard items.count == 2, let code = items[0].stringValue,
                       let (name, value) = terminology.field(ofClass: Self.adjustmentsClass, code: code, items[1]), value != .null else { continue }
                 values[name] = value
             }
-            return layer.merging(["adjustments": .object(values)]) { $1 }
+            layers.append(layer.merging(["adjustments": .object(values)]) { $1 })
         }
         func numbers(_ descriptor: NSAppleEventDescriptor) -> [Double]? {
             guard case .array(let items)? = terminology.decode(descriptor) else { return nil }
@@ -338,6 +375,25 @@ public final class AppleScriptCaptureOne: CaptureOne {
         }
         return .state(VariantState(id: id, variant: variant, adjustments: adjustments, lensCorrection: lens, layers: layers,
                                    canvasSize: numbers(fields[7]), maximumCrop: numbers(fields[8])))
+    }
+
+    /// `curves` and `colorEditor` from a layer's `editor(a)` result.
+    func editor(_ descriptor: NSAppleEventDescriptor) -> [String: JSONValue] {
+        let items = list(descriptor)
+        guard items.count == WriteSchema.curveChannels.count + 2 else { return [:] }
+        var curves: [String: JSONValue] = [:]
+        for (channel, points) in zip(WriteSchema.curveChannels, items) { curves[channel] = curve(points) }
+        let corrections = items.suffix(2).map { JSONValue.array(list($0).map { .object(terminology.record($0)) }) }
+        return ["curves": .object(curves), "colorEditor": .object(["basic": corrections[0], "advanced": corrections[1]])]
+    }
+
+    /// A curve's points, from `properties of every curve point`, as [x, y] pairs ordered by x.
+    func curve(_ descriptor: NSAppleEventDescriptor) -> JSONValue {
+        let points = list(descriptor).map(terminology.record).compactMap { point -> [Double]? in
+            guard let x = point["brightness"]?.number, let y = point["amount"]?.number else { return nil }
+            return [x, y]
+        }
+        return .array(points.sorted { $0[0] < $1[0] }.map { .array($0.map(JSONValue.double)) })
     }
 
     func list(_ descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {

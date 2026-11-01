@@ -12,6 +12,10 @@ public enum FieldOwner: Hashable {
     case variant, adjustments, lensCorrection
     case layer(Int)
     case layerAdjustments(Int)
+    /// A basic color correction, by name, in a layer's color editor.
+    case basicColor(layer: Int, name: String)
+    /// An advanced color correction, by position, in a layer's color editor.
+    case advancedColor(layer: Int, index: Int)
 
     var classCode: String {
         switch self {
@@ -19,6 +23,17 @@ public enum FieldOwner: Hashable {
         case .adjustments, .layerAdjustments: return Section.adjustments.classCode
         case .lensCorrection: return Section.lensCorrection.classCode
         case .layer: return Section.layer.classCode
+        case .basicColor: return Section.basicColor.classCode
+        case .advancedColor: return Section.advancedColor.classCode
+        }
+    }
+
+    /// The layer whose adjustments hold the field, 0 being the background; nil for variant, lens and layer fields.
+    var adjustmentsLayer: Int? {
+        switch self {
+        case .adjustments: return 0
+        case .layerAdjustments(let index), .basicColor(let index, _), .advancedColor(let index, _): return index
+        case .variant, .lensCorrection, .layer: return nil
         }
     }
 }
@@ -27,7 +42,24 @@ public struct FieldRead: Hashable {
     public let owner: FieldOwner
     public let name: String
     public let code: String
-    public init(_ owner: FieldOwner, _ spec: FieldSpec) { self.owner = owner; self.name = spec.name; self.code = spec.code }
+    public let kind: FieldSpec.Kind
+    public init(_ owner: FieldOwner, _ spec: FieldSpec) { self.owner = owner; self.name = spec.name; self.code = spec.code; self.kind = spec.kind }
+
+    /// Where `get` reports the field: `curves.rgb` for the rgb curve, `colorEditor.basic.<name>.<field>` and
+    /// `colorEditor.advanced.<position>.<field>` for color corrections, keyed so partial results nest unambiguously.
+    var components: [String] {
+        func adjustments(_ layer: Int) -> [String] { layer == 0 ? ["adjustments"] : ["layers", String(layer), "adjustments"] }
+        switch owner {
+        case .variant: return ["variant", name]
+        case .lensCorrection: return ["lensCorrection", name]
+        case .layer(let index): return ["layers", String(index), name]
+        case .adjustments, .layerAdjustments:
+            let field = kind == .curve ? ["curves", WriteSchema.curveChannel(name)] : [name]
+            return adjustments(owner.adjustmentsLayer!) + field
+        case .basicColor(let layer, let color): return adjustments(layer) + ["colorEditor", "basic", color, name]
+        case .advancedColor(let layer, let index): return adjustments(layer) + ["colorEditor", "advanced", String(index), name]
+        }
+    }
 }
 
 public struct FieldWrite: Equatable {
