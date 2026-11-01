@@ -2,7 +2,7 @@ import Foundation
 
 /// Every command, declared once. Step 4 generates the CLI, MCP tools and reference from this table.
 public enum Command: String, CaseIterable {
-    case doctor, list, collections, get, selection, set, action, revert, preview
+    case doctor, list, collections, get, selection, set, action, revert, preview, thumb
     case cropPreview = "crop_preview"
     case contactSheet = "contact_sheet"
 
@@ -19,6 +19,7 @@ public enum Command: String, CaseIterable {
         case .preview: return "Export a JPEG of one variant: the crop at a long edge, the full frame with a pixel mapping, or a region at a scale."
         case .cropPreview: return "Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written."
         case .contactSheet: return "Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events."
+        case .thumb: return "Read the camera's embedded JPEG of one variant's original, without Capture One's edits."
         }
     }
 
@@ -34,11 +35,12 @@ public enum Command: String, CaseIterable {
         case .preview: return ["id", "size", "fullFrame", "region", "scale", "timeout"]
         case .cropPreview: return ["id", "candidates", "size", "timeout"]
         case .contactSheet: return ["rating", "minRating", "colorTag", "collection", "ids", "edited", "after", "perPage", "rowHeight"]
+        case .thumb: return ["id", "maxSize"]
         }
     }
 
     /// Commands that can read a database file without Capture One.
-    public var acceptsDocumentPath: Bool { [.list, .collections, .contactSheet].contains(self) }
+    public var acceptsDocumentPath: Bool { [.list, .collections, .contactSheet, .thumb].contains(self) }
 
     public func run(_ service: Service, arguments json: Data, document: String? = nil) throws -> JSONValue {
         if document != nil, !acceptsDocumentPath {
@@ -73,6 +75,8 @@ public enum Command: String, CaseIterable {
             return try service.cropPreview(try decode(CropPreviewArguments.self, json))
         case .contactSheet:
             return try service.contactSheet(try decode(ContactSheetArguments.self, json), document: document)
+        case .thumb:
+            return try service.thumb(try decode(ThumbArguments.self, json), document: document)
         }
     }
 
