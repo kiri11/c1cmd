@@ -21,7 +21,7 @@ Run `command -v c1`.
 
   If `~/.local/bin` is not on PATH, they add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`.
 
-Done when `c1 --version` prints a version.
+Done when `c1 --version` prints a version. If it fails with `Unknown option '--version'`, an old c1 (v1) comes first on PATH: `command -v c1` shows where. Ask the photographer to remove it, then check again.
 
 ## 2. Automation permission and doctor
 

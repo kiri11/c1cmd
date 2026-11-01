@@ -20,15 +20,25 @@ Claude Code downloads the plugin itself; for Codex you unzip one file.
 ### Claude Code
 
 ```sh
-claude plugin marketplace add https://github.com/kiri11/c1cmd/releases/latest/download/marketplace.json
+claude plugin marketplace add kiri11/c1cmd
 claude plugin install c1@c1
 ```
+
+The marketplace is this repository; the plugin itself downloads from the latest release. To try a pre-release, add `kiri11/c1cmd#v2` instead. If your shell has no `claude` command, run the same steps in a session as `/plugin marketplace add kiri11/c1cmd` and `/plugin install c1@c1`.
 
 Start a new session. The skills appear as `/c1:setup`, `/c1:edit`, `/c1:learn-style` and `/c1:crop-policy`, and the agent can run `c1`. To update, run `claude plugin marketplace update c1` and then `claude plugin update c1@c1`.
 
 ### Codex
 
-1. Download `c1-plugin.zip` from the [latest release](https://github.com/kiri11/c1cmd/releases/latest) and unzip it where it can stay, for example in `~/Applications`.
+1. Download and unzip the plugin in Terminal, where it can stay:
+
+   ```sh
+   mkdir -p ~/Applications && cd ~/Applications
+   curl -fLO https://github.com/kiri11/c1cmd/releases/latest/download/c1-plugin.zip
+   unzip -o c1-plugin.zip && rm c1-plugin.zip
+   ```
+
+   Use `curl`, not a browser. macOS flags a file downloaded in a browser, and then refuses to run `c1` ("Apple could not verify “c1” is free of malware"). If that happened, run `xattr -dr com.apple.quarantine ~/Applications/c1-plugin`.
 2. Add it and install the plugin:
 
    ```sh
@@ -44,6 +54,8 @@ Start a new session. The skills appear as `/c1:setup`, `/c1:edit`, `/c1:learn-st
    ```
 
    If `c1 --version` then says "command not found", add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` and open a new terminal.
+
+   `c1 --version` must print 2.0 or later. An older c1 (v1, installed with `make install`, often in `/opt/homebrew/bin`) may come first on your PATH: remove it.
 
 **Codex's sandbox (pending).** Whether Codex's default sandbox lets `c1` send Apple Events to Capture One, and which setting it needs if not, is checked in the next pre-release test. Until then, run c1 in Codex with a sandbox mode that allows it, or approve each call.
 

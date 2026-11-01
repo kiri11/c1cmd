@@ -142,3 +142,17 @@ jobs:
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
+
+      # Claude Code sees a new version only through the marketplace entry, so the branch carries it:
+      # `claude plugin marketplace add kiri11/c1cmd#v2`. A GITHUB_TOKEN push starts no workflow run.
+      - name: Point the Branch Marketplace at the Pre-release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch --depth 1 origin "$GITHUB_REF_NAME"
+          git checkout --detach FETCH_HEAD
+          mkdir -p .claude-plugin
+          cp dist/marketplace.json .claude-plugin/marketplace.json
+          git add .claude-plugin/marketplace.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Point the marketplace at c1 ${{ steps.version.outputs.version }}"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
