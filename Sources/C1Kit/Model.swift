@@ -88,17 +88,17 @@ public struct VariantState: Equatable {
     public var lensCorrection: [String: JSONValue]
     /// Every layer, the background first; non-background layers carry their own `adjustments`.
     public var layers: [[String: JSONValue]]
-    /// The parent image's width and height before orientation.
-    public var imageSize: [Double]?
+    /// `dimensions of parent image`: the canvas after orientation and rotation, which grows as the image turns.
+    public var canvasSize: [Double]?
     /// `maximum crop`: the largest centred crop of the image's proportions, as {centre x, centre y, width, height}.
     public var maximumCrop: [Double]?
 
     public init(id: VariantID, variant: [String: JSONValue], adjustments: [String: JSONValue],
                 lensCorrection: [String: JSONValue], layers: [[String: JSONValue]],
-                imageSize: [Double]? = nil, maximumCrop: [Double]? = nil) {
+                canvasSize: [Double]? = nil, maximumCrop: [Double]? = nil) {
         self.id = id; self.variant = variant; self.adjustments = adjustments
         self.lensCorrection = lensCorrection; self.layers = layers
-        self.imageSize = imageSize; self.maximumCrop = maximumCrop
+        self.canvasSize = canvasSize; self.maximumCrop = maximumCrop
     }
 
     /// Reads back a state written by `json`, as stored in a snapshot.

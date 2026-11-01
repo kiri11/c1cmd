@@ -1,1 +1,352 @@
-{"build":"16.8.5.30","fields":{}}
+{
+  "build": "16.8.5.30",
+  "document": "session",
+  "fields": {
+    "adjustments": {
+      "black and white blue sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black and white cyan sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black and white green sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black and white magenta sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black and white red sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black and white split highlight hue": {
+        "max": 360,
+        "min": 0
+      },
+      "black and white split highlight saturation": {
+        "max": 100,
+        "min": 0
+      },
+      "black and white split shadow hue": {
+        "max": 360,
+        "min": 0
+      },
+      "black and white split shadow saturation": {
+        "max": 100,
+        "min": 0
+      },
+      "black and white yellow sensitivity": {
+        "max": 100,
+        "min": -100
+      },
+      "black recovery": {
+        "max": 100,
+        "min": -100
+      },
+      "brightness": {
+        "max": 50,
+        "min": -50
+      },
+      "clarity amount": {
+        "max": 100,
+        "min": -100
+      },
+      "clarity structure": {
+        "max": 100,
+        "min": -100
+      },
+      "color balance highlight hue": {
+        "max": 360,
+        "min": 0.01
+      },
+      "color balance highlight lightness": {
+        "max": 1,
+        "min": -1
+      },
+      "color balance highlight saturation": {
+        "max": 1,
+        "min": 0
+      },
+      "color balance master hue": {
+        "max": 360,
+        "min": 0.01
+      },
+      "color balance master saturation": {
+        "max": 1,
+        "min": 0
+      },
+      "color balance midtone hue": {
+        "max": 360,
+        "min": 0.01
+      },
+      "color balance midtone lightness": {
+        "max": 1,
+        "min": -1
+      },
+      "color balance midtone saturation": {
+        "max": 1,
+        "min": 0
+      },
+      "color balance shadow hue": {
+        "max": 360,
+        "min": 0.01
+      },
+      "color balance shadow lightness": {
+        "max": 1,
+        "min": -1
+      },
+      "color balance shadow saturation": {
+        "max": 1,
+        "min": 0
+      },
+      "contrast": {
+        "max": 50,
+        "min": -50
+      },
+      "dehaze amount": {
+        "max": 100,
+        "min": -100
+      },
+      "exposure": {
+        "max": 4,
+        "min": -4
+      },
+      "film grain granularity": {
+        "max": 100,
+        "min": 0
+      },
+      "film grain impact": {
+        "max": 100,
+        "min": 0
+      },
+      "highlight adjustment": {
+        "max": 100,
+        "min": -100
+      },
+      "highlight recovery": {
+        "max": 100,
+        "min": -100
+      },
+      "keystone amount": {
+        "max": 120,
+        "min": 10
+      },
+      "keystone aspect": {
+        "max": 100.0,
+        "min": -50.0
+      },
+      "keystone horizontal": {
+        "max": 75.0,
+        "min": -75.0
+      },
+      "keystone skew": {
+        "max": 45.0,
+        "min": -45.0
+      },
+      "keystone vertical": {
+        "max": 75.0,
+        "min": -75.0
+      },
+      "level highlight blue": {
+        "max": 255,
+        "min": 0
+      },
+      "level highlight green": {
+        "max": 255,
+        "min": 0
+      },
+      "level highlight red": {
+        "max": 255,
+        "min": 0
+      },
+      "level highlight rgb": {
+        "max": 255,
+        "min": 0
+      },
+      "level midtone blue": {
+        "max": 1,
+        "min": -1
+      },
+      "level midtone green": {
+        "max": 1,
+        "min": -1
+      },
+      "level midtone red": {
+        "max": 1,
+        "min": -1
+      },
+      "level midtone rgb": {
+        "max": 1,
+        "min": -1
+      },
+      "level shadow blue": {
+        "max": 255,
+        "min": 0
+      },
+      "level shadow green": {
+        "max": 255,
+        "min": 0
+      },
+      "level shadow red": {
+        "max": 255,
+        "min": 0
+      },
+      "level shadow rgb": {
+        "max": 255,
+        "min": 0
+      },
+      "level target highlight blue": {
+        "max": 255,
+        "min": 0
+      },
+      "level target highlight green": {
+        "max": 255,
+        "min": 0
+      },
+      "level target highlight red": {
+        "max": 255,
+        "min": 0
+      },
+      "level target highlight rgb": {
+        "max": 255,
+        "min": 0
+      },
+      "level target shadow blue": {
+        "max": 255,
+        "min": 0
+      },
+      "level target shadow green": {
+        "max": 255,
+        "min": 0
+      },
+      "level target shadow red": {
+        "max": 255,
+        "min": 0
+      },
+      "level target shadow rgb": {
+        "max": 255,
+        "min": 0
+      },
+      "moire amount": {
+        "max": 100,
+        "min": 0
+      },
+      "moire pattern": {
+        "max": 80,
+        "min": 4
+      },
+      "noise reduction color": {
+        "max": 100,
+        "min": 0
+      },
+      "noise reduction details": {
+        "max": 100,
+        "min": 0
+      },
+      "noise reduction luminance": {
+        "max": 100,
+        "min": 0
+      },
+      "noise reduction single pixel": {
+        "max": 100,
+        "min": 0
+      },
+      "orientation": {
+        "values": [
+          0,
+          90,
+          180,
+          270
+        ]
+      },
+      "rotation": {
+        "max": 45.0,
+        "min": -45.0
+      },
+      "saturation": {
+        "max": 100,
+        "min": -100
+      },
+      "shadow recovery": {
+        "max": 100,
+        "min": -100
+      },
+      "sharpening amount": {
+        "max": 1000,
+        "min": 0
+      },
+      "sharpening halo suppression": {
+        "max": 100,
+        "min": 0
+      },
+      "sharpening radius": {
+        "max": 2.5,
+        "min": 0.2
+      },
+      "sharpening threshold": {
+        "max": 12,
+        "min": 0
+      },
+      "temperature": {
+        "max": 14000,
+        "min": 800
+      },
+      "tint": {
+        "max": 50,
+        "min": -50
+      },
+      "vignetting amount": {
+        "max": 4,
+        "min": -4
+      },
+      "white recovery": {
+        "max": 100,
+        "min": -100
+      }
+    },
+    "layer": {
+      "opacity": {
+        "max": 100,
+        "min": 0
+      }
+    },
+    "lensCorrection": {
+      "distortion": {
+        "max": 120,
+        "min": 0
+      },
+      "light falloff": {
+        "max": 120.0,
+        "min": 0.0
+      },
+      "sharpness falloff": {
+        "max": 250.0,
+        "min": 0.0
+      },
+      "shift x": {
+        "max": 100,
+        "min": -100
+      },
+      "shift y": {
+        "max": 100,
+        "min": -100
+      }
+    },
+    "variant": {
+      "color tag": {
+        "max": 7,
+        "min": 0
+      },
+      "rating": {
+        "max": 5,
+        "min": 0
+      }
+    }
+  },
+  "measured": "2026-11-01T01:16:55+00:00",
+  "method": "scripts/v2-measure-bounds.py: accepted means no error and the value reads back as written"
+}

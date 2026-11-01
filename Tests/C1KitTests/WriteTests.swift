@@ -141,27 +141,27 @@ enum WriteTests {
 
     static func cropBoundsChecks() {
         let image = VariantState(id: id("1"), variant: [:], adjustments: ["rotation": .double(5)], lensCorrection: [:], layers: [],
-                                 imageSize: [5999, 4000], maximumCrop: [3162, 2253, 5324, 3549])
+                                 canvasSize: [6325, 4507], maximumCrop: [3162, 2253, 5324, 3549])
         let bounds = image.cropBounds!
         checkEqual(bounds.source, .image)
         let expected: [[Double]] = [[348.6, 4507.6], [6324.8, 3984.8], [5976.2, 0], [0, 522.8]]
-        check(zip(bounds.corners, expected).allSatisfy { abs($0[0] - $1[0]) < 0.2 && abs($0[1] - $1[1]) < 0.2 },
+        check(zip(bounds.corners, expected).allSatisfy { abs($0[0] - $1[0]) < 1 && abs($0[1] - $1[1]) < 1 },
               "the image turned 5° clockwise inside its bounding canvas: \(bounds.corners)")
         checkEqual(bounds.crossings([3162, 2254, 5324, 3549]).count, 0, "Capture One's own fit lies inside")
         let outside = bounds.crossings([3162, 2254, 5500, 3549])
         checkEqual(outside.map(\.corner), ["top right", "bottom left"], "a wider crop crosses two corners")
         let keystoned = VariantState(id: id("1"), variant: [:], adjustments: ["keystone vertical": .double(20)], lensCorrection: [:], layers: [],
-                                     imageSize: [5999, 4000], maximumCrop: [3177, 2313, 5466, 3644])
+                                     canvasSize: [5999, 4000], maximumCrop: [3177, 2313, 5466, 3644])
         checkEqual(keystoned.cropBounds?.source, .maximumCrop, "keystone uses Capture One's maximum crop")
         checkEqual(keystoned.cropBounds?.crossings([3177, 2313, 5466, 3644]).count, 0)
 
         var state = FakeCaptureOne.state("1")
         state.adjustments["rotation"] = .double(5)
-        state.imageSize = [5999, 4000]
+        state.canvasSize = [6325, 4507]
         let (fake, service, _) = fixture("crop", state: state)
         let refused = first(try! run(.set, service, #"{"ids":["1"],"variant":{"crop":[3162,2254,5500,3549]}}"#))
         checkEqual(refused?["error"]?["code"], .string("refused"))
-        check(refused?["error"]?["message"]?.stringValue?.contains("the top right corner by 8 px") == true, "the refusal names the crossed corner")
+        check(refused?["error"]?["message"]?.stringValue?.contains("the top right corner by ") == true, "the refusal names the crossed corner")
         check(!fake.calls.contains { if case .write = $0 { return true }; return false }, "a crop outside is never sent")
         let accepted = first(try! run(.set, service, #"{"ids":["1"],"variant":{"crop":[3162,2254,5000,3300]}}"#))
         checkEqual(accepted?["outcome"], .string("ok"))

@@ -337,7 +337,7 @@ public final class AppleScriptCaptureOne: CaptureOne {
             return values.count == items.count ? values : nil
         }
         return .state(VariantState(id: id, variant: variant, adjustments: adjustments, lensCorrection: lens, layers: layers,
-                                   imageSize: numbers(fields[7]), maximumCrop: numbers(fields[8])))
+                                   canvasSize: numbers(fields[7]), maximumCrop: numbers(fields[8])))
     }
 
     func list(_ descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {
