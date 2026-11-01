@@ -30,7 +30,7 @@ Capture One must be running with the Catalog or Session open. Run `c1 doctor`.
 
 - **The first call can hang** until `timeout`: macOS is showing the Automation consent dialog for the app running c1 (Terminal, Claude, Codex), often hidden behind other windows. Tell the photographer to look for it and click **Allow**, then run `c1 doctor` again.
 - **`permission-denied`**: the photographer allows it under **System Settings > Privacy & Security > Automation**, by turning on Capture One under the app that runs c1.
-- **`not-running`** or `document: null`: the photographer opens Capture One and the document. In Codex, `not-running` while Capture One is open means the sandbox hides it: c1 needs Codex started with `--sandbox danger-full-access`.
+- **`not-running`**, or a result without `document` (its warning says no document is open): the photographer opens Capture One and the document. In Codex, `not-running` while Capture One is open means the sandbox hides it: c1 needs Codex started with `--sandbox danger-full-access`.
 
 Done when `doctor` returns a `document`. Read its `warnings` aloud to the photographer: an untested Capture One build, an old Catalog backup, or scripting terms that differ from the ones c1 was built with. Warnings never block.
 
