@@ -3,8 +3,10 @@ import Foundation
 
 /// A small Catalog database with only the columns c1 reads.
 enum Fixture {
+    static let uuid = "0A1B2C3D-0000-4000-8000-000000000001"
+
     static let schema = """
-        CREATE TABLE ZDOCUMENTCONTENT (Z_PK INTEGER PRIMARY KEY, ZDOCUMENTTYPE INTEGER, ZROOTCOLLECTION INTEGER);
+        CREATE TABLE ZDOCUMENTCONTENT (Z_PK INTEGER PRIMARY KEY, ZDOCUMENTTYPE INTEGER, ZROOTCOLLECTION INTEGER, ZDOCUMENTUUID VARCHAR, ZLASTBACKUPDATE TIMESTAMP);
         CREATE TABLE ZENTITIES (Z_ENT INTEGER PRIMARY KEY, ZNAME VARCHAR);
         CREATE TABLE ZCOLLECTION (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, ZNAME VARCHAR, ZPARENT INTEGER, ZFOLDERLOCATION INTEGER, ZSMARTCRITERIA VARCHAR, ZALLIMAGESCOLLECTION INTEGER);
         CREATE TABLE ZPATHLOCATION (Z_PK INTEGER PRIMARY KEY, ZMACROOT VARCHAR, ZRELATIVEPATH VARCHAR, ZISRELATIVE BOOLEAN);
@@ -18,7 +20,7 @@ enum Fixture {
 
     static func data(documentType: Int) -> String {
         """
-        INSERT INTO ZDOCUMENTCONTENT VALUES (1, \(documentType), 1);
+        INSERT INTO ZDOCUMENTCONTENT VALUES (1, \(documentType), 1, '\(uuid)', NULL);
         INSERT INTO ZENTITIES VALUES (2,'AlbumCollection'),(5,'SmartCollection'),(7,'ProjectCollection'),
             (36,'CatalogFolderCollection'),(40,'CatalogAllImagesCollection'),(52,'SessionFolderCollection');
         INSERT INTO ZCOLLECTION VALUES
@@ -38,7 +40,7 @@ enum Fixture {
             (31,1,0,3,NULL,0,NULL),(32,1,0,3,3,0,NULL),
             (41,1,0,4,NULL,0,NULL),(42,1,0,4,4,-1,NULL);
         INSERT INTO ZVARIANTMETADATA VALUES (1,5,1),(2,3,0),(3,0,NULL),(4,5,2);
-        INSERT INTO ZVARIANTINCOLLECTION VALUES (1,20,2);
+        INSERT INTO ZVARIANTINCOLLECTION VALUES (1,20,2),(2,22,1);
         INSERT INTO ZIMAGEINCOLLECTION VALUES (1,20,1);
         """
     }
@@ -107,8 +109,13 @@ enum DatabaseTests {
     }
 
     static func routes(_ database: Database) {
-        let routes = try! database.routes(for: [id("1"), id("3"), id("4"), id("99")])
-        checkEqual(routes, [id("1"): cid("10"), id("3"): cid("11")], "folder routes; none for a folder without a collection")
+        let routes = try! database.routes(for: [id("1"), id("2"), id("3"), id("4"), id("99")])
+        checkEqual(routes, [id("1"): cid("10"), id("2"): cid("20"), id("3"): cid("11")],
+                   "the smallest collection: an album of 1 beats a folder tree of 3, a smart album never counts; none without a collection")
+        checkEqual(database.documentUUID, Fixture.uuid)
+        checkEqual(database.lastBackup, nil, "never backed up")
+        let backedUp = try! Database(path: Fixture.make("backed-up", extraSQL: "UPDATE ZDOCUMENTCONTENT SET ZLASTBACKUPDATE=1793494313.94;"))
+        checkEqual(backedUp.lastBackup, Date(timeIntervalSince1970: 1793494313.94), "ZLASTBACKUPDATE counts Unix seconds")
         checkEqual(try! database.allImagesCollection(), cid("2"))
 
         let session = try! Database(path: Fixture.make("session", documentType: 0))

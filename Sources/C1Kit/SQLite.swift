@@ -6,6 +6,13 @@ enum SQLValue: Equatable {
 
     var int: Int64? { if case .int(let value) = self { return value }; return nil }
     var text: String? { if case .text(let value) = self { return value }; return nil }
+    var number: Double? {
+        switch self {
+        case .int(let value): return Double(value)
+        case .double(let value): return value
+        default: return nil
+        }
+    }
 }
 
 typealias SQLRow = [String: SQLValue]

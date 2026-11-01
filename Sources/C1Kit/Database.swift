@@ -52,12 +52,16 @@ public struct CollectionRow: Codable, Equatable {
 /// Capture One's database, read-only. It lags Capture One by about a minute.
 public final class Database {
     public let kind: DocumentKind
+    /// Names c1's per-document storage; stable across moves and renames of the document.
+    public let documentUUID: String
+    /// The last File > Backup Catalog; nil when never backed up, and always for a Session.
+    public let lastBackup: Date?
     private let sql: SQLiteConnection
     private let root: CollectionID?
 
     /// Every table and column c1 reads. The open fails, naming what is missing, when Capture One changes them.
     static let requiredSchema: [String: [String]] = [
-        "ZDOCUMENTCONTENT": ["ZDOCUMENTTYPE", "ZROOTCOLLECTION"],
+        "ZDOCUMENTCONTENT": ["ZDOCUMENTTYPE", "ZROOTCOLLECTION", "ZDOCUMENTUUID", "ZLASTBACKUPDATE"],
         "ZVARIANT": ["Z_PK", "ZIMAGE", "ZDEFAULTLAYER", "ZCOMBINEDSETTINGS"],
         "ZIMAGE": ["Z_PK", "ZDISPLAYNAME", "ZIMAGEFILENAME", "ZIMAGELOCATION", "ZISINSIDECATALOG", "ZISTRASHED"],
         "ZPATHLOCATION": ["Z_PK", "ZMACROOT", "ZRELATIVEPATH", "ZISRELATIVE"],
@@ -75,11 +79,15 @@ public final class Database {
     public init(path: String) throws {
         sql = try SQLiteConnection(readOnly: path)
         try Self.checkSchema(sql)
-        let content = try sql.rows("SELECT ZDOCUMENTTYPE AS type, ZROOTCOLLECTION AS root FROM ZDOCUMENTCONTENT")
-        guard content.count == 1, let type = content[0]["type"]?.int else {
-            throw C1Failure(.database, "Expected one ZDOCUMENTCONTENT row in \(path), found \(content.count).")
+        let content = try sql.rows("SELECT ZDOCUMENTTYPE AS type, ZROOTCOLLECTION AS root, ZDOCUMENTUUID AS uuid, ZLASTBACKUPDATE AS backup FROM ZDOCUMENTCONTENT")
+        guard content.count == 1, let type = content[0]["type"]?.int,
+              let uuid = content[0]["uuid"]?.text, UUID(uuidString: uuid) != nil else {
+            throw C1Failure(.database, "Expected one ZDOCUMENTCONTENT row with a document UUID in \(path), found \(content.count) rows.")
         }
         kind = type == 1 ? .catalog : .session
+        documentUUID = uuid.uppercased()
+        // Measured on 16.8.5.30: Unix seconds, unlike Core Data's other dates, which count from 2001.
+        lastBackup = content[0]["backup"]?.number.map { Date(timeIntervalSince1970: $0) }
         root = content[0]["root"]?.int.map(CollectionID.init)
     }
 
@@ -98,21 +106,43 @@ public final class Database {
 
     // MARK: Routes
 
-    /// The folder collection (Catalog) or favorite (Session) holding each variant's image, when one exists.
+    /// The smallest collection that holds each variant: its image's folder (Catalog) or favorite (Session),
+    /// or an album or project listing it. A live lookup's cost follows the collection's variant count,
+    /// and a folder counts its subfolders. Ties keep the folder.
     public func routes(for ids: [VariantID]) throws -> [VariantID: CollectionID] {
         guard !ids.isEmpty else { return [:] }
+        let list = ids.map(\.description).joined(separator: ",")
+        let all = try collectionRows()
         let folders = try folderByLocation()
-        let rows = try sql.rows("""
+        let locationCounts = try variantsPerLocation()
+        var output: [VariantID: (collection: CollectionID, count: Int)] = [:]
+        for row in try sql.rows("""
             SELECT v.Z_PK AS id, i.ZIMAGELOCATION AS location FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE
-            WHERE v.Z_PK IN (\(ids.map(\.description).joined(separator: ",")))
-            """)
-        var output: [VariantID: CollectionID] = [:]
-        for row in rows {
-            if let id = row["id"]?.int, let location = row["location"]?.int, let folder = folders[location] {
-                output[VariantID(id)] = folder
-            }
+            WHERE v.Z_PK IN (\(list))
+            """) {
+            guard let id = row["id"]?.int, let location = row["location"]?.int, let folder = folders[location] else { continue }
+            let count = folderLocations(under: folder, in: all, folders: folders).reduce(0) { $0 + (locationCounts[$1] ?? 0) }
+            output[VariantID(id)] = (folder, count)
         }
-        return output
+        let listed = Set(all.filter { $0.kind == .album || $0.kind == .project }.map(\.id))
+        for row in try sql.rows("""
+            SELECT vc.ZVARIANT AS id, vc.ZCOLLECTION AS collection,
+                   (SELECT COUNT(*) FROM ZVARIANTINCOLLECTION x WHERE x.ZCOLLECTION=vc.ZCOLLECTION) AS n
+            FROM ZVARIANTINCOLLECTION vc WHERE vc.ZVARIANT IN (\(list)) ORDER BY vc.ZCOLLECTION
+            """) {
+            guard let id = row["id"]?.int.map(VariantID.init), let collection = row["collection"]?.int.map(CollectionID.init),
+                  listed.contains(collection), let count = row["n"]?.int.map(Int.init) else { continue }
+            if count < output[id]?.count ?? .max { output[id] = (collection, count) }
+        }
+        return output.mapValues(\.collection)
+    }
+
+    private func variantsPerLocation() throws -> [Int64: Int] {
+        var counts: [Int64: Int] = [:]
+        for row in try sql.rows("SELECT i.ZIMAGELOCATION AS location, COUNT(*) AS n FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
+            if let location = row["location"]?.int { counts[location] = Int(row["n"]?.int ?? 0) }
+        }
+        return counts
     }
 
     /// The Catalog's All Images collection.
@@ -287,10 +317,7 @@ public final class Database {
         for row in try sql.rows("SELECT vc.ZCOLLECTION AS id, COUNT(*) AS n FROM ZVARIANTINCOLLECTION vc JOIN ZVARIANT v ON v.Z_PK=vc.ZVARIANT JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
             if let id = row["id"]?.int { albumCounts[id] = Int(row["n"]?.int ?? 0) }
         }
-        var locationCounts: [Int64: Int] = [:]
-        for row in try sql.rows("SELECT i.ZIMAGELOCATION AS location, COUNT(*) AS n FROM ZVARIANT v JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
-            if let location = row["location"]?.int { locationCounts[location] = Int(row["n"]?.int ?? 0) }
-        }
+        let locationCounts = try variantsPerLocation()
         let total = locationCounts.values.reduce(0, +)
         let folders = try folderByLocation()
         return all.map { row in
