@@ -75,13 +75,16 @@ extension Command {
             (schema.fields[section] ?? [:]).values.sorted { $0.name < $1.name }.filter { !skip($0.name) }.map { (path($0.name), describe($0)) }
         }
         let curves = Set(WriteSchema.curveChannels.map(WriteSchema.curveField))
-        return rows(.variant) { "variant.\($0)" }
-            + rows(.adjustments, { "adjustments.\($0)" }, skip: curves.contains)
-            + rows(.adjustments, { "adjustments.curves.\(WriteSchema.curveChannel($0))" }, skip: { !curves.contains($0) })
-            + rows(.basicColor) { "adjustments.colorEditor.basic[].\($0)" }
-            + rows(.advancedColor) { "adjustments.colorEditor.advanced[].\($0)" }
-            + rows(.lensCorrection) { "lensCorrection.\($0)" }
-            + rows(.layer) { "layers[].\($0)" }
+        let groups: [[(String, String)]] = [
+            rows(.variant) { "variant.\($0)" },
+            rows(.adjustments, { "adjustments.\($0)" }, skip: curves.contains),
+            rows(.adjustments, { "adjustments.curves.\(WriteSchema.curveChannel($0))" }, skip: { !curves.contains($0) }),
+            rows(.basicColor) { "adjustments.colorEditor.basic[].\($0)" },
+            rows(.advancedColor) { "adjustments.colorEditor.advanced[].\($0)" },
+            rows(.lensCorrection) { "lensCorrection.\($0)" },
+            rows(.layer) { "layers[].\($0)" },
+        ]
+        return groups.flatMap { $0 }
     }
 
     static func setFieldLines() -> [String] {
