@@ -75,7 +75,118 @@
       "color balance shadow hue": 0,
       "color balance shadow lightness": 0,
       "color balance shadow saturation": 0,
+      "colorEditor": {
+        "advanced": [],
+        "basic": [
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "red",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "orange",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "yellow",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "green",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "cyan",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "blue",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "purple",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "pink",
+            "saturation change": 0
+          },
+          {
+            "hue change": 0,
+            "lightness change": 0,
+            "name": "all",
+            "saturation change": 0
+          }
+        ]
+      },
       "contrast": 0,
+      "curves": {
+        "blue": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            100
+          ]
+        ],
+        "green": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            100
+          ]
+        ],
+        "luma": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            100
+          ]
+        ],
+        "red": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            100
+          ]
+        ],
+        "rgb": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            100
+          ]
+        ]
+      },
       "dehaze amount": 0,
       "exposure": 0,
       "film grain granularity": 50,
