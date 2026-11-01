@@ -12,6 +12,7 @@ public enum RevertScope: String, CaseIterable, Decodable {
         case .adjustments: return WriteSchema.geometryFields.contains(name) ? .geometry : .adjustments
         case .lensCorrection: return .adjustments
         case .layer, .layerAdjustments: return .layers
+        case .basicColor(let layer, _), .advancedColor(let layer, _): return layer == 0 ? .adjustments : .layers
         }
     }
 }
@@ -142,6 +143,7 @@ extension Service {
         }
         var notRestored: [String] = []
         var deletions: [Int] = []
+        var colorActions: [ActionStep] = []
         if scope.covers(.layers) {
             let savedTags = Set(saved.layers.compactMap { LayerTag.of(name($0)) })
             deletions = current.layers.indices.dropFirst().filter { LayerTag.of(name(current.layers[$0])).map { !savedTags.contains($0) } ?? false }
@@ -153,8 +155,13 @@ extension Service {
             (.adjustments, .adjustments, saved.adjustments, current.adjustments),
             (.lensCorrection, .lensCorrection, saved.lensCorrection, current.lensCorrection),
         ]
+        func restoreEditor(layer: Int, _ before: [String: JSONValue], _ now: [String: JSONValue]) {
+            let restored = editorPlan(layer: layer, from: before, to: now, schema: schema)
+            writes += restored.writes; colorActions += restored.actions; notRestored += restored.notRestored
+        }
+        if scope.covers(.adjustments) { restoreEditor(layer: 0, saved.adjustments, current.adjustments) }
         for (section, owner, before, now) in sections {
-            for (name, value) in before.sorted(by: { $0.key < $1.key }) where differs(value, now[name]) {
+            for (name, value) in before.sorted(by: { $0.key < $1.key }) where !Self.editorKeys.contains(name) && differs(value, now[name]) {
                 if let spec = schema.fields[section]?[name] {
                     if scope.covers(RevertScope.of(owner, name)) { writes.append(FieldWrite(owner, FieldValue(spec, value))) }
                 } else if scope == .all, schema.sdefWritable[section]?.contains(name) == true,
@@ -182,16 +189,69 @@ extension Service {
                 }
                 let savedAdjustments: [String: JSONValue] = layer["adjustments"]?.object ?? [:]
                 let nowAdjustments: [String: JSONValue] = now["adjustments"]?.object ?? [:]
-                for (field, value) in savedAdjustments.sorted(by: { $0.key < $1.key }) where differs(value, nowAdjustments[field]) {
+                for (field, value) in savedAdjustments.sorted(by: { $0.key < $1.key }) where !Self.editorKeys.contains(field) && differs(value, nowAdjustments[field]) {
                     if let spec = schema.fields[.adjustments]?[field], !WriteSchema.geometryFields.contains(field) {
                         writes.append(FieldWrite(.layerAdjustments(shifted), FieldValue(spec, value)))
                     }
                 }
+                restoreEditor(layer: shifted, savedAdjustments, nowAdjustments)
             }
         }
-        var plan = Plan(writes: Patch.ordered(writes), actions: deletions.sorted(by: >).map(ActionStep.deleteLayer))
+        var plan = Plan(writes: Patch.ordered(writes), actions: deletions.sorted(by: >).map(ActionStep.deleteLayer) + colorActions)
         if !notRestored.isEmpty { plan.extra["notRestored"] = .array(notRestored.map(JSONValue.string)) }
         return plan
+    }
+
+    static let editorKeys: Set<String> = ["curves", "colorEditor"]
+
+    /// Restores one layer's curves and color corrections: curves whole and basic corrections by name, where
+    /// they differ. Advanced corrections first match the snapshot's count, deleting from the end or creating
+    /// new ones; then every field of each new or differing correction is written, because setting a color
+    /// moves the ranges around it. A snapshot without these keys predates them and restores nothing here.
+    static func editorPlan(layer: Int, from saved: [String: JSONValue], to current: [String: JSONValue],
+                           schema: WriteSchema) -> (writes: [FieldWrite], actions: [ActionStep], notRestored: [String]) {
+        let place = layer == 0 ? "adjustments" : "layers.\(layer).adjustments"
+        let owner: FieldOwner = layer == 0 ? .adjustments : .layerAdjustments(layer)
+        var writes: [FieldWrite] = [], actions: [ActionStep] = [], notRestored: [String] = []
+        for (channel, points) in (saved["curves"]?.object ?? [:]).sorted(by: { $0.key < $1.key })
+        where current["curves"]?[channel].map({ !points.approximatelyEquals($0) }) ?? true {
+            guard let spec = schema.fields[.adjustments]?[WriteSchema.curveField(channel)],
+                  let value = try? schema.validate(.adjustments, spec.name, points) else {
+                notRestored.append("\(place).curves.\(channel)")
+                continue
+            }
+            writes.append(FieldWrite(owner, value))
+        }
+        let savedBasic = saved["colorEditor"]?["basic"]?.array ?? []
+        let currentBasic = current["colorEditor"]?["basic"]?.array ?? []
+        for correction in savedBasic {
+            guard let name = correction["name"]?.string else { continue }
+            guard let now = currentBasic.first(where: { $0["name"]?.string == name }) else {
+                notRestored.append("\(place).colorEditor.basic.\(name)")
+                continue
+            }
+            for (field, value) in (correction.object ?? [:]).sorted(by: { $0.key < $1.key }) where field != "name" && !(now[field].map { value.approximatelyEquals($0) } ?? false) {
+                guard let spec = schema.fields[.basicColor]?[field] else { notRestored.append("\(place).colorEditor.basic.\(name).\(field)"); continue }
+                writes.append(FieldWrite(.basicColor(layer: layer, name: name), FieldValue(spec, value)))
+            }
+        }
+        guard case .array(let savedAdvanced)? = saved["colorEditor"]?["advanced"] else { return (writes, actions, notRestored) }
+        let currentAdvanced = current["colorEditor"]?["advanced"]?.array ?? []
+        if currentAdvanced.count > savedAdvanced.count {
+            actions += (savedAdvanced.count..<currentAdvanced.count).reversed().map { ActionStep.deleteColor(layer: layer, index: $0) }
+        } else {
+            actions += Array(repeating: ActionStep.createColor(layer: layer), count: savedAdvanced.count - currentAdvanced.count)
+        }
+        for (index, correction) in savedAdvanced.enumerated()
+        where index >= currentAdvanced.count || !correction.approximatelyEquals(currentAdvanced[index]) {
+            let fields = correction.object ?? [:]
+            for field in WriteSchema.advancedColorOrder {
+                guard let value = fields[field] else { continue }
+                guard let spec = schema.fields[.advancedColor]?[field] else { notRestored.append("\(place).colorEditor.advanced.\(index).\(field)"); continue }
+                writes.append(FieldWrite(.advancedColor(layer: layer, index: index), FieldValue(spec, value)))
+            }
+        }
+        return (writes, actions, notRestored)
     }
 
     // MARK: the write pipeline

@@ -7,7 +7,7 @@ public enum Command: String, CaseIterable {
     public var summary: String {
         switch self {
         case .doctor: return "Check Capture One, the open document and its backup; warns without blocking."
-        case .set: return "Write absolute values to 1–100 variants: adjustments, lens correction, geometry, crop, rating, color tag, layers."
+        case .set: return "Write absolute values to 1–100 variants: adjustments, curves, color corrections, lens correction, geometry, crop, rating, color tag, layers."
         case .action: return "Run a layer, mask, color, dehaze, lens or reset action on 1–100 variants."
         case .revert: return "Restore variants to the snapshot c1 took before its first write; scope all, adjustments, geometry, metadata or layers."
         case .list: return "List variants from the database, filtered and paged."

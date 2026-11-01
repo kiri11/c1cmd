@@ -14,6 +14,7 @@ public struct Snapshot: Codable, Equatable {
     public let document: String
     public let state: JSONValue
     public var masks = "Mask pixels are not readable through Capture One's scripting, so this snapshot lacks them and revert cannot restore them."
+    public var skinTone = "Skin tone corrections in the color editor are not exposed through Capture One's scripting, so this snapshot lacks them and revert cannot restore them."
 
     public init(taken: Date, document: String, state: VariantState) {
         self.taken = ISO8601DateFormatter().string(from: taken); self.document = document; self.state = state.json

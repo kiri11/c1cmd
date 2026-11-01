@@ -23,14 +23,37 @@ public struct Defaults: Decodable {
     func changed(_ fields: [String: JSONValue], section: String, baseline: [String: JSONValue]? = nil) -> [String: JSONValue] {
         let always = Set(alwaysReported[section] ?? [])
         let reference = defaults[section] ?? [:]
-        return fields.filter { name, value in
+        var kept: [String: JSONValue] = [:]
+        for (name, value) in fields {
             if always.contains(name) {
-                guard let baseline else { return true }
-                return baseline[name].map { !value.approximatelyEquals($0) } ?? true
+                if baseline?[name].map({ value.approximatelyEquals($0) }) != true { kept[name] = value }
+            } else if let value = Self.changed(value, from: reference[name]) {
+                kept[name] = value
             }
-            return reference[name].map { !value.approximatelyEquals($0) } ?? true
+        }
+        return kept
+    }
+
+    /// The part of a value that differs from its default, or nil when none does. Objects, such as `curves`,
+    /// compare key by key, and lists of named objects, such as basic color corrections, name by name.
+    static func changed(_ value: JSONValue, from reference: JSONValue?) -> JSONValue? {
+        guard let reference else { return value }
+        switch (value, reference) {
+        case (.object(let fields), .object(let defaults)):
+            var kept: [String: JSONValue] = [:]
+            for (key, field) in fields { kept[key] = changed(field, from: defaults[key]) }
+            return kept.isEmpty ? nil : .object(kept)
+        case (.array(let items), .array(let defaults)) where named(items) && named(defaults):
+            let kept = items.filter { item in
+                defaults.first { $0["name"] == item["name"] }.map { !item.approximatelyEquals($0) } ?? true
+            }
+            return kept.isEmpty ? nil : .array(kept)
+        default:
+            return value.approximatelyEquals(reference) ? nil : value
         }
     }
+
+    static func named(_ items: [JSONValue]) -> Bool { !items.isEmpty && items.allSatisfy { $0["name"]?.string != nil } }
 
     /// Non-background layers compare camera-dependent adjustments against the Image layer's values.
     public func changed(_ state: VariantState) -> JSONValue {
