@@ -399,8 +399,8 @@ struct SetLog: Encodable {
                 case .name(let name), .tag(let name): return .string(name)
                 }
             }()]
-            if let enabled = patch.enabled { fields["enabled"] = enabled }
-            if let opacity = patch.opacity { fields["opacity"] = opacity }
+            if let enabled = patch.enabled { fields["enabled"] = .bool(enabled) }
+            if let opacity = patch.opacity { fields["opacity"] = .int(Int64(opacity)) }
             if let adjustments = patch.adjustments { fields["adjustments"] = .object(adjustments) }
             return .object(fields)
         }

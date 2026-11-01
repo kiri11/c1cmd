@@ -60,6 +60,15 @@ public enum JSONValue: Codable, Equatable {
         }
     }
 
+    /// The value with every object member whose value is null left out, at any depth; nulls in lists stay.
+    public func droppingNulls() -> JSONValue {
+        switch self {
+        case .object(let members): return .object(members.filter { $0.value != .null }.mapValues { $0.droppingNulls() })
+        case .array(let items): return .array(items.map { $0.droppingNulls() })
+        default: return self
+        }
+    }
+
     public func encoded(pretty: Bool = false) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = pretty ? [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes] : [.sortedKeys, .withoutEscapingSlashes]

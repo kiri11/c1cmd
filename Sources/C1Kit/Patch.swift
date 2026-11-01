@@ -56,8 +56,8 @@ public struct SetArguments: Decodable {
 
     public struct LayerPatch: Decodable {
         public let layer: LayerRef
-        public let enabled: JSONValue?
-        public let opacity: JSONValue?
+        public let enabled: Bool?
+        public let opacity: Int?
         public let adjustments: [String: JSONValue]?
 
         enum Keys: String, CodingKey, CaseIterable { case layer, enabled, opacity, adjustments }
@@ -70,8 +70,8 @@ public struct SetArguments: Decodable {
             }
             let container = try decoder.container(keyedBy: Keys.self)
             layer = try container.decode(LayerRef.self, forKey: .layer)
-            enabled = try container.decodeIfPresent(JSONValue.self, forKey: .enabled)
-            opacity = try container.decodeIfPresent(JSONValue.self, forKey: .opacity)
+            enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+            opacity = try container.decodeIfPresent(Int.self, forKey: .opacity)
             adjustments = try container.decodeIfPresent([String: JSONValue].self, forKey: .adjustments)
         }
     }
@@ -96,7 +96,7 @@ struct Patch {
         adjustments = try AdjustmentsPatch(arguments.adjustments ?? [:], schema: schema, layer: false)
         for patch in arguments.layers ?? [] {
             var layerFields: [FieldValue] = []
-            for (name, value) in [("enabled", patch.enabled), ("opacity", patch.opacity)] {
+            for (name, value) in [("enabled", patch.enabled.map(JSONValue.bool)), ("opacity", patch.opacity.map { .int(Int64($0)) })] {
                 if let value { layerFields.append(try schema.validate(.layer, name, value)) }
             }
             let adjustments = try AdjustmentsPatch(patch.adjustments ?? [:], schema: schema, layer: true)

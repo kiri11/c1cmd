@@ -123,7 +123,7 @@ enum WriteTests {
         checkFailure(.invalidArguments, containing: "no writable field \"bogus\"") { _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"bogus":1}}"#) }
         checkFailure(.invalidArguments, containing: "an integer") { _ = try run(.set, service, #"{"ids":["1"],"variant":{"rating":2.5}}"#) }
         checkFailure(.invalidArguments, containing: "one of horizontal, none") { _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"flip":"diagonal"}}"#) }
-        checkFailure(.invalidArguments, containing: "true or false") { _ = try run(.set, service, #"{"ids":["1"],"layers":[{"layer":1,"enabled":1}]}"#) }
+        checkFailure(.invalidArguments, containing: "bad value at layers.0.enabled: Expected to decode Bool") { _ = try run(.set, service, #"{"ids":["1"],"layers":[{"layer":1,"enabled":1}]}"#) }
         checkFailure(.invalidArguments, containing: "geometry") { _ = try run(.set, service, #"{"ids":["1"],"layers":[{"layer":1,"adjustments":{"rotation":1}}]}"#) }
         checkFailure(.invalidArguments, containing: "move its bounds") {
             _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"rotation":2},"variant":{"crop":[3000,2000,100,100]}}"#)
