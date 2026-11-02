@@ -196,7 +196,6 @@ enum Embedded {
       "film grain impact": 0,
       "film grain type": "fine",
       "flip": "none",
-      "highlight adjustment": 0,
       "highlight recovery": 0,
       "keystone amount": 100,
       "keystone aspect": 0,

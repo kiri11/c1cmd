@@ -106,6 +106,15 @@ final class FakeCaptureOne: CaptureOne {
                 value = .double(min(max(number, range.lowerBound), range.upperBound))
             }
             if let substitute = substitutes[name] { value = substitute }
+            // Capture One 16.8.5.30 keeps "highlight adjustment" as "highlight recovery" negated.
+            if name == "highlight recovery", let number = value.number {
+                let mirror: (inout [String: JSONValue]) -> Bool = { $0["highlight adjustment"] = .double(-number); return true }
+                switch write.owner {
+                case .adjustments: _ = mirror(&state.adjustments)
+                case .layerAdjustments(let index): _ = Self.modifyAdjustments(&state, layer: index, mirror)
+                default: break
+                }
+            }
             return FieldPath(write.read).set(&state, value) ? nil : "no such layer"
         case .action(let action):
             commands.append("\(action)")

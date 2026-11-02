@@ -21,6 +21,8 @@ enum WriteTests {
             <property name="rotation" code="CVro" type="real"/>
             <property name="flip" code="CVfl" type="flip type"/>
             <property name="exposure" code="CVex" type="real"/>
+            <property name="highlight adjustment" code="CVha" type="real"/>
+            <property name="highlight recovery" code="CVhi" type="real"/>
             <property name="temperature" code="CVwk" type="real"/>
             <property name="contrast" code="CVco" type="real"/>
             <property name="dehaze color" code="CVdc" type="RGB color"/>
@@ -60,7 +62,8 @@ enum WriteTests {
     static let bounds = BoundsTable(build: "16.8.5.30", fields: [
         "variant": ["rating": Bound(min: 0, max: 5), "color tag": Bound(min: 0, max: 7)],
         "layer": ["opacity": Bound(min: 0, max: 100)],
-        "adjustments": ["rotation": Bound(min: -45, max: 45), "exposure": Bound(min: -4, max: 4), "temperature": Bound(min: 800, max: 14000),
+        "adjustments": ["rotation": Bound(min: -45, max: 45), "exposure": Bound(min: -4, max: 4), "highlight adjustment": Bound(min: -100, max: 100), "highlight recovery": Bound(min: -100, max: 100),
+                        "temperature": Bound(min: 800, max: 14000),
                         "dehaze color": Bound(min: 0, max: 65535)],
         "lensCorrection": ["distortion": Bound(min: 0, max: 120)],
         "basicColor": ["hue change": Bound(min: -30, max: 30), "saturation change": Bound(min: -100, max: 100), "lightness change": Bound(min: -100, max: 100)],
@@ -84,6 +87,7 @@ enum WriteTests {
         revertLayers()
         revertUnsetLayerFields()
         incompleteRevertKeepsSnapshot()
+        highlightAlias()
         timeoutIsUnknown()
         unusableLogWritesNothing()
         documentChangeWritesNothing()
@@ -344,6 +348,30 @@ enum WriteTests {
         let reverted = first(try! run(.revert, goneService, #"{"ids":["1"]}"#))
         checkEqual(reverted?["notRestored"], .array([.string("layer \"Gone\", which no longer exists")]))
         check((try? goneStore.snapshot(id("1"))) ?? nil != nil, "a revert that leaves something unrestored keeps the snapshot")
+    }
+
+    static func highlightAlias() {
+        var state = FakeCaptureOne.state("1", adjustments: ["highlight adjustment": .double(-10), "highlight recovery": .double(10)])
+        state.layers.append(["kind": .string("adjustment"), "name": .string("Sky"), "opacity": .int(100), "enabled": .bool(true),
+                             "adjustments": .object(["highlight adjustment": .double(0), "highlight recovery": .double(0)])])
+        let (fake, service, store) = fixture("highlight-alias", state: state)
+        let read = first(try! run(.get, service, #"{"ids":["1"]}"#))
+        checkEqual(read?["adjustments"]?["highlight adjustment"], nil, "get reports the value once, as highlight recovery")
+        checkSame(read?["adjustments"]?["highlight recovery"], .double(10))
+        checkEqual(read?["layers"]?.arrayValue?[1]["adjustments"]?["highlight adjustment"], nil, "on a layer too")
+        checkFailure(.invalidArguments, containing: "set highlight recovery instead") {
+            _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"highlight adjustment":40}}"#)
+        }
+        checkFailure(.invalidArguments, containing: "set highlight recovery instead") {
+            _ = try run(.set, service, #"{"ids":["1"],"layers":[{"layer":"Sky","adjustments":{"highlight adjustment":40}}]}"#)
+        }
+        _ = try! run(.set, service, #"{"ids":["1"],"adjustments":{"highlight recovery":30},"layers":[{"layer":"Sky","adjustments":{"highlight recovery":30}}]}"#)
+        let reverted = first(try! run(.revert, service, #"{"ids":["1"]}"#))
+        checkEqual(reverted?["notRestored"], nil, "the other name never shows up as unrestored")
+        checkSame(fake.state(id("1"))?.adjustments["highlight recovery"], .double(10))
+        checkSame(fake.state(id("1"))?.adjustments["highlight adjustment"], .double(-10), "and Capture One's other name follows it back")
+        checkSame(fake.state(id("1"))?.layers[1]["adjustments"]?["highlight recovery"], .double(0))
+        check((try? store.snapshot(id("1"))) ?? nil == nil, "so the revert is complete")
     }
 
     static func unusableLogWritesNothing() {

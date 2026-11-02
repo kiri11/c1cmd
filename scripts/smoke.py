@@ -30,7 +30,7 @@ from fixture import ROOT, EditingFixture, apple
 
 # Measured on 16.8.5.30: an untouched layer reports these as missing value, and after a revert as 0.
 UNSET_LAYER_FIELDS = {'black recovery', 'brightness', 'clarity amount', 'clarity structure', 'contrast', 'dehaze amount', 'exposure',
-                      'highlight adjustment', 'highlight recovery', 'moire amount', 'noise reduction details',
+                      'highlight recovery', 'moire amount', 'noise reduction details',
                       'noise reduction luminance', 'saturation', 'shadow recovery', 'sharpening amount', 'white recovery'}
 
 
@@ -107,7 +107,7 @@ class Smoke:
         return start
 
     def writes(self, variant, start):
-        self.write('set', variant, {'adjustments': {'exposure': 0.5, 'contrast': 10}, 'variant': {'rating': 4, 'color tag': 2}})
+        self.write('set', variant, {'adjustments': {'exposure': 0.5, 'contrast': 10, 'highlight recovery': 20}, 'variant': {'rating': 4, 'color tag': 2}})
         self.write('set', variant, {'adjustments': {'rotation': 2}})
         rotated = self.get(variant)
         cx, cy, w, h = rotated['variant']['crop']
@@ -116,12 +116,14 @@ class Smoke:
         layer = self.write('action', variant, {'action': 'layer.create', 'arguments': {'kind': 'adjustment', 'name': 'Smoke'}})['layer']
         self.write('action', variant, {'action': 'mask.fill', 'arguments': {'layer': layer}})
         self.write('set', variant, {'layers': [{'layer': layer, 'opacity': 60}]})
-        self.write('set', variant, {'layers': [{'layer': 'Photographer', 'adjustments': {'exposure': 1}}]})
+        self.write('set', variant, {'layers': [{'layer': 'Photographer', 'adjustments': {'exposure': 1, 'highlight recovery': 20}}]})
         refused = self.run('action', {'ids': [variant], 'action': 'luma.clear', 'arguments': {'layer': 'Photographer'}})['variants'][0]
         assert refused.get('error', {}).get('code') == 'refused', refused
         edited = self.get(variant)
         assert edited['adjustments']['exposure'] == 0.5 and edited['adjustments']['contrast'] == 10, edited['adjustments']
         assert edited['adjustments']['rotation'] == 2, edited['adjustments']['rotation']
+        assert edited['adjustments']['highlight recovery'] == 20, edited['adjustments']
+        assert all('highlight adjustment' not in l.get('adjustments', edited['adjustments']) for l in edited['layers']), 'get reports the alias'
         assert edited['variant']['rating'] == 4 and edited['variant']['color tag'] == 2, edited['variant']
         assert all(abs(a - b) <= 1 for a, b in zip(edited['variant']['crop'], crop)), (edited['variant']['crop'], crop)
         tagged = [l for l in edited['layers'] if l['name'].endswith(f'[{layer}]')]

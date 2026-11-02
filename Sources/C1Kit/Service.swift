@@ -108,7 +108,7 @@ public final class Service {
                 }
                 results.merge(again.results) { $1 }
             }
-            return LiveRead(document: document, database: database, results: results, routes: settled)
+            return LiveRead(document: document, database: database, results: results.mapValues(WriteSchema.droppingAliases), routes: settled)
         }
         throw C1Failure(.documentChanged, "Capture One's open document kept changing during the call.", hint: "Call it again.")
     }

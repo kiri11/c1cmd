@@ -106,9 +106,12 @@ public struct WriteSchema {
     /// snapshot omit them, and writing 0 renders exactly like the untouched layer.
     static let unsetLayerFields: Set<String> = [
         "black recovery", "brightness", "clarity amount", "clarity structure", "contrast", "dehaze amount", "exposure",
-        "highlight adjustment", "highlight recovery", "moire amount", "noise reduction details", "noise reduction luminance",
+        "highlight recovery", "moire amount", "noise reduction details", "noise reduction luminance",
         "saturation", "shadow recovery", "sharpening amount", "white recovery",
     ]
+    /// Measured on 16.8.5.30: each adjustments name on the left is the one on the right negated, one value under two
+    /// names, so writing either moves the other. c1 reads and writes only the name on the right.
+    static let aliases: [String: String] = ["highlight adjustment": "highlight recovery"]
     /// `get` and `set` name curves by channel under `curves`; the sdef names them "<channel> curve".
     public static let curveChannels = ["rgb", "luma", "red", "green", "blue"]
     static func curveField(_ channel: String) -> String { "\(channel) curve" }
@@ -121,11 +124,26 @@ public struct WriteSchema {
     public static let advancedColorOrder = ["enabled", "red", "green", "blue", "hue start", "hue end", "saturation start", "saturation end",
                                             "smoothness", "hue change", "saturation change", "lightness change"]
 
+    /// The read without the alias names, so `get`, snapshots and revert see each Capture One value once.
+    static func droppingAliases(_ result: ReadResult) -> ReadResult {
+        guard case .state(var state) = result else { return result }
+        for alias in aliases.keys {
+            state.adjustments[alias] = nil
+            for index in state.layers.indices {
+                guard case .object(var adjustments)? = state.layers[index]["adjustments"] else { continue }
+                adjustments[alias] = nil
+                state.layers[index]["adjustments"] = .object(adjustments)
+            }
+        }
+        return .state(state)
+    }
+
     public init(terminology: Terminology, bounds: BoundsTable) {
         for section in Section.allCases {
             for property in terminology.properties(ofClass: section.classCode) where property.writable {
                 sdefWritable[section, default: []].insert(property.name)
                 if let allowed = Self.allowed[section], !allowed.contains(property.name) { continue }
+                if section == .adjustments, Self.aliases[property.name] != nil { continue }
                 let kind: FieldSpec.Kind
                 switch property.type {
                 case "real": kind = .real
@@ -159,6 +177,9 @@ public struct WriteSchema {
             throw C1Failure(.invalidArguments, "\(name) is geometry, which belongs to the variant's adjustments, not a layer's.")
         }
         guard let spec = fields[section]?[name] else {
+            if section == .adjustments, let kept = Self.aliases[name] {
+                throw C1Failure(.invalidArguments, "\(place).\(name) is \(kept) negated, one Capture One value under two names; set \(kept) instead.")
+            }
             if unmeasured[section]?.contains(name) == true {
                 throw C1Failure(.invalidArguments, "\(place).\(name) has no measured bounds on this build, so c1 does not write it.")
             }

@@ -388,7 +388,6 @@ Named as `get` reports them; ranges were measured on Capture One 16.8.5.30.
 | `adjustments.film grain impact` | number within 0…100 |
 | `adjustments.film grain type` | one of cubic, fine, harsh, silver rich, soft, tabular |
 | `adjustments.flip` | one of horizontal, none, vertical |
-| `adjustments.highlight adjustment` | number within -100…100 |
 | `adjustments.highlight recovery` | number within -100…100 |
 | `adjustments.keystone amount` | integer within 10…120 |
 | `adjustments.keystone aspect` | number within -50…100 |
