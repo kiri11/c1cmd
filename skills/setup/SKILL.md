@@ -52,6 +52,6 @@ osascript -l JavaScript "${CLAUDE_PLUGIN_ROOT}/skills/setup/allow-c1.js" read-on
 osascript -l JavaScript "${CLAUDE_PLUGIN_ROOT}/skills/setup/allow-c1.js" all "$(command -v c1)"
 ```
 
-Outside Claude Code, `${CLAUDE_PLUGIN_ROOT}` is the unzipped plugin folder. Rules take effect in a new session. In Codex, approvals come from its own sandbox and approval settings, not from these rules.
+Outside Claude Code, `${CLAUDE_PLUGIN_ROOT}` is the unzipped plugin folder. Rules take effect in a new session, and only in Claude Code's default permission mode: in auto mode its own safety check decides, so a write can run without asking. In Codex, approvals come from its own sandbox and approval settings, not from these rules.
 
 Done when the photographer has chosen, and the script printed `updated` or `unchanged`.

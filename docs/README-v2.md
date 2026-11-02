@@ -66,7 +66,7 @@ Unzip `c1-plugin.zip`, link `bin/c1` onto your PATH as in the Codex steps, and c
 ## First run
 
 1. Open Capture One and the Catalog or Session you want to work on.
-2. Ask your agent to run the setup skill (`/c1:setup` in Claude Code). It checks the install, runs `c1 doctor`, and offers to let read-only c1 commands run without asking each time.
+2. Ask your agent to run the setup skill (`/c1:setup` in Claude Code). It checks the install, runs `c1 doctor`, and offers to let read-only c1 commands run without asking each time. Edits still ask in Claude Code's default permission mode; in auto mode, Claude Code's own check decides instead.
 3. **Allow Automation access.** The first c1 call makes macOS ask whether the app running your agent (Terminal, Claude or Codex) may control Capture One. The dialog can hide behind other windows; until you click **Allow**, the call waits and then times out. To change it later, go to **System Settings > Privacy & Security > Automation**.
 4. **Back up a Catalog** with **File > Backup Catalog** before the agent edits it. `doctor` warns when the last backup is older than a day.
 
