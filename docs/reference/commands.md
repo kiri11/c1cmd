@@ -754,10 +754,10 @@ JPEGs land in ~/Library/Caches/c1/previews/<document uuid>/; c1 deletes its prev
 |---|---|---|---|---|---|
 | `id` | variant id | yes |  |  | One variant id as a string of digits. |
 | `candidates` | list of object {centerX, centerY, width, height} | yes | 1–6 items |  | Candidate crops in crop pixels, numbered 1… in the image. |
-| `candidates[].centerX` | number | yes |  |  | Crop pixels: centre and size, y up. |
-| `candidates[].centerY` | number | yes |  |  | Crop pixels: centre and size, y up. |
-| `candidates[].width` | number | yes |  |  | Crop pixels: centre and size, y up. |
-| `candidates[].height` | number | yes |  |  | Crop pixels: centre and size, y up. |
+| `candidates[].centerX` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
+| `candidates[].centerY` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
+| `candidates[].width` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
+| `candidates[].height` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
 | `size` | integer | no | 200–3000 |  | Long edge of the side-by-side image in px (default 1500). |
 | `timeout` | number | no | 1–600 |  | Seconds to wait for the exported JPEG (default 120). Past it the outcome is unknown and the result names where the file will land. |
 

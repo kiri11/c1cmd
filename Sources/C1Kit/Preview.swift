@@ -96,6 +96,8 @@ enum Preview {
     static let defaultSize = 1500
     static let scales = 0.05...1.0
     static let regionCap = 2048
+    /// Far beyond any sensor, so every pixel count derived from a candidate fits an Int.
+    static let candidateLimit = 1e6
     static let timeouts = 1.0...600.0
     static let defaultTimeout = 120.0
     static let retention: TimeInterval = 7 * 24 * 60 * 60
@@ -350,8 +352,9 @@ extension Service {
         guard Preview.candidates.contains(candidates.count) else {
             throw C1Failure(.invalidArguments, "crop_preview takes \(Preview.candidates.lowerBound)–\(Preview.candidates.upperBound) candidates, got \(candidates.count).")
         }
-        for (index, candidate) in candidates.enumerated() where !(candidate.array.allSatisfy(\.isFinite) && candidate.width > 0 && candidate.height > 0) {
-            throw C1Failure(.invalidArguments, "Candidate \(index + 1) needs a positive width and height.")
+        for (index, candidate) in candidates.enumerated()
+        where !(candidate.array.allSatisfy { abs($0) <= Preview.candidateLimit } && candidate.width >= 1 && candidate.height >= 1) {
+            throw C1Failure(.invalidArguments, "Candidate \(index + 1) needs a width and height of at least 1 px and coordinates within ±\(Int(Preview.candidateLimit)) px.")
         }
         let size = try Preview.size(arguments.size)
         let timeout = try Preview.timeout(arguments.timeout)

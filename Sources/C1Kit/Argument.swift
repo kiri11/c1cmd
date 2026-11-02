@@ -82,7 +82,7 @@ enum Arguments {
     ]
 
     static let canvasRect: [Argument] = ["centerX", "centerY", "width", "height"].map {
-        Argument($0, .number(nil), required: true, "Crop pixels: centre and size, y up.")
+        Argument($0, .number(nil), required: true, "Crop pixels: centre and size, y up; sides at least 1 px, all within ±\(Int(Preview.candidateLimit)) px.")
     }
 
     static let region: [Argument] = [

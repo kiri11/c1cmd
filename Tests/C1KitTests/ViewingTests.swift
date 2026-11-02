@@ -76,6 +76,10 @@ enum ViewingTests {
         checkFailure(.invalidArguments, containing: "1–6 candidates") { _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [])) }
         let seven = Array(repeating: CanvasRect(centerX: 300, centerY: 200, width: 100, height: 100), count: 7)
         checkFailure(.invalidArguments, containing: "1–6 candidates") { _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: seven)) }
+        for candidate in [CanvasRect(centerX: 300, centerY: 200, width: 1e100, height: 100), CanvasRect(centerX: 300, centerY: 200, width: 100, height: 1e-320),
+                          CanvasRect(centerX: 300, centerY: 200, width: 100, height: 0.5), CanvasRect(centerX: -2e6, centerY: 200, width: 100, height: 100)] {
+            checkFailure(.invalidArguments, containing: "Candidate 1 needs") { _ = try service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidate])) }
+        }
         checkEqual(fake.calls, [], "invalid arguments fail before any Apple Event")
 
         let outside = CanvasRect(centerX: 580, centerY: 200, width: 100, height: 100)
