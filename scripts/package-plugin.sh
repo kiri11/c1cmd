@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the v2 plugin: dist/c1-plugin.zip (bin/c1, skills, the Claude Code and Codex manifests),
+# Builds the plugin: dist/c1-plugin.zip (bin/c1, skills, the Claude Code and Codex manifests),
 # dist/marketplace.json pointing at that zip's release URL, and dist/SHA256SUMS.
 # usage: scripts/package-plugin.sh VERSION [OUTPUT_DIR]
 set -eu

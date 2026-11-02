@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure the accepted range of every numeric field c1 v2 writes, live, and write Sources/C1Kit/Resources/Bounds.json.
+"""Measure the accepted range of every numeric field c1 writes, live, and write Sources/C1Kit/Resources/Bounds.json.
 
 A value is accepted when writing it raises no error and reads back as written; Capture One clamps some
 values silently and names the wrong limit for others, so only the read-back counts. Each side of a range

@@ -246,7 +246,7 @@ enum ViewingTests {
 
     static func rows(_ cells: [CGRect]) -> [[CGRect]] { Dictionary(grouping: cells, by: \.minY).sorted { $0.key < $1.key }.map(\.value) }
 
-    /// v1's layout facts, kept for v2.
+    /// Justified rows at most 1536 px wide, near rowHeight, and the last row left-aligned.
     static func sheetLayout() {
         let standard = try! SheetLayout()
         checkFailure(.invalidArguments) { _ = try SheetLayout(perPage: 49) }
