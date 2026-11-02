@@ -2,11 +2,9 @@ name: Release
 
 on:
   push:
-    branches: [ "main", "v2" ]
-  # Publishes a v2 pre-release; run it from the v2 branch.
-  workflow_dispatch:
+    branches: [ "main" ]
 
-# Serialize number allocation and publication without replacing pending pushes.
+# Serialize publication without replacing pending pushes.
 concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
@@ -16,84 +14,8 @@ permissions:
   contents: write
 
 jobs:
-  build-release:
-    name: Build & Package Release (macOS arm64)
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: macos-15
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Show Swift environment
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
-          swift --version
-          xcode-select -p
-          xcodebuild -version
-
-      - name: Build Release Binaries
-        run: swift build -c release -v
-
-      - name: Run Offline Checks (Release)
-        run: make check-built-core TEST_BUILD_DIR=.build/release
-
-      - name: Choose Daily Release Name
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
-          python3 <<'PY'
-          import datetime
-          import json
-          import os
-          import re
-          from pathlib import Path
-
-          day = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-          pattern = re.compile(rf"{day}-([0-9]+)")
-          pages = json.loads((Path(os.environ["RUNNER_TEMP"]) / "releases.json").read_text())
-          numbers = [
-              int(match.group(1))
-              for page in pages
-              for release in page
-              if (match := pattern.fullmatch(release["tag_name"]))
-          ]
-          # Keep increasing even if an earlier release was deleted.
-          tag = f"{day}-{max(numbers, default=0) + 1:02d}"
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"tag={tag}\n")
-          print(f"Release: {tag}")
-          PY
-
-      - name: Package Release Archive
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: ./scripts/package-release.sh "$RELEASE_TAG" .build/release dist
-
-      - name: Test Packaged Archive
-        run: python3 Tests/archive_test.py dist/*.tar.gz
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          files: |
-            dist/*.tar.gz
-            dist/*.sha256
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-
-  # v2 until the cutover: every push builds and checks the plugin zip; a manual run also publishes
-  # it as a pre-release, which never becomes "latest".
-  build-plugin-v2:
-    name: Build v2 Plugin (macOS arm64)
-    if: github.ref == 'refs/heads/v2'
+  release:
+    name: Build & Publish the Plugin (macOS arm64)
     runs-on: macos-15
 
     steps:
@@ -105,30 +27,18 @@ jobs:
           sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
           swift --version
 
-      - name: Run v2 Offline Checks
-        run: make check-v2
+      - name: Run Offline Checks
+        run: make check
 
-      - name: Choose Pre-release Version
+      # Semver with no manual bump; gaps in the run number are harmless.
+      - name: Choose Version
         id: version
-        run: echo "version=2.0.0-pre.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+        run: echo "version=2.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
-      - name: Package Plugin
-        run: ./scripts/package-plugin.sh "${{ steps.version.outputs.version }}" dist
+      - name: Package and Check the Plugin
+        run: make plugin VERSION="${{ steps.version.outputs.version }}"
 
-      - name: Check Packaged Plugin
-        run: ./scripts/v2-check-plugin.sh dist/c1-plugin.zip
-
-      - name: Keep Plugin Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: c1-plugin-${{ steps.version.outputs.version }}
-          path: |
-            dist/c1-plugin.zip
-            dist/marketplace.json
-            dist/SHA256SUMS
-
-      - name: Publish Pre-release
-        if: github.event_name == 'workflow_dispatch'
+      - name: Publish Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.version }}
@@ -139,14 +49,14 @@ jobs:
             dist/marketplace.json
             dist/SHA256SUMS
           draft: false
-          prerelease: true
-          make_latest: false
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
           fail_on_unmatched_files: true
 
-      # Claude Code sees a new version only through the marketplace entry, so the branch carries it:
-      # `claude plugin marketplace add kiri11/c1cmd#v2`. A GITHUB_TOKEN push starts no workflow run.
-      - name: Point the Branch Marketplace at the Pre-release
-        if: github.event_name == 'workflow_dispatch'
+      # Claude Code sees a new version only through the marketplace entry, so main carries it:
+      # `claude plugin marketplace add kiri11/c1cmd`. A GITHUB_TOKEN push starts no workflow run.
+      - name: Point the Marketplace at the Release
         run: |
           git fetch --depth 1 origin "$GITHUB_REF_NAME"
           git checkout --detach FETCH_HEAD

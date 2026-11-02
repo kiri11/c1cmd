@@ -1,113 +1,26 @@
-# Determine sensible default PREFIX:
-# 1. If explicitly passed (PREFIX=...), respect it.
-# 2. Else if /usr/local/bin is writable, use /usr/local.
-# 3. Else if /opt/homebrew/bin exists and is writable, use /opt/homebrew.
-# 4. Otherwise, fallback to $(HOME)/.local (no sudo required).
-ifeq ($(origin PREFIX), undefined)
-  ifeq ($(shell [ -w /usr/local/bin ] 2>/dev/null && echo ok), ok)
-    PREFIX = /usr/local
-  else ifeq ($(shell [ -w /opt/homebrew/bin ] 2>/dev/null && echo ok), ok)
-    PREFIX = /opt/homebrew
-  else
-    PREFIX = $(HOME)/.local
-  endif
-endif
+VERSION ?= dev
 
-BINDIR ?= $(PREFIX)/bin
-BUILD_DIR ?= .build/release
-ARCHIVE := dist/c1-v0.1.0-macos-$(shell uname -m).tar.gz
-C1_RECOVERY_FIXTURE_PARENT ?= $(CURDIR)/.build/recovery-fixtures
-C1_RECOVERY_SHUTDOWN_MODE ?= sigterm
-QUALIFY_SUITES ?= cli mcp existing
-QUALIFY_DOCUMENT_KINDS ?= session
-RECOVERY_CASES ?= all
-C1_BARRIER_TRIALS ?= 3
-TEST_BUILD_DIR ?= .build/debug
-
-.PHONY: all build build-debug install uninstall clean
+.PHONY: all build check plugin smoke clean
 
 all: build
 
 build:
-	swift build -c release
+	swift build -c release --product c1
 
-build-debug:
-	swift build
-
-# v2 read core (temporary until the cutover): build it and run its offline tests.
-.PHONY: check-v2
-check-v2:
-	swift build --product c1next
+# Offline: builds c1 and runs the unit tests against the fake Capture One, including the generated-file checks.
+check:
+	swift build --product c1
 	swift run C1KitTests
 
-# Validation targets: check (offline), qualify (live suites), qualify-recovery (live faults).
-# Fast development feedback: build once, then run all offline assertions.
-.PHONY: check check-built-core qualify qualify-recovery
-check: build-debug
-	$(MAKE) check-built-core TEST_BUILD_DIR=.build/debug
-	C1_TEST_BIN="$(CURDIR)/.build/debug/c1" C1_TEST_MCP_BIN="$(CURDIR)/.build/debug/c1-mcp" /usr/bin/time -p python3 -B Tests/contract_test.py
+# dist/c1-plugin.zip, dist/marketplace.json and dist/SHA256SUMS, with VERSION compiled in.
+plugin:
+	./scripts/package-plugin.sh "$(VERSION)" dist
+	./scripts/check-plugin.sh dist/c1-plugin.zip
 
-# Internal step of check and qualify; release CI reuses it with already built binaries.
-check-built-core:
-	/usr/bin/time -p "$(TEST_BUILD_DIR)/CaptureOneCoreTests"
-	python3 -B Tests/docs_test.py
-	python3 -B Tests/contained_crop_test.py
-	python3 -B Tests/catalog_freshness_probe_test.py
-	python3 -B Tests/variant_modified_probe_test.py
-	python3 -B Tests/native_bounds_probe_test.py
-	python3 -B Tests/stored_read_test.py
-	python3 -B Tests/benchmark_reads_test.py
-	python3 -B scripts/generate-native-editing.py --check
-	python3 -B Tests/recovery_harness_test.py
-	python3 -B Tests/barrier_harness_test.py
-	python3 -B Tests/recipe_harness_test.py
-	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" python3 -B Tests/apply_plan_test.py
-	python3 -B Tests/release_runner_test.py
-	python3 -B Tests/editing_fixture_test.py
-	C1_TEST_BIN="$(abspath $(TEST_BUILD_DIR))/c1" C1_TEST_MCP_BIN="$(abspath $(TEST_BUILD_DIR))/c1-mcp" python3 -B Tests/catalog_reader_test.py
-
-# Packaged live suites on disposable fixtures; QUALIFY_SUITES=all runs every one.
-# Excludes deliberate timeout/process-death injection. Keep Capture One calls sequential.
-qualify:
+# Live, on disposable documents: needs Capture One 16.8.5.30 with no document open and C1_TEST_RAW_FIXTURE.
+smoke: plugin
 	@test -f "$(C1_TEST_RAW_FIXTURE)" || { echo 'Set C1_TEST_RAW_FIXTURE to an existing RAW file.' >&2; exit 1; }
-	@test -n "$(EVIDENCE_DIR)" && test ! -e "$(EVIDENCE_DIR)" || { echo 'Set EVIDENCE_DIR to a new directory.' >&2; exit 1; }
-	$(MAKE) archive
-	$(MAKE) check-built-core TEST_BUILD_DIR=.build/release
-	mkdir -p "$(EVIDENCE_DIR)"
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_NATIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/native" C1_RECIPE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/recipes" C1_GEOMETRY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/geometry" C1_LENS_EVIDENCE="$(abspath $(EVIDENCE_DIR))/lens" C1_PERSPECTIVE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/perspective" C1_KEYSTONE_EVIDENCE="$(abspath $(EVIDENCE_DIR))/keystone" C1_CATALOG_EVIDENCE="$(abspath $(EVIDENCE_DIR))/catalog" C1_EXISTING_EVIDENCE="$(abspath $(EVIDENCE_DIR))/existing" C1_INVENTORY_EVIDENCE="$(abspath $(EVIDENCE_DIR))/inventory" C1_READ_WORKFLOW_EVIDENCE="$(abspath $(EVIDENCE_DIR))/read-workflow" /usr/bin/time -p caffeinate -i python3 -B Tests/release_integration_test.py "$(ARCHIVE)" --suites $(QUALIFY_SUITES) --document-kinds $(QUALIFY_DOCUMENT_KINDS)
-
-# Real fault cases against a current archive; compound edit cases carry a recipe: prefix.
-# The barrier case (in all) also needs C1_TEST_PEOPLE_FIXTURE; C1_BARRIER_TRIALS sets its trials.
-qualify-recovery:
-	@test -f "$(C1_TEST_RAW_FIXTURE)" || { echo 'Set C1_TEST_RAW_FIXTURE to an existing RAW file.' >&2; exit 1; }
-	@test -f "$(ARCHIVE)" || { echo 'Build an archive first with make archive or make qualify.' >&2; exit 1; }
-	@test -n "$(EVIDENCE_DIR)" && test ! -e "$(EVIDENCE_DIR)" || { echo 'Set EVIDENCE_DIR to a new directory.' >&2; exit 1; }
-	C1_TEST_RAW_FIXTURE="$(C1_TEST_RAW_FIXTURE)" C1_TEST_PEOPLE_FIXTURE="$(C1_TEST_PEOPLE_FIXTURE)" C1_BARRIER_TRIALS="$(C1_BARRIER_TRIALS)" C1_RECOVERY_FIXTURE_PARENT="$(C1_RECOVERY_FIXTURE_PARENT)" C1_RECOVERY_SHUTDOWN_MODE="$(C1_RECOVERY_SHUTDOWN_MODE)" /usr/bin/time -p caffeinate -i python3 -B Tests/recovery_integration_test.py "$(ARCHIVE)" "$(abspath $(EVIDENCE_DIR))" --cases $(RECOVERY_CASES)
-
-install: build
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install -m 755 $(BUILD_DIR)/c1 $(DESTDIR)$(BINDIR)/c1
-	install -m 755 $(BUILD_DIR)/c1-mcp $(DESTDIR)$(BINDIR)/c1-mcp
-	rm -rf $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
-	cp -R $(BUILD_DIR)/c1_CaptureOneCore.bundle $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
-	codesign -s - --force $(DESTDIR)$(BINDIR)/c1 2>/dev/null || true
-	codesign -s - --force $(DESTDIR)$(BINDIR)/c1-mcp 2>/dev/null || true
-	@echo "Successfully installed c1 and c1-mcp to $(DESTDIR)$(BINDIR)"
-	@case ":$(PATH):" in \
-		*":$(BINDIR):"*) ;; \
-		*) echo "\nNote: $(BINDIR) is not in your PATH. Add it with:"; \
-		   echo "  export PATH=\"$(BINDIR):\$$PATH\"" ;; \
-	esac
-
-uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/c1 $(DESTDIR)$(BINDIR)/c1-mcp
-	rm -rf $(DESTDIR)$(BINDIR)/c1_CaptureOneCore.bundle
-	@echo "Successfully uninstalled c1 and c1-mcp from $(DESTDIR)$(BINDIR)"
+	caffeinate -i python3 -B scripts/smoke.py --zip dist/c1-plugin.zip
 
 clean:
 	swift package clean
-
-.PHONY: archive
-archive: build
-	./scripts/package-release.sh v0.1.0 $(BUILD_DIR) dist
-

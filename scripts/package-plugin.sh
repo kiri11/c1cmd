@@ -19,8 +19,8 @@ cp "$VERSION_FILE" "$STAGE/Version.swift.orig"
 trap 'cp "$STAGE/Version.swift.orig" "$ROOT/$VERSION_FILE"; rm -rf "$STAGE"' EXIT
 sed "s/static let current = \"dev\"/static let current = \"$VERSION\"/" "$STAGE/Version.swift.orig" > "$VERSION_FILE"
 grep -q "\"$VERSION\"" "$VERSION_FILE"
-swift build -c release --product c1next
-BUILT=$(swift build -c release --product c1next --show-bin-path)/c1next
+swift build -c release --product c1
+BUILT=$(swift build -c release --product c1 --show-bin-path)/c1
 cp "$STAGE/Version.swift.orig" "$VERSION_FILE"
 
 PLUGIN="$STAGE/c1-plugin"

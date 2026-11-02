@@ -24,7 +24,7 @@ public struct FieldSpec: Equatable {
     }
 }
 
-/// A numeric field's accepted values, measured live by `scripts/v2-measure-bounds.py`.
+/// A numeric field's accepted values, measured live by `scripts/measure-bounds.py`.
 public struct Bound: Codable, Equatable {
     /// nil: the measurement found no limit on that side.
     public let min: Double?

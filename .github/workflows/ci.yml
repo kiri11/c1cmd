@@ -1,8 +1,9 @@
 name: CI
 
+# main runs the same checks in release.yml before it publishes.
 on:
   push:
-    branches: [ "main" ]
+    branches-ignore: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -15,13 +16,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Show Swift version and environment
+      - name: Show Swift environment
         run: |
           sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
           swift --version
-          xcode-select -p
-          xcodebuild -version
 
-      # Release builds and relocated archive checks run in release.yml on main.
-      - name: Run Offline Checks (Debug)
+      - name: Run Offline Checks
         run: make check
+
+      - name: Package and Check the Plugin
+        run: make plugin

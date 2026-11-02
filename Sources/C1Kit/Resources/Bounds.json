@@ -408,5 +408,5 @@
     }
   },
   "measured": "2026-11-01T02:33:48+00:00",
-  "method": "scripts/v2-measure-bounds.py: accepted means no error and the value reads back as written"
+  "method": "scripts/measure-bounds.py: accepted means no error and the value reads back as written"
 }

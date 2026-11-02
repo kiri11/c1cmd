@@ -1,10 +1,10 @@
 import C1Kit
 import Foundation
 
-/// The built c1next, copied alone into an empty folder: help, usage, exit codes and a database read
+/// The built c1, copied alone into an empty folder: help, usage, exit codes and a database read
 /// need neither Capture One nor a resource bundle beside the binary.
 enum CLITests {
-    static let built = ".build/debug/c1next"
+    static let built = ".build/debug/c1"
 
     struct Run { let status: Int32; let stdout: String; let stderr: String }
 
@@ -24,7 +24,7 @@ enum CLITests {
     }
 
     static func run() {
-        guard FileManager.default.fileExists(atPath: built) else { return check(false, "build c1next first: \(built) is missing") }
+        guard FileManager.default.fileExists(atPath: built) else { return check(false, "build c1 first: \(built) is missing") }
         let folder = scratchDirectory("cli-alone")
         let binary = folder.appendingPathComponent("c1")
         try! FileManager.default.copyItem(atPath: built, toPath: binary.path)

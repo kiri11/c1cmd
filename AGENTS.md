@@ -1,37 +1,45 @@
 # AGENTS.md
 
-For agents developing c1. Read [AGENT_GUIDE.md](AGENT_GUIDE.md) before any
-Capture One call, including live tests: it holds safety invariants 1–8, which
-apply here too.
+For agents developing c1. The skills in `skills/` are for agents using it.
 
-## Development invariants
+## Safety rules the code enforces
 
-9. **Tests use owned disposable fixtures, real timeouts and sequential execution,
-   and keep their evidence.** Never qualify against a main Catalog or shorten a
-   timeout, and keep failed-run evidence until recovery is complete.
-10. **Fault cases are mandatory for mutation and recovery changes; the full
-    campaign is mandatory for a new build.** Changes to mutation dispatch,
-    journaling, write blocking, locks, timeouts, application lifetime,
-    restart/reconciliation or stale references need the affected live fault cases.
-    A new Capture One build needs every suite and fault case.
+Keep each one enforced in code, with a test against the fake Capture One:
+
+1. **Originals are never touched.** No command deletes images or writes files outside c1's own output.
+2. **No command deletes a variant.** There are no clones.
+3. **Every write is logged, and the first write to a variant snapshots it.** `revert` restores the snapshot.
+4. **Warnings never block.** `doctor`, `set` and `action` warn about an untested Capture One build or an old Catalog
+   backup.
+5. **Mask pixels are never destroyed on a layer c1 did not create.** c1 tags its layers ` [c1:<token>]`, and
+   `layer.delete` and the pixel-destructive mask actions refuse untagged layers, with no override.
+
+## Live checks
+
+Live checks drive the photographer's running Capture One, so:
+
+6. **Use owned disposable documents only.** `scripts/fixture.py` creates one under `.build`, with `C1_HOME` and
+   `C1_CACHES` pointing there. Never run a check against a photographer's Catalog or Session.
+7. **One document, one call at a time, real timeouts.** Start with no document open, make Capture One calls
+   sequentially, and never shorten a timeout.
+8. **Never quit Capture One, and keep failed-run evidence.** A failed check leaves its folder under `.build`; keep
+   it until the failure is understood.
 
 ## Validating and releasing
 
-A push to `main` publishes a release, and live checks cannot run in GitHub CI. Run
-the checks the [maintainer guide](docs/MAINTAINING.md) requires locally before
-pushing.
+A push to `main` publishes a release, and live checks cannot run in GitHub CI. Run the checks the
+[maintainer guide](docs/MAINTAINING.md) requires locally before pushing.
 
 ## Documentation layout
 
-| File | Audience | In the release archive |
+| File | Audience | In the plugin zip |
 |---|---|---|
-| `README.md` | Humans: install, MCP setup, what c1 includes and supports | Yes |
-| `AGENT_GUIDE.md` | Agents using c1: setup, safety invariants 1–8, workflow | Yes |
-| `docs/reference/` | Agents and operators: command detail | Yes |
+| `README.md` | Humans: install, first run, working with the agent | No |
+| `skills/*/SKILL.md` | Agents using c1 | Yes |
+| `docs/reference/commands.md` | Generated command reference; `c1 <command> --help` prints the same facts | No |
 | `AGENTS.md`, `docs/MAINTAINING.md`, `docs/agents/` | Developers and maintainers | No |
 
-`scripts/package-release.sh` decides what ships. Shipped docs link only to other
-shipped files; the archive test enforces this.
+`scripts/package-plugin.sh` decides what ships.
 
 ## Agent skills
 
