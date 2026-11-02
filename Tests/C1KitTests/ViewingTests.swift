@@ -130,6 +130,14 @@ enum ViewingTests {
         checkEqual(frames.count, 2, "one cached frame per render state: \(frames)")
         checkEqual(fake.state(id("1"))?.variant["crop"], .array([.double(200), .double(200), .double(300), .double(300)]), "crop_preview writes nothing")
         check(!fake.calls.contains { if case .write = $0 { return true }; return false }, "no write reaches Capture One")
+        let refreshed = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900, refresh: true))
+        checkEqual(refreshed?["cached"], .bool(false), "refresh renders again, for a mask painted in Capture One")
+        let tag = (try? service.action("layer.create", ids: [id("1")], arguments: [:]))?["variants"]?.arrayValue?.first?["layer"]?.stringValue ?? ""
+        _ = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900))
+        let masked = try? service.action("mask.invert", ids: [id("1")], arguments: ["layer": .string(tag)])
+        checkEqual(masked?["variants"]?.arrayValue?.first?["outcome"], .string("ok"))
+        let afterMask = try? service.cropPreview(CropPreviewArguments(id: id("1"), candidates: [candidates[0]], size: 900))
+        checkEqual(afterMask?["cached"], .bool(false), "an action drops the cached frame, whose key cannot see mask pixels")
     }
 
     /// Measured on 16.8.5.30 at rotation 5: canvas 6325 × 4507, default crop {3162, 2253, 5324, 3549}.
@@ -172,6 +180,10 @@ enum ViewingTests {
         check(abs(point.x - 500) < 6 && abs(point.y - 250) < 6, "the region shows its canvas area: \(point)")
         let files = (try? FileManager.default.subpathsOfDirectory(atPath: caches.path))?.filter { $0.hasSuffix(".jpg") } ?? []
         checkEqual(files.count, 1, "the intermediate render is deleted: \(files)")
+        for tiny in [Region(x: 0, y: 0, width: 1e-320, height: 0.5), Region(x: 0, y: 0, width: 0.5, height: 0.001)] {
+            checkFailure(.invalidArguments, containing: "at least 1 px") { _ = try service.preview(PreviewArguments(id: id("1"), region: tiny)) }
+        }
+        checkEqual(exports(fake).count, 1, "a region under 1 px fails before Capture One renders")
 
         let big = Self.fake(small("1", canvas: [3000, 2000], crop: [1500, 1000, 3000, 2000]))
         let (bigService, _) = Self.service(big, "viewing-region-cap")
@@ -302,11 +314,11 @@ enum ViewingTests {
         let (service, _) = service(fake, "viewing-fill")
         let document = scratchURL("viewing-fill").appendingPathComponent("viewing-fill.cocatalogdb").path
         writeCot(scratchURL("viewing-fill").appendingPathComponent("Cache/Thumbnails/00000001.cot"), width: 300, height: 200, comment: "3|0;0;0|0;200;300;0|0")
-        checkFailure(.invalidArguments, containing: "timeout goes with fillMissing") {
-            _ = try service.contactSheet(ContactSheetArguments(perPage: 3, timeout: 30), document: document)
+        for arguments in [ContactSheetArguments(perPage: 3, timeout: 30), ContactSheetArguments(perPage: 3, refresh: true)] {
+            checkFailure(.invalidArguments, containing: "go with fillMissing") { _ = try service.contactSheet(arguments, document: document) }
         }
-        func sheet() -> [JSONValue] {
-            (try? service.contactSheet(ContactSheetArguments(perPage: 3, fillMissing: true), document: document))?["tiles"]?.arrayValue ?? []
+        func sheet(refresh: Bool? = nil) -> [JSONValue] {
+            (try? service.contactSheet(ContactSheetArguments(perPage: 3, fillMissing: true, refresh: refresh), document: document))?["tiles"]?.arrayValue ?? []
         }
         let first = sheet()
         checkEqual(first.map { $0["status"] }, [.string("shown"), .string("missing"), .string("exported")],
@@ -326,6 +338,12 @@ enum ViewingTests {
         fake.variants[.collection(cid("11"))]![id("3")]!.variant["crop"] = .array([300, 200, 400, 400].map(JSONValue.double))
         checkEqual(sheet().last?["reused"], .bool(false), "a crop change exports again")
         checkEqual(exports(fake).count, 2)
+        checkEqual(sheet(refresh: true).last?["reused"], .bool(false), "refresh exports again")
+        checkEqual(exports(fake).count, 3)
+        let tag = (try? service.action("layer.create", ids: [id("3")], arguments: [:]))?["variants"]?.arrayValue?.first?["layer"]?.stringValue ?? ""
+        _ = sheet()
+        _ = try? service.action("mask.fill", ids: [id("3")], arguments: ["layer": .string(tag)])
+        checkEqual(sheet().last?["reused"], .bool(false), "an action drops the variant's exported tile")
 
         let late = subfolderFake()
         late.exportDelay = 5

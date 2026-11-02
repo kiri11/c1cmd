@@ -157,12 +157,13 @@ public struct ContactSheetArguments: Decodable {
     public var perPage, rowHeight: Int?
     /// Exports the photos the cache lacks through Capture One, and reuses those exports until a setting changes.
     public var fillMissing: Bool?
+    public var refresh: Bool?
     public var timeout: Double?
 
     public init(ids: [VariantID]? = nil, minRating: Int? = nil, after: VariantID? = nil, perPage: Int? = nil, rowHeight: Int? = nil,
-                fillMissing: Bool? = nil, timeout: Double? = nil) {
+                fillMissing: Bool? = nil, refresh: Bool? = nil, timeout: Double? = nil) {
         self.ids = ids; self.minRating = minRating; self.after = after; self.perPage = perPage; self.rowHeight = rowHeight
-        self.fillMissing = fillMissing; self.timeout = timeout
+        self.fillMissing = fillMissing; self.refresh = refresh; self.timeout = timeout
     }
 }
 
@@ -176,7 +177,7 @@ extension Service {
 
     /// Starts an export for each id in one queue slot, reusing a tile exported from the same settings, then waits
     /// for the files outside the queue. A variant Capture One lacks or a late file fails its tile, not the sheet.
-    func exportTiles(_ ids: [VariantID], documentUUID: String, timeout: Double) throws -> (fills: [VariantID: TileFill], outputSet: Bool) {
+    func exportTiles(_ ids: [VariantID], documentUUID: String, refresh: Bool, timeout: Double) throws -> (fills: [VariantID: TileFill], outputSet: Bool) {
         var fills: [VariantID: TileFill] = [:]
         var pending: [(VariantID, URL)] = []
         var outputSet = false
@@ -196,7 +197,7 @@ extension Service {
                 case .failed(let reason): fills[id] = .failed(reason); continue
                 }
                 let file = folder.appendingPathComponent("tile-\(id)-\(Preview.cacheKey(state, longEdge: Self.tileEdge, cropped: true)).jpg")
-                if let image = Images.decodeJPEG(file) {
+                if !refresh, let image = Images.decodeJPEG(file) {
                     try? FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: file.path)
                     fills[id] = .exported(image, reused: true)
                     continue
@@ -226,7 +227,9 @@ extension Service {
     public func contactSheet(_ arguments: ContactSheetArguments, document: String? = nil) throws -> JSONValue {
         let layout = try SheetLayout(perPage: arguments.perPage, rowHeight: arguments.rowHeight)
         let fillMissing = arguments.fillMissing ?? false
-        guard fillMissing || arguments.timeout == nil else { throw C1Failure(.invalidArguments, "timeout goes with fillMissing.") }
+        guard fillMissing || (arguments.timeout == nil && arguments.refresh == nil) else {
+            throw C1Failure(.invalidArguments, "timeout and refresh go with fillMissing.")
+        }
         let timeout = try Preview.timeout(arguments.timeout)
         let database = try self.database(document)
         let query = ListQuery(rating: arguments.rating, minRating: arguments.minRating, colorTag: arguments.colorTag, collection: arguments.collection,
@@ -258,7 +261,8 @@ extension Service {
         var warnings: [String] = []
         let gaps = rows.indices.filter { if case .shown = tiles[$0] { return false }; return true }
         if fillMissing, !gaps.isEmpty {
-            let exported = try exportTiles(gaps.map { rows[$0].id }, documentUUID: database.documentUUID, timeout: timeout)
+            let exported = try exportTiles(gaps.map { rows[$0].id }, documentUUID: database.documentUUID,
+                                       refresh: arguments.refresh ?? false, timeout: timeout)
             fills = exported.fills
             for index in gaps {
                 // An export already carries the variant's crop.

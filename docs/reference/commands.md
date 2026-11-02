@@ -740,7 +740,7 @@ Failures: `invalid-arguments`, `not-found`, `not-running`, `no-document`, `permi
 
 Show 1–6 candidate crops side by side, cut from a cached full-frame render; the variant is not written.
 
-Candidates are rectangles in crop pixels, each checked against cropBounds. They are cut from a full-frame render that is cached until a setting other than the crop or metadata changes (about 0.5 s from cache). The render shows only the default crop, Capture One's largest centred rectangle, so a candidate beyond it fails: try it with set, preview and revert instead.
+Candidates are rectangles in crop pixels, each checked against cropBounds. They are cut from a full-frame render that is cached until a setting other than the crop or metadata changes or an action runs (about 0.5 s from cache). Mask pixels are not settings: after a mask is painted in Capture One, pass refresh. The render shows only the default crop, Capture One's largest centred rectangle, so a candidate beyond it fails: try it with set, preview and revert instead.
 
 Crops are [centre x, centre y, width, height] in whole pixels of the oriented, rotated canvas, with y up from the bottom edge. get reports cropBounds: the four corners of the area a crop may cover after rotation and keystone (source image is exact; source maximumCrop, used when keystone, lens geometry or flip are set, keeps the image's proportions, so it is narrower than the true area for other ratios).
 
@@ -759,6 +759,7 @@ JPEGs land in ~/Library/Caches/c1/previews/<document uuid>/; c1 deletes its prev
 | `candidates[].width` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
 | `candidates[].height` | number | yes |  |  | Crop pixels: centre and size, y up; sides at least 1 px, all within ±1000000 px. |
 | `size` | integer | no | 200–3000 |  | Long edge of the side-by-side image in px (default 1500). |
+| `refresh` | boolean | no |  |  | Render the full frame again instead of reusing the cached render (default false). |
 | `timeout` | number | no | 1–600 |  | Seconds to wait for the exported JPEG (default 120). Past it the outcome is unknown and the result names where the file will land. |
 
 ### Example
@@ -817,7 +818,7 @@ Failures: `invalid-arguments`, `not-found`, `not-running`, `no-document`, `permi
 
 Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events; fillMissing exports the photos the cache lacks.
 
-Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes. Ratings may lag by up to a minute.
+Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs; after a mask is painted in Capture One, pass refresh. Ratings may lag by up to a minute.
 
 A Catalog whose output folder is unset refuses every export, so c1 sets it to its preview folder and warns.
 
@@ -835,6 +836,7 @@ A Catalog whose output folder is unset refuses every export, so c1 sets it to it
 | `perPage` | integer | no | 1–48 |  | Tiles per page (default 20). |
 | `rowHeight` | integer | no | 120–450 |  | Target row height in px (default 220). |
 | `fillMissing` | boolean | no |  |  | Export the photos the thumbnail cache lacks (default false). |
+| `refresh` | boolean | no |  |  | With fillMissing: export again instead of reusing earlier exports (default false). |
 | `timeout` | number | no | 1–600 |  | With fillMissing: seconds to wait for each export (default 120). |
 
 ### Example

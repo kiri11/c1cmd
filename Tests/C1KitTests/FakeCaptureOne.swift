@@ -115,6 +115,12 @@ final class FakeCaptureOne: CaptureOne {
                 default: break
                 }
             }
+            // Capture One re-crops when rotation changes; this one moves the crop's centre by 10 px per degree.
+            if name == "rotation", write.owner == .adjustments, let number = value.number,
+               let old = state.adjustments["rotation"]?.number, var crop = state.variant["crop"]?.arrayValue?.compactMap(\.number), crop.count == 4 {
+                crop[0] += 10 * (number - old); crop[1] += 10 * (number - old)
+                state.variant["crop"] = .array(crop.map(JSONValue.double))
+            }
             return FieldPath(write.read).set(&state, value) ? nil : "no such layer"
         case .action(let action):
             commands.append("\(action)")

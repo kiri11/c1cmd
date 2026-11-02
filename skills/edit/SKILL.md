@@ -13,7 +13,7 @@ description: Edit photos in Capture One with c1 - tone, color, curves, crop, rot
 - **One document.** Keep the one Catalog or Session open; do not ask to switch documents mid-edit.
 - **`get` before deciding.** Read the variant's current values with `c1 get` before choosing any target. The photographer may have changed it since your last read.
 - **`revert` is the undo.** `revert` restores the snapshot c1 took before its first write, by scope. `action variant.reset` applies Capture One's defaults and deletes c1's layers: it is not an undo.
-- **Hand-drawn masks are the photographer's.** For a mask c1 cannot make (brush, gradient, radial, one subject among several), do not approximate one. Show the preview, describe the region by landmarks ("the sky above the ridge, left of the tree"), and ask the photographer to draw a layer with a unique name. Once they confirm, find it by that name in `get`'s `layers` and set its adjustments.
+- **Hand-drawn masks are the photographer's.** For a mask c1 cannot make (brush, gradient, radial, one subject among several), do not approximate one. Show the preview, describe the region by landmarks ("the sky above the ridge, left of the tree"), and ask the photographer to draw a layer with a unique name. Once they confirm, find it by that name in `get`'s `layers` and set its adjustments. c1's cached renders cannot see mask pixels, so pass `refresh: true` to the next `crop_preview` or `contact_sheet` with `fillMissing`.
 
 ## Before the first edit
 

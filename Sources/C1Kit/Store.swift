@@ -29,9 +29,11 @@ public struct Snapshot: Codable, Equatable {
 
 /// `~/.c1/documents/<document UUID>/`: the write log and the snapshots.
 public struct DocumentStore {
+    public let documentUUID: String
     public let directory: URL
 
     public init(home: URL, documentUUID: String) {
+        self.documentUUID = documentUUID
         directory = home.appendingPathComponent("documents").appendingPathComponent(documentUUID)
     }
 

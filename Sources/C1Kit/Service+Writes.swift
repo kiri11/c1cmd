@@ -120,8 +120,10 @@ extension Service {
         let tags = (0..<Action.peopleAreas.count).map { _ in LayerTag.make() }
         var logged = arguments
         logged["action"] = .string(name)
-        return try perform("action", arguments: .object(logged), ids: ids, snapshot: true) { state, _ in
-            request.step(for: state, tags: tags).map { step in
+        return try perform("action", arguments: .object(logged), ids: ids, snapshot: true) { state, store in
+            // Before the write, so an unknown outcome drops them too: their cache keys cannot see mask pixels.
+            dropCachedRenders(state.id, documentUUID: store.documentUUID)
+            return request.step(for: state, tags: tags).map { step in
                 var extra: [String: JSONValue] = [:]
                 if action == .layerCreate { extra["layer"] = .string(tags[0]) }
                 return Plan(actions: [step], extra: extra)
@@ -183,6 +185,15 @@ extension Service {
                     notRestored.append("\(section.rawValue).\(name)")
                 }
             }
+        }
+        // Writing a field that moves cropBounds re-crops, so a crop equal to the snapshot's is written again after it.
+        if scope.covers(.geometry), let crop = saved.variant["crop"], crop != .null, let spec = schema.fields[.variant]?["crop"],
+           writes.contains(where: { write in
+               [.adjustments: Section.adjustments, .lensCorrection: .lensCorrection][write.owner]
+                   .map { WriteSchema.boundsFields[$0]?.contains(write.field.spec.name) == true } ?? false
+           }),
+           !writes.contains(where: { $0.owner == .variant && $0.field.spec.name == "crop" }) {
+            writes.append(FieldWrite(.variant, FieldValue(spec, crop)))
         }
         if scope.covers(.layers) {
             var used = Set<Int>()

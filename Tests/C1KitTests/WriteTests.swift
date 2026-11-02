@@ -87,6 +87,7 @@ enum WriteTests {
         revertLayers()
         revertUnsetLayerFields()
         incompleteRevertKeepsSnapshot()
+        revertRecrops()
         highlightAlias()
         timeoutIsUnknown()
         unusableLogWritesNothing()
@@ -348,6 +349,25 @@ enum WriteTests {
         let reverted = first(try! run(.revert, goneService, #"{"ids":["1"]}"#))
         checkEqual(reverted?["notRestored"], .array([.string("layer \"Gone\", which no longer exists")]))
         check((try? goneStore.snapshot(id("1"))) ?? nil != nil, "a revert that leaves something unrestored keeps the snapshot")
+    }
+
+    static func revertRecrops() {
+        var state = FakeCaptureOne.state("1")
+        state.variant["crop"] = .array([.int(3000), .int(2000), .int(1000), .int(1000)])
+        let (fake, service, store) = fixture("revert-recrop", state: state)
+        _ = try! run(.set, service, #"{"ids":["1"],"adjustments":{"rotation":2}}"#)
+        _ = try! run(.set, service, #"{"ids":["1"],"variant":{"crop":[3000,2000,1000,1000]}}"#)
+        let reverted = first(try! run(.revert, service, #"{"ids":["1"]}"#))
+        checkSame(fake.state(id("1"))?.variant["crop"], .array([.double(3000), .double(2000), .double(1000), .double(1000)]),
+                  "a crop already equal to the snapshot's is written again after rotation re-crops")
+        checkSame(reverted?["after"]?["variant"]?["crop"], .array([.double(3000), .double(2000), .double(1000), .double(1000)]), "and read back")
+        check((try? store.snapshot(id("1"))) ?? nil == nil, "so the revert is complete")
+
+        _ = try! run(.set, service, #"{"ids":["1"],"adjustments":{"rotation":2}}"#)
+        fake.substitutes = ["crop": .array([.int(3010), .int(2010), .int(1000), .int(1000)])]
+        _ = try! run(.revert, service, #"{"ids":["1"]}"#)
+        fake.substitutes = [:]
+        check((try? store.snapshot(id("1"))) ?? nil != nil, "a crop that does not read back as saved keeps the snapshot")
     }
 
     static func highlightAlias() {

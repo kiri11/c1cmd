@@ -52,10 +52,10 @@ public enum Command: String, CaseIterable {
             return ["The default is the variant's crop at a long edge of size px (1.1–2 s). fullFrame renders the default crop instead (Capture One's largest centred rectangle) and maps it: mapping {scale, left, top} turns crop pixels into render pixels as x' = (x − left) × scale, y' = (top − y) × scale, and currentCrop and cropBounds are given in render pixels. region renders a part of the cropped preview at scale × full resolution, for judging detail; the result gives the region in crop pixels. The variant is not written: c1 exports through its c1-preview recipe.",
                     Arguments.outputFolder, Arguments.previewFiles, Arguments.queue]
         case .cropPreview:
-            return ["Candidates are rectangles in crop pixels, each checked against cropBounds. They are cut from a full-frame render that is cached until a setting other than the crop or metadata changes (about 0.5 s from cache). The render shows only the default crop, Capture One's largest centred rectangle, so a candidate beyond it fails: try it with set, preview and revert instead.",
+            return ["Candidates are rectangles in crop pixels, each checked against cropBounds. They are cut from a full-frame render that is cached until a setting other than the crop or metadata changes or an action runs (about 0.5 s from cache). Mask pixels are not settings: after a mask is painted in Capture One, pass refresh. The render shows only the default crop, Capture One's largest centred rectangle, so a candidate beyond it fails: try it with set, preview and revert instead.",
                     Arguments.cropPixels, Arguments.outputFolder, Arguments.previewFiles]
         case .contactSheet:
-            return ["Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes. Ratings may lag by up to a minute.",
+            return ["Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs; after a mask is painted in Capture One, pass refresh. Ratings may lag by up to a minute.",
                     Arguments.outputFolder]
         case .thumb:
             return ["The camera's embedded JPEG, or a JPEG original itself, read from the original file in about 0.05 s. It shows no Capture One adjustments, crop or rotation: use preview to see edits."]
@@ -93,12 +93,14 @@ public enum Command: String, CaseIterable {
             return [Arguments.id,
                     Argument("candidates", .list(.object(Arguments.canvasRect), count: Preview.candidates), required: true, "Candidate crops in crop pixels, numbered 1… in the image."),
                     Argument("size", .integer(Preview.sizes), "Long edge of the side-by-side image in px (default \(Preview.defaultSize))."),
+                    Argument("refresh", .boolean, "Render the full frame again instead of reusing the cached render (default false)."),
                     Arguments.timeout]
         case .contactSheet:
             return Arguments.filters + [
                 Argument("perPage", .integer(SheetLayout.perPageRange), "Tiles per page (default 20)."),
                 Argument("rowHeight", .integer(SheetLayout.rowHeightRange), "Target row height in px (default 220)."),
                 Argument("fillMissing", .boolean, "Export the photos the thumbnail cache lacks (default false)."),
+                Argument("refresh", .boolean, "With fillMissing: export again instead of reusing earlier exports (default false)."),
                 Argument("timeout", .number(Preview.timeouts), "With fillMissing: seconds to wait for each export (default \(Int(Preview.defaultTimeout))).")]
         case .thumb:
             return [Arguments.id, Argument("maxSize", .integer(Service.thumbSizes), "Long edge cap in px (default \(Preview.defaultSize)).")]

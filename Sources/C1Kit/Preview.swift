@@ -84,10 +84,11 @@ public struct CropPreviewArguments: Decodable {
     public var id: VariantID
     public var candidates: [CanvasRect]
     public var size: Int?
+    public var refresh: Bool?
     public var timeout: Double?
 
-    public init(id: VariantID, candidates: [CanvasRect], size: Int? = nil, timeout: Double? = nil) {
-        self.id = id; self.candidates = candidates; self.size = size; self.timeout = timeout
+    public init(id: VariantID, candidates: [CanvasRect], size: Int? = nil, refresh: Bool? = nil, timeout: Double? = nil) {
+        self.id = id; self.candidates = candidates; self.size = size; self.refresh = refresh; self.timeout = timeout
     }
 }
 
@@ -262,6 +263,16 @@ extension Service {
         "\(id)-\(kind)-\(longEdge)-\(UUID().uuidString.prefix(8).lowercased())"
     }
 
+    /// Deletes `id`'s cached full-frame renders and sheet tiles. Their cache keys hash the readable settings, which
+    /// leave out mask pixels, so a mask edit would otherwise reuse a stale render.
+    func dropCachedRenders(_ id: VariantID, documentUUID: String) {
+        let folder = previewsRoot.appendingPathComponent(documentUUID)
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        where name.hasPrefix("frame-\(id)-") || name.hasPrefix("tile-\(id)-") {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
+        }
+    }
+
     // MARK: preview
 
     public func preview(_ arguments: PreviewArguments) throws -> JSONValue {
@@ -323,6 +334,10 @@ extension Service {
             guard let found = CanvasRect(state.variant["crop"]?.array?.compactMap(\.number)), found.width > 0, found.height > 0 else {
                 throw C1Failure(.scriptError, "Capture One reported no crop for variant \(id).")
             }
+            guard region.width * scale * found.width >= 1, region.height * scale * found.height >= 1 else {
+                throw C1Failure(.invalidArguments, "region covers \(region.width * scale * found.width) × \(region.height * scale * found.height) px at scale \(scale); it needs at least 1 px each way.",
+                                hint: "Widen the region or raise scale.")
+            }
             crop = found
             let longEdge = max(1, Int((scale * max(found.width, found.height)).rounded()))
             return (longEdge, Self.uniqueName(id, "render", longEdge), false)
@@ -380,7 +395,7 @@ extension Service {
                                     hint: "Preview this crop with set and preview instead, or move it inside that rectangle.")
                 }
             }
-            return (frameEdge, "frame-\(arguments.id)-\(Preview.cacheKey(state, longEdge: frameEdge))", true)
+            return (frameEdge, "frame-\(arguments.id)-\(Preview.cacheKey(state, longEdge: frameEdge))", !(arguments.refresh ?? false))
         }
         guard let area = Preview.fullFrameArea(rendered.state),
               abs(area.width / area.height - Double(rendered.image.width) / Double(rendered.image.height)) < 0.01 else {
