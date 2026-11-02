@@ -7,8 +7,9 @@ For each document kind it opens an owned document holding a copy of the RAW, the
 1. reads: doctor (the zip's version, the document, no warnings), list with and without --document, collections,
    selection, get and get with changed;
 2. writes: set tone, rating and color tag, then rotation and a crop inside cropBounds; action layer.create,
-   mask.fill and a layer's opacity; get shows each change; the first write takes a snapshot, revert restores
-   the start and drops it, and the log holds every write;
+   mask.fill and a layer's opacity; exposure on a photographer's layer, where luma.clear is refused; get shows
+   each change; the first write takes a snapshot, revert restores the start and drops it, and the log holds every
+   write;
 3. viewing: preview at 800 px, a region, the full frame, crop_preview with two candidates, contact_sheet and
    thumb each write their image, and get is unchanged by them.
 
@@ -25,7 +26,12 @@ import sys
 import tempfile
 import time
 
-from fixture import ROOT, EditingFixture
+from fixture import ROOT, EditingFixture, apple
+
+# Measured on 16.8.5.30: an untouched layer reports these as missing value, and after a revert as 0.
+UNSET_LAYER_FIELDS = {'black recovery', 'brightness', 'clarity amount', 'clarity structure', 'contrast', 'dehaze amount', 'exposure',
+                      'highlight adjustment', 'highlight recovery', 'moire amount', 'noise reduction details',
+                      'noise reduction luminance', 'saturation', 'shadow recovery', 'sharpening amount', 'white recovery'}
 
 
 def without(value, keys):
@@ -38,7 +44,13 @@ def without(value, keys):
 
 def comparable(state):
     # Capture One fills in a layer's dehaze color on its own, so a revert can't hold it fixed.
-    return without(state, {'route', 'dehaze color'})
+    state = without(state, {'route', 'dehaze color'})
+    for layer in state['layers'][1:]:
+        adjustments = layer.get('adjustments', {})
+        for name in UNSET_LAYER_FIELDS & set(adjustments):
+            if adjustments[name] == 0:
+                del adjustments[name]
+    return state
 
 
 def image_size(path):
@@ -104,6 +116,9 @@ class Smoke:
         layer = self.write('action', variant, {'action': 'layer.create', 'arguments': {'kind': 'adjustment', 'name': 'Smoke'}})['layer']
         self.write('action', variant, {'action': 'mask.fill', 'arguments': {'layer': layer}})
         self.write('set', variant, {'layers': [{'layer': layer, 'opacity': 60}]})
+        self.write('set', variant, {'layers': [{'layer': 'Photographer', 'adjustments': {'exposure': 1}}]})
+        refused = self.run('action', {'ids': [variant], 'action': 'luma.clear', 'arguments': {'layer': 'Photographer'}})['variants'][0]
+        assert refused.get('error', {}).get('code') == 'refused', refused
         edited = self.get(variant)
         assert edited['adjustments']['exposure'] == 0.5 and edited['adjustments']['contrast'] == 10, edited['adjustments']
         assert edited['adjustments']['rotation'] == 2, edited['adjustments']['rotation']
@@ -111,6 +126,8 @@ class Smoke:
         assert all(abs(a - b) <= 1 for a, b in zip(edited['variant']['crop'], crop)), (edited['variant']['crop'], crop)
         tagged = [l for l in edited['layers'] if l['name'].endswith(f'[{layer}]')]
         assert len(tagged) == 1 and tagged[0]['opacity'] == 60, edited['layers']
+        photographer = [l for l in edited['layers'] if l['name'] == 'Photographer']
+        assert photographer[0]['adjustments']['exposure'] == 1, photographer
         home = Path(self.fixture.environment['C1_HOME'])
         snapshots = f'documents/*/snapshots/{variant}.json'
         assert list(home.glob(snapshots)), 'no snapshot after the first write'
@@ -119,7 +136,7 @@ class Smoke:
         assert comparable(reverted) == comparable(start), 'revert did not restore the start'
         assert not list(home.glob(snapshots)), 'a successful revert keeps its snapshot'
         logs = list(home.glob('documents/*/log.jsonl'))
-        assert len(logs) == 1 and len(logs[0].read_text().splitlines()) == 7, logs
+        assert len(logs) == 1 and len(logs[0].read_text().splitlines()) == 8, logs
         self.report['writes'] = 'ok'
         return reverted
 
@@ -147,6 +164,9 @@ def run_kind(kind, c1, version, raw):
     smoke = Smoke(fixture, c1, version)
     try:
         variant = fixture.open()[0]['id']
+        # A photographer's layer, untouched and untagged, before c1's first write.
+        fixture.assert_current()
+        apple(f'make new layer at variant id {json.dumps(variant)} of current document with properties {{name:"Photographer", kind:adjustment}}')
         start = smoke.reads(variant)
         reverted = smoke.writes(variant, start)
         smoke.viewing(variant, reverted)

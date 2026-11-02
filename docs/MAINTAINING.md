@@ -42,7 +42,8 @@ Choose by what changed:
 
 ### Deeper live checks
 
-Each runs on its own disposable document (`C1_TEST_DOCUMENT_KIND=session|catalog`) and prints a JSON report:
+Each runs on its own disposable document (`C1_TEST_DOCUMENT_KIND=session|catalog`) holding a copy of
+`C1_TEST_RAW_FIXTURE`, keeps `C1_HOME` and `C1_CACHES` inside its folder, and prints a JSON report:
 
 | Script | Checks |
 |---|---|

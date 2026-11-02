@@ -59,7 +59,11 @@ Start a new session. The skills appear as `/c1:setup`, `/c1:edit`, `/c1:learn-st
 
 ### Upgrading from c1 v1
 
-c1 v2 replaces v1 and its MCP server. Remove v1 before you install: run `make uninstall` in its checkout, or delete `c1`, `c1-mcp` and `c1_CaptureOneCore.bundle` from where it was installed (often `/opt/homebrew/bin`). Remove any `c1-mcp` entry from your MCP client's configuration too. Claude Code adds the plugin's `c1` at the end of your PATH, so an old `c1` earlier on it would run instead.
+c1 v2 replaces v1 and its MCP server. Claude Code adds the plugin's `c1` at the end of your PATH, so an old `c1` earlier on it would run instead. Remove v1 before you install:
+
+1. Find the folder v1 was installed in: `command -v c1-mcp` prints the path of v1's MCP server there. v1 chose `/usr/local/bin`, `/opt/homebrew/bin` or `~/.local/bin`.
+2. Delete `c1`, `c1-mcp` and `c1_CaptureOneCore.bundle` from that folder. `make uninstall` in a v1 checkout does the same, but a checkout updated to v2 no longer has it.
+3. Remove any `c1-mcp` entry from your MCP client's configuration.
 
 ### Without a plugin system
 

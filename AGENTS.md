@@ -12,7 +12,7 @@ Keep each one enforced in code, with a test against the fake Capture One:
 4. **Warnings never block.** `doctor`, `set` and `action` warn about an untested Capture One build or an old Catalog
    backup.
 5. **Mask pixels are never destroyed on a layer c1 did not create.** c1 tags its layers ` [c1:<token>]`, and
-   `layer.delete` and the pixel-destructive mask actions refuse untagged layers, with no override.
+   `layer.delete`, the pixel-destructive mask actions and `luma.clear` refuse untagged layers, with no override.
 
 ## Live checks
 

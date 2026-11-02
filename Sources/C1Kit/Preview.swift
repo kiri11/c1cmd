@@ -148,6 +148,10 @@ enum Preview {
         return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// The names c1 gives its files. A Catalog's output folder may point into the previews folder, so the
+    /// photographer's own exports can land beside them; prune deletes only these.
+    static let ownName = try! Regex(#"(\d+-(full|crop|render|region|candidates)-\d+-[0-9a-f]{8}|(frame|tile)-\d+-[0-9a-f]{16}|thumb-\d+-\d+|sheet-\d+-\d+-[0-9a-f]{8})\.jpg"#)
+
     /// Deletes c1's preview files older than the retention, and folders left empty.
     static func prune(_ root: URL, now: Date) {
         let manager = FileManager.default
@@ -156,7 +160,8 @@ enum Preview {
             let files = (try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys)) ?? []
             var kept = 0
             for file in files {
-                guard let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
+                guard (try? ownName.wholeMatch(in: file.lastPathComponent)) != nil,
+                      let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
                       now.timeIntervalSince(values.contentModificationDate ?? now) > retention else { kept += 1; continue }
                 try? manager.removeItem(at: file)
             }

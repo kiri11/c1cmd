@@ -60,15 +60,14 @@ public struct DocumentStore {
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
     }
 
-    public func append(_ line: JSONValue) throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let fd = open(logURL.path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0o644)
-        guard fd >= 0 else { throw C1Failure(.internal, "Cannot open \(logURL.path): \(String(cString: strerror(errno))).") }
-        defer { close(fd) }
-        let bytes = Array((line.encoded() + "\n").utf8)
-        guard Darwin.write(fd, bytes, bytes.count) == bytes.count else {
-            throw C1Failure(.internal, "Cannot append to \(logURL.path): \(String(cString: strerror(errno))).")
+    /// Opened before Capture One is asked to write, so an unusable log stops the call before anything changes.
+    public func openLog() throws -> Log {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            throw C1Failure(.internal, "Cannot create \(directory.path): \(error.localizedDescription)")
         }
+        return try Log(logURL)
     }
 
     /// Readers never see a half-written file.
@@ -78,6 +77,27 @@ public struct DocumentStore {
             try data.write(to: url, options: .atomic)
         } catch {
             throw C1Failure(.internal, "Cannot write \(url.path): \(error.localizedDescription)")
+        }
+    }
+}
+
+/// The write log, one JSON line per call, held open for the call.
+public final class Log {
+    let url: URL
+    private let fd: Int32
+
+    init(_ url: URL) throws {
+        self.url = url
+        fd = open(url.path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { throw C1Failure(.internal, "Cannot open \(url.path): \(String(cString: strerror(errno))).") }
+    }
+
+    deinit { close(fd) }
+
+    public func append(_ line: JSONValue) throws {
+        let bytes = Array((line.encoded() + "\n").utf8)
+        guard Darwin.write(fd, bytes, bytes.count) == bytes.count else {
+            throw C1Failure(.internal, "Cannot append to \(url.path): \(String(cString: strerror(errno))).")
         }
     }
 }

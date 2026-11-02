@@ -207,7 +207,7 @@ struct AdjustmentsPatch {
                 }
                 basic = try entries(editor["basic"], .basicColor, schema: schema, place: place) { $0.string }
                 advanced = try entries(editor["advanced"], .advancedColor, schema: schema, place: place) { value in
-                    value.number.flatMap { $0 >= 0 && $0.rounded() == $0 ? Int($0) : nil }
+                    value.wholeNumber.flatMap { $0 >= 0 ? Int($0) : nil }
                 }
             default:
                 if schema.fields[.adjustments]?[name]?.kind == .curve {

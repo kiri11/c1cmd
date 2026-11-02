@@ -202,19 +202,30 @@ enum ViewingTests {
     static func pruning() {
         let fake = fake(small("1"))
         let (service, caches) = service(fake, "viewing-prune")
+        let manager = FileManager.default
+        func make(_ file: URL, age days: Double) {
+            try! manager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            manager.createFile(atPath: file.path, contents: Data("x".utf8))
+            try! manager.setAttributes([.modificationDate: Date().addingTimeInterval(-days * 86400)], ofItemAtPath: file.path)
+        }
         let folder = caches.appendingPathComponent("previews/OLD-DOC")
-        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let old = folder.appendingPathComponent("old.jpg"), recent = caches.appendingPathComponent("previews/\(Fixture.uuid)/recent.jpg")
-        try! FileManager.default.createDirectory(at: recent.deletingLastPathComponent(), withIntermediateDirectories: true)
-        for file in [old, recent] { FileManager.default.createFile(atPath: file.path, contents: Data("x".utf8)) }
-        try! FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-8 * 86400)], ofItemAtPath: old.path)
-        try! FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-6 * 86400)], ofItemAtPath: recent.path)
+        for name in ["5-full-800-89abcdef.jpg", "5-crop-800-89abcdef.jpg", "5-region-640-89abcdef.jpg", "5-candidates-800-89abcdef.jpg",
+                     "5-render-1200-89abcdef.jpg", "frame-5-0123456789abcdef.jpg", "tile-5-0123456789abcdef.jpg", "thumb-5-400.jpg",
+                     "sheet-1-9-89abcdef.jpg"] { make(folder.appendingPathComponent(name), age: 8) }
+        let current = caches.appendingPathComponent("previews/\(Fixture.uuid)")
+        let recent = current.appendingPathComponent("1-crop-1500-0123abcd.jpg")
+        let exports = ["IMG_0001.jpg", "5-crop-800-89abcdef_1.jpg"].map(current.appendingPathComponent)
+        make(recent, age: 6)
+        for file in exports { make(file, age: 8) }
         fake.outputFolderMissing = true
         let result = try? service.preview(PreviewArguments(id: id("1"), size: 300))
         check(result?["warnings"]?.arrayValue?.first?.stringValue?.contains("output folder was unset or missing") == true,
               "a result says when c1 set the Catalog's output folder: \(String(describing: result))")
-        check(!FileManager.default.fileExists(atPath: folder.path), "files older than 7 days go, with their emptied folder")
-        check(FileManager.default.fileExists(atPath: recent.path), "younger files stay")
+        check(!manager.fileExists(atPath: folder.path), "every kind of c1 file older than 7 days goes, with its emptied folder")
+        check(manager.fileExists(atPath: recent.path), "younger files stay")
+        for file in exports {
+            check(manager.fileExists(atPath: file.path), "\(file.lastPathComponent), not named by c1, stays however old: the output folder may point here")
+        }
     }
 
     static func rows(_ cells: [CGRect]) -> [[CGRect]] { Dictionary(grouping: cells, by: \.minY).sorted { $0.key < $1.key }.map(\.value) }

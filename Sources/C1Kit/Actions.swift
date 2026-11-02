@@ -23,10 +23,11 @@ public enum Action: String, CaseIterable {
     case lensReset = "lens.reset"
     case variantReset = "variant.reset"
 
-    /// `layer.delete` and the seven mask actions that overwrite pixels; `mask.copy` overwrites its destination.
+    /// The actions whose effect revert cannot undo: `layer.delete`, the seven mask actions that overwrite pixels
+    /// (`mask.copy` overwrites its destination) and `luma.clear`, because no snapshot holds the luma range.
     public var destructive: Bool {
         switch self {
-        case .layerDelete, .maskClear, .maskFill, .maskInvert, .maskRasterize, .maskFeather, .maskRefine, .maskCopy: return true
+        case .layerDelete, .maskClear, .maskFill, .maskInvert, .maskRasterize, .maskFeather, .maskRefine, .maskCopy, .lumaClear: return true
         default: return false
         }
     }
@@ -125,7 +126,7 @@ public enum Action: String, CaseIterable {
         case .styleApply:
             guard values["name"]?.string?.isEmpty == false else { throw fail("needs name, an installed style.") }
         case .colorDelete:
-            guard let color = values["color"]?.number, color >= 0, color.rounded() == color else {
+            guard let color = values["color"]?.wholeNumber, color >= 0 else {
                 throw fail("color must be the correction's position, 0 or more.")
             }
         case .dehazePick:
@@ -147,7 +148,7 @@ extension Action.Request {
         func editable(_ index: Int) -> Refusal? {
             if index == 0 { return "\(action.rawValue) cannot act on the background layer." }
             if LayerTag.of(name(index)) == nil {
-                return "\(action.rawValue) destroys mask pixels, which c1 cannot restore, so it runs only on layers c1 created; \"\(name(index))\" is the photographer's."
+                return "\(action.rawValue) changes a mask in a way revert cannot undo, so it runs only on layers c1 created; \"\(name(index))\" is the photographer's."
             }
             return nil
         }

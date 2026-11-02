@@ -46,6 +46,12 @@ public enum JSONValue: Codable, Equatable {
         }
     }
 
+    /// A whole number that Int64 holds and a Double represents exactly, or nil.
+    public var wholeNumber: Int64? {
+        guard let value = number, value.rounded() == value, abs(value) < 1e15 else { return nil }
+        return Int64(value)
+    }
+
     /// Equality that treats integers and reals as numbers and allows a small difference,
     /// because Capture One reports 32-bit floats as 64-bit reals.
     public func approximatelyEquals(_ other: JSONValue, tolerance: Double = 1e-5) -> Bool {

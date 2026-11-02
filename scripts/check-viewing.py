@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Live check of c1 preview, crop_preview, contact_sheet and thumb.
 
-Usage: C1_TEST_DOCUMENT_KIND=session|catalog scripts/check-viewing.py [--before <older c1>] [--runs 5]
+Usage: C1_TEST_RAW_FIXTURE=<RAW> C1_TEST_DOCUMENT_KIND=session|catalog scripts/check-viewing.py [--before <older c1>] [--runs 5]
 
 On an owned disposable document holding a copy of --raw, it:
 1. records what `export crop method: ignore` renders on a variant rotated 5° with a tight crop, against
@@ -65,7 +65,7 @@ class Live:
         self.calls = []
 
     def run(self, command, arguments, binary=None, ok=True):
-        env = dict(os.environ, C1_HOME=str(self.home))
+        env = dict(self.fixture.environment, C1_HOME=str(self.home))
         started = time.monotonic()
         r = subprocess.run([binary or self.c1, command, json.dumps(arguments)], env=env, capture_output=True, text=True, timeout=900)
         elapsed = time.monotonic() - started
@@ -121,12 +121,15 @@ def wait_for(path, seconds=180):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--raw', default=os.environ.get('C1_TEST_RAW_FIXTURE', os.path.expanduser('~/Desktop/papochka/TK7A7230.CR3')))
-    parser.add_argument('--more', default=os.path.expanduser('~/Desktop/papochka'), help='a folder of RAWs; 19 are copied for the contact sheet')
+    parser.add_argument('--raw', default=os.environ.get('C1_TEST_RAW_FIXTURE'))
+    parser.add_argument('--more', help="a folder of RAWs, by default the RAW's own; 19 are copied for the contact sheet")
     parser.add_argument('--c1', default=str(ROOT / '.build/debug/c1'))
     parser.add_argument('--before', help='an older c1 to time get against')
     parser.add_argument('--runs', type=int, default=5)
     args = parser.parse_args()
+    if not args.raw:
+        parser.error('set C1_TEST_RAW_FIXTURE or pass --raw')
+    args.more = args.more or str(Path(args.raw).parent)
     events = []
     fixture = EditingFixture('viewing', args.raw, args.c1, lambda kind, data: events.append(dict(event=kind, **data)))
     evidence = fixture.base / 'viewing-evidence.json'

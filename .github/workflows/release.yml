@@ -51,6 +51,8 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
+          body: |
+            Upgrading from c1 v1? Remove the old `c1`, `c1-mcp` and `c1_CaptureOneCore.bundle`, and any `c1-mcp` entry in your MCP client, before you install: see [Upgrading from c1 v1](${{ github.server_url }}/${{ github.repository }}#upgrading-from-c1-v1).
           generate_release_notes: true
           fail_on_unmatched_files: true
 

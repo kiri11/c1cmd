@@ -143,8 +143,8 @@ extension Service {
                 return .failure("The snapshot of this variant is malformed; c1 keeps it as it is.")
             }
             return .success(Self.revertPlan(from: saved, to: current, scope: scope, schema: schema))
-        } finish: { id, ok, store in
-            if ok, scope == .all { try store.deleteSnapshot(id) }
+        } finish: { id, complete, store in
+            if complete, scope == .all { try store.deleteSnapshot(id) }
         }
     }
 
@@ -206,6 +206,15 @@ extension Service {
                 for (field, value) in savedAdjustments.sorted(by: { $0.key < $1.key }) where !Self.editorKeys.contains(field) && differs(value, nowAdjustments[field]) {
                     if let spec = schema.fields[.adjustments]?[field], !WriteSchema.geometryFields.contains(field) {
                         writes.append(FieldWrite(.layerAdjustments(shifted), FieldValue(spec, value)))
+                    }
+                }
+                // A field the snapshot lacks was unset then; set since, it goes back to 0 where that is measured to match.
+                for (field, value) in nowAdjustments.sorted(by: { $0.key < $1.key })
+                where savedAdjustments[field] == nil && !Self.editorKeys.contains(field) && differs(value, .int(0)) {
+                    if WriteSchema.unsetLayerFields.contains(field), let zero = try? schema.validate(.adjustments, field, .int(0), layerAdjustments: true) {
+                        writes.append(FieldWrite(.layerAdjustments(shifted), zero))
+                    } else {
+                        notRestored.append("layers.\(shifted).adjustments.\(field)")
                     }
                 }
                 restoreEditor(layer: shifted, savedAdjustments, nowAdjustments)
@@ -272,6 +281,8 @@ extension Service {
 
     /// Reads each variant, plans its steps, saves snapshots before the first write, runs every variant
     /// in one script, then compares read-backs and logs the call. A refused variant does not stop the others.
+    /// `finish` learns per variant whether its plan completed: no step failed, every read-back matched the value
+    /// sent, and the plan left nothing unrestored.
     func perform(_ command: String, arguments: JSONValue, ids: [VariantID], snapshot: Bool,
                  plan: (VariantState, DocumentStore) throws -> Result<Plan, Refusal>,
                  finish: ((VariantID, Bool, DocumentStore) throws -> Void)? = nil) throws -> JSONValue {
@@ -279,7 +290,7 @@ extension Service {
             let read = try liveRead(ids)
             let uuid = read.database.documentUUID
             let store = DocumentStore(home: home, documentUUID: uuid)
-            let warnings = Self.warnings(read.document, read.database, now())
+            var warnings = Self.warnings(read.document, read.database, now())
             var results: [VariantID: JSONValue] = [:]
             var planned: [VariantID: (state: VariantState, plan: Plan)] = [:]
             for id in ids {
@@ -289,7 +300,7 @@ extension Service {
                     case .failure(let refusal):
                         results[id] = Self.variantError(id, "refused", refusal.message)
                     case .success(let plan) where plan.steps.isEmpty:
-                        try finish?(id, true, store)
+                        try finish?(id, plan.extra["notRestored"] == nil, store)
                         results[id] = .object(["id": .string(id.description), "outcome": .string("ok"), "before": .object([:]), "after": .object([:])]
                                               .merging(plan.extra) { $1 })
                     case .success(let plan):
@@ -302,6 +313,8 @@ extension Service {
                 }
             }
             let order = ids.filter { planned[$0] != nil }
+            let log = order.isEmpty ? nil : try store.openLog()
+            var unlogged: String?
             if snapshot {
                 for id in order where try store.snapshot(id) == nil {
                     try store.save(Snapshot(taken: now(), document: uuid, state: planned[id]!.state), for: id)
@@ -327,14 +340,14 @@ extension Service {
                     line["outcome"] = .string(definite ? "failed" : "unknown")
                     line["error"] = failure.json["error"]
                     line["variants"] = .array(order.map { .object(["id": .string($0.description), "before": before($0)]) })
-                    try store.append(.object(line))
+                    do { try log!.append(.object(line)) } catch { failure.hint = [failure.hint, "c1 could not log this call: \(error)"].compactMap { $0 }.joined(separator: " ") }
                     throw failure
                 }
                 var logged: [JSONValue] = []
                 for id in order {
                     let (state, plan) = planned[id]!
                     var entry: [String: JSONValue] = ["id": .string(id.description)]
-                    var ok = false
+                    var ok = false, complete = false
                     switch outcomes[id] ?? .failed("Capture One returned no result for this id.") {
                     case .done(let errors, let values, let layerNames):
                         ok = errors.isEmpty
@@ -346,6 +359,7 @@ extension Service {
                             return .object(["field": .string(read.path), "sent": sent, "stored": stored ?? .null])
                         }
                         if !mismatches.isEmpty { entry["warnings"] = .array(mismatches) }
+                        complete = ok && mismatches.isEmpty && plan.extra["notRestored"] == nil
                         if !errors.isEmpty {
                             entry["errors"] = .array(errors.map { error in
                                 .object(["step": .string(Self.describe(plan.steps[error.step])), "message": .string(error.message)])
@@ -364,13 +378,14 @@ extension Service {
                     }
                     logged.append(.object(entry))
                     results[id] = .object(entry.merging(plan.extra) { $1 })
-                    try finish?(id, ok, store)
+                    try finish?(id, complete, store)
                 }
                 line["outcome"] = .string(logged.allSatisfy { $0["outcome"] == .string("ok") } ? "ok" : "failed")
                 line["variants"] = .array(logged)
-                try store.append(.object(line))
+                do { try log!.append(.object(line)) } catch { unlogged = "\(error)" }
             }
             var output: [String: JSONValue] = ["variants": .array(ids.map { results[$0]! })]
+            if let unlogged { warnings.append("Capture One made the changes above, but c1 could not log them: \(unlogged)") }
             if !warnings.isEmpty { output["warnings"] = .array(warnings.map(JSONValue.string)) }
             return .object(output)
         }

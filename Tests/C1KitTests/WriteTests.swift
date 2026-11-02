@@ -82,10 +82,14 @@ enum WriteTests {
         snapshotOnFirstWrite()
         revertScopes()
         revertLayers()
+        revertUnsetLayerFields()
+        incompleteRevertKeepsSnapshot()
         timeoutIsUnknown()
+        unusableLogWritesNothing()
         documentChangeWritesNothing()
         healthWarnings()
         writeScript()
+        noStepDeletesPhotos()
     }
 
     static func fixture(_ name: String, extraSQL: String = "", now: @escaping () -> Date = Date.init,
@@ -129,6 +133,12 @@ enum WriteTests {
             _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"rotation":2},"variant":{"crop":[3000,2000,100,100]}}"#)
         }
         checkFailure(.invalidArguments, containing: "whole pixels") { _ = try run(.set, service, #"{"ids":["1"],"variant":{"crop":[1,2,3]}}"#) }
+        checkFailure(.invalidArguments, containing: "whole pixels") { _ = try run(.set, service, #"{"ids":["1"],"variant":{"crop":[1,1,1e100,10]}}"#) }
+        checkFailure(.invalidArguments, containing: "an integer") { _ = try run(.set, service, #"{"ids":["1"],"variant":{"rating":1e100}}"#) }
+        checkFailure(.invalidArguments, containing: "needs its index") {
+            _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"colorEditor":{"advanced":[{"index":1e100,"red":1}]}}}"#)
+        }
+        checkFailure(.invalidArguments, containing: "color must be") { _ = try run(.action, service, #"{"ids":["1"],"action":"color.delete","arguments":{"color":1e100}}"#) }
         checkFailure(.invalidArguments, containing: "never renames") { _ = try run(.set, service, #"{"ids":["1"],"layers":[{"layer":1,"name":"Sky"}]}"#) }
         checkFailure(.invalidArguments, containing: "at least one value") { _ = try run(.set, service, #"{"ids":["1"]}"#) }
         checkFailure(.invalidArguments, containing: "No action") { _ = try run(.action, service, #"{"ids":["1"],"action":"mask.paint"}"#) }
@@ -210,7 +220,7 @@ enum WriteTests {
         checkEqual(created?["layers"]?["after"], .array([.string("Background"), .string("Sky"), .string("Dodge [\(tag)]")]))
 
         for (action, arguments) in [("layer.delete", #"{"layer":"Sky"}"#), ("mask.clear", #"{"layer":1}"#), ("mask.feather", #"{"layer":1,"amount":5}"#),
-                                    ("mask.copy", #"{"layer":"Sky","source":"\#(tag)"}"#)] {
+                                    ("mask.copy", #"{"layer":"Sky","source":"\#(tag)"}"#), ("luma.clear", #"{"layer":"Sky"}"#)] {
             let refused = first(try! run(.action, service, #"{"ids":["1"],"action":"\#(action)","arguments":\#(arguments)}"#))
             check(refused?["error"]?["message"]?.stringValue?.contains("photographer's") == true, "\(action) is refused on an untagged layer")
         }
@@ -295,6 +305,55 @@ enum WriteTests {
         checkEqual(reverted?["outcome"], .string("ok"))
     }
 
+    static func revertUnsetLayerFields() {
+        var state = FakeCaptureOne.state("1")
+        // Capture One reports an untouched layer's exposure as missing value, so get and the snapshot omit it.
+        state.layers.append(["kind": .string("adjustment"), "name": .string("Sky"), "opacity": .int(100), "enabled": .bool(true), "adjustments": .object([:])])
+        let (fake, service, store) = fixture("revert-unset", state: state)
+        _ = try! run(.set, service, #"{"ids":["1"],"layers":[{"layer":"Sky","adjustments":{"exposure":1}}]}"#)
+        let reverted = first(try! run(.revert, service, #"{"ids":["1"]}"#))
+        checkEqual(reverted?["outcome"], .string("ok"))
+        checkSame(fake.state(id("1"))?.layers[1]["adjustments"]?["exposure"], .double(0), "a layer field unset in the snapshot goes back to 0")
+        check((try? store.snapshot(id("1"))) ?? nil == nil, "and the revert is complete")
+
+        let (other, otherService, otherStore) = fixture("revert-unset-unknown", state: state)
+        _ = try! run(.set, otherService, #"{"ids":["1"],"layers":[{"layer":"Sky","adjustments":{"temperature":6000}}]}"#)
+        let unknown = first(try! run(.revert, otherService, #"{"ids":["1"]}"#))
+        checkEqual(unknown?["notRestored"], .array([.string("layers.1.adjustments.temperature")]), "an unset field without a measured neutral is reported")
+        checkSame(other.state(id("1"))?.layers[1]["adjustments"]?["temperature"], .double(6000))
+        check((try? otherStore.snapshot(id("1"))) ?? nil != nil, "and the snapshot is kept")
+    }
+
+    static func incompleteRevertKeepsSnapshot() {
+        let (fake, service, store) = fixture("revert-mismatch")
+        _ = try! run(.set, service, #"{"ids":["1"],"adjustments":{"temperature":6000}}"#)
+        fake.clamps = ["temperature": 6000...6000]
+        let mismatched = first(try! run(.revert, service, #"{"ids":["1"]}"#))
+        checkEqual(mismatched?["warnings"]?.arrayValue?.first?["stored"], .double(6000))
+        check((try? store.snapshot(id("1"))) ?? nil != nil, "a revert whose read-back differs keeps the snapshot")
+        fake.clamps = [:]
+        _ = try! run(.revert, service, #"{"ids":["1"]}"#)
+        checkSame(fake.state(id("1"))?.adjustments["temperature"], .double(5000), "the kept snapshot lets revert run again")
+        check((try? store.snapshot(id("1"))) ?? nil == nil, "and a complete revert then drops it")
+
+        var state = FakeCaptureOne.state("1")
+        state.layers.append(["kind": .string("adjustment"), "name": .string("Gone"), "opacity": .int(100), "enabled": .bool(true), "adjustments": .object([:])])
+        let (gone, goneService, goneStore) = fixture("revert-gone", state: state)
+        _ = try! run(.set, goneService, #"{"ids":["1"],"adjustments":{"exposure":1}}"#)
+        gone.variants[.collection(cid("10"))]![id("1")]!.layers.remove(at: 1)
+        let reverted = first(try! run(.revert, goneService, #"{"ids":["1"]}"#))
+        checkEqual(reverted?["notRestored"], .array([.string("layer \"Gone\", which no longer exists")]))
+        check((try? goneStore.snapshot(id("1"))) ?? nil != nil, "a revert that leaves something unrestored keeps the snapshot")
+    }
+
+    static func unusableLogWritesNothing() {
+        let (fake, service, store) = fixture("log-unusable")
+        try! FileManager.default.createDirectory(at: store.directory.appendingPathComponent("log.jsonl"), withIntermediateDirectories: true)
+        checkFailure(.internal, containing: "log.jsonl") { _ = try run(.set, service, #"{"ids":["1"],"adjustments":{"exposure":1}}"#) }
+        check(!fake.calls.contains { if case .write = $0 { return true }; return false }, "an unusable log stops the call before Capture One writes")
+        checkSame(fake.state(id("1"))?.adjustments["exposure"], .double(0))
+    }
+
     static func timeoutIsUnknown() {
         let (fake, service, store) = fixture("timeout")
         fake.writeFailure = AppleScriptCaptureOne.failure(message: "AppleEvent timed out.", number: -1712)
@@ -354,6 +413,32 @@ enum WriteTests {
         check(script.contains("set end of errs to {2, n, e}"), "each step has its own try")
         check(script.contains("get id of v"), "a missing variant fails before any step")
         checkEqual(AppleScriptCaptureOne.number(0.1 + 0.2), "0.3", "numbers print without float noise")
+    }
+
+    /// Safety rules 1 and 2: no write script can delete or move a photo, a variant or a file. The exhaustive
+    /// switch makes a new action step fail to compile until it is added here.
+    static func noStepDeletesPhotos() {
+        func sample(_ step: ActionStep) -> ActionStep {
+            switch step {
+            case .createLayer, .deleteLayer, .layerCommand, .maskAmount, .copyMask, .peopleMask, .applyStyle,
+                 .createColor, .deleteColor, .pickDehaze, .recalculateDehaze, .resetLens, .resetVariant: return step
+            }
+        }
+        let steps: [ActionStep] = [.createLayer(kind: "adjustment", name: "x [c1:abcdef]"), .deleteLayer(1), .layerCommand("clear mask", layer: 1),
+                                   .maskAmount("feather mask", layer: 1, amount: 5), .copyMask(from: 1, to: 2),
+                                   .peopleMask(areas: ["face"], separateLayers: true, tags: ["c1:abcdef"]), .applyStyle(layer: 0, name: "Warm"),
+                                   .createColor(layer: 0), .deleteColor(layer: 0, index: 0), .pickDehaze(layer: 0, point: [1, 2]),
+                                   .recalculateDehaze(layer: 0), .resetLens, .resetVariant].map(sample)
+        let curve = schema.fields[.adjustments]!["rgb curve"]!
+        let write = VariantWrite(target: ReadTarget(id("7"), .collection(cid("14"))),
+                                 steps: steps.map(Step.action) + [.write(FieldWrite(.adjustments, FieldValue(curve, .array([.array([.int(0), .int(0)]), .array([.int(100), .int(100)])]))))],
+                                 readBack: [])
+        let script = AppleScriptCaptureOne.writeScript([write], document: LiveDocument(id: "/c", kind: .catalog, name: "c", folder: "/c", appVersion: ""), timeoutSeconds: 60)
+        let allowed = try! Regex(#"delete (layer \d+ of v|curve point 2|advanced color correction \d+ of .+)"#)
+        let deletions = script.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.contains("delete") }
+        check(!deletions.isEmpty, "the script holds the deleting steps")
+        for line in deletions { check((try? allowed.wholeMatch(in: line)) != nil, "only layers, curve points and color corrections are deleted: \(line)") }
+        for word in ["trash", "move ", "duplicate", "export", "process "] { check(!script.contains(word), "no write script uses \(word)") }
     }
 }
 

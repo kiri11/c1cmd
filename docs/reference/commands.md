@@ -539,7 +539,7 @@ Per-variant errors, beside other variants' results: `refused`, `not-found`, `rea
 
 Run a layer, mask, color, dehaze, lens or reset action on 1–100 variants.
 
-c1 tags the layers it creates with " [c1:<tag>]". layer.delete and the mask actions that overwrite pixels run only on those layers, because mask pixels cannot be restored; variant.reset is refused while the variant has a layer that is not c1's, because Capture One then deletes every layer. A layer renamed in Capture One without its tag becomes the photographer's. reset applies defaults; it is not an undo: revert is.
+c1 tags the layers it creates with " [c1:<tag>]". layer.delete, the mask actions that overwrite pixels and luma.clear run only on those layers, because revert cannot restore mask pixels or a luma range; variant.reset is refused while the variant has a layer that is not c1's, because Capture One then deletes every layer. A layer renamed in Capture One without its tag becomes the photographer's. reset applies defaults; it is not an undo: revert is.
 
 Every write reads the variant first, so a set takes about 3 s, and about 1 s more for each layer other than the background. Before c1's first write to a variant it saves the variant's full settings as a snapshot, and revert restores it; each write call is appended to a log. Both live in ~/.c1/documents/<document uuid>/. Values are absolute: give the target, not a change. c1 checks names, types and measured ranges before dispatch, then reads each field back: a stored value that differs from the one sent is a warning {field, sent, stored}, not a failure. A timeout's outcome is unknown: call get again to see the current state; c1 does not retry.
 
@@ -619,7 +619,7 @@ Per-variant errors, beside other variants' results: `refused`, `not-found`, `rea
 
 Restore variants to the snapshot c1 took before its first write; scope all, adjustments, geometry, metadata or layers.
 
-Restores the snapshot c1 took before its first write to each variant: deletes the tagged layers created since, and restores every other layer and the background. Later edits in Capture One to that variant are overwritten. A snapshot layer that no longer exists is reported as not restored. After a revert of scope all, the snapshot is deleted and the next write takes a fresh one. Scopes: adjustments (tone, color, curves, lens), geometry (rotation, keystone, orientation, flip, crop), metadata (rating, color tag), layers.
+Restores the snapshot c1 took before its first write to each variant: deletes the tagged layers created since, and restores every other layer and the background. Later edits in Capture One to that variant are overwritten. A snapshot layer that no longer exists is reported as not restored. After a complete revert of scope all, the snapshot is deleted and the next write takes a fresh one; a revert with errors, warnings or notRestored entries keeps it, so revert can run again. Scopes: adjustments (tone, color, curves, lens), geometry (rotation, keystone, orientation, flip, crop), metadata (rating, color tag), layers.
 
 Every Capture One call from every c1 process waits in one first-in, first-out queue: at most 8 callers wait, and others fail at once with busy, as does a caller that waits 10 minutes. A crashed caller's place is released automatically.
 

@@ -8,7 +8,7 @@ step past it); otherwise it searches outward by powers of ten and bisects. A sid
 recorded as unbounded.
 
 Runs on an owned disposable document (C1_TEST_DOCUMENT_KIND=session|catalog, default session) holding a
-copy of --raw. Requires Capture One 16.8.5.30 with no open document. Calls run one at a time, the fixture
+copy of --raw (default $C1_TEST_RAW_FIXTURE). Requires Capture One 16.8.5.30 with no open document. Calls run one at a time, the fixture
 closes when done, and on failure it is kept with its evidence. Never quits Capture One.
 """
 import argparse
@@ -130,12 +130,14 @@ def side(probe, owner, code, kind, origin, direction, seed):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--raw', default=os.path.expanduser('~/Desktop/papochka/TK7A7230.CR3'))
+    parser.add_argument('--raw', default=os.environ.get('C1_TEST_RAW_FIXTURE'))
     parser.add_argument('--output', type=Path, default=OUTPUT)
     parser.add_argument('--no-seeds', action='store_true', help='search every side instead of confirming the previous table')
     parser.add_argument('--only', nargs='+', metavar='SECTION.FIELD',
                         help='measure only these fields and merge them into the existing table')
     args = parser.parse_args()
+    if not args.raw:
+        parser.error('set C1_TEST_RAW_FIXTURE or pass --raw')
     seeds = {} if args.no_seeds else json.loads(SEEDS.read_text())['bounds']
     seed_sections = {'adjustments': 'adjustments', 'lensCorrection': 'lens', 'layer': 'layer'}
     events = []

@@ -102,6 +102,13 @@ public struct WriteSchema {
     ]
     /// Geometry is the background's alone; a layer's adjustments never carry it.
     static let geometryFields: Set<String> = boundsFields[.adjustments]!
+    /// Measured on 16.8.5.30: a layer reports these as missing value until they are written, so `get` and the
+    /// snapshot omit them, and writing 0 renders exactly like the untouched layer.
+    static let unsetLayerFields: Set<String> = [
+        "black recovery", "brightness", "clarity amount", "clarity structure", "contrast", "dehaze amount", "exposure",
+        "highlight adjustment", "highlight recovery", "moire amount", "noise reduction details", "noise reduction luminance",
+        "saturation", "shadow recovery", "sharpening amount", "white recovery",
+    ]
     /// `get` and `set` name curves by channel under `curves`; the sdef names them "<channel> curve".
     public static let curveChannels = ["rgb", "luma", "red", "green", "blue"]
     static func curveField(_ channel: String) -> String { "\(channel) curve" }
@@ -162,7 +169,7 @@ public struct WriteSchema {
             C1Failure(.invalidArguments, "\(label ?? "\(place).\(name)") must be \(expected), got \(value.encoded()).")
         }
         func number(_ item: JSONValue, integral: Bool) throws -> Double {
-            guard let number = item.number, number.isFinite, !integral || number.rounded() == number else {
+            guard let number = item.number, number.isFinite, !integral || item.wholeNumber != nil else {
                 throw fail(integral ? "an integer" : "a number")
             }
             if let bound = spec.bound, !bound.accepts(number) { throw fail(bound.description) }
@@ -191,14 +198,12 @@ public struct WriteSchema {
             guard case .array(let items) = value, items.count == 4 else {
                 throw fail("[centre x, centre y, width, height] in whole pixels")
             }
-            let numbers = try items.map { item -> Double in
-                guard let number = item.number, number.isFinite, number.rounded() == number else {
-                    throw fail("[centre x, centre y, width, height] in whole pixels")
-                }
+            let numbers = try items.map { item -> Int64 in
+                guard let number = item.wholeNumber else { throw fail("[centre x, centre y, width, height] in whole pixels") }
                 return number
             }
             guard numbers[2] >= 1, numbers[3] >= 1 else { throw fail("a rectangle at least 1 pixel wide and high") }
-            return FieldValue(spec, .array(numbers.map { .int(Int64($0)) }))
+            return FieldValue(spec, .array(numbers.map(JSONValue.int)))
         case .curve:
             let expected = "\(Self.curvePoints.lowerBound)–\(Self.curvePoints.upperBound) [x, y] points within 0–100, x increasing by more than \(format(Self.curveGap))"
             guard case .array(let items) = value, Self.curvePoints.contains(items.count) else { throw fail(expected) }
