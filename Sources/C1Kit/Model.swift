@@ -70,12 +70,32 @@ public struct LiveDocument: Codable, Equatable {
     }
 
     public var databasePath: String {
-        let url = URL(fileURLWithPath: folder)
-        let file = kind == .catalog ? "cocatalogdb" : "cosessiondb"
-        if url.pathExtension == file { return url.path }
-        // A Session's name carries the extension; a Catalog's does not.
-        let base = name.hasSuffix(".\(file)") ? String(name.dropLast(file.count + 1)) : name
-        return url.appendingPathComponent("\(base).\(file)").path
+        get throws {
+            let url = URL(fileURLWithPath: folder)
+            let file = kind == .catalog ? "cocatalogdb" : "cosessiondb"
+            if url.pathExtension == file { return url.path }
+            if kind == .catalog {
+                return try Self.catalogDatabasePath(in: url, name: name)
+            }
+            // A Session's name already carries the extension.
+            let base = name.hasSuffix(".\(file)") ? String(name.dropLast(file.count + 1)) : name
+            return url.appendingPathComponent("\(base).\(file)").path
+        }
+    }
+
+    /// Catalog packages and folders can keep a database whose name differs from the document's.
+    static func catalogDatabasePath(in folder: URL, name: String) throws -> String {
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey])) ?? []
+        let databases = files.filter {
+            $0.pathExtension == "cocatalogdb" && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+        guard databases.count <= 1 else {
+            throw C1Failure(.database, "Multiple Catalog databases in \(folder.path): \(databases.map(\.lastPathComponent).sorted().joined(separator: ", ")). Specify a .cocatalogdb path explicitly.")
+        }
+        if let database = databases.first { return folder.appendingPathComponent(database.lastPathComponent).path }
+        // Preserve the usual missing-file diagnostic when no database is present.
+        let base = name.hasSuffix(".cocatalogdb") ? String(name.dropLast(".cocatalogdb".count)) : name
+        return folder.appendingPathComponent("\(base).cocatalogdb").path
     }
 }
 
