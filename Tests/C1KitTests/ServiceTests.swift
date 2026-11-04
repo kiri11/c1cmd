@@ -12,15 +12,48 @@ enum ServiceTests {
         commandArguments()
         liveCallsShareTheQueue()
         databasePaths()
+        catalogDatabaseDiscovery()
     }
 
     static func databasePaths() {
-        checkEqual(LiveDocument(id: "/s/Shoot", kind: .session, name: "Shoot.cosessiondb", folder: "/s/Shoot", appVersion: "").databasePath,
+        checkEqual(try! LiveDocument(id: "/s/Shoot", kind: .session, name: "Shoot.cosessiondb", folder: "/s/Shoot", appVersion: "").databasePath,
                    "/s/Shoot/Shoot.cosessiondb", "a Session's name already carries the extension")
-        checkEqual(LiveDocument(id: "/c/Main.cocatalog", kind: .catalog, name: "Main", folder: "/c/Main.cocatalog", appVersion: "").databasePath,
+        checkEqual(try! LiveDocument(id: "/c/Main.cocatalog", kind: .catalog, name: "Main", folder: "/c/Main.cocatalog", appVersion: "").databasePath,
                    "/c/Main.cocatalog/Main.cocatalogdb")
-        checkEqual(LiveDocument(id: "/c/Main.cocatalogdb", kind: .catalog, name: "Main", folder: "/c/Main.cocatalogdb", appVersion: "").databasePath,
+        checkEqual(try! LiveDocument(id: "/c/Main.cocatalogdb", kind: .catalog, name: "Main", folder: "/c/Main.cocatalogdb", appVersion: "").databasePath,
                    "/c/Main.cocatalogdb", "an unpackaged Catalog")
+    }
+
+    static func catalogDatabaseDiscovery() {
+        let source = URL(fileURLWithPath: Fixture.make("catalog-discovery-source"))
+        for folderName in ["C1", "Renamed.cocatalog"] {
+            let folder = scratchDirectory("catalog-discovery-\(folderName)")
+            let database = folder.appendingPathComponent("Catalog2.cocatalogdb")
+            try! FileManager.default.copyItem(at: source, to: database)
+            // Backups and directories with the same extension are not database candidates.
+            try! FileManager.default.copyItem(at: source, to: folder.appendingPathComponent("Catalog2.cocatalogdb.backup"))
+            try! FileManager.default.createDirectory(at: folder.appendingPathComponent("Ignored.cocatalogdb"), withIntermediateDirectories: true)
+            let fake = FakeCaptureOne()
+            fake.liveDocument = LiveDocument(id: folder.path, kind: .catalog, name: "C1", folder: folder.path, appVersion: "16.8.5.30")
+            fake.variants = [.collection(cid("10")): [id("1"): FakeCaptureOne.state("1")]]
+            let service = Service(captureOne: fake, queue: CaptureOneQueue(directory: scratchDirectory("\(folderName)-discovery-queue")),
+                                  home: scratchDirectory("\(folderName)-discovery-home"), liveTerms: { .snapshot })
+            checkEqual(try? fake.liveDocument.databasePath, database.path, "Catalog discovery ignores the document name")
+            checkEqual(try? service.doctor()["document"]?["uuid"], .string(Fixture.uuid), "doctor opens the discovered database")
+            checkEqual(try? ids(service.list(ListQuery(limit: 1), document: nil)), ["1"])
+            checkEqual(try? ids(service.get(ids: [id("1")])), ["1"], "live reads use the discovered database")
+            checkEqual(try? ids(service.list(ListQuery(limit: 1), document: database.path)), ["1"], "explicit database paths still work")
+            if folder.pathExtension == "cocatalog" {
+                checkEqual(try? ids(service.list(ListQuery(limit: 1), document: folder.path)), ["1"], "explicit Catalog packages also discover the database")
+            }
+            let other = folder.appendingPathComponent("C1.cocatalogdb")
+            try! FileManager.default.copyItem(at: source, to: other)
+            checkFailure(.database, containing: "Multiple Catalog databases") { _ = try service.doctor() }
+            if folder.pathExtension == "cocatalog" {
+                checkFailure(.database, containing: "Multiple Catalog databases") { _ = try service.list(ListQuery(), document: folder.path) }
+            }
+            checkEqual(try? ids(service.list(ListQuery(limit: 1), document: database.path)), ["1"], "an explicit database resolves ambiguity")
+        }
     }
 
     static func liveCallsShareTheQueue() {
