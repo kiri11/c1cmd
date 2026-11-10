@@ -6,11 +6,11 @@
     {
       "name": "c1",
       "description": "Edit photos in Capture One from Claude Code or Codex: a command line and skills for setup, editing, style learning and crop policy.",
-      "version": "2.0.49",
+      "version": "2.0.50",
       "source": {
         "source": "archive",
-        "url": "https://github.com/kiri11/c1cmd/releases/download/2.0.49/c1-plugin.zip",
-        "sha256": "2defc1facd2ce735050ece488a12dc30a906e5f7f05b231dafc38572db54b393"
+        "url": "https://github.com/kiri11/c1cmd/releases/download/2.0.50/c1-plugin.zip",
+        "sha256": "d62b03e263583e86e74c56df5734eb4b0f2d7d74fa453dde2aca68dab3ad37ba"
       }
     }
   ]
