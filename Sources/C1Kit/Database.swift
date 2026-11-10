@@ -58,16 +58,19 @@ public final class Database {
     public let lastBackup: Date?
     private let sql: SQLiteConnection
     private let root: CollectionID?
+    /// Recent Imports; each import is an album under it.
+    private let recentImports: CollectionID?
 
     /// Every table and column c1 reads. The open fails, naming what is missing, when Capture One changes them.
     static let requiredSchema: [String: [String]] = [
         "ZDOCUMENTCONTENT": ["ZDOCUMENTTYPE", "ZROOTCOLLECTION", "ZDOCUMENTUUID", "ZLASTBACKUPDATE"],
+        "ZIMAGEINCOLLECTION": ["ZCOLLECTION", "ZIMAGE"],
         "ZVARIANT": ["Z_PK", "ZIMAGE", "ZDEFAULTLAYER", "ZCOMBINEDSETTINGS", "ZVARIANTUUID"],
         "ZIMAGE": ["Z_PK", "ZDISPLAYNAME", "ZIMAGEFILENAME", "ZIMAGELOCATION", "ZISINSIDECATALOG", "ZISTRASHED"],
         "ZPATHLOCATION": ["Z_PK", "ZMACROOT", "ZRELATIVEPATH", "ZISRELATIVE"],
         "ZVARIANTLAYER": ["Z_PK", "ZMETADATA"],
         "ZVARIANTMETADATA": ["Z_PK", "ZBASIC_RATING", "ZCOLOR_TAG_INDEX"],
-        "ZCOLLECTION": ["Z_PK", "Z_ENT", "ZNAME", "ZPARENT", "ZFOLDERLOCATION", "ZSMARTCRITERIA", "ZALLIMAGESCOLLECTION"],
+        "ZCOLLECTION": ["Z_PK", "Z_ENT", "ZNAME", "ZPARENT", "ZFOLDERLOCATION", "ZSMARTCRITERIA", "ZALLIMAGESCOLLECTION", "ZLASTIMPORTSCOLLECTION"],
         "ZENTITIES": ["Z_ENT", "ZNAME"],
         "ZVARIANTINCOLLECTION": ["ZCOLLECTION", "ZVARIANT"],
     ]
@@ -79,7 +82,11 @@ public final class Database {
     public init(path: String) throws {
         sql = try SQLiteConnection(readOnly: path)
         try Self.checkSchema(sql)
-        let content = try sql.rows("SELECT ZDOCUMENTTYPE AS type, ZROOTCOLLECTION AS root, ZDOCUMENTUUID AS uuid, ZLASTBACKUPDATE AS backup FROM ZDOCUMENTCONTENT")
+        let content = try sql.rows("""
+            SELECT ZDOCUMENTTYPE AS type, ZROOTCOLLECTION AS root, ZDOCUMENTUUID AS uuid, ZLASTBACKUPDATE AS backup,
+                   (SELECT ZLASTIMPORTSCOLLECTION FROM ZCOLLECTION WHERE Z_PK=ZROOTCOLLECTION) AS imports
+            FROM ZDOCUMENTCONTENT
+            """)
         guard content.count == 1, let type = content[0]["type"]?.int,
               let uuid = content[0]["uuid"]?.text, UUID(uuidString: uuid) != nil else {
             throw C1Failure(.database, "Expected one ZDOCUMENTCONTENT row with a document UUID in \(path), found \(content.count) rows.")
@@ -89,6 +96,7 @@ public final class Database {
         // Measured on 16.8.5.30: Unix seconds, unlike Core Data's other dates, which count from 2001.
         lastBackup = content[0]["backup"]?.number.map { Date(timeIntervalSince1970: $0) }
         root = content[0]["root"]?.int.map(CollectionID.init)
+        recentImports = content[0]["imports"]?.int.map(CollectionID.init)
     }
 
     static func checkSchema(_ sql: SQLiteConnection) throws {
@@ -267,12 +275,15 @@ public final class Database {
 
     /// The SQL predicate for membership in a collection. Albums use variant rows only (#44):
     /// image rows expand to every variant of the image, which is wrong for albums built with `add inside`.
+    /// An import is the exception (#73): Capture One 16.8.5.30 gives it image rows and no variant rows.
     private func membership(_ collection: CollectionID) throws -> String {
         let all = try collectionRows()
         guard let row = all.first(where: { $0.id == collection }) else {
             throw C1Failure(.invalidArguments, "No collection \(collection) in this document.")
         }
         switch row.kind {
+        case .album where row.isImport:
+            return "id IN (SELECT mv.Z_PK FROM ZIMAGEINCOLLECTION ic JOIN ZVARIANT mv ON mv.ZIMAGE=ic.ZIMAGE WHERE ic.ZCOLLECTION=\(collection))"
         case .album:
             return "EXISTS(SELECT 1 FROM ZVARIANTINCOLLECTION vc WHERE vc.ZCOLLECTION=\(collection) AND vc.ZVARIANT=id)"
         case .folder, .favorite:
@@ -304,7 +315,11 @@ public final class Database {
 
     // MARK: Collections
 
-    struct Collection { let id: CollectionID; let name: String?; let kind: CollectionRow.Kind; let parent: CollectionID? }
+    struct Collection {
+        let id: CollectionID; let name: String?; let kind: CollectionRow.Kind; let parent: CollectionID?
+        /// An album under Recent Imports, whose members are image rows.
+        let isImport: Bool
+    }
 
     private func collectionRows() throws -> [Collection] {
         let rows = try sql.rows("""
@@ -321,7 +336,8 @@ public final class Database {
             let folderName = row["location"]?.int.flatMap { paths[$0] }.map { URL(fileURLWithPath: $0).lastPathComponent }
             return Collection(id: id, name: row["name"]?.text ?? folderName,
                               kind: Self.kind(entity: row["entity"]?.text, smart: row["smart"]?.int == 1),
-                              parent: parent == root ? nil : parent)
+                              parent: parent == root ? nil : parent,
+                              isImport: parent != nil && parent == recentImports)
         }
     }
 
@@ -345,13 +361,17 @@ public final class Database {
         for row in try sql.rows("SELECT vc.ZCOLLECTION AS id, COUNT(*) AS n FROM ZVARIANTINCOLLECTION vc JOIN ZVARIANT v ON v.Z_PK=vc.ZVARIANT JOIN ZIMAGE i ON i.Z_PK=v.ZIMAGE WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
             if let id = row["id"]?.int { albumCounts[id] = Int(row["n"]?.int ?? 0) }
         }
+        var importCounts: [Int64: Int] = [:]
+        for row in try sql.rows("SELECT ic.ZCOLLECTION AS id, COUNT(*) AS n FROM ZIMAGEINCOLLECTION ic JOIN ZIMAGE i ON i.Z_PK=ic.ZIMAGE JOIN ZVARIANT v ON v.ZIMAGE=i.Z_PK WHERE COALESCE(i.ZISTRASHED,0)=0 GROUP BY 1") {
+            if let id = row["id"]?.int { importCounts[id] = Int(row["n"]?.int ?? 0) }
+        }
         let locationCounts = try variantsPerLocation()
         let total = locationCounts.values.reduce(0, +)
         let folders = try folderByLocation()
         return all.map { row in
             let count: Int?
             switch row.kind {
-            case .album: count = albumCounts[row.id.value] ?? 0
+            case .album: count = (row.isImport ? importCounts : albumCounts)[row.id.value] ?? 0
             case .folder, .favorite: count = folderLocations(under: row.id, in: all, folders: folders).reduce(0) { $0 + (locationCounts[$1] ?? 0) }
             case .allImages: count = total
             default: count = nil

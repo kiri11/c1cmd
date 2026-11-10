@@ -8,7 +8,7 @@ enum Fixture {
     static let schema = """
         CREATE TABLE ZDOCUMENTCONTENT (Z_PK INTEGER PRIMARY KEY, ZDOCUMENTTYPE INTEGER, ZROOTCOLLECTION INTEGER, ZDOCUMENTUUID VARCHAR, ZLASTBACKUPDATE TIMESTAMP);
         CREATE TABLE ZENTITIES (Z_ENT INTEGER PRIMARY KEY, ZNAME VARCHAR);
-        CREATE TABLE ZCOLLECTION (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, ZNAME VARCHAR, ZPARENT INTEGER, ZFOLDERLOCATION INTEGER, ZSMARTCRITERIA VARCHAR, ZALLIMAGESCOLLECTION INTEGER);
+        CREATE TABLE ZCOLLECTION (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, ZNAME VARCHAR, ZPARENT INTEGER, ZFOLDERLOCATION INTEGER, ZSMARTCRITERIA VARCHAR, ZALLIMAGESCOLLECTION INTEGER, ZLASTIMPORTSCOLLECTION INTEGER);
         CREATE TABLE ZPATHLOCATION (Z_PK INTEGER PRIMARY KEY, ZMACROOT VARCHAR, ZRELATIVEPATH VARCHAR, ZISRELATIVE BOOLEAN);
         CREATE TABLE ZIMAGE (Z_PK INTEGER PRIMARY KEY, ZDISPLAYNAME VARCHAR, ZIMAGEFILENAME VARCHAR, ZIMAGELOCATION INTEGER, ZISINSIDECATALOG BOOLEAN, ZISTRASHED BOOLEAN);
         CREATE TABLE ZVARIANT (Z_PK INTEGER PRIMARY KEY, ZIMAGE INTEGER, ZDEFAULTLAYER INTEGER, ZCOMBINEDSETTINGS INTEGER, ZVARIANTUUID VARCHAR);
@@ -23,7 +23,7 @@ enum Fixture {
         INSERT INTO ZDOCUMENTCONTENT VALUES (1, \(documentType), 1, '\(uuid)', NULL);
         INSERT INTO ZENTITIES VALUES (2,'AlbumCollection'),(5,'SmartCollection'),(7,'ProjectCollection'),
             (36,'CatalogFolderCollection'),(40,'CatalogAllImagesCollection'),(52,'SessionFolderCollection');
-        INSERT INTO ZCOLLECTION VALUES
+        INSERT INTO ZCOLLECTION (Z_PK, Z_ENT, ZNAME, ZPARENT, ZFOLDERLOCATION, ZSMARTCRITERIA, ZALLIMAGESCOLLECTION) VALUES
             (1,7,'root',NULL,NULL,NULL,2),
             (2,40,'All Images',1,NULL,NULL,NULL),
             (10,\(documentType == 1 ? 36 : 52),NULL,99,100,NULL,NULL),
@@ -66,6 +66,7 @@ enum DatabaseTests {
         membership(database)
         routes(database)
         collections(database)
+        recentImports()
         schemaFailure()
     }
 
@@ -137,6 +138,26 @@ enum DatabaseTests {
         checkEqual(byID["20"]?.parent, nil, "children of the root have no parent")
         checkEqual(byID["21"]?.kind, .smartAlbum); checkEqual(byID["21"]?.variantCount, nil)
         checkEqual(byID["22"]?.kind, .smartAlbum, "an album with rules is a smart album")
+    }
+
+    /// The layout Capture One 16.8.5.30 writes: an album under Recent Imports holds image rows and no variant rows (#73).
+    static func recentImports() {
+        let database = try! Database(path: Fixture.make("imports", extraSQL: """
+            INSERT INTO ZENTITIES VALUES (8,'VirtualFolderCollection');
+            UPDATE ZCOLLECTION SET ZLASTIMPORTSCOLLECTION=30 WHERE Z_PK=1;
+            INSERT INTO ZCOLLECTION (Z_PK, Z_ENT, ZNAME, ZPARENT) VALUES (30,8,'Recent Imports',1),(31,2,'November 1, 2026',30);
+            INSERT INTO ZIMAGEINCOLLECTION VALUES (10,31,1),(11,31,2),(12,31,4);
+            """))
+        let byID = Dictionary(uniqueKeysWithValues: try! database.collections().map { ($0.id.description, $0) })
+        checkEqual(byID["31"]?.kind, .album); checkEqual(byID["31"]?.parent, cid("30"))
+        checkEqual(byID["31"]?.variantCount, 3, "an import counts every variant of its images, less the trashed")
+        checkEqual(byID["20"]?.variantCount, 1, "an ordinary album still counts variant rows only (#44)")
+        checkEqual(page(database, ListQuery(collection: cid("31"))), ["1", "2", "3"], "an import lists every variant of its images")
+        checkEqual(page(database, ListQuery(collection: cid("20"))), ["2"], "an ordinary album ignores its image rows (#44)")
+        checkEqual(page(database, ListQuery(minRating: 5, collection: cid("31"))), ["1"], "filters combine with an import")
+        let first = try! database.list(ListQuery(collection: cid("31"), limit: 2))
+        checkEqual(first.rows.map(\.id.description), ["1", "2"], "import first page")
+        checkEqual(page(database, ListQuery(collection: cid("31"), after: first.next, limit: 2)), ["3"], "import second page")
     }
 
     static func schemaFailure() {
