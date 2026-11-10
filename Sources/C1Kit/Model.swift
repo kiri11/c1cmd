@@ -83,19 +83,21 @@ public struct LiveDocument: Codable, Equatable {
         }
     }
 
-    /// Catalog packages and folders can keep a database whose name differs from the document's.
+    /// The database named after the document, or else the folder's only one: a renamed Catalog keeps its old database name.
     static func catalogDatabasePath(in folder: URL, name: String) throws -> String {
+        let base = name.hasSuffix(".cocatalogdb") ? String(name.dropLast(".cocatalogdb".count)) : name
+        let named = folder.appendingPathComponent("\(base).cocatalogdb")
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: named.path, isDirectory: &isDirectory), !isDirectory.boolValue { return named.path }
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey])) ?? []
         let databases = files.filter {
             $0.pathExtension == "cocatalogdb" && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }
         guard databases.count <= 1 else {
-            throw C1Failure(.database, "Multiple Catalog databases in \(folder.path): \(databases.map(\.lastPathComponent).sorted().joined(separator: ", ")). Specify a .cocatalogdb path explicitly.")
+            throw C1Failure(.database, "Multiple Catalog databases in \(folder.path): \(databases.map(\.lastPathComponent).sorted().joined(separator: ", ")), and none is named \(named.lastPathComponent). Pass a .cocatalogdb path with --document.")
         }
-        if let database = databases.first { return folder.appendingPathComponent(database.lastPathComponent).path }
-        // Preserve the usual missing-file diagnostic when no database is present.
-        let base = name.hasSuffix(".cocatalogdb") ? String(name.dropLast(".cocatalogdb".count)) : name
-        return folder.appendingPathComponent("\(base).cocatalogdb").path
+        // With no database at all, the named path gives the usual missing-file diagnostic.
+        return databases.first.map { folder.appendingPathComponent($0.lastPathComponent).path } ?? named.path
     }
 }
 

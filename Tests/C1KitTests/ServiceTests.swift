@@ -46,13 +46,20 @@ enum ServiceTests {
             if folder.pathExtension == "cocatalog" {
                 checkEqual(try? ids(service.list(ListQuery(limit: 1), document: folder.path)), ["1"], "explicit Catalog packages also discover the database")
             }
-            let other = folder.appendingPathComponent("C1.cocatalogdb")
-            try! FileManager.default.copyItem(at: source, to: other)
+            try! FileManager.default.copyItem(at: source, to: folder.appendingPathComponent("Other.cocatalogdb"))
             checkFailure(.database, containing: "Multiple Catalog databases") { _ = try service.doctor() }
             if folder.pathExtension == "cocatalog" {
                 checkFailure(.database, containing: "Multiple Catalog databases") { _ = try service.list(ListQuery(), document: folder.path) }
             }
             checkEqual(try? ids(service.list(ListQuery(limit: 1), document: database.path)), ["1"], "an explicit database resolves ambiguity")
+            let named = folder.appendingPathComponent("C1.cocatalogdb")
+            try! FileManager.default.copyItem(at: source, to: named)
+            checkEqual(try? fake.liveDocument.databasePath, named.path, "the database named after the document wins over the others")
+            checkEqual(try? service.doctor()["document"]?["uuid"], .string(Fixture.uuid), "doctor opens the named database beside others")
+            if folder.pathExtension == "cocatalog" {
+                try! FileManager.default.copyItem(at: source, to: folder.appendingPathComponent(folder.deletingPathExtension().lastPathComponent + ".cocatalogdb"))
+                checkEqual(try? ids(service.list(ListQuery(limit: 1), document: folder.path)), ["1"], "an explicit package opens the database named after it")
+            }
         }
     }
 
