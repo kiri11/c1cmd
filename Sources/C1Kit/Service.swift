@@ -72,9 +72,10 @@ public final class Service {
             let routes: [VariantID: Route]
             let fallback: Route
             do {
-                database = try openDatabase(document.databasePath)
+                let path = try document.databasePath
+                database = try openDatabase(path)
                 guard database.kind == document.kind else {
-                    throw C1Failure(.database, "The database at \(document.databasePath) is a \(database.kind.rawValue), but Capture One reports a \(document.kind.rawValue).")
+                    throw C1Failure(.database, "The database at \(path) is a \(database.kind.rawValue), but Capture One reports a \(document.kind.rawValue).")
                 }
                 switch document.kind {
                 case .catalog:
@@ -142,7 +143,7 @@ public final class Service {
         let url = URL(fileURLWithPath: document)
         switch url.pathExtension {
         case "cocatalog":
-            return try openDatabase(url.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".cocatalogdb").path)
+            return try openDatabase(LiveDocument.catalogDatabasePath(in: url, name: url.deletingPathExtension().lastPathComponent))
         case "cocatalogdb", "cosessiondb":
             return try openDatabase(url.path)
         default:

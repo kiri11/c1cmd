@@ -70,12 +70,34 @@ public struct LiveDocument: Codable, Equatable {
     }
 
     public var databasePath: String {
-        let url = URL(fileURLWithPath: folder)
-        let file = kind == .catalog ? "cocatalogdb" : "cosessiondb"
-        if url.pathExtension == file { return url.path }
-        // A Session's name carries the extension; a Catalog's does not.
-        let base = name.hasSuffix(".\(file)") ? String(name.dropLast(file.count + 1)) : name
-        return url.appendingPathComponent("\(base).\(file)").path
+        get throws {
+            let url = URL(fileURLWithPath: folder)
+            let file = kind == .catalog ? "cocatalogdb" : "cosessiondb"
+            if url.pathExtension == file { return url.path }
+            if kind == .catalog {
+                return try Self.catalogDatabasePath(in: url, name: name)
+            }
+            // A Session's name already carries the extension.
+            let base = name.hasSuffix(".\(file)") ? String(name.dropLast(file.count + 1)) : name
+            return url.appendingPathComponent("\(base).\(file)").path
+        }
+    }
+
+    /// The database named after the document, or else the folder's only one: a renamed Catalog keeps its old database name.
+    static func catalogDatabasePath(in folder: URL, name: String) throws -> String {
+        let base = name.hasSuffix(".cocatalogdb") ? String(name.dropLast(".cocatalogdb".count)) : name
+        let named = folder.appendingPathComponent("\(base).cocatalogdb")
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: named.path, isDirectory: &isDirectory), !isDirectory.boolValue { return named.path }
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey])) ?? []
+        let databases = files.filter {
+            $0.pathExtension == "cocatalogdb" && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+        guard databases.count <= 1 else {
+            throw C1Failure(.database, "Multiple Catalog databases in \(folder.path): \(databases.map(\.lastPathComponent).sorted().joined(separator: ", ")), and none is named \(named.lastPathComponent). Pass a .cocatalogdb path with --document.")
+        }
+        // With no database at all, the named path gives the usual missing-file diagnostic.
+        return databases.first.map { folder.appendingPathComponent($0.lastPathComponent).path } ?? named.path
     }
 }
 
