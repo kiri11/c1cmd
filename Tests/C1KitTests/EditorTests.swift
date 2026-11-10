@@ -51,7 +51,7 @@ enum EditorTests {
             (#""curves":{"rgb":[[0,0],[100,101]]}"#, "within 0–100"),
             (#""curves":{"rgb":[[0,0,0],[100,100]]}"#, "[x, y] points"),
             (#""curves":{"alpha":[[0,0],[100,100]]}"#, "no channel \"alpha\""),
-            (#""rgb curve":[[0,0],[100,100]]"#, "set under curves, as curves.rgb"),
+            (#""rgb curve":[[0,0],[100,100]]"#, "adjustments.rgb curve is set under curves, as adjustments.curves.rgb."),
             (#""colorEditor":{"skin":[]}"#, "has no \"skin\""),
             (#""colorEditor":{"basic":[{"hue change":5}]}"#, "needs its name"),
             (#""colorEditor":{"basic":[{"name":"red"}]}"#, "red sets nothing"),
@@ -67,6 +67,9 @@ enum EditorTests {
         }
         checkFailure(.invalidArguments, containing: "a layer's adjustments.curves.rgb must be") {
             _ = try WriteTests.run(.set, service, #"{"ids":["1"],"layers":[{"layer":2,"adjustments":{"curves":{"rgb":[[0,0]]}}}]}"#)
+        }
+        checkFailure(.invalidArguments, containing: "a layer's adjustments.luma curve is set under curves, as a layer's adjustments.curves.luma.") {
+            _ = try WriteTests.run(.set, service, #"{"ids":["1"],"layers":[{"layer":2,"adjustments":{"luma curve":[[0,0],[100,100]]}}]}"#)
         }
         checkEqual(fake.calls, [], "invalid curves and corrections never reach Capture One")
         let gap = WriteTests.first(try! WriteTests.run(.set, service, #"{"ids":["1"],"adjustments":{"curves":{"red":[[0,0],[1.55,1],[100,100]]}}}"#))

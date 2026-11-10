@@ -211,7 +211,7 @@ struct AdjustmentsPatch {
                 }
             default:
                 if schema.fields[.adjustments]?[name]?.kind == .curve {
-                    throw fail("\(name) is set under curves, as curves.\(WriteSchema.curveChannel(name)).")
+                    throw fail("\(name) is set under curves, as \(place).curves.\(WriteSchema.curveChannel(name)).")
                 }
                 fields.append(try schema.validate(.adjustments, name, value, layerAdjustments: layer))
             }
