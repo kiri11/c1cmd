@@ -155,20 +155,22 @@ enum Preview {
     /// photographer's own exports can land beside them; prune deletes only these.
     static let ownName = try! Regex(#"(\d+-(full|crop|render|region|candidates)-\d+-[0-9a-f]{8}|(frame|tile)-\d+-[0-9a-f]{16}|thumb-\d+-\d+|sheet-\d+-\d+-[0-9a-f]{8})\.jpg"#)
 
-    /// Deletes c1's preview files older than the retention, and folders left empty.
+    /// Deletes c1's preview files older than the retention, and folders left empty. Anything else stays,
+    /// including files directly under `root`, where a photographer's output folder may point.
     static func prune(_ root: URL, now: Date) {
         let manager = FileManager.default
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
-        for folder in (try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? [] {
-            let files = (try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys)) ?? []
-            var kept = 0
+        for folder in (try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        where (try? folder.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+            guard let files = try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys) else { continue }
             for file in files {
                 guard (try? ownName.wholeMatch(in: file.lastPathComponent)) != nil,
                       let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
-                      now.timeIntervalSince(values.contentModificationDate ?? now) > retention else { kept += 1; continue }
+                      now.timeIntervalSince(values.contentModificationDate ?? now) > retention else { continue }
                 try? manager.removeItem(at: file)
             }
-            if kept == 0 { try? manager.removeItem(at: folder) }
+            // rmdir refuses a folder that is not empty, so a file written since the listing stays.
+            rmdir(folder.path)
         }
     }
 

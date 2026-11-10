@@ -234,12 +234,21 @@ enum ViewingTests {
         let exports = ["IMG_0001.jpg", "5-crop-800-89abcdef_1.jpg"].map(current.appendingPathComponent)
         make(recent, age: 6)
         for file in exports { make(file, age: 8) }
+        // An output folder pointed at previews itself puts exports here, named by Capture One.
+        let rootExports = ["IMG_0002.jpg", "5-crop-800-89abcdef.jpg"].map { caches.appendingPathComponent("previews/\($0)") }
+        for file in rootExports { make(file, age: 8) }
+        let nested = caches.appendingPathComponent("previews/OLD-SUB/Outputs/IMG_0003.jpg")
+        make(nested, age: 8)
         fake.outputFolderMissing = true
         let result = try? service.preview(PreviewArguments(id: id("1"), size: 300))
         check(result?["warnings"]?.arrayValue?.first?.stringValue?.contains("output folder was unset or missing") == true,
               "a result says when c1 set the Catalog's output folder: \(String(describing: result))")
         check(!manager.fileExists(atPath: folder.path), "every kind of c1 file older than 7 days goes, with its emptied folder")
         check(manager.fileExists(atPath: recent.path), "younger files stay")
+        for file in rootExports {
+            check(manager.fileExists(atPath: file.path), "\(file.lastPathComponent), directly in previews, stays however old or named")
+        }
+        check(manager.fileExists(atPath: nested.path), "a folder holding a subfolder keeps it and what it holds")
         for file in exports {
             check(manager.fileExists(atPath: file.path), "\(file.lastPathComponent), not named by c1, stays however old: the output folder may point here")
         }
