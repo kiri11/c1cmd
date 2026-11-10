@@ -14,6 +14,7 @@ enum ViewingTests {
         sheetLayout()
         contactSheet()
         contactSheetFillsGaps()
+        contactSheetRefreshesCachedTiles()
         thumbOfAJPEG()
         commandTable()
     }
@@ -352,6 +353,34 @@ enum ViewingTests {
         let tiles = (try? slow.contactSheet(ContactSheetArguments(perPage: 3, fillMissing: true, timeout: 1), document: slowDocument))?["tiles"]?.arrayValue ?? []
         check(tiles.count == 3 && tiles[2]["status"] == JSONValue.string("missing") && tiles[2]["fillError"]?.stringValue?.contains("may still land") == true,
               "a late export leaves its tile missing and says where it may land, without failing the sheet")
+    }
+
+    /// Capture One's thumbnail of variant 1 still shows the full frame after its crop became 3:4 (#74).
+    static func contactSheetRefreshesCachedTiles() {
+        let fake = FakeCaptureOne()
+        fake.variants = [.collection(cid("10")): [id("1"): small("1", crop: [300, 200, 300, 400])]]
+        let (service, _) = service(fake, "viewing-stale")
+        let document = scratchURL("viewing-stale").appendingPathComponent("viewing-stale.cocatalogdb").path
+        writeCot(scratchURL("viewing-stale").appendingPathComponent("Cache/Thumbnails/00000001.cot"), width: 300, height: 200, comment: "3|0;0;0|0;200;300;0|0")
+        func tile(refresh: Bool? = nil) -> JSONValue? {
+            (try? service.contactSheet(ContactSheetArguments(ids: [id("1")], fillMissing: true, refresh: refresh), document: document))?["tiles"]?.arrayValue?.first
+        }
+        let cached = tile()
+        checkEqual([cached?["status"], cached?["crop"]], [.string("shown"), .string("full-frame")], "without refresh the cached thumbnail is shown as it is")
+        checkEqual(exports(fake).count, 0, "and nothing is exported")
+
+        let fresh = tile(refresh: true)
+        checkEqual([fresh?["status"], fresh?["reused"]], [.string("exported"), .bool(false)], "refresh exports a tile the cache already has")
+        if let cell = fresh?["cell"], let w = cell["width"]?.number, let h = cell["height"]?.number {
+            check(abs(w / h - 0.75) < 0.02, "the refreshed tile shows the current 3:4 crop: \(w)×\(h)")
+        } else {
+            check(false, "the refreshed tile has a cell")
+        }
+
+        fake.variants = [:]
+        let kept = tile(refresh: true)
+        check(kept?["status"] == JSONValue.string("shown") && kept?["fillError"]?.stringValue?.contains("no variant 1") == true,
+              "a refresh that fails keeps the cached thumbnail and says why")
     }
 
     static func thumbOfAJPEG() {

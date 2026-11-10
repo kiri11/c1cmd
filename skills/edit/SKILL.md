@@ -13,7 +13,7 @@ description: Edit photos in Capture One with c1 - tone, color, curves, crop, rot
 - **One document.** Keep the one Catalog or Session open; do not ask to switch documents mid-edit.
 - **`get` before deciding.** Read the variant's current values with `c1 get` before choosing any target. The photographer may have changed it since your last read.
 - **`revert` is the undo.** `revert` restores the snapshot c1 took before its first write, by scope. `action variant.reset` applies Capture One's defaults and deletes c1's layers: it is not an undo.
-- **Hand-drawn masks are the photographer's.** For a mask c1 cannot make (brush, gradient, radial, one subject among several), do not approximate one. Show the preview, describe the region by landmarks ("the sky above the ridge, left of the tree"), and ask the photographer to draw a layer with a unique name. Once they confirm, find it by that name in `get`'s `layers` and set its adjustments. c1's cached renders cannot see mask pixels, so pass `refresh: true` to the next `crop_preview` or `contact_sheet` with `fillMissing`.
+- **Hand-drawn masks are the photographer's.** For a mask c1 cannot make (brush, gradient, radial, one subject among several), do not approximate one. Show the preview, describe the region by landmarks ("the sky above the ridge, left of the tree"), and ask the photographer to draw a layer with a unique name. Once they confirm, find it by that name in `get`'s `layers` and set its adjustments. c1's cached renders cannot see mask pixels, so pass `refresh: true` to the next `crop_preview`, or to `contact_sheet` with `fillMissing: true`.
 
 ## Before the first edit
 
@@ -41,7 +41,7 @@ Follow the crop policy. Rotate (and any keystone) first in its own `set`, then `
 
 ## Fan-out for many photos
 
-For a batch, run one subagent per photo, at most about 4 at once. Give each the photo id, the goal, the style and crop policy paths, and this skill's rules; each runs the loop on its photo only and returns its summary. c1 queues their calls to Capture One, so they never collide. When all are done, make one `c1 contact_sheet` of the batch (`ids`, and `fillMissing: true` for photos Capture One has not shown in its browser, about 2.4 s per gap), review it for consistency across the set, and fix outliers with the loop.
+For a batch, run one subagent per photo, at most about 4 at once. Give each the photo id, the goal, the style and crop policy paths, and this skill's rules; each runs the loop on its photo only and returns its summary. c1 queues their calls to Capture One, so they never collide. When all are done, make one `c1 contact_sheet` of the batch (`ids`, with `fillMissing: true` and `refresh: true`, about 2.4 s per photo: Capture One's cached thumbnails can still show the photos as they were before your edits), review it for consistency across the set, and fix outliers with the loop.
 
 ## Hand back
 

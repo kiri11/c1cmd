@@ -157,6 +157,7 @@ public struct ContactSheetArguments: Decodable {
     public var perPage, rowHeight: Int?
     /// Exports the photos the cache lacks through Capture One, and reuses those exports until a setting changes.
     public var fillMissing: Bool?
+    /// Exports every photo again: Capture One's thumbnails lag edits and crops, and c1's exports cannot see mask pixels.
     public var refresh: Bool?
     public var timeout: Double?
 
@@ -223,7 +224,7 @@ extension Service {
     }
 
     /// Tiles Capture One's cached thumbnails for one page of `list`'s scope, from SQLite and the cache only, unless
-    /// `fillMissing` exports the gaps.
+    /// `fillMissing` exports the gaps, or with `refresh` every tile.
     public func contactSheet(_ arguments: ContactSheetArguments, document: String? = nil) throws -> JSONValue {
         let layout = try SheetLayout(perPage: arguments.perPage, rowHeight: arguments.rowHeight)
         let fillMissing = arguments.fillMissing ?? false
@@ -259,12 +260,12 @@ extension Service {
         }
         var fills: [VariantID: TileFill] = [:]
         var warnings: [String] = []
-        let gaps = rows.indices.filter { if case .shown = tiles[$0] { return false }; return true }
-        if fillMissing, !gaps.isEmpty {
-            let exported = try exportTiles(gaps.map { rows[$0].id }, documentUUID: database.documentUUID,
-                                       refresh: arguments.refresh ?? false, timeout: timeout)
+        let refresh = arguments.refresh ?? false
+        let wanted = rows.indices.filter { if !refresh, case .shown = tiles[$0] { return false }; return true }
+        if fillMissing, !wanted.isEmpty {
+            let exported = try exportTiles(wanted.map { rows[$0].id }, documentUUID: database.documentUUID, refresh: refresh, timeout: timeout)
             fills = exported.fills
-            for index in gaps {
+            for index in wanted {
                 // An export already carries the variant's crop.
                 if case .exported(let image, _)? = fills[rows[index].id] { tiles[index] = .shown(image, crop: .fullFrame) }
             }
@@ -283,12 +284,13 @@ extension Service {
         for (row, (tile, cell)) in zip(rows, zip(tiles, arrangement.cells)) {
             var item: [String: JSONValue] = ["id": .string(row.id.description), "name": row.name.map(JSONValue.string) ?? .null,
                                              "rating": .int(Int64(row.rating)), "cell": Self.pixelJSON(cell)]
-            switch tile {
-            case .shown(let image, _) where fills[row.id] != nil:
+            if case .failed(let reason)? = fills[row.id] { item["fillError"] = .string(reason) }
+            switch (tile, fills[row.id]) {
+            case (.shown(let image, _), .exported(_, let reused)?):
                 canvas.draw(image, from: tile.visible, in: cell)
                 item["status"] = .string("exported")
-                if case .exported(_, let reused)? = fills[row.id] { item["reused"] = .bool(reused) }
-            case .shown(let image, let crop):
+                item["reused"] = .bool(reused)
+            case (.shown(let image, let crop), _):
                 canvas.draw(image, from: tile.visible, in: cell)
                 switch crop {
                 case .applied: item["crop"] = .string("applied")
@@ -300,12 +302,11 @@ extension Service {
                     canvas.text("UNCROPPED", in: badge, size: 10, color: Images.darkText, centered: true)
                 }
                 item["status"] = .string("shown")
-            case .missing, .unreadable:
+            case (.missing, _), (.unreadable, _):
                 let missing: Bool = { if case .missing = tile { return true }; return false }()
                 canvas.fill(cell, Images.placeholder)
                 canvas.text(missing ? "NO CACHE" : "UNREADABLE", in: cell.insetBy(dx: 4, dy: 0), size: 15, color: Images.dimText, centered: true)
                 item["status"] = .string(missing ? "missing" : "unreadable")
-                if case .failed(let reason)? = fills[row.id] { item["fillError"] = .string(reason) }
             }
             canvas.text("\(row.id) · ★\(row.rating) · \(row.name ?? "")",
                         in: CGRect(x: cell.minX, y: cell.maxY, width: cell.width, height: CGFloat(SheetLayout.labelHeight)), size: 11, color: Images.text)

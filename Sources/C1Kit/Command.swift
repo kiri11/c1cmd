@@ -55,7 +55,7 @@ public enum Command: String, CaseIterable {
             return ["Candidates are rectangles in crop pixels, each checked against cropBounds. They are cut from a full-frame render that is cached until a setting other than the crop or metadata changes or an action runs (about 0.5 s from cache). Mask pixels are not settings: after a mask is painted in Capture One, pass refresh. The render shows only the default crop, Capture One's largest centred rectangle, so a candidate beyond it fails: try it with set, preview and revert instead.",
                     Arguments.cropPixels, Arguments.outputFolder, Arguments.previewFiles]
         case .contactSheet:
-            return ["Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs; after a mask is painted in Capture One, pass refresh. Ratings may lag by up to a minute.",
+            return ["Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs. Capture One's thumbnails can lag an edit or a crop, and a reused export cannot see a mask painted in Capture One: to review recent changes pass refresh with fillMissing, which exports every tile on the page again. Ratings may lag by up to a minute.",
                     Arguments.outputFolder]
         case .thumb:
             return ["The camera's embedded JPEG, or a JPEG original itself, read from the original file in about 0.05 s. It shows no Capture One adjustments, crop or rotation: use preview to see edits."]
@@ -100,7 +100,7 @@ public enum Command: String, CaseIterable {
                 Argument("perPage", .integer(SheetLayout.perPageRange), "Tiles per page (default 20)."),
                 Argument("rowHeight", .integer(SheetLayout.rowHeightRange), "Target row height in px (default 220)."),
                 Argument("fillMissing", .boolean, "Export the photos the thumbnail cache lacks (default false)."),
-                Argument("refresh", .boolean, "With fillMissing: export again instead of reusing earlier exports (default false)."),
+                Argument("refresh", .boolean, "With fillMissing: export every tile again, including those with a cached thumbnail, instead of reusing the cache and earlier exports (default false)."),
                 Argument("timeout", .number(Preview.timeouts), "With fillMissing: seconds to wait for each export (default \(Int(Preview.defaultTimeout))).")]
         case .thumb:
             return [Arguments.id, Argument("maxSize", .integer(Service.thumbSizes), "Long edge cap in px (default \(Preview.defaultSize)).")]

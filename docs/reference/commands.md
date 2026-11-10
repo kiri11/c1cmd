@@ -818,7 +818,7 @@ Failures: `invalid-arguments`, `not-found`, `not-running`, `no-document`, `permi
 
 Tile Capture One's cached thumbnails for a page of list's scope into one JPEG, without Apple Events; fillMissing exports the photos the cache lacks.
 
-Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs; after a mask is painted in Capture One, pass refresh. Ratings may lag by up to a minute.
+Scope comes from list's filters or ids, paged by perPage. Tiles are justified rows at most 1536 px wide, labelled id · ★rating · name. Capture One builds thumbnails only for photos its browser has shown, so a sheet has gaps for the rest; fillMissing exports each gap at 1024 px, about 2.4 s per gap, and reuses an export until a setting other than rating or color tag changes or an action runs. Capture One's thumbnails can lag an edit or a crop, and a reused export cannot see a mask painted in Capture One: to review recent changes pass refresh with fillMissing, which exports every tile on the page again. Ratings may lag by up to a minute.
 
 A Catalog whose output folder is unset refuses every export, so c1 sets it to its preview folder and warns.
 
@@ -836,7 +836,7 @@ A Catalog whose output folder is unset refuses every export, so c1 sets it to it
 | `perPage` | integer | no | 1–48 |  | Tiles per page (default 20). |
 | `rowHeight` | integer | no | 120–450 |  | Target row height in px (default 220). |
 | `fillMissing` | boolean | no |  |  | Export the photos the thumbnail cache lacks (default false). |
-| `refresh` | boolean | no |  |  | With fillMissing: export again instead of reusing earlier exports (default false). |
+| `refresh` | boolean | no |  |  | With fillMissing: export every tile again, including those with a cached thumbnail, instead of reusing the cache and earlier exports (default false). |
 | `timeout` | number | no | 1–600 |  | With fillMissing: seconds to wait for each export (default 120). |
 
 ### Example
