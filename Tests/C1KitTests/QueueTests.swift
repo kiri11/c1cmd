@@ -114,7 +114,7 @@ enum QueueTests {
             group.enter()
             Thread.detachNewThread {
                 defer { group.leave() }
-                // Separate queue objects, as separate MCP requests or processes would have.
+                // Separate queue objects, as separate processes would have.
                 let queue = CaptureOneQueue(directory: directory, pollInterval: 0.002)
                 let ran: Bool? = try? queue.run {
                     lock.lock(); running += 1; maxRunning = max(maxRunning, running); lock.unlock()

@@ -53,17 +53,7 @@ Start a new session. The skills appear as `/c1:setup`, `/c1:edit`, `/c1:learn-st
 
    If `c1 --version` then says "command not found", add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` and open a new terminal.
 
-   `c1 --version` must print 2.0 or later. An older c1 may come first on your PATH: see [Upgrading from c1 v1](#upgrading-from-c1-v1).
-
 **Codex's sandbox.** `c1` has to run outside Codex's sandbox. Under `read-only` it cannot write its lock file, and under `workspace-write` it cannot see Capture One, so it reports `not-running` while Capture One is open. Start Codex with `--sandbox danger-full-access` for a c1 session (tested with Codex 0.153.4). In Codex the skills appear as `$c1:setup`, `$c1:edit`, `$c1:learn-style` and `$c1:crop-policy`.
-
-### Upgrading from c1 v1
-
-c1 v2 replaces v1 and its MCP server. Claude Code adds the plugin's `c1` at the end of your PATH, so an old `c1` earlier on it would run instead. Remove v1 before you install:
-
-1. Find the folder v1 was installed in: `command -v c1-mcp` prints the path of v1's MCP server there. v1 chose `/usr/local/bin`, `/opt/homebrew/bin` or `~/.local/bin`.
-2. Delete `c1`, `c1-mcp` and `c1_CaptureOneCore.bundle` from that folder. `make uninstall` in a v1 checkout does the same, but a checkout updated to v2 no longer has it.
-3. Remove any `c1-mcp` entry from your MCP client's configuration.
 
 ### Without a plugin system
 

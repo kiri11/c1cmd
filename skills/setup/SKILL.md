@@ -11,8 +11,7 @@ c1 edits photos in the Capture One Catalog or Session the photographer has open.
 
 Run `c1 --version`.
 
-- **Prints a version**: go on.
-- **`Unknown option '--version'`**: an old c1 (v1) comes first on PATH, and the agent would run it instead of the plugin's. `command -v c1` shows where; ask the photographer to remove it by deleting that `c1` and the `c1-mcp` and `c1_CaptureOneCore.bundle` beside it (`make uninstall` does this only in a checkout still on v1). c1 cannot be set up while it stays.
+- **Prints a version**: in Claude Code, also run `command -v c1`. Claude Code adds the plugin's `bin/` at the end of PATH, so another `c1` earlier on PATH runs instead of the plugin's. If the path is not `${CLAUDE_PLUGIN_ROOT}/bin/c1`, ask the photographer to remove that other `c1`, then check again.
 - **Missing in Claude Code**: the plugin puts its `bin/` on the shell's PATH while it is enabled. Ask the photographer to run `/plugin`, enable `c1`, and start a new session.
 - **Missing elsewhere (Codex, a plain shell)**: c1 sits in the unzipped plugin folder at `bin/c1`. Ask the photographer to link it onto their PATH, then check again:
 
